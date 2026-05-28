@@ -1,0 +1,137 @@
+{
+  "starbucks-stanleys": {
+    "hero": "/mockups/starbucks-stanleys-hero.png",
+    "front": "/mockups/starbucks-stanleys-front.png",
+    "back": "/mockups/starbucks-stanleys-back.png"
+  },
+  "shame-ie-blue": {
+    "hero": "/mockups/shame-ie-blue-hero.png",
+    "front": "/mockups/shame-ie-blue-front.png",
+    "back": "/mockups/shame-ie-blue-back.png"
+  },
+  "shame-ie-yellow": {
+    "hero": "/mockups/shame-ie-yellow-hero.png",
+    "front": "/mockups/shame-ie-yellow-front.png",
+    "back": "/mockups/shame-ie-yellow-back.png"
+  },
+  "slugger-athletics-mothers-day-buy-in": {
+    "hero": "/mockups/slugger-athletics-mothers-day-buy-in-hero.png",
+    "front": "/mockups/slugger-athletics-mothers-day-buy-in-front.png",
+    "back": "/mockups/slugger-athletics-mothers-day-buy-in-back.png"
+  },
+  "autism-awareness": {
+    "hero": "/mockups/autism-awareness-hero.png",
+    "front": "/mockups/autism-awareness-front.png",
+    "back": "/mockups/autism-awareness-back.png"
+  },
+  "sa-cosmic-invaders-hoodie": {
+    "hero": "/mockups/sa-cosmic-invaders-hoodie-hero.png",
+    "front": "/mockups/sa-cosmic-invaders-hoodie-front.png",
+    "back": "/mockups/sa-cosmic-invaders-hoodie-back.png"
+  },
+  "cosmic-invaders-jersey": {
+    "hero": "/mockups/cosmic-invaders-jersey-hero.png",
+    "front": "/mockups/cosmic-invaders-jersey-front.png",
+    "back": "/mockups/cosmic-invaders-jersey-back.png"
+  },
+  "sa-teal-black-hoodie": {
+    "hero": "/mockups/sa-teal-black-hoodie-hero.png",
+    "front": "/mockups/sa-teal-black-hoodie-front.png",
+    "back": "/mockups/sa-teal-black-hoodie-back.png"
+  },
+  "sa-black-hoodie": {
+    "hero": "/mockups/sa-black-hoodie-hero.png",
+    "front": "/mockups/sa-black-hoodie-front.png",
+    "back": "/mockups/sa-black-hoodie-back.png"
+  },
+  "sa-red-black-hoodie": {
+    "hero": "/mockups/sa-red-black-hoodie-hero.png",
+    "front": "/mockups/sa-red-black-hoodie-front.png",
+    "back": "/mockups/sa-red-black-hoodie-back.png"
+  },
+  "sa-xmas-hoodie": {
+    "hero": "/mockups/sa-xmas-hoodie-hero.png",
+    "front": "/mockups/sa-xmas-hoodie-front.png",
+    "back": "/mockups/sa-xmas-hoodie-back.png"
+  },
+  "sa-christmas-jersey-ls": {
+    "hero": "/mockups/sa-christmas-jersey-ls-hero.png",
+    "front": "/mockups/sa-christmas-jersey-ls-front.png",
+    "back": "/mockups/sa-christmas-jersey-ls-back.png"
+  },
+  "sa-christmas-jersey": {
+    "hero": "/mockups/sa-christmas-jersey-hero.png",
+    "front": "/mockups/sa-christmas-jersey-front.png",
+    "back": "/mockups/sa-christmas-jersey-back.png"
+  },
+  "vice-city": {
+    "hero": "/mockups/vice-city-hero.png",
+    "front": "/mockups/vice-city-front.png",
+    "back": "/mockups/vice-city-back.png"
+  },
+  "horror-mashup-neon-hoodie": {
+    "hero": "/mockups/horror-mashup-neon-hoodie-hero.png",
+    "front": "/mockups/horror-mashup-neon-hoodie-front.png",
+    "back": "/mockups/horror-mashup-neon-hoodie-back.png"
+  },
+  "michael-myers-hoodie": {
+    "hero": "/mockups/michael-myers-hoodie-hero.png",
+    "front": "/mockups/michael-myers-hoodie-front.png",
+    "back": "/mockups/michael-myers-hoodie-back.png"
+  },
+  "pennywise-hoodie": {
+    "hero": "/mockups/pennywise-hoodie-hero.png",
+    "front": "/mockups/pennywise-hoodie-front.png",
+    "back": "/mockups/pennywise-hoodie-back.png"
+  },
+  "freddy-hoodie": {
+    "hero": "/mockups/freddy-hoodie-hero.png",
+    "front": "/mockups/freddy-hoodie-front.png",
+    "back": "/mockups/freddy-hoodie-back.png"
+  },
+  "horror-mashup-neon": {
+    "hero": "/mockups/horror-mashup-neon-hero.png",
+    "front": "/mockups/horror-mashup-neon-front.png",
+    "back": "/mockups/horror-mashup-neon-back.png"
+  },
+  "michael-myers-jersey": {
+    "hero": "/mockups/michael-myers-jersey-hero.png",
+    "front": "/mockups/michael-myers-jersey-front.png",
+    "back": "/mockups/michael-myers-jersey-back.png"
+  },
+  "jason-vorhees-hoodie": {
+    "hero": "/mockups/jason-vorhees-hoodie-hero.png",
+    "front": "/mockups/jason-vorhees-hoodie-front.png",
+    "back": "/mockups/jason-vorhees-hoodie-back.png"
+  },
+  "jason-vorhees": {
+    "hero": "/mockups/jason-vorhees-hero.png",
+    "front": "/mockups/jason-vorhees-front.png",
+    "back": "/mockups/jason-vorhees-back.png"
+  },
+  "freddy-jersey": {
+    "hero": "/mockups/freddy-jersey-hero.png",
+    "front": "/mockups/freddy-jersey-front.png",
+    "back": "/mockups/freddy-jersey-back.png"
+  },
+  "pennywise-jersey": {
+    "hero": "/mockups/pennywise-jersey-hero.png",
+    "front": "/mockups/pennywise-jersey-front.png",
+    "back": "/mockups/pennywise-jersey-back.png"
+  },
+  "military-jersey": {
+    "hero": "/mockups/military-jersey-hero.png",
+    "front": "/mockups/military-jersey-front.png",
+    "back": "/mockups/military-jersey-back.png"
+  },
+  "90s-jersey": {
+    "hero": "/mockups/90s-jersey-hero.png",
+    "front": "/mockups/90s-jersey-front.png",
+    "back": "/mockups/90s-jersey-back.png"
+  },
+  "sunset-jersey": {
+    "hero": "/mockups/sunset-jersey-hero.png",
+    "front": "/mockups/sunset-jersey-front.png",
+    "back": "/mockups/sunset-jersey-back.png"
+  }
+}

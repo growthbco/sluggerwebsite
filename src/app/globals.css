@@ -1,26 +1,103 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Slugger Athletics brand theme — gold accent (#b8a36c) sampled from
+   sluggerathletics.com. Supports a DARK (default) and LIGHT theme via
+   [data-theme="light"] so the two directions can be compared.
+--------------------------------------------------------------------------- */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Dark theme (default) */
+  --ink: #13160b; /* page background (darkest) */
+  --steel: #1b1e13; /* card surface */
+  --steel-2: #23271a; /* deeper surface */
+  --foreground: #f5f5f2; /* primary text */
+  --muted: #a39f8f; /* secondary text */
+  --line: rgba(255, 255, 255, 0.09); /* hairline borders */
+
+  --brand-gold: #b8a36c;
+  --brand-gold-dark: #9c884f;
+  --on-brand: #13160b; /* text that sits on the gold accent (always dark) */
+
+  --background: var(--ink);
+}
+
+[data-theme="light"] {
+  --ink: #ffffff;
+  --steel: #f6f4ee;
+  --steel-2: #ece9df;
+  --foreground: #15160f;
+  --muted: #6f6e66;
+  --line: rgba(0, 0, 0, 0.1);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  --color-brand: var(--brand-gold);
+  --color-brand-dark: var(--brand-gold-dark);
+  --color-on-brand: var(--on-brand);
+  --color-ink: var(--ink);
+  --color-steel: var(--steel);
+  --color-steel-2: var(--steel-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+
+  --font-display: var(--font-display);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Register the marquee animation so Tailwind v4 emits the `animate-marquee`
+   utility AND its keyframes. (A plain .animate-marquee class collides with the
+   animate-* utility namespace and gets dropped.) */
+@theme {
+  --animate-marquee: marquee 30s linear infinite;
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
   }
 }
 
 body {
-  background: var(--background);
+  background: var(--ink);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Heavy condensed display headings, uppercase, tight tracking. */
+.display {
+  font-family: var(--font-display), Impact, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 0.92;
+}
+
+/* Angular "cut corner" used on CTAs and chips, echoing the example site. */
+.clip-slant {
+  clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+}
+
+.clip-slant-both {
+  clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+}
+
+/* Pause the trust-strip marquee on hover (animation registered in @theme above). */
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Subtle diagonal texture for section backgrounds. */
+.bg-grid {
+  background-image: linear-gradient(
+    135deg,
+    rgba(184, 163, 108, 0.06) 0 1px,
+    transparent 1px 14px
+  );
 }
