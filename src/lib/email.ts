@@ -1,7 +1,8 @@
-// Sends transactional email via Resend (https://resend.com).
-// Used for contact-form submissions and (later) team-order quotes.
+// Sends transactional email via Brevo (https://brevo.com).
+// Used for contact-form submissions, design-request confirmations, and
+// designer notifications. The higher-level helpers below stay provider-agnostic.
 
-export const emailEnabled = () => Boolean(process.env.RESEND_API_KEY);
+export const emailEnabled = () => Boolean(process.env.BREVO_API_KEY);
 
 // Where customer-facing form submissions are delivered.
 export const CONTACT_INBOX = process.env.CONTACT_TO_EMAIL || "apparel@sluggerathletics.com";
@@ -13,23 +14,40 @@ type SendArgs = {
   replyTo?: string;
 };
 
+// Parse "Name <email@x.com>" or just "email@x.com" into Brevo's sender object.
+function parseFrom(raw: string): { name?: string; email: string } {
+  const m = raw.match(/^\s*(.+?)\s*<\s*([^>]+)\s*>\s*$/);
+  if (m) return { name: m[1].trim(), email: m[2].trim() };
+  return { email: raw.trim() };
+}
+
 export async function sendEmail({ to, subject, html, replyTo }: SendArgs): Promise<boolean> {
-  const key = process.env.RESEND_API_KEY;
+  const key = process.env.BREVO_API_KEY;
   if (!key) {
-    console.warn("RESEND_API_KEY not set - skipping email send");
+    console.warn("BREVO_API_KEY not set - skipping email send");
     return false;
   }
-  // Must be a verified domain/sender in your Resend account.
-  const from = process.env.EMAIL_FROM || "Slugger Athletics <noreply@sluggerathletics.com>";
+  // Sender must be a verified sender / domain in your Brevo account.
+  const sender = parseFrom(process.env.EMAIL_FROM || "Slugger Athletics <noreply@sluggerathletics.com>");
 
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to, subject, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
+      headers: {
+        "api-key": key,
+        "Content-Type": "application/json",
+        accept: "application/json",
+      },
+      body: JSON.stringify({
+        sender,
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+        ...(replyTo ? { replyTo: { email: replyTo } } : {}),
+      }),
     });
     if (!res.ok) {
-      console.error("Resend email failed:", res.status, await res.text());
+      console.error("Brevo email failed:", res.status, await res.text());
       return false;
     }
     return true;
