@@ -9,12 +9,21 @@ type Row = { name: string; number: string; sizes: Record<string, string>; notes:
 
 const emptyRow = (): Row => ({ name: "", number: "", sizes: {}, notes: "" });
 
-export function TeamOrderForm() {
+type Prefill = {
+  designToken: string;
+  teamName: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  approvedDesignUrl: string | null;
+};
+
+export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [mode, setMode] = useState<"manual" | "link">("manual");
-  const [teamName, setTeamName] = useState("");
-  const [contactName, setContactName] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
+  const [teamName, setTeamName] = useState(prefill?.teamName ?? "");
+  const [contactName, setContactName] = useState(prefill?.contactName ?? "");
+  const [contactEmail, setContactEmail] = useState(prefill?.contactEmail ?? "");
+  const [contactPhone, setContactPhone] = useState(prefill?.contactPhone ?? "");
   const [jerseyStyle, setJerseyStyle] = useState(JERSEY_STYLES[0]);
   const [material, setMaterial] = useState(JERSEY_MATERIALS[0].key);
   const [items, setItems] = useState<string[]>(["jersey"]);
@@ -49,7 +58,7 @@ export function TeamOrderForm() {
       const res = await fetch("/api/team-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle, jerseyMaterial: material, items, roster: rows }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle, jerseyMaterial: material, items, roster: rows, designToken: prefill?.designToken }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
@@ -64,7 +73,7 @@ export function TeamOrderForm() {
       const res = await fetch("/api/team-order/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle, jerseyMaterial: material, items }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle, jerseyMaterial: material, items, designToken: prefill?.designToken }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create link");

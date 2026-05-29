@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { getByManageToken, getRoster, submitTeamOrder } from "@/lib/team-orders";
 import { postTeamOrderToDiscord } from "@/lib/discord";
+import { markOrdered } from "@/lib/design-requests";
 
 export const runtime = "nodejs";
 
@@ -43,6 +44,12 @@ export async function POST(_req: Request, { params }: { params: Promise<{ token:
         notes: r.notes ?? undefined,
       })),
     });
+    // If this team order is linked to a design request, flip the design to
+    // "ordered" so the funnel reflects the linked outcome.
+    if (order.designRequestId) {
+      try { await markOrdered(order.designRequestId); } catch (e) { console.error("markOrdered failed:", e); }
+    }
+
     return NextResponse.json({ ok: true, reference: order.reference });
   } catch (e) {
     console.error("submitTeamOrder failed:", e);

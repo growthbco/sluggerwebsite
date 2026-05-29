@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { createTeamOrder } from "@/lib/team-orders";
+import { getByStatusToken } from "@/lib/design-requests";
 
 export const runtime = "nodejs";
 
@@ -12,7 +13,7 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { teamName?: string; contactName?: string; contactEmail?: string; contactPhone?: string; jerseyStyle?: string; jerseyMaterial?: string; items?: string[] };
+  let body: { teamName?: string; contactName?: string; contactEmail?: string; contactPhone?: string; jerseyStyle?: string; jerseyMaterial?: string; items?: string[]; designToken?: string };
   try {
     body = await req.json();
   } catch {
@@ -20,6 +21,13 @@ export async function POST(req: Request) {
   }
   if (!body.teamName || !body.contactName || !body.contactEmail) {
     return NextResponse.json({ error: "Team name, your name, and email are required." }, { status: 400 });
+  }
+
+  // Resolve linked design (if any), to attach the design request id.
+  let designRequestId: string | undefined;
+  if (body.designToken) {
+    const req = await getByStatusToken(body.designToken);
+    if (req) designRequestId = req.id;
   }
 
   try {
@@ -31,6 +39,7 @@ export async function POST(req: Request) {
       jerseyStyle: body.jerseyStyle,
       jerseyMaterial: body.jerseyMaterial,
       items: body.items,
+      designRequestId,
     });
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     return NextResponse.json({

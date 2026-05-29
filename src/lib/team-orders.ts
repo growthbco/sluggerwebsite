@@ -11,6 +11,7 @@ export type NewTeamOrder = {
   jerseyStyle?: string;
   jerseyMaterial?: string;
   items?: string[];
+  designRequestId?: string;
 };
 
 export type RosterInput = {
@@ -44,6 +45,7 @@ export async function createTeamOrder(input: NewTeamOrder) {
       jerseyStyle: input.jerseyStyle,
       jerseyMaterial: input.jerseyMaterial,
       items: input.items?.length ? input.items : ["jersey"],
+      designRequestId: input.designRequestId,
       selfEntryToken,
       manageToken,
       selfEntryOpen: true,

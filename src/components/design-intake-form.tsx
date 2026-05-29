@@ -1,0 +1,202 @@
+"use client";
+
+import { useState } from "react";
+import Image from "next/image";
+import { upload } from "@vercel/blob/client";
+
+type Uploaded = { url: string; pathname: string };
+
+export function DesignIntakeForm() {
+  const [teamName, setTeamName] = useState("");
+  const [sport, setSport] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [vision, setVision] = useState("");
+  const [colors, setColors] = useState("");
+  const [images, setImages] = useState<Uploaded[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const [message, setMessage] = useState("");
+  const [statusUrl, setStatusUrl] = useState<string | null>(null);
+
+  const inputCls =
+    "w-full bg-steel border border-line px-3 py-2.5 text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none";
+
+  async function handleFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setUploading(true);
+    setMessage("");
+    try {
+      const uploaded: Uploaded[] = [];
+      for (const file of Array.from(files)) {
+        if (file.size > 15 * 1024 * 1024) {
+          throw new Error(`${file.name} is larger than 15MB.`);
+        }
+        const blob = await upload(`design-inspiration/${file.name}`, file, {
+          access: "public",
+          handleUploadUrl: "/api/design-request/upload",
+        });
+        uploaded.push({ url: blob.url, pathname: blob.pathname });
+      }
+      setImages((prev) => [...prev, ...uploaded]);
+    } catch (e) {
+      setMessage((e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function removeImage(i: number) {
+    setImages((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  async function submit() {
+    setStatus("sending");
+    setMessage("");
+    try {
+      const res = await fetch("/api/design-request/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teamName,
+          sport,
+          contactName,
+          contactEmail,
+          contactPhone,
+          vision,
+          colors,
+          inspirationImages: images.map((i) => i.url),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not submit your design request.");
+      setStatus("done");
+      setStatusUrl(data.statusUrl);
+    } catch (e) {
+      setStatus("error");
+      setMessage((e as Error).message);
+    }
+  }
+
+  if (status === "done") {
+    return (
+      <div className="bg-steel border border-line p-8 text-center">
+        <div className="mx-auto h-12 w-12 grid place-items-center clip-slant bg-brand text-on-brand display text-xl">✓</div>
+        <h2 className="display text-2xl text-foreground mt-4">Design request received!</h2>
+        <p className="mt-3 text-muted">
+          Our in-house designer will get started on your free mockup. You can track its progress here:
+        </p>
+        {statusUrl && (
+          <div className="mt-4">
+            <a href={statusUrl} className="text-brand hover:underline break-all text-sm">{statusUrl}</a>
+            <p className="text-xs text-muted mt-2">Bookmark this link - you'll use it to approve the proof.</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const canSubmit =
+    teamName && contactName && contactEmail && (vision.trim() || images.length > 0) && !uploading;
+
+  return (
+    <div className="space-y-6">
+      {/* Team + contact */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="display text-sm text-foreground">Team / Business Name *</label>
+          <input className={`mt-2 ${inputCls}`} value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="e.g. Sandstorm Softball" />
+        </div>
+        <div>
+          <label className="display text-sm text-foreground">Sport / Use</label>
+          <input className={`mt-2 ${inputCls}`} value={sport} onChange={(e) => setSport(e.target.value)} placeholder="Softball, baseball, business..." />
+        </div>
+        <div>
+          <label className="display text-sm text-foreground">Your Name *</label>
+          <input className={`mt-2 ${inputCls}`} value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Your name" />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="display text-sm text-foreground">Email *</label>
+            <input className={`mt-2 ${inputCls}`} type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="you@email.com" />
+          </div>
+          <div>
+            <label className="display text-sm text-foreground">Phone</label>
+            <input className={`mt-2 ${inputCls}`} type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(000) 000-0000" />
+          </div>
+        </div>
+      </div>
+
+      {/* Brief */}
+      <div>
+        <label className="display text-sm text-foreground">Describe your vision</label>
+        <textarea
+          className={`mt-2 ${inputCls} min-h-32 resize-y`}
+          value={vision}
+          onChange={(e) => setVision(e.target.value)}
+          placeholder="What look are you going for? Theme, mood, references (e.g. 'Vice City vibe, palm trees, neon pink/teal')..."
+        />
+      </div>
+
+      <div>
+        <label className="display text-sm text-foreground">Colors</label>
+        <input className={`mt-2 ${inputCls}`} value={colors} onChange={(e) => setColors(e.target.value)} placeholder="Team colors, hex codes, or 'we want pink and black'..." />
+      </div>
+
+      {/* Inspiration uploads */}
+      <div>
+        <label className="display text-sm text-foreground">Inspiration images (optional)</label>
+        <p className="text-sm text-muted mt-1">Upload anything that inspires the look - other jerseys, logos, color palettes. JPG/PNG/WEBP/PDF up to 15MB each.</p>
+        <label className="mt-3 block cursor-pointer border-2 border-dashed border-line hover:border-brand/50 transition-colors p-6 text-center bg-steel">
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            multiple
+            className="hidden"
+            onChange={(e) => handleFiles(e.target.files)}
+          />
+          <span className="display text-foreground">{uploading ? "Uploading..." : "Click or drop files here"}</span>
+          <p className="text-sm text-muted mt-1">{uploading ? "Hang tight..." : "You can add multiple"}</p>
+        </label>
+        {images.length > 0 && (
+          <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2">
+            {images.map((img, i) => (
+              <div key={img.url} className="relative aspect-square bg-steel border border-line group overflow-hidden">
+                {/\.(png|jpe?g|webp|gif)$/i.test(img.url) ? (
+                  <Image src={img.url} alt="Inspiration" fill sizes="20vw" className="object-cover" unoptimized />
+                ) : (
+                  <div className="absolute inset-0 grid place-items-center text-xs text-muted p-2 text-center break-all">
+                    {img.pathname.split("/").pop()}
+                  </div>
+                )}
+                <button
+                  onClick={() => removeImage(i)}
+                  className="absolute top-1 right-1 grid place-items-center h-6 w-6 bg-ink/80 text-foreground hover:bg-brand hover:text-on-brand text-xs"
+                  aria-label="Remove image"
+                  type="button"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {status === "error" && <p className="text-sm text-brand">{message}</p>}
+      {message && status !== "error" && <p className="text-sm text-brand">{message}</p>}
+
+      <button
+        onClick={submit}
+        disabled={!canSubmit || status === "sending"}
+        className="w-full clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg py-3.5 transition-colors disabled:opacity-60"
+      >
+        {status === "sending" ? "Submitting..." : "Send My Design Request"}
+      </button>
+      <p className="text-xs text-muted text-center">
+        Free design proofs. No commitment - approve when you love it.
+      </p>
+    </div>
+  );
+}

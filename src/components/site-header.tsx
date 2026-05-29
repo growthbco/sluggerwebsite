@@ -6,6 +6,7 @@ const nav = [
   { href: "/", label: "Home" },
   { href: "/shop", label: "Shop" },
   { href: "/team-uniforms", label: "Team Uniforms" },
+  { href: "/design", label: "Start a Design" },
   { href: "/drops", label: "Buy-Ins" },
   { href: "/embroidery", label: "Embroidery" },
   { href: "/gallery", label: "Gallery" },

@@ -59,6 +59,17 @@ export const teamOrderStatus = pgEnum("team_order_status", [
   "cancelled",
 ]);
 
+// Design intake → proof → approval funnel; precedes the team order.
+export const designRequestStatus = pgEnum("design_request_status", [
+  "submitted", // client filled the intake form
+  "in_design", // designer is working on it
+  "proof_sent", // designer uploaded a proof for client review
+  "changes_requested", // client asked for revisions; back to designer
+  "approved", // client approved the proof
+  "ordered", // a team order was created against this design
+  "cancelled",
+]);
+
 /* ------------------------------------------------------------------ */
 /* Catalog                                                             */
 /* ------------------------------------------------------------------ */
@@ -331,6 +342,9 @@ export const teamOrders = pgTable(
     manageToken: text("manage_token"),
     selfEntryOpen: boolean("self_entry_open").notNull().default(false),
 
+    // Optional link back to the design request this team order fulfills.
+    designRequestId: uuid("design_request_id"),
+
     quotedTotalCents: integer("quoted_total_cents"),
 
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
@@ -342,6 +356,7 @@ export const teamOrders = pgTable(
     uniqueIndex("team_orders_self_entry_token_idx").on(t.selfEntryToken),
     uniqueIndex("team_orders_manage_token_idx").on(t.manageToken),
     index("team_orders_status_idx").on(t.status),
+    index("team_orders_design_request_idx").on(t.designRequestId),
   ],
 );
 
@@ -367,6 +382,55 @@ export const teamOrderRoster = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("team_order_roster_order_idx").on(t.teamOrderId)],
+);
+
+/* ------------------------------------------------------------------ */
+/* Design Requests (intake → proof → approval)                         */
+/* ------------------------------------------------------------------ */
+
+export const designRequests = pgTable(
+  "design_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    reference: text("reference").notNull(),
+    status: designRequestStatus("status").notNull().default("submitted"),
+
+    // Requester / team
+    teamName: text("team_name").notNull(),
+    sport: text("sport"),
+    contactName: text("contact_name").notNull(),
+    contactEmail: text("contact_email").notNull(),
+    contactPhone: text("contact_phone"),
+
+    // The brief
+    vision: text("vision"), // free-form description of desired look
+    colors: text("colors"),
+    notes: text("notes"),
+
+    // Inspiration uploaded by the client (Vercel Blob URLs).
+    inspirationImages: jsonb("inspiration_images").$type<string[]>().default([]),
+    // Proof/mockup images uploaded by the designer.
+    proofImages: jsonb("proof_images").$type<string[]>().default([]),
+    // The single approved proof URL (selected on approval) — attached to the team order.
+    approvedDesignUrl: text("approved_design_url"),
+
+    // Tokens powering the public client + private staff links.
+    statusToken: text("status_token"),
+    manageToken: text("manage_token"),
+
+    // Timestamps
+    proofSentAt: timestamp("proof_sent_at", { withTimezone: true }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    orderedAt: timestamp("ordered_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("design_requests_reference_idx").on(t.reference),
+    uniqueIndex("design_requests_status_token_idx").on(t.statusToken),
+    uniqueIndex("design_requests_manage_token_idx").on(t.manageToken),
+    index("design_requests_status_idx").on(t.status),
+  ],
 );
 
 /* ------------------------------------------------------------------ */

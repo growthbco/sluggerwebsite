@@ -54,16 +54,16 @@ export default function Home() {
             </p>
             <div className="mt-9 flex flex-wrap gap-4">
               <Link
-                href="/shop"
+                href="/design"
                 className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors"
               >
-                Shop Now
+                Start a Design
               </Link>
               <Link
-                href="/team-order"
+                href="/shop"
                 className="clip-slant border border-line text-foreground hover:bg-foreground/5 display text-lg px-8 py-4 transition-colors"
               >
-                Start a Team Order
+                Shop Drops
               </Link>
             </div>
           </div>

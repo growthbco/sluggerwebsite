@@ -1,0 +1,44 @@
+import type { Metadata } from "next";
+import { DesignIntakeForm } from "@/components/design-intake-form";
+
+export const metadata: Metadata = {
+  title: "Start a Design - Custom Jersey & Uniform Design",
+  description:
+    "Start your custom design with Slugger Athletics. Upload inspiration, describe your look, and our in-house designer creates a free mockup for you to approve. No commitment.",
+  alternates: { canonical: "/design" },
+};
+
+export default function DesignPage() {
+  return (
+    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14">
+      <header className="max-w-2xl">
+        <span className="display text-brand text-sm">Free Design - No Obligation</span>
+        <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">Start Your Design</h1>
+        <p className="mt-3 text-muted">
+          Tell us what you want. Drop in inspiration images or describe your
+          vision - our in-house designer will work up a free mockup, send it
+          back, and you approve when you love it. Then your team places the
+          order in a couple of clicks.
+        </p>
+      </header>
+
+      <ol className="mt-8 grid sm:grid-cols-3 gap-3">
+        {[
+          { n: 1, t: "Describe & upload", d: "Share your vision and any inspiration images." },
+          { n: 2, t: "We mock it up", d: "Our designer sends you a free proof to review." },
+          { n: 3, t: "Approve & order", d: "Approve the design, then your team places the order." },
+        ].map((s) => (
+          <li key={s.n} className="bg-steel border border-line p-4">
+            <div className="h-8 w-8 grid place-items-center clip-slant bg-brand text-on-brand display text-sm">{s.n}</div>
+            <h3 className="display text-foreground mt-3 text-sm">{s.t}</h3>
+            <p className="text-sm text-muted mt-1">{s.d}</p>
+          </li>
+        ))}
+      </ol>
+
+      <div className="mt-10">
+        <DesignIntakeForm />
+      </div>
+    </div>
+  );
+}

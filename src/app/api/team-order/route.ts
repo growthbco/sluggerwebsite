@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { postTeamOrderToDiscord } from "@/lib/discord";
+import { dbEnabled } from "@/db";
+import { getByStatusToken, markOrdered } from "@/lib/design-requests";
 
 export const runtime = "nodejs";
 
@@ -15,6 +17,7 @@ export async function POST(req: Request) {
     jerseyMaterial?: string;
     items?: string[];
     roster?: RosterRow[];
+    designToken?: string;
   };
   try {
     body = await req.json();
@@ -51,6 +54,17 @@ export async function POST(req: Request) {
       notes: r.notes,
     })),
   });
+
+  // If this manual order came from an approved design, flip the design to
+  // "ordered" so the funnel reflects the linked outcome.
+  if (body.designToken && dbEnabled()) {
+    try {
+      const req = await getByStatusToken(body.designToken);
+      if (req) await markOrdered(req.id);
+    } catch (e) {
+      console.error("markOrdered failed:", e);
+    }
+  }
 
   // The order is captured for the team even if Discord isn't configured yet.
   return NextResponse.json({ ok: true, reference, notified: posted });

@@ -43,6 +43,79 @@ function esc(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/** Email the designer that a new design request came in. */
+export async function emailDesignRequestToDesigner(req: {
+  reference: string;
+  teamName: string;
+  sport?: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone?: string;
+  vision?: string;
+  colors?: string;
+  inspirationImages?: string[];
+  manageUrl?: string;
+}): Promise<boolean> {
+  const imgs = (req.inspirationImages ?? [])
+    .map((u, i) => `<li><a href="${esc(u)}">Inspiration ${i + 1}</a></li>`)
+    .join("");
+  const html = `
+    <h2>New design request - ${esc(req.reference)}</h2>
+    <p><strong>Team:</strong> ${esc(req.teamName)} ${req.sport ? `(${esc(req.sport)})` : ""}</p>
+    <p><strong>Contact:</strong> ${esc(req.contactName)} - ${esc(req.contactEmail)}${req.contactPhone ? ` - ${esc(req.contactPhone)}` : ""}</p>
+    ${req.colors ? `<p><strong>Colors:</strong> ${esc(req.colors)}</p>` : ""}
+    ${req.vision ? `<p><strong>Vision:</strong><br>${esc(req.vision).replace(/\n/g, "<br>")}</p>` : ""}
+    ${imgs ? `<p><strong>Inspiration:</strong></p><ul>${imgs}</ul>` : ""}
+    ${req.manageUrl ? `<p><a href="${esc(req.manageUrl)}">Open in manage view to upload a proof →</a></p>` : ""}
+  `;
+  return sendEmail({
+    to: CONTACT_INBOX,
+    subject: `New design request: ${req.teamName} - ${req.reference}`,
+    html,
+    replyTo: req.contactEmail,
+  });
+}
+
+/** Email the client a confirmation with their status link. */
+export async function emailDesignRequestConfirmation(args: {
+  to: string;
+  teamName: string;
+  reference: string;
+  statusUrl: string;
+}): Promise<boolean> {
+  const html = `
+    <h2>We got your design request, ${esc(args.teamName)}!</h2>
+    <p>Reference: <strong>${esc(args.reference)}</strong></p>
+    <p>Our in-house designer will start work on a free mockup. You'll get a notification when the proof is ready to review.</p>
+    <p>Track your design request: <a href="${esc(args.statusUrl)}">${esc(args.statusUrl)}</a></p>
+    <p>- The Slugger Athletics team</p>
+  `;
+  return sendEmail({
+    to: args.to,
+    subject: `Your Slugger Athletics design request (${args.reference})`,
+    html,
+  });
+}
+
+/** Email the client that a proof is ready to review. */
+export async function emailProofReady(args: {
+  to: string;
+  teamName: string;
+  reference: string;
+  statusUrl: string;
+}): Promise<boolean> {
+  const html = `
+    <h2>Your proof is ready, ${esc(args.teamName)}!</h2>
+    <p>Reference: <strong>${esc(args.reference)}</strong></p>
+    <p>Review and approve (or request changes) here: <a href="${esc(args.statusUrl)}">${esc(args.statusUrl)}</a></p>
+  `;
+  return sendEmail({
+    to: args.to,
+    subject: `Your Slugger Athletics proof is ready (${args.reference})`,
+    html,
+  });
+}
+
 /** Email the business a contact-form submission. */
 export async function emailContactSubmission(msg: {
   name: string;

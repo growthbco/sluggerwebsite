@@ -147,6 +147,72 @@ export async function postTeamOrderToDiscord(order: TeamOrderPayload): Promise<b
   return send(url, body);
 }
 
+type DesignRequestPayload = {
+  reference: string;
+  teamName: string;
+  sport?: string;
+  contactName: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  vision?: string;
+  colors?: string;
+  inspirationImages?: string[];
+  manageUrl?: string;
+};
+
+/** Post a new design intake to the #design-requests channel.
+ *  Includes contact + inspiration image links so the designer can start work.
+ *  Each request gets its own thread (when the channel is a Forum) for the
+ *  mockup -> approval back-and-forth. */
+export async function postDesignRequestToDiscord(req: DesignRequestPayload): Promise<boolean> {
+  const url = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
+  if (!url) {
+    console.warn("DISCORD_DESIGN_REQUESTS_WEBHOOK_URL not set - skipping design Discord post");
+    return false;
+  }
+
+  const fields = [
+    { name: "Request", value: `\`${req.reference}\``, inline: true },
+    { name: "Team", value: req.teamName || "-", inline: true },
+    { name: "Sport", value: req.sport || "-", inline: true },
+    {
+      name: "Contact",
+      value: [req.contactName, req.contactEmail, req.contactPhone].filter(Boolean).join(" · ") || "-",
+      inline: false,
+    },
+  ];
+  if (req.colors) fields.push({ name: "Colors", value: req.colors.slice(0, 200), inline: false });
+  if (req.vision) fields.push({ name: "Vision", value: req.vision.slice(0, 1024), inline: false });
+  if (req.inspirationImages?.length) {
+    fields.push({
+      name: "Inspiration",
+      value: req.inspirationImages.map((u, i) => `[Image ${i + 1}](${u})`).join(" · ").slice(0, 1024),
+      inline: false,
+    });
+  }
+  if (req.manageUrl) fields.push({ name: "Manage", value: req.manageUrl, inline: false });
+
+  const body: Record<string, unknown> = {
+    username: "Slugger Design Requests",
+    embeds: [
+      {
+        title: `🎨 ${req.teamName}`,
+        color: GOLD,
+        fields,
+        // First inspiration image as the embed image so it's visible at a glance.
+        ...(req.inspirationImages?.[0] ? { image: { url: req.inspirationImages[0] } } : {}),
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  };
+
+  if (process.env.DISCORD_DESIGN_REQUESTS_FORUM === "true") {
+    body.thread_name = `${req.teamName} (${req.reference})`.slice(0, 100);
+  }
+
+  return send(url, body);
+}
+
 type ContactPayload = {
   name: string;
   email: string;
