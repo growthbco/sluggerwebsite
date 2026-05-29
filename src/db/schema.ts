@@ -407,6 +407,11 @@ export const designRequests = pgTable(
     colors: text("colors"),
     notes: text("notes"),
 
+    // When the customer needs the uniforms in hand. Anything < 14 days triggers
+    // the rush flag and surfaces a $5/item rush fee to both customer + team.
+    neededBy: timestamp("needed_by", { withTimezone: true }),
+    rush: boolean("rush").notNull().default(false),
+
     // Inspiration uploaded by the client (Vercel Blob URLs).
     inspirationImages: jsonb("inspiration_images").$type<string[]>().default([]),
     // Proof/mockup images uploaded by the designer.

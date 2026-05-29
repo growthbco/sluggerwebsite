@@ -14,6 +14,7 @@ export function DesignIntakeForm() {
   const [contactPhone, setContactPhone] = useState("");
   const [vision, setVision] = useState("");
   const [colors, setColors] = useState("");
+  const [neededBy, setNeededBy] = useState("");
   const [images, setImages] = useState<Uploaded[]>([]);
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
@@ -67,6 +68,7 @@ export function DesignIntakeForm() {
           vision,
           colors,
           inspirationImages: images.map((i) => i.url),
+          neededBy: neededBy || undefined,
         }),
       });
       const data = await res.json();
@@ -142,6 +144,28 @@ export function DesignIntakeForm() {
       <div>
         <label className="display text-sm text-foreground">Colors</label>
         <input className={`mt-2 ${inputCls}`} value={colors} onChange={(e) => setColors(e.target.value)} placeholder="Team colors, hex codes, or 'we want pink and black'..." />
+      </div>
+
+      <div>
+        <label className="display text-sm text-foreground">When do you need the uniforms in hand?</label>
+        <input
+          className={`mt-2 ${inputCls} max-w-xs`}
+          type="date"
+          value={neededBy}
+          onChange={(e) => setNeededBy(e.target.value)}
+          min={new Date().toISOString().split("T")[0]}
+        />
+        {(() => {
+          if (!neededBy) return null;
+          const days = (new Date(neededBy).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+          if (days >= 14) return <p className="mt-2 text-sm text-muted">✓ You&apos;re within our standard 2-3 week turnaround.</p>;
+          if (days < 0) return <p className="mt-2 text-sm text-brand">That date is in the past — please pick a future date.</p>;
+          return (
+            <p className="mt-2 text-sm bg-brand/10 border border-brand/40 text-foreground p-3">
+              ⚡ Heads up — that&apos;s within 2 weeks. A <strong>$5 per item rush fee</strong> applies to make this deadline.
+            </p>
+          );
+        })()}
       </div>
 
       {/* Inspiration uploads */}

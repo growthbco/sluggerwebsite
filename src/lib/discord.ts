@@ -151,14 +151,25 @@ type DesignRequestPayload = {
   reference: string;
   teamName: string;
   sport?: string;
-  contactName: string;
+  // Contact fields kept on the type so callers don't have to change, but they
+  // are intentionally NOT rendered in the Discord embed (designer-facing).
+  contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
   vision?: string;
   colors?: string;
   inspirationImages?: string[];
   manageUrl?: string;
+  neededBy?: string | Date | null;
+  rush?: boolean;
 };
+
+function fmtNeededBy(v: string | Date | null | undefined): string | null {
+  if (!v) return null;
+  const d = typeof v === "string" ? new Date(v) : v;
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 
 /** Post a new design intake to the #design-requests channel.
  *  Includes contact + inspiration image links so the designer can start work.
@@ -171,16 +182,20 @@ export async function postDesignRequestToDiscord(req: DesignRequestPayload): Pro
     return false;
   }
 
+  // Designer-facing channel: customer contact (name/email/phone) is intentionally
+  // omitted. The business has the contact via the email notification + DB.
   const fields = [
     { name: "Request", value: `\`${req.reference}\``, inline: true },
-    { name: "Team", value: req.teamName || "-", inline: true },
     { name: "Sport", value: req.sport || "-", inline: true },
-    {
-      name: "Contact",
-      value: [req.contactName, req.contactEmail, req.contactPhone].filter(Boolean).join(" · ") || "-",
-      inline: false,
-    },
   ];
+  const needed = fmtNeededBy(req.neededBy ?? null);
+  if (needed) {
+    fields.push({
+      name: req.rush ? "Needed by 🚨 RUSH" : "Needed by",
+      value: req.rush ? `${needed} — within 2 weeks (rush fee applies)` : needed,
+      inline: true,
+    });
+  }
   if (req.colors) fields.push({ name: "Colors", value: req.colors.slice(0, 200), inline: false });
   if (req.vision) fields.push({ name: "Vision", value: req.vision.slice(0, 1024), inline: false });
   if (req.inspirationImages?.length) {

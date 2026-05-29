@@ -13,7 +13,21 @@ export type NewDesignRequest = {
   colors?: string;
   notes?: string;
   inspirationImages?: string[];
+  /** When the customer needs the uniforms in hand. ISO date string. */
+  neededBy?: string;
 };
+
+const RUSH_DAYS = 14;
+export const RUSH_FEE_NOTE = "Anything needed within 2 weeks incurs a rush fee of $5 per item.";
+
+/** Returns true if a deadline date is within the rush window (< 14 days away). */
+export function isRush(neededBy?: Date | string | null): boolean {
+  if (!neededBy) return false;
+  const d = typeof neededBy === "string" ? new Date(neededBy) : neededBy;
+  if (isNaN(d.getTime())) return false;
+  const days = (d.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+  return days < RUSH_DAYS;
+}
 
 function makeRef() {
   return `DR-${Date.now().toString(36).toUpperCase().slice(-6)}`;
@@ -27,6 +41,9 @@ export async function createDesignRequest(input: NewDesignRequest) {
   const reference = makeRef();
   const statusToken = token();
   const manageToken = token();
+
+  const neededByDate = input.neededBy ? new Date(input.neededBy) : null;
+  const rush = isRush(neededByDate);
 
   const [row] = await db
     .insert(designRequests)
@@ -42,12 +59,14 @@ export async function createDesignRequest(input: NewDesignRequest) {
       colors: input.colors,
       notes: input.notes,
       inspirationImages: input.inspirationImages ?? [],
+      neededBy: neededByDate && !isNaN(neededByDate.getTime()) ? neededByDate : null,
+      rush,
       statusToken,
       manageToken,
     })
     .returning();
 
-  return { id: row.id, reference, statusToken, manageToken };
+  return { id: row.id, reference, statusToken, manageToken, rush, neededBy: row.neededBy };
 }
 
 export async function getByStatusToken(tkn: string) {

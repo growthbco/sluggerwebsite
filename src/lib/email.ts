@@ -61,7 +61,7 @@ function esc(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/** Email the designer that a new design request came in. */
+/** Email the designer/business that a new design request came in. */
 export async function emailDesignRequestToDesigner(req: {
   reference: string;
   teamName: string;
@@ -73,13 +73,23 @@ export async function emailDesignRequestToDesigner(req: {
   colors?: string;
   inspirationImages?: string[];
   manageUrl?: string;
+  neededBy?: string | Date | null;
+  rush?: boolean;
 }): Promise<boolean> {
   const imgs = (req.inspirationImages ?? [])
     .map((u, i) => `<li><a href="${esc(u)}">Inspiration ${i + 1}</a></li>`)
     .join("");
+  let neededByStr: string | null = null;
+  if (req.neededBy) {
+    const d = typeof req.neededBy === "string" ? new Date(req.neededBy) : req.neededBy;
+    if (!isNaN(d.getTime())) neededByStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+  const subjectPrefix = req.rush ? "🚨 RUSH " : "";
   const html = `
-    <h2>New design request - ${esc(req.reference)}</h2>
+    <h2>${req.rush ? "🚨 RUSH " : ""}New design request - ${esc(req.reference)}</h2>
+    ${req.rush ? `<p style="background:#fff3cd;padding:8px 12px;border-left:4px solid #e3132c;"><strong>RUSH request:</strong> needed within 2 weeks. A $5/item rush fee applies.</p>` : ""}
     <p><strong>Team:</strong> ${esc(req.teamName)} ${req.sport ? `(${esc(req.sport)})` : ""}</p>
+    ${neededByStr ? `<p><strong>Needed by:</strong> ${neededByStr}</p>` : ""}
     <p><strong>Contact:</strong> ${esc(req.contactName)} - ${esc(req.contactEmail)}${req.contactPhone ? ` - ${esc(req.contactPhone)}` : ""}</p>
     ${req.colors ? `<p><strong>Colors:</strong> ${esc(req.colors)}</p>` : ""}
     ${req.vision ? `<p><strong>Vision:</strong><br>${esc(req.vision).replace(/\n/g, "<br>")}</p>` : ""}
@@ -88,7 +98,7 @@ export async function emailDesignRequestToDesigner(req: {
   `;
   return sendEmail({
     to: CONTACT_INBOX,
-    subject: `New design request: ${req.teamName} - ${req.reference}`,
+    subject: `${subjectPrefix}New design request: ${req.teamName} - ${req.reference}`,
     html,
     replyTo: req.contactEmail,
   });

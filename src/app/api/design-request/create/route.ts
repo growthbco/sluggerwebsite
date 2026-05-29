@@ -24,6 +24,7 @@ export async function POST(req: Request) {
     colors?: string;
     notes?: string;
     inspirationImages?: string[];
+    neededBy?: string;
   };
   try {
     body = await req.json();
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { reference, statusToken, manageToken } = await createDesignRequest({
+    const { reference, statusToken, manageToken, rush, neededBy } = await createDesignRequest({
       teamName: body.teamName,
       sport: body.sport,
       contactName: body.contactName,
@@ -54,6 +55,7 @@ export async function POST(req: Request) {
       colors: body.colors,
       notes: body.notes,
       inspirationImages: body.inspirationImages ?? [],
+      neededBy: body.neededBy,
     });
 
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -67,13 +69,13 @@ export async function POST(req: Request) {
         reference,
         teamName: body.teamName,
         sport: body.sport,
-        contactName: body.contactName,
-        contactEmail: body.contactEmail,
-        contactPhone: body.contactPhone,
+        // Contact intentionally NOT included (designer-facing channel).
         vision: body.vision,
         colors: body.colors,
         inspirationImages: body.inspirationImages ?? [],
         manageUrl,
+        neededBy,
+        rush,
       }),
       emailDesignRequestToDesigner({
         reference,
@@ -86,6 +88,8 @@ export async function POST(req: Request) {
         colors: body.colors,
         inspirationImages: body.inspirationImages ?? [],
         manageUrl,
+        neededBy,
+        rush,
       }),
       emailDesignRequestConfirmation({
         to: body.contactEmail,
