@@ -62,7 +62,7 @@ export default function Home() {
               >
                 <span className="display text-[11px] tracking-wider opacity-80">NEW CUSTOMER</span>
                 <p className="display text-xl sm:text-2xl mt-1">Get a Free Design →</p>
-                <p className="text-sm opacity-90 mt-1">Tell us your vision. We design free, you approve.</p>
+                <p className="text-sm opacity-90 mt-1">$35 to start, credited 100% to your final order.</p>
               </Link>
               <Link
                 href="/team-order"

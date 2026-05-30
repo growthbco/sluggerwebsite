@@ -73,8 +73,17 @@ export function DesignIntakeForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not submit your design request.");
+      // Three outcomes:
+      //  - waived (returning customer): show success + status URL
+      //  - needs payment: redirect to Stripe Checkout
+      //  - misconfigured: fall back to showing the status URL
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return;
+      }
       setStatus("done");
       setStatusUrl(data.statusUrl);
+      if (data.waived) setMessage("returning_customer");
     } catch (e) {
       setStatus("error");
       setMessage((e as Error).message);
@@ -82,17 +91,22 @@ export function DesignIntakeForm() {
   }
 
   if (status === "done") {
+    const returning = message === "returning_customer";
     return (
       <div className="bg-steel border border-line p-8 text-center">
         <div className="mx-auto h-12 w-12 grid place-items-center clip-slant bg-brand text-on-brand display text-xl">✓</div>
-        <h2 className="display text-2xl text-foreground mt-4">Design request received!</h2>
+        <h2 className="display text-2xl text-foreground mt-4">
+          {returning ? "Welcome back!" : "Design request received!"}
+        </h2>
         <p className="mt-3 text-muted">
-          Our in-house designer will get started on your free mockup. You can track its progress here:
+          {returning
+            ? "Your $35 design fee was automatically waived as a returning Slugger customer. Our designer is already on it."
+            : "Our in-house designer will get started on your mockup. You can track its progress here:"}
         </p>
         {statusUrl && (
           <div className="mt-4">
             <a href={statusUrl} className="text-brand hover:underline break-all text-sm">{statusUrl}</a>
-            <p className="text-xs text-muted mt-2">Bookmark this link - you'll use it to approve the proof.</p>
+            <p className="text-xs text-muted mt-2">Bookmark this link - you&apos;ll use it to approve the proof.</p>
           </div>
         )}
       </div>
@@ -216,10 +230,12 @@ export function DesignIntakeForm() {
         disabled={!canSubmit || status === "sending"}
         className="w-full clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg py-3.5 transition-colors disabled:opacity-60"
       >
-        {status === "sending" ? "Submitting..." : "Send My Design Request"}
+        {status === "sending" ? "Submitting..." : "Submit & Pay $35"}
       </button>
       <p className="text-xs text-muted text-center">
-        Free design proofs. No commitment - approve when you love it.
+        $35 starts the design — credited 100% to your final order, so the design is free with purchase.
+        <br />
+        Returning customer? We&apos;ll waive it automatically when you submit.
       </p>
     </div>
   );

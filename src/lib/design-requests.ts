@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, and, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { designRequests } from "@/db/schema";
+import { designRequests, teamOrders } from "@/db/schema";
+
+// Default design fee (env override: DESIGN_FEE_CENTS). Filters out customers
+// who would otherwise shop our designs elsewhere. Credited to the final order.
+export const DESIGN_FEE_CENTS = Number(process.env.DESIGN_FEE_CENTS) || 3500;
 
 export type NewDesignRequest = {
   teamName: string;
@@ -15,6 +19,10 @@ export type NewDesignRequest = {
   inspirationImages?: string[];
   /** When the customer needs the uniforms in hand. ISO date string. */
   neededBy?: string;
+  /** Fee state — set by the create-request route based on returning-customer
+   *  detection. Defaults to "pending_payment" if not provided. */
+  feeWaivedReason?: string | null;
+  feeWaivedRef?: string | null;
 };
 
 const RUSH_DAYS = 14;
@@ -35,6 +43,56 @@ function makeRef() {
 
 const token = () => randomUUID().replace(/-/g, "");
 
+/** Look up a prior order (design or team-order) for this email. Used to
+ *  auto-waive the design fee for returning customers — we don't want to
+ *  re-charge people we know are going to buy from us. */
+export async function findReturningCustomerRef(email: string): Promise<string | null> {
+  if (!email) return null;
+  const db = getDb();
+  const e = email.trim().toLowerCase();
+
+  // 1. Any prior design that reached approved/ordered = proven customer.
+  const [prior] = await db
+    .select({ reference: designRequests.reference })
+    .from(designRequests)
+    .where(
+      and(
+        sql`lower(${designRequests.contactEmail}) = ${e}`,
+        or(eq(designRequests.status, "approved"), eq(designRequests.status, "ordered")),
+      ),
+    )
+    .limit(1);
+  if (prior) return prior.reference;
+
+  // 2. Any prior team order at all = also a known customer.
+  const [priorOrder] = await db
+    .select({ reference: teamOrders.reference })
+    .from(teamOrders)
+    .where(sql`lower(${teamOrders.contactEmail}) = ${e}`)
+    .limit(1);
+  if (priorOrder) return priorOrder.reference;
+
+  return null;
+}
+
+/** Mark the design fee as paid (via Stripe webhook) and flip status to
+ *  submitted so the designer pipeline kicks in. */
+export async function markDesignFeePaid(
+  designRequestId: string,
+  paymentId: string,
+) {
+  const db = getDb();
+  await db
+    .update(designRequests)
+    .set({
+      designFeePaidAt: new Date(),
+      designFeePaymentId: paymentId,
+      status: "submitted",
+      updatedAt: new Date(),
+    })
+    .where(eq(designRequests.id, designRequestId));
+}
+
 /** Client submits the intake form -> create a request, mint tokens. */
 export async function createDesignRequest(input: NewDesignRequest) {
   const db = getDb();
@@ -45,11 +103,16 @@ export async function createDesignRequest(input: NewDesignRequest) {
   const neededByDate = input.neededBy ? new Date(input.neededBy) : null;
   const rush = isRush(neededByDate);
 
+  // If the fee is waived (returning customer / promo applied server-side),
+  // jump straight to 'submitted' so the designer pipeline kicks in. Otherwise
+  // hold at 'pending_payment' until Stripe confirms via webhook.
+  const waived = Boolean(input.feeWaivedReason);
+
   const [row] = await db
     .insert(designRequests)
     .values({
       reference,
-      status: "submitted",
+      status: waived ? "submitted" : "pending_payment",
       teamName: input.teamName,
       sport: input.sport,
       contactName: input.contactName,
@@ -63,10 +126,14 @@ export async function createDesignRequest(input: NewDesignRequest) {
       rush,
       statusToken,
       manageToken,
+      designFeeAmountCents: DESIGN_FEE_CENTS,
+      designFeePaidAt: waived ? new Date() : null,
+      designFeeWaivedReason: input.feeWaivedReason ?? null,
+      designFeeWaivedRef: input.feeWaivedRef ?? null,
     })
     .returning();
 
-  return { id: row.id, reference, statusToken, manageToken, rush, neededBy: row.neededBy };
+  return { id: row.id, reference, statusToken, manageToken, rush, neededBy: row.neededBy, waived };
 }
 
 /** Save the Discord thread id of this request's forum post so follow-up

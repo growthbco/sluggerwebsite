@@ -12,13 +12,17 @@ export default function DesignPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14">
       <header className="max-w-2xl">
-        <span className="display text-brand text-sm">Free Design - No Obligation</span>
+        <span className="display text-brand text-sm">Free with Order</span>
         <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">Start Your Design</h1>
         <p className="mt-3 text-muted">
           Tell us what you want. Drop in inspiration images or describe your
-          vision - our in-house designer will work up a free mockup, send it
-          back, and you approve when you love it. Then your team places the
-          order in a couple of clicks.
+          vision &mdash; our in-house designer works up a mockup, sends it
+          back, and you approve when you love it.
+        </p>
+        <p className="mt-3 text-sm text-foreground/90 border-l-2 border-brand pl-3">
+          <span className="display text-brand">$35 to start.</span> Credited 100% to your
+          final order &mdash; so the design is free with purchase.
+          Returning customers: we waive the fee automatically.
         </p>
       </header>
 

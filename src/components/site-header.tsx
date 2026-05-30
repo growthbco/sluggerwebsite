@@ -58,7 +58,7 @@ export function SiteHeader() {
               </Link>
               <Link
                 href="/team-order"
-                className="hidden sm:inline-flex clip-slant border border-brand/70 text-foreground hover:bg-brand/10 display text-xs sm:text-sm px-3 sm:px-5 py-2.5 transition-colors"
+                className="hidden sm:inline-flex border border-brand/70 text-foreground hover:bg-brand/10 display text-xs sm:text-sm px-3 sm:px-5 py-2.5 transition-colors"
               >
                 Team Order
               </Link>
@@ -76,7 +76,7 @@ export function SiteHeader() {
             </Link>
             <Link
               href="/team-order"
-              className="flex-1 text-center clip-slant border border-brand/70 text-foreground display text-xs px-3 py-2.5"
+              className="flex-1 text-center border border-brand/70 text-foreground display text-xs px-3 py-2.5"
             >
               Team Order
             </Link>

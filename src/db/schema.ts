@@ -61,7 +61,8 @@ export const teamOrderStatus = pgEnum("team_order_status", [
 
 // Design intake → proof → approval funnel; precedes the team order.
 export const designRequestStatus = pgEnum("design_request_status", [
-  "submitted", // client filled the intake form
+  "pending_payment", // intake filled but $35 design fee not yet paid (Stripe pending)
+  "submitted", // client filled the intake form (fee paid or waived)
   "in_design", // designer is working on it
   "proof_sent", // designer uploaded a proof for client review
   "changes_requested", // client asked for revisions; back to designer
@@ -460,6 +461,16 @@ export const designRequests = pgTable(
     // Used so change-request + approval follow-ups land in the SAME thread
     // instead of creating a new one per event.
     discordThreadId: text("discord_thread_id"),
+
+    // Design fee ($35 default) — captured upfront to filter out customers who
+    // would otherwise shop the design elsewhere. Waived automatically for
+    // returning customers (matched by email against prior approved design or
+    // submitted team order).
+    designFeeAmountCents: integer("design_fee_amount_cents").notNull().default(3500),
+    designFeePaidAt: timestamp("design_fee_paid_at", { withTimezone: true }),
+    designFeePaymentId: text("design_fee_payment_id"), // stripe session id
+    designFeeWaivedReason: text("design_fee_waived_reason"), // returning_customer | promo:<code> | manual
+    designFeeWaivedRef: text("design_fee_waived_ref"), // e.g. "DR-XXXX" of the prior order that triggered the waiver
 
     // Timestamps
     proofSentAt: timestamp("proof_sent_at", { withTimezone: true }),

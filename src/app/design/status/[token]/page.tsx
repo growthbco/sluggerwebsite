@@ -21,8 +21,27 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
   const request = await getByStatusToken(token);
   if (!request) return <Centered title="Link not found">This link is invalid or has expired.</Centered>;
 
+  // Surface the design-fee state above the status panel so the customer
+  // always knows where they stand on the $35 (paid / waived / pending).
+  const feeState: { label: string; tone: "good" | "warn" } = request.designFeeWaivedReason
+    ? { label: "✓ Design fee waived — returning customer", tone: "good" }
+    : request.designFeePaidAt
+    ? { label: "✓ $35 design fee paid — credited 100% to your final order", tone: "good" }
+    : request.status === "pending_payment"
+    ? { label: "⏳ Awaiting payment — your designer starts once the $35 lands", tone: "warn" }
+    : { label: `$35 design fee on file (${request.status})`, tone: "good" };
+
   return (
-    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14">
+    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14 space-y-4">
+      <div
+        className={`text-sm px-4 py-2 border ${
+          feeState.tone === "good"
+            ? "border-brand/40 bg-brand/5 text-foreground"
+            : "border-amber-500/40 bg-amber-500/5 text-foreground"
+        }`}
+      >
+        {feeState.label}
+      </div>
       <DesignStatusPanel
         token={token}
         reference={request.reference}

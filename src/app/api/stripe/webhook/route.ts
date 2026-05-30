@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
-import { postOrderToDiscord } from "@/lib/discord";
+import { postOrderToDiscord, postDesignRequestToDiscord } from "@/lib/discord";
+import { dbEnabled } from "@/db";
+import { getById, markDesignFeePaid, setDiscordThreadId } from "@/lib/design-requests";
+import { emailDesignRequestToDesigner, emailDesignRequestConfirmation } from "@/lib/email";
 
 export const runtime = "nodejs";
 
@@ -25,6 +28,62 @@ export async function POST(req: Request) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
+
+    // Design fee checkout: payment confirms the intake. Mark paid + fire the
+    // designer notifications now (we held them until payment so the designer
+    // queue doesn't fill with unpaid leads).
+    if (session.metadata?.kind === "design_fee" && session.metadata?.designRequestId && dbEnabled()) {
+      try {
+        const designRequestId = session.metadata.designRequestId;
+        await markDesignFeePaid(designRequestId, session.id);
+        const request = await getById(designRequestId);
+        if (request) {
+          const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+          const statusUrl = `${SITE}/design/status/${request.statusToken}`;
+          const manageUrl = `${SITE}/design/manage/${request.manageToken}`;
+          const discordResult = await postDesignRequestToDiscord({
+            reference: request.reference,
+            teamName: request.teamName,
+            sport: request.sport ?? undefined,
+            vision: request.vision ?? undefined,
+            colors: request.colors ?? undefined,
+            inspirationImages: request.inspirationImages ?? [],
+            manageUrl,
+            neededBy: request.neededBy ?? undefined,
+            rush: request.rush,
+          });
+          if (discordResult.threadId) {
+            try { await setDiscordThreadId(designRequestId, discordResult.threadId); } catch (e) { console.error("setDiscordThreadId failed:", e); }
+          }
+          await Promise.allSettled([
+            emailDesignRequestToDesigner({
+              reference: request.reference,
+              teamName: request.teamName,
+              sport: request.sport ?? undefined,
+              contactName: request.contactName,
+              contactEmail: request.contactEmail,
+              contactPhone: request.contactPhone ?? undefined,
+              vision: request.vision ?? undefined,
+              colors: request.colors ?? undefined,
+              inspirationImages: request.inspirationImages ?? [],
+              manageUrl,
+              neededBy: request.neededBy ?? undefined,
+              rush: request.rush,
+            }),
+            emailDesignRequestConfirmation({
+              to: request.contactEmail,
+              teamName: request.teamName,
+              reference: request.reference,
+              statusUrl,
+            }),
+          ]);
+        }
+      } catch (e) {
+        console.error("Design fee webhook failed:", e);
+      }
+      return NextResponse.json({ received: true });
+    }
+
     try {
       const stripe = getStripe();
       const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 100 });

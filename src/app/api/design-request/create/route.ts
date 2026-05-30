@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
-import { createDesignRequest, setDiscordThreadId } from "@/lib/design-requests";
+import {
+  createDesignRequest,
+  setDiscordThreadId,
+  findReturningCustomerRef,
+  DESIGN_FEE_CENTS,
+} from "@/lib/design-requests";
 import { postDesignRequestToDiscord } from "@/lib/discord";
 import { emailDesignRequestToDesigner, emailDesignRequestConfirmation } from "@/lib/email";
+import { getStripe, stripeEnabled } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
@@ -35,8 +41,6 @@ export async function POST(req: Request) {
   if (!body.teamName || !body.contactName || !body.contactEmail) {
     return NextResponse.json({ error: "Team name, your name, and email are required." }, { status: 400 });
   }
-  // Optional uploads; require either a vision description or at least one image
-  // so we have *something* to design from.
   if (!body.vision && !(body.inspirationImages?.length)) {
     return NextResponse.json(
       { error: "Add a description of your vision, or upload at least one inspiration image." },
@@ -44,8 +48,14 @@ export async function POST(req: Request) {
     );
   }
 
+  // Auto-bypass the $35 fee for returning customers (matched by email against
+  // any prior approved design or submitted team order).
+  const priorRef = await findReturningCustomerRef(body.contactEmail);
+  const feeWaivedReason = priorRef ? "returning_customer" : null;
+  const feeWaivedRef = priorRef ?? null;
+
   try {
-    const { id: requestId, reference, statusToken, manageToken, rush, neededBy } = await createDesignRequest({
+    const { id: requestId, reference, statusToken, manageToken, rush, neededBy, waived } = await createDesignRequest({
       teamName: body.teamName,
       sport: body.sport,
       contactName: body.contactName,
@@ -56,56 +66,104 @@ export async function POST(req: Request) {
       notes: body.notes,
       inspirationImages: body.inspirationImages ?? [],
       neededBy: body.neededBy,
+      feeWaivedReason,
+      feeWaivedRef,
     });
 
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const statusUrl = `${SITE}/design/status/${statusToken}`;
     const manageUrl = `${SITE}/design/manage/${manageToken}`;
 
-    // Notify designer (Discord thread + email) and confirm to the client.
-    // Don't fail the user if either side isn't configured yet.
-    // We await Discord first so we can persist the thread id (used to route
-    // change-request / approval follow-ups back into the same thread).
-    const discordResult = await postDesignRequestToDiscord({
-      reference,
-      teamName: body.teamName,
-      sport: body.sport,
-      // Contact intentionally NOT included (designer-facing channel).
-      vision: body.vision,
-      colors: body.colors,
-      inspirationImages: body.inspirationImages ?? [],
-      manageUrl,
-      neededBy,
-      rush,
-    });
-    if (discordResult.threadId) {
-      try { await setDiscordThreadId(requestId, discordResult.threadId); } catch (e) { console.error("setDiscordThreadId failed:", e); }
-    }
-
-    await Promise.allSettled([
-      emailDesignRequestToDesigner({
+    // ─── PATH A: fee waived → notify designer + client immediately ────────
+    if (waived) {
+      const discordResult = await postDesignRequestToDiscord({
         reference,
         teamName: body.teamName,
         sport: body.sport,
-        contactName: body.contactName,
-        contactEmail: body.contactEmail,
-        contactPhone: body.contactPhone,
         vision: body.vision,
         colors: body.colors,
         inspirationImages: body.inspirationImages ?? [],
         manageUrl,
         neededBy,
         rush,
-      }),
-      emailDesignRequestConfirmation({
-        to: body.contactEmail,
-        teamName: body.teamName,
+      });
+      if (discordResult.threadId) {
+        try { await setDiscordThreadId(requestId, discordResult.threadId); } catch (e) { console.error("setDiscordThreadId failed:", e); }
+      }
+      await Promise.allSettled([
+        emailDesignRequestToDesigner({
+          reference,
+          teamName: body.teamName,
+          sport: body.sport,
+          contactName: body.contactName,
+          contactEmail: body.contactEmail,
+          contactPhone: body.contactPhone,
+          vision: body.vision,
+          colors: body.colors,
+          inspirationImages: body.inspirationImages ?? [],
+          manageUrl,
+          neededBy,
+          rush,
+        }),
+        emailDesignRequestConfirmation({
+          to: body.contactEmail,
+          teamName: body.teamName,
+          reference,
+          statusUrl,
+        }),
+      ]);
+      return NextResponse.json({
+        ok: true,
         reference,
         statusUrl,
-      }),
-    ]);
+        waived: true,
+        waivedReason: "returning_customer",
+        priorRef,
+      });
+    }
 
-    return NextResponse.json({ ok: true, reference, statusUrl });
+    // ─── PATH B: needs to pay → create Stripe Checkout, hold notifications ─
+    if (!stripeEnabled()) {
+      // Without Stripe configured, fail safe by treating like a waiver but
+      // logging the unbilled state. Should never hit in production.
+      console.error("Stripe not configured but fee required for", reference);
+      return NextResponse.json({ error: "Payments not configured" }, { status: 503 });
+    }
+    const stripe = getStripe();
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      customer_email: body.contactEmail,
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: "Custom Design — Slugger Athletics",
+              description: `Design brief for ${body.teamName}. Fully credited to your final team order.`,
+            },
+            unit_amount: DESIGN_FEE_CENTS,
+          },
+          quantity: 1,
+        },
+      ],
+      allow_promotion_codes: true, // staff-created codes (REPEAT, VIP, etc.)
+      metadata: {
+        designRequestId: requestId,
+        designReference: reference,
+        kind: "design_fee",
+      },
+      success_url: `${statusUrl}?paid=true`,
+      cancel_url: `${SITE}/design?cancelled=${reference}`,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      reference,
+      statusUrl,
+      checkoutUrl: session.url,
+      waived: false,
+    });
   } catch (e) {
     console.error("createDesignRequest failed:", e);
     return NextResponse.json({ error: "Could not save your design request" }, { status: 500 });
