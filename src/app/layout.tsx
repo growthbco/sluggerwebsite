@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Oswald } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { CartProvider } from "@/lib/cart";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -55,7 +55,14 @@ export default function RootLayout({
           <main className="flex-1">{children}</main>
           <SiteFooter />
         </CartProvider>
-        <ThemeToggle />
+        {/* LeadConnector chat widget — loaded after page is interactive so
+            it doesn't block first paint. */}
+        <Script
+          src="https://beta.leadconnectorhq.com/loader.js"
+          data-resources-url="https://beta.leadconnectorhq.com/chat-widget/loader.js"
+          data-widget-id="6a1a594796c166bea6d701a5"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

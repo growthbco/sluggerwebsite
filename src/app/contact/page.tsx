@@ -42,8 +42,17 @@ export default function ContactPage() {
 
         <aside className="space-y-6">
           <div className="bg-steel border border-line p-6">
-            <h2 className="display text-lg text-foreground">Reach us directly</h2>
-            <dl className="mt-4 space-y-3 text-sm">
+            <h2 className="display text-lg text-foreground">Fastest way to reach us</h2>
+            <a
+              href="sms:+13526601232"
+              className="mt-4 flex items-center justify-center gap-2 clip-slant bg-brand text-on-brand display text-base px-5 py-3 hover:bg-brand-dark transition-colors"
+            >
+              💬 Text us: (352) 660-1232
+            </a>
+            <p className="mt-3 text-xs text-muted text-center">
+              Text gets you a same-day reply during business hours.
+            </p>
+            <dl className="mt-5 space-y-3 text-sm border-t border-line pt-4">
               <div>
                 <dt className="text-muted">Email</dt>
                 <dd>
@@ -53,9 +62,9 @@ export default function ContactPage() {
                 </dd>
               </div>
               <div>
-                <dt className="text-muted">Phone</dt>
+                <dt className="text-muted">Call</dt>
                 <dd>
-                  <a href="tel:+13526601232" className="text-brand hover:underline">352-660-1232</a>
+                  <a href="tel:+13526601232" className="text-brand hover:underline">(352) 660-1232</a>
                 </dd>
               </div>
               <div>
