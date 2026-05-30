@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { getByStatusToken, approveDesign } from "@/lib/design-requests";
+import { postDesignThreadUpdate } from "@/lib/discord";
 
 export const runtime = "nodejs";
 
@@ -27,6 +28,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   try {
     await approveDesign(request.id, approvedUrl);
+    // Post into the same Discord thread so the team sees the approval inline.
+    await postDesignThreadUpdate({
+      threadId: request.discordThreadId ?? undefined,
+      title: `✅ Approved — ${request.teamName} (${request.reference})`,
+      description: "Client approved the design. The customer is being routed into the Team Order form (their team + contact pre-filled, design auto-attached).",
+      imageUrl: approvedUrl,
+      username: "Slugger Design Requests",
+    });
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("approveDesign failed:", e);

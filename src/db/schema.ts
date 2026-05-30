@@ -438,6 +438,11 @@ export const designRequests = pgTable(
     statusToken: text("status_token"),
     manageToken: text("manage_token"),
 
+    // Discord thread id of this request's forum post (captured on first send).
+    // Used so change-request + approval follow-ups land in the SAME thread
+    // instead of creating a new one per event.
+    discordThreadId: text("discord_thread_id"),
+
     // Timestamps
     proofSentAt: timestamp("proof_sent_at", { withTimezone: true }),
     approvedAt: timestamp("approved_at", { withTimezone: true }),

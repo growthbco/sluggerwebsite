@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
-import { createDesignRequest } from "@/lib/design-requests";
+import { createDesignRequest, setDiscordThreadId } from "@/lib/design-requests";
 import { postDesignRequestToDiscord } from "@/lib/discord";
 import { emailDesignRequestToDesigner, emailDesignRequestConfirmation } from "@/lib/email";
 
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { reference, statusToken, manageToken, rush, neededBy } = await createDesignRequest({
+    const { id: requestId, reference, statusToken, manageToken, rush, neededBy } = await createDesignRequest({
       teamName: body.teamName,
       sport: body.sport,
       contactName: body.contactName,
@@ -64,19 +64,25 @@ export async function POST(req: Request) {
 
     // Notify designer (Discord thread + email) and confirm to the client.
     // Don't fail the user if either side isn't configured yet.
+    // We await Discord first so we can persist the thread id (used to route
+    // change-request / approval follow-ups back into the same thread).
+    const discordResult = await postDesignRequestToDiscord({
+      reference,
+      teamName: body.teamName,
+      sport: body.sport,
+      // Contact intentionally NOT included (designer-facing channel).
+      vision: body.vision,
+      colors: body.colors,
+      inspirationImages: body.inspirationImages ?? [],
+      manageUrl,
+      neededBy,
+      rush,
+    });
+    if (discordResult.threadId) {
+      try { await setDiscordThreadId(requestId, discordResult.threadId); } catch (e) { console.error("setDiscordThreadId failed:", e); }
+    }
+
     await Promise.allSettled([
-      postDesignRequestToDiscord({
-        reference,
-        teamName: body.teamName,
-        sport: body.sport,
-        // Contact intentionally NOT included (designer-facing channel).
-        vision: body.vision,
-        colors: body.colors,
-        inspirationImages: body.inspirationImages ?? [],
-        manageUrl,
-        neededBy,
-        rush,
-      }),
       emailDesignRequestToDesigner({
         reference,
         teamName: body.teamName,

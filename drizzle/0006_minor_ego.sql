@@ -1,0 +1,1 @@
+ALTER TABLE "design_requests" ADD COLUMN "discord_thread_id" text;

@@ -69,6 +69,16 @@ export async function createDesignRequest(input: NewDesignRequest) {
   return { id: row.id, reference, statusToken, manageToken, rush, neededBy: row.neededBy };
 }
 
+/** Save the Discord thread id of this request's forum post so follow-up
+ *  events (change requests, approvals) land in the SAME thread. */
+export async function setDiscordThreadId(id: string, threadId: string) {
+  const db = getDb();
+  await db
+    .update(designRequests)
+    .set({ discordThreadId: threadId, updatedAt: new Date() })
+    .where(eq(designRequests.id, id));
+}
+
 export async function getByStatusToken(tkn: string) {
   const db = getDb();
   const [row] = await db.select().from(designRequests).where(eq(designRequests.statusToken, tkn)).limit(1);

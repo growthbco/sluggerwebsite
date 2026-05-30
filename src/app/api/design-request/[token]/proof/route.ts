@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { getByManageToken, addProofImages } from "@/lib/design-requests";
 import { emailProofReady } from "@/lib/email";
+import { postDesignThreadUpdate } from "@/lib/discord";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       teamName: request.teamName,
       reference: request.reference,
       statusUrl: `${SITE}/design/status/${request.statusToken}`,
+    });
+    // Log into the Discord thread so the team has a single timeline.
+    await postDesignThreadUpdate({
+      threadId: request.discordThreadId ?? undefined,
+      title: `📤 Proof sent — ${request.teamName} (${request.reference})`,
+      description: `${urls.length} proof${urls.length === 1 ? "" : "s"} sent to the client for review.`,
+      imageUrl: urls[urls.length - 1],
+      username: "Slugger Design Requests",
     });
     return NextResponse.json({ ok: true });
   } catch (e) {

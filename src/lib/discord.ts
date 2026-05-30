@@ -174,12 +174,14 @@ function fmtNeededBy(v: string | Date | null | undefined): string | null {
 /** Post a new design intake to the #design-requests channel.
  *  Includes contact + inspiration image links so the designer can start work.
  *  Each request gets its own thread (when the channel is a Forum) for the
- *  mockup -> approval back-and-forth. */
-export async function postDesignRequestToDiscord(req: DesignRequestPayload): Promise<boolean> {
+ *  mockup -> approval back-and-forth.
+ *  Returns the Discord thread id (for forum posts) so callers can persist it
+ *  and route follow-ups (change requests, approvals) into the same thread. */
+export async function postDesignRequestToDiscord(req: DesignRequestPayload): Promise<{ ok: boolean; threadId?: string }> {
   const url = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
   if (!url) {
     console.warn("DISCORD_DESIGN_REQUESTS_WEBHOOK_URL not set - skipping design Discord post");
-    return false;
+    return { ok: false };
   }
 
   // Designer-facing channel: customer contact (name/email/phone) is intentionally
@@ -225,7 +227,11 @@ export async function postDesignRequestToDiscord(req: DesignRequestPayload): Pro
     body.thread_name = `${req.teamName} (${req.reference})`.slice(0, 100);
   }
 
-  return send(url, body);
+  // Use wait=true so Discord returns the created Message; for forum posts the
+  // channel_id is the new thread's id, which we persist for future follow-ups.
+  const msg = await sendAndReturn(url, body);
+  if (!msg) return { ok: false };
+  return { ok: true, threadId: msg.channel_id };
 }
 
 type ContactPayload = {
@@ -276,4 +282,61 @@ async function send(url: string, body: unknown): Promise<boolean> {
     console.error("Discord webhook error:", e);
     return false;
   }
+}
+
+/** Same as send() but uses ?wait=true so Discord returns the created Message,
+ *  which lets us capture channel_id (= thread_id for forum posts). */
+async function sendAndReturn(url: string, body: unknown): Promise<{ id?: string; channel_id?: string } | null> {
+  try {
+    const sep = url.includes("?") ? "&" : "?";
+    const res = await fetch(`${url}${sep}wait=true`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      console.error("Discord webhook failed:", res.status, await res.text());
+      return null;
+    }
+    return (await res.json()) as { id?: string; channel_id?: string };
+  } catch (e) {
+    console.error("Discord webhook error:", e);
+    return null;
+  }
+}
+
+/** Post a follow-up update INTO the existing thread for a design request
+ *  (when the design channel is a Forum). Used for change-requests + approvals
+ *  so the back-and-forth lives in one place. Falls back to a new post if
+ *  threadId isn't known. */
+export async function postDesignThreadUpdate(opts: {
+  threadId?: string | null;
+  title: string;
+  description?: string;
+  fields?: { name: string; value: string; inline?: boolean }[];
+  imageUrl?: string;
+  username?: string;
+}): Promise<boolean> {
+  const baseUrl = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
+  if (!baseUrl) return false;
+  const url = opts.threadId ? `${baseUrl}?thread_id=${opts.threadId}` : baseUrl;
+  const body: Record<string, unknown> = {
+    username: opts.username ?? "Slugger Design Requests",
+    embeds: [
+      {
+        title: opts.title,
+        ...(opts.description ? { description: opts.description } : {}),
+        color: GOLD,
+        ...(opts.fields?.length ? { fields: opts.fields } : {}),
+        ...(opts.imageUrl ? { image: { url: opts.imageUrl } } : {}),
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  };
+  // If we don't have a thread_id and the channel is a Forum, we'd need a
+  // thread_name to post — only do this fallback if forum mode is on.
+  if (!opts.threadId && process.env.DISCORD_DESIGN_REQUESTS_FORUM === "true") {
+    body.thread_name = opts.title.slice(0, 100);
+  }
+  return send(url, body);
 }
