@@ -57,6 +57,8 @@ export async function sendEmail({ to, subject, html, replyTo }: SendArgs): Promi
   }
 }
 
+import { brandedEmail } from "@/lib/email-template";
+
 function esc(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -85,21 +87,26 @@ export async function emailDesignRequestToDesigner(req: {
     if (!isNaN(d.getTime())) neededByStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   }
   const subjectPrefix = req.rush ? "🚨 RUSH " : "";
-  const html = `
-    <h2>${req.rush ? "🚨 RUSH " : ""}New design request - ${esc(req.reference)}</h2>
-    ${req.rush ? `<p style="background:#fff3cd;padding:8px 12px;border-left:4px solid #e3132c;"><strong>RUSH request:</strong> needed within 2 weeks. A $5/item rush fee applies.</p>` : ""}
-    <p><strong>Team:</strong> ${esc(req.teamName)} ${req.sport ? `(${esc(req.sport)})` : ""}</p>
-    ${neededByStr ? `<p><strong>Needed by:</strong> ${neededByStr}</p>` : ""}
-    <p><strong>Contact:</strong> ${esc(req.contactName)} - ${esc(req.contactEmail)}${req.contactPhone ? ` - ${esc(req.contactPhone)}` : ""}</p>
-    ${req.colors ? `<p><strong>Colors:</strong> ${esc(req.colors)}</p>` : ""}
-    ${req.vision ? `<p><strong>Vision:</strong><br>${esc(req.vision).replace(/\n/g, "<br>")}</p>` : ""}
-    ${imgs ? `<p><strong>Inspiration:</strong></p><ul>${imgs}</ul>` : ""}
-    ${req.manageUrl ? `<p><a href="${esc(req.manageUrl)}">Open in manage view to upload a proof →</a></p>` : ""}
+  const bodyHtml = `
+    ${req.rush ? `<p style="background:#fff3cd;padding:10px 14px;border-left:4px solid #b8a36c;margin:0 0 16px;"><strong style="color:#13160b;">🚨 RUSH request:</strong> needed within 2 weeks. A $5/item rush fee applies.</p>` : ""}
+    <p style="margin:0 0 10px;"><strong>Team:</strong> ${esc(req.teamName)} ${req.sport ? `(${esc(req.sport)})` : ""}</p>
+    ${neededByStr ? `<p style="margin:0 0 10px;"><strong>Needed by:</strong> ${neededByStr}</p>` : ""}
+    <p style="margin:0 0 10px;"><strong>Contact:</strong> ${esc(req.contactName)} · ${esc(req.contactEmail)}${req.contactPhone ? ` · ${esc(req.contactPhone)}` : ""}</p>
+    ${req.colors ? `<p style="margin:0 0 10px;"><strong>Colors:</strong> ${esc(req.colors)}</p>` : ""}
+    ${req.vision ? `<p style="margin:14px 0 6px;"><strong>Vision:</strong></p><p style="margin:0;">${esc(req.vision).replace(/\n/g, "<br>")}</p>` : ""}
+    ${imgs ? `<p style="margin:14px 0 6px;"><strong>Inspiration:</strong></p><ul style="margin:0;padding-left:18px;">${imgs}</ul>` : ""}
   `;
   return sendEmail({
     to: CONTACT_INBOX,
     subject: `${subjectPrefix}New design request: ${req.teamName} - ${req.reference}`,
-    html,
+    html: brandedEmail({
+      preheader: `${req.teamName} - ${req.reference}`,
+      heading: `${req.rush ? "🚨 RUSH · " : ""}New design request`,
+      intro: `Reference: <strong>${esc(req.reference)}</strong>`,
+      bodyHtml,
+      ctaText: req.manageUrl ? "Open manage view" : undefined,
+      ctaUrl: req.manageUrl,
+    }),
     replyTo: req.contactEmail,
   });
 }
@@ -111,17 +118,21 @@ export async function emailDesignRequestConfirmation(args: {
   reference: string;
   statusUrl: string;
 }): Promise<boolean> {
-  const html = `
-    <h2>We got your design request, ${esc(args.teamName)}!</h2>
-    <p>Reference: <strong>${esc(args.reference)}</strong></p>
-    <p>Our in-house designer will start work on a free mockup. You'll get a notification when the proof is ready to review.</p>
-    <p>Track your design request: <a href="${esc(args.statusUrl)}">${esc(args.statusUrl)}</a></p>
-    <p>- The Slugger Athletics team</p>
-  `;
   return sendEmail({
     to: args.to,
     subject: `Your Slugger Athletics design request (${args.reference})`,
-    html,
+    html: brandedEmail({
+      preheader: `We're on it - reference ${args.reference}`,
+      heading: `We got it, ${esc(args.teamName)}!`,
+      intro: `Reference: <strong>${esc(args.reference)}</strong>`,
+      bodyHtml: `
+        <p style="margin:0 0 12px;">Our in-house designer is starting work on your <strong>free mockup</strong>. We'll send you another email the moment it's ready to review.</p>
+        <p style="margin:0;">Bookmark your tracking link below so you can check in anytime - it's also where you'll approve the design when it's ready.</p>
+      `,
+      ctaText: "Track your design",
+      ctaUrl: args.statusUrl,
+      footerNote: "Free design proofs · 2-3 week standard turnaround · 1-week rush available",
+    }),
   });
 }
 
@@ -132,15 +143,19 @@ export async function emailProofReady(args: {
   reference: string;
   statusUrl: string;
 }): Promise<boolean> {
-  const html = `
-    <h2>Your proof is ready, ${esc(args.teamName)}!</h2>
-    <p>Reference: <strong>${esc(args.reference)}</strong></p>
-    <p>Review and approve (or request changes) here: <a href="${esc(args.statusUrl)}">${esc(args.statusUrl)}</a></p>
-  `;
   return sendEmail({
     to: args.to,
-    subject: `Your Slugger Athletics proof is ready (${args.reference})`,
-    html,
+    subject: `🎨 Your Slugger Athletics proof is ready (${args.reference})`,
+    html: brandedEmail({
+      preheader: `Your design proof is ready - approve or request changes.`,
+      heading: `Your proof is ready, ${esc(args.teamName)}!`,
+      intro: `Reference: <strong>${esc(args.reference)}</strong>`,
+      bodyHtml: `
+        <p style="margin:0 0 12px;">Your designer just uploaded your proof. Review it, then either <strong>approve</strong> to move straight into your team order, or request changes if anything needs to be tweaked.</p>
+      `,
+      ctaText: "Review your proof",
+      ctaUrl: args.statusUrl,
+    }),
   });
 }
 
@@ -152,19 +167,23 @@ export async function emailContactSubmission(msg: {
   subject?: string;
   message: string;
 }): Promise<boolean> {
-  const html = `
-    <h2>New website contact message</h2>
-    <p><strong>Name:</strong> ${esc(msg.name)}</p>
-    <p><strong>Email:</strong> ${esc(msg.email)}</p>
-    ${msg.phone ? `<p><strong>Phone:</strong> ${esc(msg.phone)}</p>` : ""}
-    <p><strong>Subject:</strong> ${esc(msg.subject || "General")}</p>
-    <p><strong>Message:</strong></p>
-    <p>${esc(msg.message).replace(/\n/g, "<br>")}</p>
+  const bodyHtml = `
+    <p style="margin:0 0 8px;"><strong>Name:</strong> ${esc(msg.name)}</p>
+    <p style="margin:0 0 8px;"><strong>Email:</strong> ${esc(msg.email)}</p>
+    ${msg.phone ? `<p style="margin:0 0 8px;"><strong>Phone:</strong> ${esc(msg.phone)}</p>` : ""}
+    <p style="margin:0 0 8px;"><strong>Subject:</strong> ${esc(msg.subject || "General")}</p>
+    <p style="margin:14px 0 6px;"><strong>Message:</strong></p>
+    <p style="margin:0;background:#f6f4ee;padding:12px 14px;border-left:3px solid #b8a36c;">${esc(msg.message).replace(/\n/g, "<br>")}</p>
   `;
   return sendEmail({
     to: CONTACT_INBOX,
     subject: `New contact: ${msg.subject || "Website message"} - ${msg.name}`,
-    html,
-    replyTo: msg.email, // so you can reply straight to the customer
+    html: brandedEmail({
+      preheader: `New contact from ${msg.name}`,
+      heading: "New website contact message",
+      intro: `From <strong>${esc(msg.name)}</strong>. Reply to this email to respond directly.`,
+      bodyHtml,
+    }),
+    replyTo: msg.email,
   });
 }

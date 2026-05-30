@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { ProofAnnotator, type Annotation } from "@/components/proof-annotator";
 
 type Props = {
   token: string;
@@ -12,6 +13,8 @@ type Props = {
   proofImages: string[];
   initialApprovedUrl: string | null;
   teamOrderUrl: string;
+  revisionsUsed: number;
+  maxRevisions: number;
 };
 
 const STATUS_COPY: Record<string, { label: string; blurb: string }> = {
@@ -24,17 +27,31 @@ const STATUS_COPY: Record<string, { label: string; blurb: string }> = {
   cancelled: { label: "Cancelled", blurb: "" },
 };
 
-export function DesignStatusPanel({ token, reference, teamName, status, proofImages, initialApprovedUrl, teamOrderUrl }: Props) {
+export function DesignStatusPanel({
+  token,
+  reference,
+  teamName,
+  status,
+  proofImages,
+  initialApprovedUrl,
+  teamOrderUrl,
+  revisionsUsed,
+  maxRevisions,
+}: Props) {
   const [currentStatus, setCurrentStatus] = useState(status);
   const [chosen, setChosen] = useState<string | null>(initialApprovedUrl ?? proofImages[proofImages.length - 1] ?? null);
   const [busy, setBusy] = useState<"" | "approving" | "requesting">("");
   const [message, setMessage] = useState("");
   const [showChanges, setShowChanges] = useState(false);
-  const [note, setNote] = useState("");
+  const [generalNote, setGeneralNote] = useState("");
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [used, setUsed] = useState(revisionsUsed);
 
   const copy = STATUS_COPY[currentStatus] ?? { label: currentStatus, blurb: "" };
   const isApproved = currentStatus === "approved" || currentStatus === "ordered";
   const hasProof = proofImages.length > 0;
+  const revisionsLeft = Math.max(0, maxRevisions - used);
+  const maxedOut = revisionsLeft === 0;
 
   async function approve() {
     if (!chosen) return;
@@ -57,19 +74,31 @@ export function DesignStatusPanel({ token, reference, teamName, status, proofIma
   }
 
   async function submitChanges() {
+    const hasNote = generalNote.trim().length > 0;
+    const hasPins = annotations.some((a) => a.note.trim().length > 0);
+    if (!hasNote && !hasPins) {
+      setMessage("Add at least one pin with a note, or write a general note.");
+      return;
+    }
     setBusy("requesting");
     setMessage("");
     try {
       const res = await fetch(`/api/design-request/${token}/request-changes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note }),
+        body: JSON.stringify({
+          generalNote: generalNote.trim() || undefined,
+          proofImageUrl: chosen ?? undefined,
+          annotations: annotations.filter((a) => a.note.trim().length > 0),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not save");
       setCurrentStatus("changes_requested");
       setShowChanges(false);
-      setNote("");
+      setGeneralNote("");
+      setAnnotations([]);
+      if (typeof data.used === "number") setUsed(data.used);
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
@@ -84,13 +113,18 @@ export function DesignStatusPanel({ token, reference, teamName, status, proofIma
         <h1 className="display text-3xl sm:text-4xl text-foreground mt-1">{teamName}</h1>
         <div className="mt-4 inline-block clip-slant bg-brand text-on-brand display text-sm px-4 py-2">{copy.label}</div>
         {copy.blurb && <p className="mt-3 text-muted">{copy.blurb}</p>}
+        {hasProof && !isApproved && (
+          <p className="mt-2 text-xs text-muted">
+            Revisions used: <strong className="text-foreground">{used}</strong> of {maxRevisions}
+          </p>
+        )}
       </header>
 
       {hasProof && (
         <section>
           <h2 className="display text-xl text-foreground">Your proof{proofImages.length > 1 ? "s" : ""}</h2>
           {proofImages.length > 1 && !isApproved && (
-            <p className="text-sm text-muted mt-1">Click a proof to select it, then approve.</p>
+            <p className="text-sm text-muted mt-1">Click a proof to select it, then approve or request changes.</p>
           )}
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {proofImages.map((u) => (
@@ -137,24 +171,47 @@ export function DesignStatusPanel({ token, reference, teamName, status, proofIma
           </button>
           <button
             onClick={() => setShowChanges((v) => !v)}
-            className="clip-slant border border-line text-foreground hover:bg-foreground/5 display text-lg px-8 py-4 transition-colors"
+            disabled={maxedOut}
+            className="clip-slant border border-line text-foreground hover:bg-foreground/5 display text-lg px-8 py-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={maxedOut ? `You've used all ${maxRevisions} free revisions` : undefined}
           >
-            Request Changes
+            Request Changes{maxedOut ? " (locked)" : ""}
           </button>
         </section>
       ) : (
         <p className="text-muted">No proof yet. We&apos;ll email you when it&apos;s ready.</p>
       )}
 
-      {showChanges && !isApproved && (
-        <section className="bg-steel border border-line p-5 space-y-3">
-          <h3 className="display text-foreground">Tell us what to change</h3>
-          <textarea
-            className="w-full bg-ink border border-line px-3 py-2.5 text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none min-h-24"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="What would you like adjusted? Colors, text, layout..."
-          />
+      {maxedOut && !isApproved && hasProof && (
+        <section className="bg-steel border border-line p-5">
+          <p className="text-sm text-foreground">
+            You&apos;ve used all <strong>{maxRevisions} free revisions</strong>. For additional changes,
+            email <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a>.
+          </p>
+        </section>
+      )}
+
+      {showChanges && !isApproved && !maxedOut && (
+        <section className="bg-steel border border-line p-5 space-y-4">
+          <div>
+            <h3 className="display text-foreground">Tell us what to change</h3>
+            <p className="text-sm text-muted mt-1">
+              Click pins on the proof to mark exactly what to change. You have{" "}
+              <strong className="text-foreground">{revisionsLeft}</strong> revision{revisionsLeft === 1 ? "" : "s"} left.
+            </p>
+          </div>
+
+          {chosen && (
+            <ProofAnnotator
+              proofUrl={chosen}
+              generalNote={generalNote}
+              setGeneralNote={setGeneralNote}
+              annotations={annotations}
+              setAnnotations={setAnnotations}
+              disabled={busy !== ""}
+            />
+          )}
+
           <button
             onClick={submitChanges}
             disabled={busy !== ""}

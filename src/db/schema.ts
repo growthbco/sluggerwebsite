@@ -412,6 +412,21 @@ export const designRequests = pgTable(
     neededBy: timestamp("needed_by", { withTimezone: true }),
     rush: boolean("rush").notNull().default(false),
 
+    // Revision tracking. We cap at MAX_REVISIONS (3) so clients can't loop forever.
+    // changeRequests stores the structured feedback from each round (annotations
+    // pinned to the proof + general note + which proof url it was made against).
+    revisionsUsed: integer("revisions_used").notNull().default(0),
+    changeRequests: jsonb("change_requests")
+      .$type<
+        Array<{
+          at: string;
+          proofImageUrl?: string;
+          generalNote?: string;
+          annotations?: { n: number; x: number; y: number; note: string }[];
+        }>
+      >()
+      .default([]),
+
     // Inspiration uploaded by the client (Vercel Blob URLs).
     inspirationImages: jsonb("inspiration_images").$type<string[]>().default([]),
     // Proof/mockup images uploaded by the designer.

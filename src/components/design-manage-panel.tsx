@@ -4,6 +4,14 @@ import { useState } from "react";
 import Image from "next/image";
 import { upload } from "@vercel/blob/client";
 
+type Annotation = { n: number; x: number; y: number; note: string };
+type ChangeRequest = {
+  at: string;
+  proofImageUrl?: string;
+  generalNote?: string;
+  annotations?: Annotation[];
+};
+
 type Props = {
   token: string;
   reference: string;
@@ -15,9 +23,30 @@ type Props = {
   inspirationImages: string[];
   proofImages: string[];
   statusUrl: string;
+  revisionsUsed: number;
+  maxRevisions: number;
+  changeRequests: ChangeRequest[];
+  rush: boolean;
+  neededBy: string | null;
 };
 
-export function DesignManagePanel({ token, reference, teamName, status, vision, colors, contact, inspirationImages, proofImages, statusUrl }: Props) {
+export function DesignManagePanel({
+  token,
+  reference,
+  teamName,
+  status,
+  vision,
+  colors,
+  contact,
+  inspirationImages,
+  proofImages,
+  statusUrl,
+  revisionsUsed,
+  maxRevisions,
+  changeRequests,
+  rush,
+  neededBy,
+}: Props) {
   const [proofs, setProofs] = useState<string[]>(proofImages);
   const [uploading, setUploading] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -80,6 +109,21 @@ export function DesignManagePanel({ token, reference, teamName, status, vision, 
       <header>
         <span className="display text-brand text-sm">{reference} · {status.replace(/_/g, " ")}</span>
         <h1 className="display text-3xl sm:text-4xl text-foreground mt-1">{teamName}</h1>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          {rush && (
+            <span className="inline-block clip-slant bg-brand text-on-brand display px-3 py-1">
+              🚨 RUSH {neededBy ? `· needed by ${new Date(neededBy).toLocaleDateString()}` : ""}
+            </span>
+          )}
+          {!rush && neededBy && (
+            <span className="inline-block border border-line text-muted display px-3 py-1">
+              Needed by {new Date(neededBy).toLocaleDateString()}
+            </span>
+          )}
+          <span className="inline-block border border-line text-muted display px-3 py-1">
+            Revisions: {revisionsUsed} / {maxRevisions}
+          </span>
+        </div>
       </header>
 
       <section className="bg-steel border border-line p-5 grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
@@ -125,6 +169,53 @@ export function DesignManagePanel({ token, reference, teamName, status, vision, 
                 )}
               </a>
             ))}
+          </div>
+        </section>
+      )}
+
+      {changeRequests.length > 0 && (
+        <section>
+          <h2 className="display text-xl text-foreground">Change requests ({changeRequests.length})</h2>
+          <p className="text-sm text-muted mt-1">Latest first. Pins are tied to specific spots on the proof.</p>
+          <div className="mt-4 space-y-6">
+            {[...changeRequests].reverse().map((cr, ridx) => {
+              const round = changeRequests.length - ridx;
+              return (
+                <div key={cr.at + ridx} className="bg-steel border border-line p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="display text-foreground text-sm">Round {round}</span>
+                    <span className="text-xs text-muted">{new Date(cr.at).toLocaleString()}</span>
+                  </div>
+                  {cr.proofImageUrl && (
+                    <div className="relative bg-white border border-line w-full" style={{ aspectRatio: "4 / 3" }}>
+                      <Image src={cr.proofImageUrl} alt={`Round ${round} proof`} fill sizes="(max-width: 768px) 100vw, 700px" className="object-contain p-2" unoptimized />
+                      {(cr.annotations ?? []).map((a) => (
+                        <span
+                          key={a.n}
+                          className="absolute -translate-x-1/2 -translate-y-1/2 grid place-items-center h-7 w-7 rounded-full bg-brand text-on-brand display text-xs shadow-lg ring-2 ring-on-brand"
+                          style={{ left: `${a.x}%`, top: `${a.y}%` }}
+                        >
+                          {a.n}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {(cr.annotations?.length ?? 0) > 0 && (
+                    <ol className="mt-3 space-y-1.5 text-sm">
+                      {cr.annotations!.map((a) => (
+                        <li key={a.n} className="flex gap-3">
+                          <span className="shrink-0 grid place-items-center h-6 w-6 rounded-full bg-brand text-on-brand display text-xs">{a.n}</span>
+                          <span className="text-foreground/90">{a.note}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  {cr.generalNote && (
+                    <p className="mt-3 text-sm text-muted whitespace-pre-line border-l-2 border-brand/60 pl-3">{cr.generalNote}</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
       )}

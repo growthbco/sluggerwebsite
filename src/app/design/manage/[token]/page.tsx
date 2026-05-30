@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
-import { getByManageToken } from "@/lib/design-requests";
+import { getByManageToken, MAX_REVISIONS } from "@/lib/design-requests";
 import { DesignManagePanel } from "@/components/design-manage-panel";
 
 export const metadata: Metadata = { title: "Manage Design Request", robots: { index: false } };
@@ -37,6 +37,11 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         inspirationImages={request.inspirationImages ?? []}
         proofImages={request.proofImages ?? []}
         statusUrl={`${SITE}/design/status/${request.statusToken}`}
+        revisionsUsed={request.revisionsUsed ?? 0}
+        maxRevisions={MAX_REVISIONS}
+        changeRequests={request.changeRequests ?? []}
+        rush={request.rush}
+        neededBy={request.neededBy ? request.neededBy.toISOString() : null}
       />
     </div>
   );

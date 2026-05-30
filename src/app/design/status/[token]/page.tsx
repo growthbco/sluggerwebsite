@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
-import { getByStatusToken } from "@/lib/design-requests";
+import { getByStatusToken, MAX_REVISIONS } from "@/lib/design-requests";
 import { DesignStatusPanel } from "@/components/design-status-panel";
 
 export const metadata: Metadata = { title: "Your Design Request", robots: { index: false } };
@@ -31,6 +31,8 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
         proofImages={request.proofImages ?? []}
         initialApprovedUrl={request.approvedDesignUrl}
         teamOrderUrl={`/team-order?design=${token}`}
+        revisionsUsed={request.revisionsUsed ?? 0}
+        maxRevisions={MAX_REVISIONS}
       />
     </div>
   );

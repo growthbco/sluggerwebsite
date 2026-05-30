@@ -110,17 +110,54 @@ export async function approveDesign(id: string, approvedUrl?: string) {
     .where(eq(designRequests.id, id));
 }
 
-/** Client requests changes; loops back to designer. */
-export async function requestChanges(id: string, note?: string) {
+/** Max free revision rounds a client gets before the Request Changes
+ *  button locks. Cap exists to keep designs from spiraling. */
+export const MAX_REVISIONS = 3;
+
+export type Annotation = { n: number; x: number; y: number; note: string };
+export type ChangeRequestEntry = {
+  at: string;
+  proofImageUrl?: string;
+  generalNote?: string;
+  annotations?: Annotation[];
+};
+
+/** Client requests changes; loops back to designer.
+ *  Stores a structured entry (annotations + general note) in changeRequests
+ *  history, increments the revision counter, and flips status. Refuses if cap
+ *  is already reached. */
+export async function requestChanges(
+  id: string,
+  payload: { generalNote?: string; proofImageUrl?: string; annotations?: Annotation[] } = {},
+): Promise<{ ok: true; used: number; max: number } | { ok: false; reason: "max_reached"; used: number; max: number }> {
   const db = getDb();
   const [existing] = await db.select().from(designRequests).where(eq(designRequests.id, id)).limit(1);
-  if (!existing) return;
+  if (!existing) return { ok: false, reason: "max_reached", used: 0, max: MAX_REVISIONS };
+
+  const used = existing.revisionsUsed ?? 0;
+  if (used >= MAX_REVISIONS) {
+    return { ok: false, reason: "max_reached", used, max: MAX_REVISIONS };
+  }
+
   const now = new Date();
-  const newNotes = note ? `${existing.notes ?? ""}\n[Change request ${now.toISOString()}] ${note}`.trim() : existing.notes;
+  const entry: ChangeRequestEntry = {
+    at: now.toISOString(),
+    proofImageUrl: payload.proofImageUrl,
+    generalNote: payload.generalNote,
+    annotations: payload.annotations?.length ? payload.annotations : undefined,
+  };
+
   await db
     .update(designRequests)
-    .set({ status: "changes_requested", notes: newNotes, updatedAt: now })
+    .set({
+      status: "changes_requested",
+      revisionsUsed: used + 1,
+      changeRequests: [...(existing.changeRequests ?? []), entry],
+      updatedAt: now,
+    })
     .where(eq(designRequests.id, id));
+
+  return { ok: true, used: used + 1, max: MAX_REVISIONS };
 }
 
 /** Called after a team order is submitted against this design. */
