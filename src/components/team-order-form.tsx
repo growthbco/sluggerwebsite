@@ -112,23 +112,32 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
         </button>
       </div>
 
-      {/* Team + contact */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="display text-sm text-foreground">Team Name *</label>
-          <input className={`mt-2 ${inputCls}`} value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="e.g. Sandstorm" />
+      {/* Team + contact — locked when arriving from an approved design so the
+          team-order stays tied to the design (same name = same job). */}
+      {prefill ? (
+        <div className="bg-steel border border-brand/40 p-4 space-y-2">
+          <div className="flex items-baseline justify-between">
+            <span className="display text-foreground">{prefill.teamName}</span>
+            <span className="text-[10px] uppercase tracking-wider text-brand">From approved design</span>
+          </div>
+          <p className="text-xs text-muted">
+            {prefill.contactName} · {prefill.contactEmail}{prefill.contactPhone ? ` · ${prefill.contactPhone}` : ""}
+          </p>
+          <p className="text-[11px] text-muted/80">
+            Team name &amp; contact are locked to keep this order tied to your approved design.
+            Need to change them? Email <a href="mailto:apparel@sluggerathletics.com" className="underline">apparel@sluggerathletics.com</a>.
+          </p>
         </div>
-        <div>
-          <label className="display text-sm text-foreground">Jersey Style *</label>
-          <select className={`mt-2 ${inputCls}`} value={jerseyStyle} onChange={(e) => setJerseyStyle(e.target.value)}>
-            {JERSEY_STYLES.map((s) => <option key={s}>{s}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="display text-sm text-foreground">Your Name *</label>
-          <input className={`mt-2 ${inputCls}`} value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Coach / contact" />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="display text-sm text-foreground">Team Name *</label>
+            <input className={`mt-2 ${inputCls}`} value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="e.g. Sandstorm" />
+          </div>
+          <div>
+            <label className="display text-sm text-foreground">Your Name *</label>
+            <input className={`mt-2 ${inputCls}`} value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Coach / contact" />
+          </div>
           <div>
             <label className="display text-sm text-foreground">Email{mode === "link" ? " *" : ""}</label>
             <input className={`mt-2 ${inputCls}`} value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="email@team.com" />
@@ -138,6 +147,14 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
             <input className={`mt-2 ${inputCls}`} value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(000) 000-0000" />
           </div>
         </div>
+      )}
+
+      {/* Jersey style — editable in both flows */}
+      <div>
+        <label className="display text-sm text-foreground">Jersey Style *</label>
+        <select className={`mt-2 ${inputCls}`} value={jerseyStyle} onChange={(e) => setJerseyStyle(e.target.value)}>
+          {JERSEY_STYLES.map((s) => <option key={s}>{s}</option>)}
+        </select>
       </div>
 
       {/* Jersey material */}

@@ -28,7 +28,25 @@ export async function POST(req: Request) {
   const roster = (body.roster ?? []).filter(
     (r) => r.name || r.number || r.size || (r.sizes && Object.keys(r.sizes).length),
   );
-  if (!body.teamName || !body.contactName) {
+
+  // If a designToken is attached, the team/contact identity MUST come from the
+  // design — the customer can't rename their team mid-funnel or break the link
+  // between approved design → team order → print-file QA.
+  let teamName = body.teamName;
+  let contactName = body.contactName;
+  let contactEmail = body.contactEmail;
+  let contactPhone = body.contactPhone;
+  if (body.designToken && dbEnabled()) {
+    const design = await getByStatusToken(body.designToken);
+    if (design && (design.status === "approved" || design.status === "ordered")) {
+      teamName = design.teamName;
+      contactName = design.contactName;
+      contactEmail = design.contactEmail;
+      contactPhone = design.contactPhone ?? undefined;
+    }
+  }
+
+  if (!teamName || !contactName) {
     return NextResponse.json({ error: "Team name and contact name are required." }, { status: 400 });
   }
   if (roster.length === 0) {
@@ -39,10 +57,10 @@ export async function POST(req: Request) {
 
   const posted = await postTeamOrderToDiscord({
     reference,
-    teamName: body.teamName,
-    contactName: body.contactName,
-    contactEmail: body.contactEmail,
-    contactPhone: body.contactPhone,
+    teamName,
+    contactName,
+    contactEmail,
+    contactPhone,
     jerseyStyle: body.jerseyStyle,
     jerseyMaterial: body.jerseyMaterial,
     items: body.items?.length ? body.items : ["jersey"],
@@ -59,8 +77,8 @@ export async function POST(req: Request) {
   // "ordered" so the funnel reflects the linked outcome.
   if (body.designToken && dbEnabled()) {
     try {
-      const req = await getByStatusToken(body.designToken);
-      if (req) await markOrdered(req.id);
+      const d = await getByStatusToken(body.designToken);
+      if (d) await markOrdered(d.id);
     } catch (e) {
       console.error("markOrdered failed:", e);
     }

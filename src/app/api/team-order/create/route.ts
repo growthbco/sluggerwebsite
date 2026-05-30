@@ -19,23 +19,37 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  if (!body.teamName || !body.contactName || !body.contactEmail) {
-    return NextResponse.json({ error: "Team name, your name, and email are required." }, { status: 400 });
-  }
-
-  // Resolve linked design (if any), to attach the design request id.
+  // If a designToken is attached, the team/contact identity MUST come from the
+  // design — the link between approved design → team order is the source of
+  // truth for which uniform belongs to which team.
+  let teamName = body.teamName;
+  let contactName = body.contactName;
+  let contactEmail = body.contactEmail;
+  let contactPhone = body.contactPhone;
   let designRequestId: string | undefined;
   if (body.designToken) {
-    const req = await getByStatusToken(body.designToken);
-    if (req) designRequestId = req.id;
+    const design = await getByStatusToken(body.designToken);
+    if (design) {
+      designRequestId = design.id;
+      if (design.status === "approved" || design.status === "ordered") {
+        teamName = design.teamName;
+        contactName = design.contactName;
+        contactEmail = design.contactEmail;
+        contactPhone = design.contactPhone ?? undefined;
+      }
+    }
+  }
+
+  if (!teamName || !contactName || !contactEmail) {
+    return NextResponse.json({ error: "Team name, your name, and email are required." }, { status: 400 });
   }
 
   try {
     const { reference, selfEntryToken, manageToken } = await createTeamOrder({
-      teamName: body.teamName,
-      contactName: body.contactName,
-      contactEmail: body.contactEmail,
-      contactPhone: body.contactPhone,
+      teamName,
+      contactName,
+      contactEmail,
+      contactPhone,
       jerseyStyle: body.jerseyStyle,
       jerseyMaterial: body.jerseyMaterial,
       items: body.items,
