@@ -19,10 +19,30 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(ROOT, "public", "sa-monogram.jpg");
 
-// The brand mark is designed black + gold on white. We preserve that look:
-// trim the source's outer white border, then place the trimmed mark onto a
-// fresh white square with a touch of padding so it reads cleanly at 16×16.
-const BG = { r: 255, g: 255, b: 255, alpha: 1 };
+// Alpha-key the white background. A simple greyscale->alpha pass would ghost
+// the brand-gold (it's a mid-luminance color); instead we key alpha by each
+// pixel's distance from white across all channels, scaled so even the gold
+// (#b8a36c, min channel ≈ 108) lands fully opaque.
+async function knockoutWhite(srcBuffer) {
+  const { data, info } = await sharp(srcBuffer)
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  const out = Buffer.alloc(width * height * 4);
+  for (let i = 0, j = 0; i < data.length; i += 3, j += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    out[j] = r;
+    out[j + 1] = g;
+    out[j + 2] = b;
+    // 255 - min(r,g,b) is the most-saturated channel's darkness; ×2 makes any
+    // pixel with even one channel <= 127 fully opaque (covers black + gold),
+    // while pure white stays at 0.
+    const minC = Math.min(r, g, b);
+    out[j + 3] = Math.min(255, (255 - minC) * 2);
+  }
+  return sharp(out, { raw: { width, height, channels: 4 } }).png().toBuffer();
+}
 
 async function buildMark(size) {
   // Padding around the mark inside the square. Tiny sizes need more breathing
@@ -30,15 +50,23 @@ async function buildMark(size) {
   const pad = size <= 16 ? 0.06 : size <= 32 ? 0.05 : 0.07;
   const inner = Math.round(size * (1 - pad * 2));
 
+  // 1) trim the white border, 2) knock the white out to transparent,
+  // 3) fit the mark into the inner box.
   const trimmed = await sharp(SRC)
     .trim({ background: { r: 255, g: 255, b: 255 }, threshold: 12 })
-    .resize(inner, inner, { fit: "contain", background: BG })
     .toBuffer();
 
+  const keyed = await knockoutWhite(trimmed);
+
+  const mark = await sharp(keyed)
+    .resize(inner, inner, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .toBuffer();
+
+  // Transparent square canvas — browsers show the tab background through it.
   return sharp({
-    create: { width: size, height: size, channels: 4, background: BG },
+    create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
   })
-    .composite([{ input: trimmed, gravity: "center" }])
+    .composite([{ input: mark, gravity: "center" }])
     .png()
     .toBuffer();
 }
