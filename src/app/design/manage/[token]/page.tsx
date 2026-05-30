@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
 import { getByManageToken, MAX_REVISIONS } from "@/lib/design-requests";
+import { getByDesignRequestId, getRoster } from "@/lib/team-orders";
 import { DesignManagePanel } from "@/components/design-manage-panel";
+import { PrintFileQA } from "@/components/print-file-qa";
 
 export const metadata: Metadata = { title: "Manage Design Request", robots: { index: false } };
 
@@ -24,8 +26,15 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
 
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
+  // Designer-only print-file QA: only renders once the client has approved this
+  // design AND started a linked team order with at least one roster entry.
+  // The coach's view (/team-order/manage/...) deliberately does NOT show this
+  // — we don't want to put the print-file check in front of the customer.
+  const linkedOrder = await getByDesignRequestId(request.id);
+  const linkedRoster = linkedOrder ? await getRoster(linkedOrder.id) : [];
+
   return (
-    <div className="mx-auto max-w-4xl px-4 sm:px-6 py-14">
+    <div className="mx-auto max-w-4xl px-4 sm:px-6 py-14 space-y-10">
       <DesignManagePanel
         token={token}
         reference={request.reference}
@@ -43,6 +52,25 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         rush={request.rush}
         neededBy={request.neededBy ? request.neededBy.toISOString() : null}
       />
+
+      {linkedOrder && linkedRoster.length > 0 && (
+        <PrintFileQA
+          // Auth: the verify endpoint accepts the team-order's manage token.
+          // The designer reaches this page from the Discord thread (which only
+          // staff can see), so it's safe to surface the team-order token here.
+          token={linkedOrder.manageToken!}
+          rosterCount={linkedRoster.length}
+          initialPrintFileUrl={linkedOrder.printFileUrl}
+          initialResult={linkedOrder.printFileVerification ?? null}
+        />
+      )}
+
+      {linkedOrder && linkedRoster.length === 0 && (
+        <p className="text-sm text-muted text-center">
+          Print file QA will appear here once the team submits at least one player on their roster
+          (team order <span className="font-mono">{linkedOrder.reference}</span>).
+        </p>
+      )}
     </div>
   );
 }

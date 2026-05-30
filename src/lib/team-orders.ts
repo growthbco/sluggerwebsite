@@ -67,6 +67,20 @@ export async function getByManageToken(token: string) {
   return row ?? null;
 }
 
+/** The team order (if any) that fulfills a given design request. Used by the
+ *  designer-facing print-file QA so they can verify against the roster the
+ *  team submitted, without exposing the QA tool to the coach. */
+export async function getByDesignRequestId(designRequestId: string) {
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(teamOrders)
+    .where(eq(teamOrders.designRequestId, designRequestId))
+    .orderBy(asc(teamOrders.createdAt))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function getRoster(teamOrderId: string) {
   const db = getDb();
   return db

@@ -3,7 +3,6 @@ import Image from "next/image";
 import { dbEnabled } from "@/db";
 import { getByManageToken, getRoster, getLinkedDesignPreview } from "@/lib/team-orders";
 import { TeamOrderManage } from "@/components/team-order-manage";
-import { PrintFileQA } from "@/components/print-file-qa";
 
 export const metadata: Metadata = { title: "Manage Team Order", robots: { index: false } };
 
@@ -74,16 +73,6 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
         }))}
         submitted={order.status === "submitted"}
       />
-
-      {/* Designer-facing pre-press QA: only useful once roster entries exist. */}
-      {roster.length > 0 && (
-        <PrintFileQA
-          token={token}
-          rosterCount={roster.length}
-          initialPrintFileUrl={order.printFileUrl}
-          initialResult={order.printFileVerification ?? null}
-        />
-      )}
     </div>
   );
 }
