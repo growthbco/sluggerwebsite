@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { eq, asc } from "drizzle-orm";
 import { getDb } from "@/db";
-import { teamOrders, teamOrderRoster } from "@/db/schema";
+import { teamOrders, teamOrderRoster, designRequests } from "@/db/schema";
 
 export type NewTeamOrder = {
   teamName: string;
@@ -94,6 +94,33 @@ export async function addRosterRow(teamOrderId: string, input: RosterInput, fill
     })
     .returning();
   return row;
+}
+
+export type LinkedDesignPreview = {
+  reference: string;
+  status: string;
+  /** Approved image if status=approved, else most recent proof image. */
+  imageUrl: string | null;
+  /** True when the design hasn't been approved yet (we're showing latest proof). */
+  pending: boolean;
+};
+
+/** Pull the design image to show on the join/manage pages so players + coaches
+ *  visually verify they're on the right team's roster. Returns null if there's
+ *  no linked design or nothing visual yet. */
+export async function getLinkedDesignPreview(designRequestId: string | null | undefined): Promise<LinkedDesignPreview | null> {
+  if (!designRequestId) return null;
+  const db = getDb();
+  const [d] = await db.select().from(designRequests).where(eq(designRequests.id, designRequestId)).limit(1);
+  if (!d) return null;
+  const approved = d.approvedDesignUrl ?? null;
+  const latestProof = d.proofImages?.length ? d.proofImages[d.proofImages.length - 1] : null;
+  return {
+    reference: d.reference,
+    status: d.status,
+    imageUrl: approved ?? latestProof,
+    pending: d.status !== "approved",
+  };
 }
 
 /** Coach submits the order; locks self-entry and marks it submitted. */

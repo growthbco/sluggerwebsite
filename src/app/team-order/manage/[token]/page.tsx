@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { dbEnabled } from "@/db";
-import { getByManageToken, getRoster } from "@/lib/team-orders";
+import { getByManageToken, getRoster, getLinkedDesignPreview } from "@/lib/team-orders";
 import { TeamOrderManage } from "@/components/team-order-manage";
 
 export const metadata: Metadata = { title: "Manage Team Order", robots: { index: false } };
@@ -17,12 +18,44 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
     return <Centered title="Link not found">This management link is invalid or has expired.</Centered>;
   }
 
-  const roster = await getRoster(order.id);
+  const [roster, design] = await Promise.all([
+    getRoster(order.id),
+    getLinkedDesignPreview(order.designRequestId),
+  ]);
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   const shareUrl = `${SITE}/team-order/join/${order.selfEntryToken}`;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14">
+    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14 space-y-8">
+      {/* Visual confirmation card so the coach (and screenshots they share with
+          their players) make the team ↔ uniform connection obvious. */}
+      {design?.imageUrl && (
+        <section className="rounded-xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
+          <div className="flex flex-col sm:flex-row">
+            <div className="sm:w-56 aspect-[4/3] sm:aspect-auto sm:h-44 relative bg-black/5 shrink-0">
+              <Image
+                src={design.imageUrl}
+                alt={`${order.teamName} approved design`}
+                fill
+                sizes="(max-width: 640px) 100vw, 224px"
+                className="object-contain"
+                unoptimized
+              />
+            </div>
+            <div className="px-4 py-3 flex-1">
+              <p className="text-xs text-muted uppercase tracking-wider">
+                {design.pending ? "Latest proof (pending approval)" : "Approved design"}
+              </p>
+              <p className="display text-lg text-foreground mt-1">{order.teamName}</p>
+              <p className="text-xs text-muted mt-1">Design ref: <span className="font-mono">{design.reference}</span></p>
+              <p className="text-xs text-muted mt-2">
+                Every player entry on this roster is tied to this design.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       <TeamOrderManage
         token={token}
         reference={order.reference}
