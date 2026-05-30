@@ -6,6 +6,7 @@ import { CartButton } from "@/components/cart-button";
 // entry points (Free Design + Team Order) live as buttons on the right so
 // they're the most obvious actions, not lost in a list of links.
 const nav = [
+  { href: "/", label: "Home" },
   { href: "/shop", label: "Shop" },
   { href: "/team-uniforms", label: "Uniforms" },
   { href: "/drops", label: "Buy-Ins" },
