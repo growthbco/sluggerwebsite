@@ -52,20 +52,32 @@ export default function Home() {
               chains. <span className="text-foreground font-semibold">Free designs, no obligation</span> -
               ready in 2-3 weeks, or as fast as one week with rush.
             </p>
-            <div className="mt-9 flex flex-wrap gap-4">
+            {/* Two clearly distinct entry points — most customers fit one of
+                these two buckets, and we never want them guessing which to
+                click. */}
+            <div className="mt-9 grid sm:grid-cols-2 gap-3 max-w-2xl">
               <Link
                 href="/design"
-                className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors"
+                className="group bg-brand hover:bg-brand-dark text-on-brand p-5 transition-colors"
               >
-                Start a Design
+                <span className="display text-[11px] tracking-wider opacity-80">NEW CUSTOMER</span>
+                <p className="display text-xl sm:text-2xl mt-1">Get a Free Design →</p>
+                <p className="text-sm opacity-90 mt-1">Tell us your vision. We design free, you approve.</p>
               </Link>
               <Link
-                href="/shop"
-                className="clip-slant border border-line text-foreground hover:bg-foreground/5 display text-lg px-8 py-4 transition-colors"
+                href="/team-order"
+                className="group bg-ink/60 border border-brand/70 hover:bg-brand/10 text-foreground p-5 transition-colors"
               >
-                Shop Drops
+                <span className="display text-[11px] tracking-wider text-brand">HAVE YOUR DESIGN?</span>
+                <p className="display text-xl sm:text-2xl mt-1">Start a Team Order →</p>
+                <p className="text-sm text-muted mt-1">Skip ahead and submit your roster.</p>
               </Link>
             </div>
+            <p className="mt-4 text-sm">
+              <Link href="/shop" className="text-muted hover:text-foreground underline underline-offset-4">
+                Or shop our latest drops →
+              </Link>
+            </p>
           </div>
         </div>
       </section>

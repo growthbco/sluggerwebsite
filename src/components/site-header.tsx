@@ -2,15 +2,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { CartButton } from "@/components/cart-button";
 
+// Text nav is intentionally focused on browsing categories. The two funnel
+// entry points (Free Design + Team Order) live as buttons on the right so
+// they're the most obvious actions, not lost in a list of links.
 const nav = [
-  { href: "/", label: "Home" },
   { href: "/shop", label: "Shop" },
-  { href: "/team-uniforms", label: "Team Uniforms" },
-  { href: "/design", label: "Start a Design" },
+  { href: "/team-uniforms", label: "Uniforms" },
   { href: "/drops", label: "Buy-Ins" },
   { href: "/embroidery", label: "Embroidery" },
   { href: "/gallery", label: "Gallery" },
-  { href: "/team-order", label: "Team Order" },
 ];
 
 export function SiteHeader() {
@@ -23,9 +23,8 @@ export function SiteHeader() {
 
       <div className="bg-ink/95 backdrop-blur border-b border-line">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo (used as-is - reads on dark via its gold/white outline, and on light) */}
-            <Link href="/" className="flex items-center">
+          <div className="flex items-center justify-between h-16 gap-4">
+            <Link href="/" className="flex items-center shrink-0">
               <Image
                 src="/slugger-logo.png"
                 alt="Slugger Athletics"
@@ -36,8 +35,8 @@ export function SiteHeader() {
               />
             </Link>
 
-            {/* Nav */}
-            <nav className="hidden md:flex items-center gap-7">
+            {/* Browse nav (links only) */}
+            <nav className="hidden lg:flex items-center gap-6">
               {nav.map((item) => (
                 <Link
                   key={item.href}
@@ -49,16 +48,38 @@ export function SiteHeader() {
               ))}
             </nav>
 
-            {/* Actions */}
-            <div className="flex items-center gap-3">
+            {/* Funnel entry points + cart */}
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              <Link
+                href="/design"
+                className="hidden sm:inline-flex clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-xs sm:text-sm px-3 sm:px-5 py-2.5 transition-colors"
+              >
+                Free Design
+              </Link>
               <Link
                 href="/team-order"
-                className="hidden sm:inline-flex clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-sm px-5 py-2.5 transition-colors"
+                className="hidden sm:inline-flex clip-slant border border-brand/70 text-foreground hover:bg-brand/10 display text-xs sm:text-sm px-3 sm:px-5 py-2.5 transition-colors"
               >
-                Start a Team Order
+                Team Order
               </Link>
               <CartButton />
             </div>
+          </div>
+
+          {/* Mobile-only funnel CTAs (header buttons hidden under sm) */}
+          <div className="sm:hidden flex gap-2 pb-3">
+            <Link
+              href="/design"
+              className="flex-1 text-center clip-slant bg-brand text-on-brand display text-xs px-3 py-2.5"
+            >
+              Free Design
+            </Link>
+            <Link
+              href="/team-order"
+              className="flex-1 text-center clip-slant border border-brand/70 text-foreground display text-xs px-3 py-2.5"
+            >
+              Team Order
+            </Link>
           </div>
         </div>
       </div>
