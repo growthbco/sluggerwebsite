@@ -123,6 +123,24 @@ export async function getLinkedDesignPreview(designRequestId: string | null | un
   };
 }
 
+/** Persist a print-file verification result. */
+export async function savePrintFileVerification(
+  teamOrderId: string,
+  printFileUrl: string,
+  verification: NonNullable<typeof teamOrders.$inferSelect.printFileVerification>,
+) {
+  const db = getDb();
+  await db
+    .update(teamOrders)
+    .set({
+      printFileUrl,
+      printFileVerification: verification,
+      printFileVerifiedAt: verification.ok ? new Date() : null,
+      updatedAt: new Date(),
+    })
+    .where(eq(teamOrders.id, teamOrderId));
+}
+
 /** Coach submits the order; locks self-entry and marks it submitted. */
 export async function submitTeamOrder(teamOrderId: string) {
   const db = getDb();

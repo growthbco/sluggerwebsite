@@ -50,6 +50,13 @@
       "when": 1780105354300,
       "tag": "0006_minor_ego",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1780107852828,
+      "tag": "0007_rare_blockbuster",
+      "breakpoints": true
     }
   ]
 }

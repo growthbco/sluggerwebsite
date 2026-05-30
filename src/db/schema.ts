@@ -327,6 +327,24 @@ export const teamOrders = pgTable(
     rosterFileUrl: text("roster_file_url"),
     specialInstructions: text("special_instructions"),
 
+    // Print-file QA: the designer uploads the print-file layout, we OCR it with
+    // Gemini and compare against the submitted roster to catch typos before printing.
+    printFileUrl: text("print_file_url"),
+    printFileVerifiedAt: timestamp("print_file_verified_at", { withTimezone: true }),
+    printFileVerification: jsonb("print_file_verification").$type<{
+      ok: boolean;
+      summary: string;
+      extracted: { name: string; number: string; size: string }[];
+      mismatches: {
+        kind: "missing" | "extra" | "wrong_size" | "wrong_number" | "name_typo";
+        roster?: { name?: string; number?: string; size?: string };
+        printed?: { name?: string; number?: string; size?: string };
+        detail: string;
+      }[];
+      verifiedAt: string;
+      model: string;
+    }>(),
+
     shippingAddress: jsonb("shipping_address").$type<{
       line1?: string;
       line2?: string;

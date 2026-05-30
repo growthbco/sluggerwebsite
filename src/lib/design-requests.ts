@@ -91,6 +91,12 @@ export async function getByManageToken(tkn: string) {
   return row ?? null;
 }
 
+export async function getById(id: string) {
+  const db = getDb();
+  const [row] = await db.select().from(designRequests).where(eq(designRequests.id, id)).limit(1);
+  return row ?? null;
+}
+
 /** Designer uploads proof image(s); auto-bumps status to proof_sent. */
 export async function addProofImages(id: string, urls: string[]) {
   const db = getDb();
