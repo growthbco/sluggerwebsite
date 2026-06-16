@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { upload } from "@vercel/blob/client";
+import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
 
 type Uploaded = { url: string; pathname: string };
 
@@ -83,7 +84,7 @@ export function DesignIntakeForm() {
       }
       setStatus("done");
       setStatusUrl(data.statusUrl);
-      if (data.waived) setMessage("returning_customer");
+      if (data.waived) setMessage(data.waivedReason || "waived");
     } catch (e) {
       setStatus("error");
       setMessage((e as Error).message);
@@ -103,6 +104,9 @@ export function DesignIntakeForm() {
             ? "Your $35 design fee was automatically waived as a returning Slugger customer. Our designer is already on it."
             : "Our in-house designer will get started on your mockup. You can track its progress here:"}
         </p>
+        {!returning && DESIGN_FEE_WAIVED && message === "promo_campaign" && (
+          <p className="mt-2 text-sm text-brand">No design fee — it&apos;s on us right now. 🎉</p>
+        )}
         {statusUrl && (
           <div className="mt-4">
             <a href={statusUrl} className="text-brand hover:underline break-all text-sm">{statusUrl}</a>
@@ -230,13 +234,24 @@ export function DesignIntakeForm() {
         disabled={!canSubmit || status === "sending"}
         className="w-full clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg py-3.5 transition-colors disabled:opacity-60"
       >
-        {status === "sending" ? "Submitting..." : "Submit & Pay $35"}
+        {status === "sending"
+          ? "Submitting..."
+          : DESIGN_FEE_WAIVED
+          ? "Submit Design Request"
+          : "Submit & Pay $35"}
       </button>
-      <p className="text-xs text-muted text-center">
-        $35 starts the design — credited 100% to your final order, so the design is free with purchase.
-        <br />
-        Returning customer? We&apos;ll waive it automatically when you submit.
-      </p>
+      {DESIGN_FEE_WAIVED ? (
+        <p className="text-xs text-muted text-center">
+          No design fee right now &mdash; it&apos;s on us. Our in-house designer starts as
+          soon as you submit, free to see, no commitment.
+        </p>
+      ) : (
+        <p className="text-xs text-muted text-center">
+          $35 starts the design &mdash; credited 100% to your final order, so the design is free with purchase.
+          <br />
+          Returning customer? We&apos;ll waive it automatically when you submit.
+        </p>
+      )}
     </div>
   );
 }

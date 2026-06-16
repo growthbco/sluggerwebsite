@@ -4,6 +4,7 @@ import { categories } from "@/lib/sample-data";
 import { dropProducts, primaryImage, formatPrice } from "@/lib/catalog";
 import { heroPhoto } from "@/lib/gallery";
 import { ElevateSection, Reviews, SocialGrid, AboutBand, FaqTeaser } from "@/components/home-extras";
+import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
 
 export default function Home() {
   const drops = dropProducts(3);
@@ -62,7 +63,11 @@ export default function Home() {
               >
                 <span className="display text-[11px] tracking-wider opacity-80">NEW CUSTOMER</span>
                 <p className="display text-xl sm:text-2xl mt-1">Get a Free Design →</p>
-                <p className="text-sm opacity-90 mt-1">$35 to start, credited 100% to your final order.</p>
+                <p className="text-sm opacity-90 mt-1">
+                  {DESIGN_FEE_WAIVED
+                    ? "No design fee right now — free to start, no commitment."
+                    : "$35 to start, credited 100% to your final order."}
+                </p>
               </Link>
               <Link
                 href="/team-order"

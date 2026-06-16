@@ -24,7 +24,13 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
   // Surface the design-fee state above the status panel so the customer
   // always knows where they stand on the $35 (paid / waived / pending).
   const feeState: { label: string; tone: "good" | "warn" } = request.designFeeWaivedReason
-    ? { label: "✓ Design fee waived — returning customer", tone: "good" }
+    ? {
+        label:
+          request.designFeeWaivedReason === "returning_customer"
+            ? "✓ Design fee waived — returning customer"
+            : "✓ Design fee waived",
+        tone: "good",
+      }
     : request.designFeePaidAt
     ? { label: "✓ $35 design fee paid — credited 100% to your final order", tone: "good" }
     : request.status === "pending_payment"

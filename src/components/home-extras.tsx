@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { galleryPhotos, allMedia } from "@/lib/gallery";
 import { ReviewWidget } from "@/components/review-widget";
+import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
 
 /* "Elevate Your Game" - feature section carried over from the current site. */
 const ELEVATE_BENEFITS = [
@@ -134,7 +135,9 @@ const FAQS = [
   { q: "Is there a minimum order?", a: "Team orders are built for groups, but reach out for small runs - we'll work with you. Individual buy-in drops have no minimum; you just buy your size." },
   { q: "How long does production take?", a: "Most orders ship in 2-3 weeks after you approve your design. Need it sooner? Rush gets you there in about a week (specialty items may add a few days)." },
   { q: "How does sizing work?", a: "Our signature jerseys have a relaxed fit and run slightly large. Each product page has a size guide, and players pick their own size on team orders to cut down on returns." },
-  { q: "Do you really design for free?", a: "Yes — with one small step. We charge $35 upfront to start the design, then credit 100% of it back to your final team order, so the design is free with purchase. The $35 just keeps us from designing for people who shop our artwork elsewhere. Returning Slugger customers get it waived automatically." },
+  { q: "Do you really design for free?", a: DESIGN_FEE_WAIVED
+      ? "Yes — and right now there's no fee at all. We're waiving the usual $35 design fee for a limited time, so you can start a custom design completely free, see a proof, and approve it with no commitment."
+      : "Yes — with one small step. We charge $35 upfront to start the design, then credit 100% of it back to your final team order, so the design is free with purchase. The $35 just keeps us from designing for people who shop our artwork elsewhere. Returning Slugger customers get it waived automatically." },
 ];
 
 export function FaqTeaser() {

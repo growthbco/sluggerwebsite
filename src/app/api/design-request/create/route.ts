@@ -6,6 +6,7 @@ import {
   findReturningCustomerRef,
   DESIGN_FEE_CENTS,
 } from "@/lib/design-requests";
+import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
 import { postDesignRequestToDiscord } from "@/lib/discord";
 import { emailDesignRequestToDesigner, emailDesignRequestConfirmation } from "@/lib/email";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
@@ -49,9 +50,15 @@ export async function POST(req: Request) {
   }
 
   // Auto-bypass the $35 fee for returning customers (matched by email against
-  // any prior approved design or submitted team order).
+  // any prior approved design or submitted team order). When the promo flag is
+  // on, waive for everyone (campaign mode) — returning customers still get
+  // tagged as such for reporting.
   const priorRef = await findReturningCustomerRef(body.contactEmail);
-  const feeWaivedReason = priorRef ? "returning_customer" : null;
+  const feeWaivedReason = priorRef
+    ? "returning_customer"
+    : DESIGN_FEE_WAIVED
+    ? "promo_campaign"
+    : null;
   const feeWaivedRef = priorRef ?? null;
 
   try {
@@ -117,7 +124,7 @@ export async function POST(req: Request) {
         reference,
         statusUrl,
         waived: true,
-        waivedReason: "returning_customer",
+        waivedReason: feeWaivedReason,
         priorRef,
       });
     }

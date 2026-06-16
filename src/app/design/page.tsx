@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DesignIntakeForm } from "@/components/design-intake-form";
+import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
 
 export const metadata: Metadata = {
   title: "Start a Design - Custom Jersey & Uniform Design",
@@ -19,11 +20,18 @@ export default function DesignPage() {
           vision &mdash; our in-house designer works up a mockup, sends it
           back, and you approve when you love it.
         </p>
-        <p className="mt-3 text-sm text-foreground/90 border-l-2 border-brand pl-3">
-          <span className="display text-brand">$35 to start.</span> Credited 100% to your
-          final order &mdash; so the design is free with purchase.
-          Returning customers: we waive the fee automatically.
-        </p>
+        {DESIGN_FEE_WAIVED ? (
+          <p className="mt-3 text-sm text-foreground/90 border-l-2 border-brand pl-3">
+            <span className="display text-brand">Free to start right now.</span> No $35 design
+            fee &mdash; see your team&apos;s mockup on us, no commitment. Limited-time.
+          </p>
+        ) : (
+          <p className="mt-3 text-sm text-foreground/90 border-l-2 border-brand pl-3">
+            <span className="display text-brand">$35 to start.</span> Credited 100% to your
+            final order &mdash; so the design is free with purchase.
+            Returning customers: we waive the fee automatically.
+          </p>
+        )}
       </header>
 
       <ol className="mt-8 grid sm:grid-cols-3 gap-3">
