@@ -3,6 +3,7 @@ import { dbEnabled } from "@/db";
 import { getByManageToken, MAX_REVISIONS } from "@/lib/design-requests";
 import { getByDesignRequestId, getRoster } from "@/lib/team-orders";
 import { DesignManagePanel } from "@/components/design-manage-panel";
+import { DesignMessages } from "@/components/design-messages";
 import { PrintFileQA } from "@/components/print-file-qa";
 
 export const metadata: Metadata = { title: "Manage Design Request", robots: { index: false } };
@@ -52,6 +53,10 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         rush={request.rush}
         neededBy={request.neededBy ? request.neededBy.toISOString() : null}
       />
+
+      <div className="pt-6 border-t border-line">
+        <DesignMessages token={token} role="designer" initialMessages={request.messages ?? []} />
+      </div>
 
       {linkedOrder && linkedRoster.length > 0 && (
         <PrintFileQA

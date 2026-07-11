@@ -243,6 +243,25 @@ export async function requestChanges(
   return { ok: true, used: used + 1, max: MAX_REVISIONS };
 }
 
+export type DesignMessage = { at: string; from: "designer" | "client"; text: string };
+
+/** Append a message to the designer <-> client Q&A thread. Returns the full
+ *  updated thread. Messages don't burn a revision. */
+export async function addDesignMessage(
+  id: string,
+  from: DesignMessage["from"],
+  text: string,
+): Promise<DesignMessage[] | null> {
+  const db = getDb();
+  const [existing] = await db.select().from(designRequests).where(eq(designRequests.id, id)).limit(1);
+  if (!existing) return null;
+
+  const now = new Date();
+  const messages = [...(existing.messages ?? []), { at: now.toISOString(), from, text }];
+  await db.update(designRequests).set({ messages, updatedAt: now }).where(eq(designRequests.id, id));
+  return messages;
+}
+
 /** Called after a team order is submitted against this design. */
 export async function markOrdered(id: string) {
   const db = getDb();

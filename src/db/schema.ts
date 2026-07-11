@@ -446,6 +446,13 @@ export const designRequests = pgTable(
       >()
       .default([]),
 
+    // Designer <-> client Q&A thread. Designer posts from the manage page,
+    // client answers from the status page. Distinct from changeRequests:
+    // messages don't burn a revision.
+    messages: jsonb("messages")
+      .$type<Array<{ at: string; from: "designer" | "client"; text: string }>>()
+      .default([]),
+
     // Inspiration uploaded by the client (Vercel Blob URLs).
     inspirationImages: jsonb("inspiration_images").$type<string[]>().default([]),
     // Proof/mockup images uploaded by the designer.

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
 import { getByStatusToken, MAX_REVISIONS } from "@/lib/design-requests";
 import { DesignStatusPanel } from "@/components/design-status-panel";
+import { DesignMessages } from "@/components/design-messages";
 
 export const metadata: Metadata = { title: "Your Design Request", robots: { index: false } };
 
@@ -59,6 +60,9 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
         revisionsUsed={request.revisionsUsed ?? 0}
         maxRevisions={MAX_REVISIONS}
       />
+      <div className="pt-6 border-t border-line">
+        <DesignMessages token={token} role="client" initialMessages={request.messages ?? []} />
+      </div>
     </div>
   );
 }
