@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Oswald } from "next/font/google";
 import Script from "next/script";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -63,6 +64,7 @@ export default function RootLayout({
           data-widget-id="6a1a594796c166bea6d701a5"
           strategy="afterInteractive"
         />
+        <Analytics />
       </body>
     </html>
   );

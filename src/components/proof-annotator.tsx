@@ -71,10 +71,20 @@ export function ProofAnnotator({
           {annotations.map((a) => (
             <span
               key={a.n}
-              className="absolute -translate-x-1/2 -translate-y-1/2 grid place-items-center h-7 w-7 rounded-full bg-brand text-on-brand display text-xs shadow-lg ring-2 ring-on-brand pointer-events-none"
+              onClick={(e) => e.stopPropagation()}
+              className="group absolute -translate-x-1/2 -translate-y-1/2 grid place-items-center h-7 w-7 rounded-full bg-brand text-on-brand display text-xs shadow-lg ring-2 ring-on-brand cursor-default"
               style={{ left: `${a.x}%`, top: `${a.y}%` }}
             >
               {a.n}
+              {a.note.trim() && (
+                <span
+                  className={`pointer-events-none absolute z-10 w-max max-w-60 bg-ink text-foreground text-xs font-normal leading-snug text-left px-3 py-2 border border-line shadow-xl opacity-0 group-hover:opacity-100 transition-opacity ${
+                    a.y < 18 ? "top-full mt-2" : "bottom-full mb-2"
+                  } ${a.x < 15 ? "left-0" : a.x > 85 ? "right-0" : "left-1/2 -translate-x-1/2"}`}
+                >
+                  {a.note}
+                </span>
+              )}
             </span>
           ))}
         </div>

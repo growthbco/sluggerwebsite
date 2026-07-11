@@ -431,7 +431,7 @@ export const designRequests = pgTable(
     neededBy: timestamp("needed_by", { withTimezone: true }),
     rush: boolean("rush").notNull().default(false),
 
-    // Revision tracking. We cap at MAX_REVISIONS (3) so clients can't loop forever.
+    // Revision tracking. We cap at MAX_REVISIONS so clients can't loop forever.
     // changeRequests stores the structured feedback from each round (annotations
     // pinned to the proof + general note + which proof url it was made against).
     revisionsUsed: integer("revisions_used").notNull().default(0),

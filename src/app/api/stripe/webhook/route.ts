@@ -4,7 +4,8 @@ import { getStripe } from "@/lib/stripe";
 import { postOrderToDiscord, postDesignRequestToDiscord } from "@/lib/discord";
 import { dbEnabled } from "@/db";
 import { getById, markDesignFeePaid, setDiscordThreadId } from "@/lib/design-requests";
-import { emailDesignRequestToDesigner, emailDesignRequestConfirmation } from "@/lib/email";
+import { emailDesignRequestToDesigner, emailDesignRequestConfirmation, emailOrderConfirmation } from "@/lib/email";
+import { persistPaidOrder } from "@/lib/orders";
 
 export const runtime = "nodejs";
 
@@ -108,20 +109,73 @@ export async function POST(req: Request) {
         amountCents: li.amount_total ?? 0,
       }));
 
-      // Group orders by drop: thread title = primary product (drop) name.
-      const threadName = lines[0]?.name;
+      const reference = `SA-${session.id.slice(-8).toUpperCase()}`;
+      const orderTypeKey = (session.metadata?.orderType ?? "shop") as "shop" | "buy_in" | "team_store";
 
-      await postOrderToDiscord({
-        reference: `SA-${session.id.slice(-8).toUpperCase()}`,
-        orderType: typeMap[session.metadata?.orderType ?? "shop"] ?? "Shop",
-        customerName: session.customer_details?.name ?? undefined,
-        customerEmail: session.customer_details?.email ?? undefined,
-        shipping,
-        lines,
-        totalCents: session.amount_total ?? 0,
-        threadName,
-      });
-      // TODO: persist order to Neon once DATABASE_URL is configured (dedupe via session.id).
+      // Persist first: the unique index on the session id makes this the
+      // dedupe gate, so a Stripe retry skips Discord + email too.
+      let isNewOrder = true;
+      if (dbEnabled()) {
+        try {
+          const { inserted } = await persistPaidOrder({
+            reference,
+            type: orderTypeKey in typeMap ? orderTypeKey : "shop",
+            stripeCheckoutSessionId: session.id,
+            stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : undefined,
+            customerName: session.customer_details?.name ?? undefined,
+            customerEmail: session.customer_details?.email ?? undefined,
+            shippingAddress: addr
+              ? {
+                  line1: addr.line1 ?? undefined,
+                  line2: addr.line2 ?? undefined,
+                  city: addr.city ?? undefined,
+                  state: addr.state ?? undefined,
+                  postalCode: addr.postal_code ?? undefined,
+                  country: addr.country ?? undefined,
+                }
+              : undefined,
+            subtotalCents: session.amount_subtotal ?? 0,
+            shippingCents: session.total_details?.amount_shipping ?? 0,
+            totalCents: session.amount_total ?? 0,
+            lines: lineItems.data.map((li) => ({
+              name: li.description ?? "Item",
+              quantity: li.quantity ?? 1,
+              unitPriceCents: li.price?.unit_amount ?? Math.round((li.amount_total ?? 0) / (li.quantity || 1)),
+            })),
+          });
+          isNewOrder = inserted;
+        } catch (e) {
+          console.error("Failed to persist order:", e);
+        }
+      }
+
+      if (isNewOrder) {
+        // Group orders by drop: thread title = primary product (drop) name.
+        const threadName = lines[0]?.name;
+
+        await postOrderToDiscord({
+          reference,
+          orderType: typeMap[orderTypeKey] ?? "Shop",
+          customerName: session.customer_details?.name ?? undefined,
+          customerEmail: session.customer_details?.email ?? undefined,
+          shipping,
+          lines,
+          totalCents: session.amount_total ?? 0,
+          threadName,
+        });
+
+        const buyerEmail = session.customer_details?.email;
+        if (buyerEmail) {
+          await emailOrderConfirmation({
+            to: buyerEmail,
+            customerName: session.customer_details?.name ?? undefined,
+            reference,
+            lines,
+            totalCents: session.amount_total ?? 0,
+            shipping,
+          });
+        }
+      }
     } catch (e) {
       console.error("Failed to process completed checkout:", e);
       // Return 200 so Stripe doesn't retry forever on our internal errors.

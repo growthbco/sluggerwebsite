@@ -159,6 +159,50 @@ export async function emailProofReady(args: {
   });
 }
 
+/** Email the buyer a paid-order confirmation with an item summary. */
+export async function emailOrderConfirmation(args: {
+  to: string;
+  customerName?: string;
+  reference: string;
+  lines: { name: string; quantity: number; amountCents: number }[];
+  totalCents: number;
+  shipping?: string;
+}): Promise<boolean> {
+  const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+  const rows = args.lines
+    .map(
+      (l) => `
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #e6e2d6;">${esc(l.name)}${l.quantity > 1 ? ` × ${l.quantity}` : ""}</td>
+          <td style="padding:8px 0;border-bottom:1px solid #e6e2d6;text-align:right;">${money(l.amountCents)}</td>
+        </tr>`,
+    )
+    .join("");
+  const firstName = args.customerName?.split(" ")[0];
+  return sendEmail({
+    to: args.to,
+    subject: `Order confirmed! Your Slugger Athletics gear is in the works (${args.reference})`,
+    html: brandedEmail({
+      preheader: `We got your order ${args.reference} - here's what happens next.`,
+      heading: `Thanks for your order${firstName ? `, ${esc(firstName)}` : ""}!`,
+      intro: `Order reference: <strong>${esc(args.reference)}</strong>`,
+      bodyHtml: `
+        <table style="width:100%;border-collapse:collapse;margin:0 0 14px;">
+          ${rows}
+          <tr>
+            <td style="padding:10px 0;"><strong>Total</strong></td>
+            <td style="padding:10px 0;text-align:right;"><strong>${money(args.totalCents)}</strong></td>
+          </tr>
+        </table>
+        ${args.shipping ? `<p style="margin:0 0 12px;"><strong>Ships to:</strong><br>${esc(args.shipping).replace(/\n/g, "<br>")}</p>` : ""}
+        <p style="margin:0;">Custom gear is made to order - standard turnaround is <strong>2-3 weeks</strong>. We'll email you again when your order ships. Questions in the meantime? Just reply to this email.</p>
+      `,
+      footerNote: "Slugger Athletics · Custom team gear, made to order",
+    }),
+    replyTo: CONTACT_INBOX,
+  });
+}
+
 /** Email the business a contact-form submission. */
 export async function emailContactSubmission(msg: {
   name: string;

@@ -195,7 +195,7 @@ export async function approveDesign(id: string, approvedUrl?: string) {
 
 /** Max free revision rounds a client gets before the Request Changes
  *  button locks. Cap exists to keep designs from spiraling. */
-export const MAX_REVISIONS = 3;
+export const MAX_REVISIONS = 5;
 
 export type Annotation = { n: number; x: number; y: number; note: string };
 export type ChangeRequestEntry = {
