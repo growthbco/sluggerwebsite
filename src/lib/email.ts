@@ -165,6 +165,7 @@ export async function emailDesignerMessage(args: {
   teamName: string;
   reference: string;
   text: string;
+  fromName?: string;
   statusUrl: string;
 }): Promise<boolean> {
   return sendEmail({
@@ -172,7 +173,7 @@ export async function emailDesignerMessage(args: {
     subject: `💬 A question about your ${args.teamName} design (${args.reference})`,
     html: brandedEmail({
       preheader: `Your designer needs a quick answer to keep your design moving.`,
-      heading: `Quick question from your designer`,
+      heading: args.fromName ? `Quick question from ${esc(args.fromName)} at Slugger` : `Quick question from your designer`,
       intro: `Reference: <strong>${esc(args.reference)}</strong>`,
       bodyHtml: `
         <p style="margin:0;background:#f6f4ee;padding:12px 14px;border-left:3px solid #b8a36c;">${esc(args.text).replace(/\n/g, "<br>")}</p>

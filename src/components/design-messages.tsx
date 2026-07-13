@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-export type DesignMessage = { at: string; from: "designer" | "client"; text: string };
+export type DesignMessage = { at: string; from: "designer" | "client"; text: string; name?: string };
+
+const NAME_KEY = "slugger-sender-name";
 
 /** Designer <-> client Q&A thread. Rendered on both the designer manage page
  *  (role="designer") and the client status page (role="client"); the shared
@@ -18,8 +20,18 @@ export function DesignMessages({
 }) {
   const [messages, setMessages] = useState<DesignMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
+  const [senderName, setSenderName] = useState("");
   const [busy, setBusy] = useState<"" | "sending" | "refreshing">("");
   const [error, setError] = useState("");
+
+  // Remember the designer's name across visits so they type it once.
+  useEffect(() => {
+    if (role !== "designer") return;
+    try {
+      const saved = localStorage.getItem(NAME_KEY);
+      if (saved) setSenderName(saved);
+    } catch {}
+  }, [role]);
 
   const mine = role;
   const heading = role === "designer" ? "Message the client" : "Messages with your designer";
@@ -34,10 +46,16 @@ export function DesignMessages({
     setBusy("sending");
     setError("");
     try {
+      const name = senderName.trim();
+      if (role === "designer") {
+        try {
+          if (name) localStorage.setItem(NAME_KEY, name);
+        } catch {}
+      }
       const res = await fetch(`/api/design-request/${token}/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, ...(role === "designer" && name ? { name } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not send");
@@ -91,8 +109,14 @@ export function DesignMessages({
                 }`}
               >
                 <p className="text-xs text-muted mb-1">
-                  {m.from === "designer" ? "Slugger design team" : "Client"} ·{" "}
-                  {new Date(m.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                  {m.from === mine
+                    ? "You"
+                    : m.from === "designer"
+                    ? m.name
+                      ? `${m.name} · Slugger Athletics`
+                      : "Slugger design team"
+                    : "Client"}{" "}
+                  · {new Date(m.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                 </p>
                 <p className="text-foreground whitespace-pre-line">{m.text}</p>
               </div>
@@ -101,7 +125,17 @@ export function DesignMessages({
         </div>
       )}
 
-      <div className="mt-4 flex gap-2 items-end">
+      {role === "designer" && (
+        <input
+          value={senderName}
+          onChange={(e) => setSenderName(e.target.value)}
+          placeholder="Your name (shown to the client, e.g. Gary)"
+          maxLength={40}
+          className="mt-4 w-full sm:w-72 bg-steel border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+          disabled={busy === "sending"}
+        />
+      )}
+      <div className="mt-3 flex gap-2 items-end">
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

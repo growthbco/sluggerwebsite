@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 };
 
 const FAQS = [
+  { q: "How much does custom gear cost?", a: "Flat per-piece pricing with the custom design included: round-neck jerseys are $28 (any sport), two-button $35, full-button $38, pants and hoodies $40, shorts $25, embroidered hats $25-30, socks $15. No minimums - see the full list on our Pricing page. Prices are plus tax." },
   { q: "How do I place a team order?", a: "Head to Team Order, pick your jersey style, then either enter your roster yourself or share a link so each player adds their own name, number, and size. We email your total and a free design proof to approve before production." },
   { q: "Is there a minimum order?", a: "Team orders are built for groups, but reach out for small runs - we'll work with you. Individual buy-in drops have no minimum; you just buy your size." },
   { q: "How long does production take?", a: "Most orders ship in 2-3 weeks after you approve your design. Need it sooner? Rush gets you there in about a week. Specialty items like hoodies, pants, or long-sleeve jerseys may add a few days." },

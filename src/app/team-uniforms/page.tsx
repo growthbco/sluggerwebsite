@@ -26,6 +26,8 @@ export default function TeamUniformsPage() {
           Slugger Athletics designs and produces <strong className="text-foreground">custom team uniforms and sublimated jerseys</strong> for
           baseball, softball, and every sport - right here in Ocala and across Central
           Florida. Designed in-house for free, built to perform, and shipped fast.
+          Jerseys start at <strong className="text-foreground">$28</strong> with flat, no-minimum pricing -{" "}
+          <a href="/pricing" className="text-brand hover:underline">see the full price list</a>.
         </>
       }
       offeringsTitle="Full Uniform Programs"
