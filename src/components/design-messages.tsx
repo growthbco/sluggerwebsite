@@ -111,12 +111,16 @@ export function DesignMessages({
                 }`}
               >
                 <p className="text-xs text-muted mb-1">
-                  {m.from === mine
-                    ? "You"
-                    : m.from === "designer"
+                  {/* Staff messages always show the sender's name - the manage
+                      link is shared, so "You" would hide who actually replied. */}
+                  {m.from === "designer"
                     ? m.name
-                      ? `${m.name} · Slugger Athletics`
+                      ? role === "client"
+                        ? `${m.name} · Slugger Athletics`
+                        : m.name
                       : "Slugger design team"
+                    : role === "client"
+                    ? "You"
                     : "Client"}{" "}
                   · {new Date(m.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                 </p>
