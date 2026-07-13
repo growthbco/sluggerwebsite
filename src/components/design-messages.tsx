@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 export type DesignMessage = { at: string; from: "designer" | "client"; text: string; name?: string };
 
 const NAME_KEY = "slugger-sender-name";
+// Staff who reply to clients. Picking one is required so every reply is attributed.
+const STAFF_NAMES = ["Gary", "Justin", "Bonans"];
 
 /** Designer <-> client Q&A thread. Rendered on both the designer manage page
  *  (role="designer") and the client status page (role="client"); the shared
@@ -24,12 +26,12 @@ export function DesignMessages({
   const [busy, setBusy] = useState<"" | "sending" | "refreshing">("");
   const [error, setError] = useState("");
 
-  // Remember the designer's name across visits so they type it once.
+  // Remember who's replying across visits so they pick once.
   useEffect(() => {
     if (role !== "designer") return;
     try {
       const saved = localStorage.getItem(NAME_KEY);
-      if (saved) setSenderName(saved);
+      if (saved && STAFF_NAMES.includes(saved)) setSenderName(saved);
     } catch {}
   }, [role]);
 
@@ -126,14 +128,19 @@ export function DesignMessages({
       )}
 
       {role === "designer" && (
-        <input
+        <select
           value={senderName}
           onChange={(e) => setSenderName(e.target.value)}
-          placeholder="Your name (shown to the client, e.g. Gary)"
-          maxLength={40}
-          className="mt-4 w-full sm:w-72 bg-steel border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+          className="mt-4 w-full sm:w-72 bg-steel border border-line px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
           disabled={busy === "sending"}
-        />
+        >
+          <option value="">Who&apos;s replying? (shown to the client)</option>
+          {STAFF_NAMES.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
       )}
       <div className="mt-3 flex gap-2 items-end">
         <textarea
@@ -146,7 +153,8 @@ export function DesignMessages({
         <button
           type="button"
           onClick={send}
-          disabled={busy !== "" || !draft.trim()}
+          disabled={busy !== "" || !draft.trim() || (role === "designer" && !senderName)}
+          title={role === "designer" && !senderName ? "Pick who's replying first" : undefined}
           className="clip-slant bg-brand text-on-brand display text-sm px-5 py-3 hover:bg-brand-dark disabled:opacity-50"
         >
           {busy === "sending" ? "Sending..." : "Send"}
