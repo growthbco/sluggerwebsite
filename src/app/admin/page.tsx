@@ -9,6 +9,7 @@ import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
 import { AdminLogout } from "@/components/admin-logout";
 import { AdminInvoiceButton } from "@/components/admin-invoice-button";
+import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminArchiveButton } from "@/components/admin-archive-button";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
@@ -23,6 +24,13 @@ const STATUS_TONE: Record<string, string> = {
   approved: "border-green-500/50 text-green-400",
   ordered: "border-green-500/50 text-green-400",
   cancelled: "border-line text-muted",
+  // team orders
+  draft: "border-line text-muted",
+  collecting: "border-brand/50 text-brand",
+  quoted: "border-amber-500/50 text-amber-400",
+  in_production: "border-sky-500/50 text-sky-400",
+  paid: "border-green-500/50 text-green-400",
+  shipped: "border-green-500/50 text-green-400",
 };
 
 function Badge({ label }: { label: string }) {
@@ -82,7 +90,12 @@ export default async function AdminPage() {
         rushShipping: teamOrders.rushShipping,
         quotedTotalCents: teamOrders.quotedTotalCents,
         invoiceUrl: teamOrders.invoiceUrl,
+        depositCents: teamOrders.depositCents,
+        depositPaidAt: teamOrders.depositPaidAt,
+        balanceInvoiceUrl: teamOrders.balanceInvoiceUrl,
         invoicePaidAt: teamOrders.invoicePaidAt,
+        trackingNumber: teamOrders.trackingNumber,
+        shippedAt: teamOrders.shippedAt,
         archivedAt: teamOrders.archivedAt,
         archivedNote: teamOrders.archivedNote,
         updatedAt: teamOrders.updatedAt,
@@ -102,10 +115,14 @@ export default async function AdminPage() {
       .orderBy(desc(teams.createdAt)),
     db
       .select({
+        id: orders.id,
         reference: orders.reference,
         type: orders.type,
+        status: orders.status,
         customerName: orders.customerName,
         totalCents: orders.totalCents,
+        trackingNumber: orders.trackingNumber,
+        shippedAt: orders.shippedAt,
         createdAt: orders.createdAt,
       })
       .from(orders)
@@ -246,7 +263,8 @@ export default async function AdminPage() {
             <tbody className="divide-y divide-[color:var(--line)]">
               {activeOrders.map((o) => {
                 const estimate = o.quotedTotalCents ?? orderEstimates.get(o.id);
-                const paid = o.status === "paid" || Boolean(o.invoicePaidAt);
+                const paid = Boolean(o.invoicePaidAt) || o.status === "paid" || o.status === "shipped";
+                const deposit = o.depositCents ?? (estimate ? Math.round(estimate / 2) : 0);
                 return (
                   <tr key={o.reference} className="hover:bg-steel/60">
                     <td className="px-3 py-2 font-mono text-xs">
@@ -263,13 +281,32 @@ export default async function AdminPage() {
                     </td>
                     <td className="px-3 py-2">
                       <span className="flex items-center gap-2">
-                        {paid ? (
-                          <span className="text-xs display text-green-400">PAID</span>
+                        {o.shippedAt ? (
+                          <span className="text-xs display text-green-400" title={o.trackingNumber ?? undefined}>
+                            🚚 SHIPPED
+                          </span>
+                        ) : paid ? (
+                          <>
+                            <span className="text-xs display text-green-400">PAID</span>
+                            <AdminShipButton kind="team_order" id={o.id} who={o.teamName} />
+                          </>
+                        ) : o.depositPaidAt && estimate ? (
+                          <>
+                            <span className="text-xs display text-sky-400" title="50% deposit received">DEPOSIT ✓</span>
+                            <AdminInvoiceButton
+                              teamOrderId={o.id}
+                              teamName={o.teamName}
+                              dueCents={estimate - deposit}
+                              stage="balance"
+                              resend={Boolean(o.balanceInvoiceUrl)}
+                            />
+                          </>
                         ) : estimate ? (
                           <AdminInvoiceButton
                             teamOrderId={o.id}
                             teamName={o.teamName}
-                            estimateCents={estimate}
+                            dueCents={deposit}
+                            stage="deposit"
                             resend={Boolean(o.invoiceUrl)}
                           />
                         ) : (
@@ -340,15 +377,22 @@ export default async function AdminPage() {
           <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
             {recentOrders.length === 0 && <p className="px-3 py-3 text-sm text-muted">No orders yet.</p>}
             {recentOrders.map((o) => (
-              <div key={o.reference} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+              <div key={o.reference} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
                 <div>
                   <span className="font-mono text-xs text-foreground">{o.reference}</span>
                   <span className="ml-2 text-muted">{o.customerName ?? "-"}</span>
                   <span className="ml-2 text-xs text-muted">({o.type})</span>
                 </div>
-                <p className="text-foreground shrink-0">
-                  {money(o.totalCents)} <span className="text-muted text-xs">{fmtDate(o.createdAt)}</span>
-                </p>
+                <span className="flex items-center gap-2 shrink-0">
+                  <span className="text-foreground">
+                    {money(o.totalCents)} <span className="text-muted text-xs">{fmtDate(o.createdAt)}</span>
+                  </span>
+                  {o.shippedAt ? (
+                    <span className="text-xs display text-green-400" title={o.trackingNumber ?? undefined}>🚚</span>
+                  ) : o.status === "paid" ? (
+                    <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} />
+                  ) : null}
+                </span>
               </div>
             ))}
           </div>

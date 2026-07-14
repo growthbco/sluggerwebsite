@@ -100,15 +100,22 @@ export async function postTeamOrderPaidToDiscord(args: {
   reference: string;
   teamName: string;
   totalCents: number;
+  stage?: "deposit" | "balance";
 }): Promise<boolean> {
   const url = process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
   if (!url) return false;
+  const amt = `$${(args.totalCents / 100).toFixed(2)}`;
+  const isDeposit = args.stage === "deposit";
   return send(url, {
     username: "Slugger Team Orders",
     embeds: [
       {
-        title: `💰 PAID — ${args.teamName} (${args.reference})`,
-        description: `Invoice paid: **$${(args.totalCents / 100).toFixed(2)}**. Clear for production.`,
+        title: isDeposit
+          ? `💰 50% DEPOSIT PAID — ${args.teamName} (${args.reference})`
+          : `💰 PAID IN FULL — ${args.teamName} (${args.reference})`,
+        description: isDeposit
+          ? `Deposit received: **${amt}**. Clear to START production.`
+          : `Balance received: **${amt}**. Clear to ship when ready.`,
         color: GOLD,
         timestamp: new Date().toISOString(),
       },

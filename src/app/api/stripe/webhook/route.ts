@@ -93,9 +93,16 @@ export async function POST(req: Request) {
       try {
         const db = getDb();
         const now = new Date();
+        // Deposit (50%) flips the order into production; the balance payment
+        // (or a legacy full invoice with no stage) marks it fully paid.
+        const isDeposit = session.metadata.stage === "deposit";
         const [row] = await db
           .update(teamOrders)
-          .set({ status: "paid", invoicePaidAt: now, updatedAt: now })
+          .set(
+            isDeposit
+              ? { status: "in_production", depositPaidAt: now, invoiceRemindersSent: 0, updatedAt: now }
+              : { status: "paid", invoicePaidAt: now, invoiceRemindersSent: 0, updatedAt: now },
+          )
           .where(eq(teamOrders.id, session.metadata.teamOrderId))
           .returning({ reference: teamOrders.reference, teamName: teamOrders.teamName });
         if (row) {
@@ -103,6 +110,7 @@ export async function POST(req: Request) {
             reference: row.reference,
             teamName: row.teamName,
             totalCents: session.amount_total ?? 0,
+            stage: isDeposit ? "deposit" : "balance",
           });
         }
       } catch (e) {

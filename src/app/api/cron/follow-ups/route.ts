@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
-import { findProofFollowUpCandidates, recordFollowUp, MAX_FOLLOW_UPS } from "@/lib/follow-ups";
-import { emailProofFollowUp } from "@/lib/email";
+import {
+  findProofFollowUpCandidates,
+  recordFollowUp,
+  MAX_FOLLOW_UPS,
+  findInvoiceReminderCandidates,
+  recordInvoiceReminder,
+  MAX_INVOICE_REMINDERS,
+} from "@/lib/follow-ups";
+import { emailProofFollowUp, emailInvoiceReminder } from "@/lib/email";
 import { postDesignThreadUpdate } from "@/lib/discord";
 
 export const runtime = "nodejs";
@@ -54,5 +61,37 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ dryRun, count: results.length, results });
+  // Unpaid invoice reminders (deposit or balance on team orders).
+  const invoiceCandidates = await findInvoiceReminderCandidates();
+  const invoiceResults: { reference: string; team: string; stage: string; round: number; sent?: boolean }[] = [];
+  for (const c of invoiceCandidates) {
+    const round = c.remindersSent + 1;
+    if (dryRun) {
+      invoiceResults.push({ reference: c.reference, team: c.teamName, stage: c.stage, round });
+      continue;
+    }
+    try {
+      const sent = await emailInvoiceReminder({
+        to: c.contactEmail,
+        teamName: c.teamName,
+        reference: c.reference,
+        stage: c.stage,
+        dueCents: c.dueCents,
+        payUrl: c.payUrl,
+        isFinal: round >= MAX_INVOICE_REMINDERS,
+      });
+      if (sent) await recordInvoiceReminder(c.id);
+      invoiceResults.push({ reference: c.reference, team: c.teamName, stage: c.stage, round, sent });
+    } catch (e) {
+      console.error(`Invoice reminder failed for ${c.reference}:`, e);
+      invoiceResults.push({ reference: c.reference, team: c.teamName, stage: c.stage, round, sent: false });
+    }
+  }
+
+  return NextResponse.json({
+    dryRun,
+    count: results.length + invoiceResults.length,
+    results,
+    invoiceReminders: invoiceResults,
+  });
 }

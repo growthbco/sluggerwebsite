@@ -159,14 +159,15 @@ export async function emailProofReady(args: {
   });
 }
 
-/** Team-order invoice: itemized roster total + a Stripe payment link. */
+/** Team-order invoice (50% deposit or final balance) + a Stripe payment link. */
 export async function emailTeamOrderInvoice(args: {
   to: string;
   teamName: string;
   reference: string;
+  stage: "deposit" | "balance";
   lines: { label: string; quantity: number; unitPriceCents: number; totalCents: number }[];
-  rushFeeCents: number;
   totalCents: number;
+  dueCents: number;
   payUrl: string;
 }): Promise<boolean> {
   const money = (c: number) => `$${(c / 100).toFixed(2)}`;
@@ -179,27 +180,95 @@ export async function emailTeamOrderInvoice(args: {
         </tr>`,
     )
     .join("");
+  const isDeposit = args.stage === "deposit";
   return sendEmail({
     to: args.to,
-    subject: `Your ${args.teamName} team order total: $${(args.totalCents / 100).toFixed(2)} (${args.reference})`,
+    subject: isDeposit
+      ? `Your ${args.teamName} order: ${money(args.dueCents)} deposit starts production (${args.reference})`
+      : `Final balance for your ${args.teamName} order: ${money(args.dueCents)} (${args.reference})`,
     html: brandedEmail({
-      preheader: `Your roster is priced and ready - pay online to start production.`,
-      heading: `Your team order is ready to pay, ${esc(args.teamName)}!`,
+      preheader: isDeposit
+        ? `Pay the 50% deposit and your order goes straight into production.`
+        : `Your order is in production - the balance is due before it ships.`,
+      heading: isDeposit ? `Let's get your order started, ${esc(args.teamName)}!` : `Almost there, ${esc(args.teamName)}!`,
       intro: `Order reference: <strong>${esc(args.reference)}</strong>`,
       bodyHtml: `
+        ${rows ? `<table style="width:100%;border-collapse:collapse;margin:0 0 14px;">${rows}
+          <tr><td style="padding:10px 0;"><strong>Order total (plus tax)</strong></td><td style="padding:10px 0;text-align:right;"><strong>${money(args.totalCents)}</strong></td></tr>
+        </table>` : ""}
         <table style="width:100%;border-collapse:collapse;margin:0 0 14px;">
-          ${rows}
-          ${args.rushFeeCents > 0 ? `<tr><td style="padding:8px 0;border-bottom:1px solid #e6e2d6;">Rush production ($5/item)</td><td style="padding:8px 0;border-bottom:1px solid #e6e2d6;text-align:right;">${money(args.rushFeeCents)}</td></tr>` : ""}
           <tr>
-            <td style="padding:10px 0;"><strong>Total (plus tax)</strong></td>
-            <td style="padding:10px 0;text-align:right;"><strong>${money(args.totalCents)}</strong></td>
+            <td style="padding:10px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;"><strong>${isDeposit ? "Due now (50% deposit)" : "Final balance due"}</strong></td>
+            <td style="padding:10px 14px;background:#f6f4ee;text-align:right;"><strong>${money(args.dueCents)}</strong></td>
           </tr>
         </table>
-        <p style="margin:0;">Pay securely online with the button below - production starts as soon as payment lands. Questions or need to adjust the roster first? Just reply to this email.</p>
+        ${
+          isDeposit
+            ? `<p style="margin:0;">Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} is due before your order ships. Questions or roster changes first? Just reply to this email.</p>`
+            : `<p style="margin:0;">Your gear is in production! Settling the balance now means we ship the moment it's ready - no waiting. Questions? Just reply to this email.</p>`
+        }
       `,
-      ctaText: "Pay your invoice",
+      ctaText: isDeposit ? "Pay your deposit" : "Pay the balance",
       ctaUrl: args.payUrl,
-      footerNote: "Standard 2-3 week turnaround after payment · Free local pickup in Ocala",
+      footerNote: "Standard 2-3 week turnaround · Free local pickup in Ocala",
+    }),
+    replyTo: CONTACT_INBOX,
+  });
+}
+
+/** Reminder for an unpaid deposit or balance invoice. */
+export async function emailInvoiceReminder(args: {
+  to: string;
+  teamName: string;
+  reference: string;
+  stage: "deposit" | "balance";
+  dueCents: number;
+  payUrl: string;
+  isFinal: boolean;
+}): Promise<boolean> {
+  const money = `$${(args.dueCents / 100).toFixed(2)}`;
+  const isDeposit = args.stage === "deposit";
+  return sendEmail({
+    to: args.to,
+    subject: isDeposit
+      ? `Reminder: your ${money} deposit starts production (${args.reference})`
+      : `Reminder: ${money} balance due on your ${args.teamName} order (${args.reference})`,
+    html: brandedEmail({
+      preheader: isDeposit ? `Your order is on hold until the deposit lands.` : `Pay the balance so we can ship the moment it's ready.`,
+      heading: `${args.isFinal ? "Last reminder" : "Friendly reminder"}, ${esc(args.teamName)}!`,
+      intro: `Order reference: <strong>${esc(args.reference)}</strong>`,
+      bodyHtml: isDeposit
+        ? `<p style="margin:0;">Your team order is priced and ready, but production doesn't start until the <strong>${money} deposit</strong> comes in. Pay below and we get to work the same day. Roster changes or questions? Just reply.</p>`
+        : `<p style="margin:0;">Your gear is in production and the remaining <strong>${money}</strong> is due before it ships. Settling it now means zero delay when your order is ready. Questions? Just reply.</p>`,
+      ctaText: isDeposit ? "Pay your deposit" : "Pay the balance",
+      ctaUrl: args.payUrl,
+    }),
+    replyTo: CONTACT_INBOX,
+  });
+}
+
+/** Shipping notification with the tracking number. */
+export async function emailOrderShipped(args: {
+  to: string;
+  name?: string | null;
+  reference: string;
+  trackingNumber: string;
+  trackingUrl: string;
+}): Promise<boolean> {
+  return sendEmail({
+    to: args.to,
+    subject: `🚚 Your Slugger Athletics order is on the way! (${args.reference})`,
+    html: brandedEmail({
+      preheader: `Tracking number ${args.trackingNumber}`,
+      heading: `It's on the way${args.name ? `, ${esc(args.name.split(" ")[0])}` : ""}!`,
+      intro: `Order reference: <strong>${esc(args.reference)}</strong>`,
+      bodyHtml: `
+        <p style="margin:0 0 12px;">Your custom gear just shipped. Track it here:</p>
+        <p style="margin:0 0 12px;background:#f6f4ee;padding:12px 14px;border-left:3px solid #b8a36c;font-family:monospace;">${esc(args.trackingNumber)}</p>
+        <p style="margin:0;">Once it lands, we'd love to see it on the field - tag us @sluggerathletics!</p>
+      `,
+      ctaText: "Track your package",
+      ctaUrl: args.trackingUrl,
     }),
     replyTo: CONTACT_INBOX,
   });

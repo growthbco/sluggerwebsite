@@ -287,6 +287,10 @@ export const orders = pgTable(
     // Set true once successfully pushed to Discord so retries don't double-post.
     discordNotifiedAt: timestamp("discord_notified_at", { withTimezone: true }),
 
+    // Fulfillment (Pirate Ship tracking, emailed to the buyer on ship).
+    trackingNumber: text("tracking_number"),
+    shippedAt: timestamp("shipped_at", { withTimezone: true }),
+
     // Origin context (drop or team store) when applicable.
     dropId: uuid("drop_id").references(() => drops.id, { onDelete: "set null" }),
     teamId: uuid("team_id").references(() => teams.id, { onDelete: "set null" }),
@@ -388,9 +392,20 @@ export const teamOrders = pgTable(
     designRequestId: uuid("design_request_id"),
 
     quotedTotalCents: integer("quoted_total_cents"),
-    // One-time Stripe Payment Link sent as the invoice; paid via webhook.
-    invoiceUrl: text("invoice_url"),
-    invoicePaidAt: timestamp("invoice_paid_at", { withTimezone: true }),
+    // Two-stage invoicing: a 50% deposit starts production; the balance is
+    // collected when the order is ready. Each is a one-time Stripe Payment
+    // Link; payment lands via webhook.
+    invoiceUrl: text("invoice_url"), // deposit link
+    depositCents: integer("deposit_cents"),
+    depositPaidAt: timestamp("deposit_paid_at", { withTimezone: true }),
+    balanceInvoiceUrl: text("balance_invoice_url"),
+    invoicePaidAt: timestamp("invoice_paid_at", { withTimezone: true }), // fully paid
+    // Unpaid-invoice reminders (deposit or balance); reset on each new invoice.
+    invoiceRemindersSent: integer("invoice_reminders_sent").notNull().default(0),
+    lastInvoiceReminderAt: timestamp("last_invoice_reminder_at", { withTimezone: true }),
+    // Fulfillment
+    trackingNumber: text("tracking_number"),
+    shippedAt: timestamp("shipped_at", { withTimezone: true }),
 
     // Admin archive: hides the order from the active list without deleting it,
     // with a note ("lost - went with competitor") for later follow-up.

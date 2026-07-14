@@ -4,7 +4,7 @@
 
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { designRequests } from "@/db/schema";
+import { designRequests, teamOrders } from "@/db/schema";
 
 export const MAX_FOLLOW_UPS = 2;
 const FIRST_AFTER_DAYS = 2; // proof sent -> first nudge
@@ -64,6 +64,85 @@ export async function findProofFollowUpCandidates(now = new Date()): Promise<Fol
     });
   }
   return due;
+}
+
+/* ------------------------------------------------------------------ */
+/* Unpaid invoice reminders (team orders)                              */
+/* ------------------------------------------------------------------ */
+
+export const MAX_INVOICE_REMINDERS = 2;
+const INVOICE_FIRST_AFTER_DAYS = 3;
+const INVOICE_NEXT_AFTER_DAYS = 4;
+
+export type InvoiceReminderCandidate = {
+  id: string;
+  reference: string;
+  teamName: string;
+  contactEmail: string;
+  stage: "deposit" | "balance";
+  payUrl: string;
+  dueCents: number;
+  remindersSent: number;
+};
+
+/** Team orders with an outstanding deposit or balance invoice that's gone
+ *  quiet. Archived orders are skipped - they're deliberately parked. */
+export async function findInvoiceReminderCandidates(now = new Date()): Promise<InvoiceReminderCandidate[]> {
+  const db = getDb();
+  const rows = await db.select().from(teamOrders);
+
+  const due: InvoiceReminderCandidate[] = [];
+  for (const o of rows) {
+    if (o.archivedAt || o.invoicePaidAt) continue;
+    const sent = o.invoiceRemindersSent ?? 0;
+    if (sent >= MAX_INVOICE_REMINDERS) continue;
+
+    // Which invoice is outstanding?
+    let stage: "deposit" | "balance" | null = null;
+    let payUrl: string | null = null;
+    if (o.balanceInvoiceUrl && o.depositPaidAt) {
+      stage = "balance";
+      payUrl = o.balanceInvoiceUrl;
+    } else if (o.invoiceUrl && !o.depositPaidAt) {
+      stage = "deposit";
+      payUrl = o.invoiceUrl;
+    }
+    if (!stage || !payUrl || !o.contactEmail) continue;
+
+    const total = o.quotedTotalCents ?? 0;
+    const deposit = o.depositCents ?? Math.round(total / 2);
+    const dueCents = stage === "deposit" ? deposit : total - deposit;
+    if (dueCents <= 0) continue;
+
+    const since = o.lastInvoiceReminderAt ?? o.updatedAt;
+    const waitDays = sent === 0 ? INVOICE_FIRST_AFTER_DAYS : INVOICE_NEXT_AFTER_DAYS;
+    if (!since || now.getTime() - since.getTime() < waitDays * DAY_MS) continue;
+
+    due.push({
+      id: o.id,
+      reference: o.reference,
+      teamName: o.teamName,
+      contactEmail: o.contactEmail,
+      stage,
+      payUrl,
+      dueCents,
+      remindersSent: sent,
+    });
+  }
+  return due;
+}
+
+export async function recordInvoiceReminder(id: string, now = new Date()) {
+  const db = getDb();
+  const [row] = await db
+    .select({ sent: teamOrders.invoiceRemindersSent })
+    .from(teamOrders)
+    .where(eq(teamOrders.id, id))
+    .limit(1);
+  await db
+    .update(teamOrders)
+    .set({ invoiceRemindersSent: (row?.sent ?? 0) + 1, lastInvoiceReminderAt: now })
+    .where(eq(teamOrders.id, id));
 }
 
 export async function recordFollowUp(id: string, now = new Date()) {
