@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { postTeamOrderToDiscord } from "@/lib/discord";
 import { dbEnabled } from "@/db";
 import { getByStatusToken, markOrdered } from "@/lib/design-requests";
+import { createTeamOrder, addRosterRow, submitTeamOrder } from "@/lib/team-orders";
 
 export const runtime = "nodejs";
 
 type RosterRow = { name?: string; number?: string; size?: string; sizes?: Record<string, string>; notes?: string };
 
+// Manual-roster team order submission (coach typed/imported the full roster).
+// Persists to the DB first - Discord is a notification, not the datastore.
 export async function POST(req: Request) {
   let body: {
     teamName?: string;
@@ -36,54 +39,96 @@ export async function POST(req: Request) {
   let contactName = body.contactName;
   let contactEmail = body.contactEmail;
   let contactPhone = body.contactPhone;
+  let design: Awaited<ReturnType<typeof getByStatusToken>> | null = null;
   if (body.designToken && dbEnabled()) {
-    const design = await getByStatusToken(body.designToken);
+    design = await getByStatusToken(body.designToken);
     if (design && (design.status === "approved" || design.status === "ordered")) {
       teamName = design.teamName;
       contactName = design.contactName;
       contactEmail = design.contactEmail;
       contactPhone = design.contactPhone ?? undefined;
+    } else {
+      design = null;
     }
   }
 
-  if (!teamName || !contactName) {
-    return NextResponse.json({ error: "Team name and contact name are required." }, { status: 400 });
+  if (!teamName || !contactName || !contactEmail) {
+    return NextResponse.json({ error: "Team name, contact name, and email are required." }, { status: 400 });
   }
   if (roster.length === 0) {
     return NextResponse.json({ error: "Add at least one player to the roster." }, { status: 400 });
   }
-
-  const reference = `TO-${Date.now().toString(36).toUpperCase().slice(-6)}`;
-
-  const posted = await postTeamOrderToDiscord({
-    reference,
-    teamName,
-    contactName,
-    contactEmail,
-    contactPhone,
-    jerseyStyle: body.jerseyStyle,
-    jerseyMaterial: body.jerseyMaterial,
-    items: body.items?.length ? body.items : ["jersey"],
-    roster: roster.map((r) => ({
-      name: r.name,
-      number: r.number,
-      size: r.sizes?.jersey ?? r.size,
-      sizes: r.sizes,
-      notes: r.notes,
-    })),
-  });
-
-  // If this manual order came from an approved design, flip the design to
-  // "ordered" so the funnel reflects the linked outcome.
-  if (body.designToken && dbEnabled()) {
-    try {
-      const d = await getByStatusToken(body.designToken);
-      if (d) await markOrdered(d.id);
-    } catch (e) {
-      console.error("markOrdered failed:", e);
-    }
+  if (!dbEnabled()) {
+    return NextResponse.json({ error: "Ordering isn't configured yet." }, { status: 503 });
   }
 
-  // The order is captured for the team even if Discord isn't configured yet.
-  return NextResponse.json({ ok: true, reference, notified: posted });
+  const items = body.items?.length ? body.items : ["jersey"];
+
+  try {
+    // 1. Persist: order + roster rows, then lock it as submitted.
+    const created = await createTeamOrder({
+      teamName,
+      contactName,
+      contactEmail,
+      contactPhone,
+      jerseyStyle: body.jerseyStyle,
+      jerseyMaterial: body.jerseyMaterial,
+      items,
+      designRequestId: design?.id,
+    });
+    for (const r of roster.slice(0, 200)) {
+      await addRosterRow(
+        created.id,
+        {
+          playerName: r.name,
+          playerNumber: r.number,
+          size: r.size,
+          sizes: r.sizes,
+          notes: r.notes,
+        },
+        "coach",
+      );
+    }
+    await submitTeamOrder(created.id);
+    if (design) {
+      try {
+        await markOrdered(design.id);
+      } catch (e) {
+        console.error("markOrdered failed:", e);
+      }
+    }
+
+    // 2. Notify (never the source of truth).
+    const posted = await postTeamOrderToDiscord({
+      reference: created.reference,
+      teamName,
+      contactName,
+      contactEmail,
+      contactPhone,
+      jerseyStyle: body.jerseyStyle,
+      jerseyMaterial: body.jerseyMaterial,
+      items,
+      roster: roster.map((r) => ({
+        name: r.name,
+        number: r.number,
+        size: r.sizes?.jersey ?? r.size,
+        sizes: r.sizes,
+        notes: r.notes,
+      })),
+    });
+
+    const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    return NextResponse.json({
+      ok: true,
+      reference: created.reference,
+      manageUrl: `${SITE}/team-order/manage/${created.manageToken}`,
+      notified: posted,
+    });
+  } catch (e) {
+    console.error("team order create failed:", e);
+    return NextResponse.json(
+      { error: "Could not save your order - please try again or text us at (352) 660-1232." },
+      { status: 500 },
+    );
+  }
 }

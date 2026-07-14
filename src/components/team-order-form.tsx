@@ -34,6 +34,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [message, setMessage] = useState("");
   const [links, setLinks] = useState<{ shareUrl: string; manageUrl: string } | null>(null);
   const [copied, setCopied] = useState("");
+  const [manageUrl, setManageUrl] = useState<string | null>(null);
 
   // Returning visitor prefill (browser-local). Skipped when the identity is
   // already locked from an approved design.
@@ -79,7 +80,8 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       if (!res.ok) throw new Error(data.error || "Something went wrong");
       setStatus("done");
       saveRememberedContact({ name: contactName, email: contactEmail, phone: contactPhone });
-      setMessage(`Order ${data.reference} submitted! We'll be in touch with your total and proof.`);
+      setMessage(`Order ${data.reference} submitted! We'll be in touch with your total.`);
+      if (data.manageUrl) setManageUrl(data.manageUrl);
     } catch (e) { setStatus("error"); setMessage((e as Error).message); }
   }
 
@@ -110,6 +112,25 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
         <div className="mx-auto h-12 w-12 grid place-items-center clip-slant bg-brand text-on-brand display text-xl">✓</div>
         <h2 className="display text-2xl text-foreground mt-4">Roster Submitted</h2>
         <p className="mt-3 text-muted">{message}</p>
+        {manageUrl && (
+          <div className="mt-6 text-left bg-ink border border-line p-4">
+            <p className="display text-sm text-foreground">📌 Save your order link</p>
+            <p className="mt-1 text-sm text-muted">
+              This is your page for this order - check its status anytime, and if someone joins the
+              team later you can add extra jerseys and pay for just those pieces right there.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <input readOnly value={manageUrl} className="flex-1 bg-steel border border-line px-3 py-2 text-xs text-foreground/80" />
+              <button
+                type="button"
+                onClick={() => copyLink(manageUrl, "manage")}
+                className="clip-slant bg-brand text-on-brand display text-sm px-4 py-2 hover:bg-brand-dark"
+              >
+                {copied === "manage" ? "Copied ✓" : "Copy"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
