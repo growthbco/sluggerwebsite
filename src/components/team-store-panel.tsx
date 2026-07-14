@@ -121,11 +121,23 @@ export function TeamStorePanel({
         </div>
       ) : (
         <div className="mt-3 bg-steel border border-line p-4">
-          <p className="text-sm text-muted">
-            Open a store so players and parents buy their own gear (per-person Stripe checkout,
-            weight-based shipping or free Ocala pickup). Pick what this team can order:
+          <p className="text-sm text-foreground">
+            <strong>What's a team store?</strong>{" "}
+            <span className="text-muted">
+              A private shop page for this team, built from their approved design. Each player or
+              parent opens the link, picks their gear and size, adds their name and number, and{" "}
+              <strong className="text-foreground">pays Slugger directly by card</strong> - no
+              collecting sizes or money by hand.
+            </span>
           </p>
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <p className="mt-2 text-sm text-muted">
+            <strong className="text-foreground">When to use it:</strong> people buy individually or
+            join over time (rec teams, fan gear, fundraisers).{" "}
+            <strong className="text-foreground">When NOT to:</strong> one coach pays for the whole
+            team at once - use the roster + invoice flow instead.
+          </p>
+          <p className="mt-3 text-sm text-foreground display">1. Check what this team can buy:</p>
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
             {presets.map((p) => (
               <label key={p.key} className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
                 <input
@@ -138,14 +150,20 @@ export function TeamStorePanel({
               </label>
             ))}
           </div>
+          <p className="mt-3 text-sm text-foreground display">2. Open the store and share the link with the coach:</p>
           <button
             type="button"
             onClick={create}
             disabled={busy || picked.size === 0}
-            className="mt-4 clip-slant bg-brand text-on-brand display px-6 py-3 hover:bg-brand-dark disabled:opacity-50"
+            className="mt-2 clip-slant bg-brand text-on-brand display px-6 py-3 hover:bg-brand-dark disabled:opacity-50"
           >
             {busy ? "Creating..." : "Open Team Store"}
           </button>
+          <p className="mt-3 text-xs text-muted">
+            Every purchase pays by card on the spot, emails the buyer a receipt, posts to Discord
+            under this team, and shows up (with revenue) on the staff dashboard. Buyers pick live-rate
+            shipping or free Ocala pickup. You can close or reopen the store anytime.
+          </p>
         </div>
       )}
       {error && <p className="mt-2 text-sm text-brand">{error}</p>}
