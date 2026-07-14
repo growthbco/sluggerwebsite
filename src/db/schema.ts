@@ -502,6 +502,11 @@ export const designRequests = pgTable(
     designFeeWaivedReason: text("design_fee_waived_reason"), // returning_customer | promo:<code> | manual
     designFeeWaivedRef: text("design_fee_waived_ref"), // e.g. "DR-XXXX" of the prior order that triggered the waiver
 
+    // Automated proof follow-ups: how many reminders we've emailed and when
+    // the last one went out. Capped so clients never get spammed.
+    followUpsSent: integer("follow_ups_sent").notNull().default(0),
+    lastFollowUpAt: timestamp("last_follow_up_at", { withTimezone: true }),
+
     // Timestamps
     proofSentAt: timestamp("proof_sent_at", { withTimezone: true }),
     approvedAt: timestamp("approved_at", { withTimezone: true }),

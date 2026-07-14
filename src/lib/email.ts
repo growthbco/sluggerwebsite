@@ -159,6 +159,41 @@ export async function emailProofReady(args: {
   });
 }
 
+/** Friendly reminder that a proof is waiting on the client's review. */
+export async function emailProofFollowUp(args: {
+  to: string;
+  teamName: string;
+  reference: string;
+  statusUrl: string;
+  round: number;
+  neededBy?: Date | null;
+}): Promise<boolean> {
+  const deadline =
+    args.neededBy && !isNaN(args.neededBy.getTime())
+      ? args.neededBy.toLocaleDateString("en-US", { month: "long", day: "numeric" })
+      : null;
+  const isFinal = args.round >= 2;
+  return sendEmail({
+    to: args.to,
+    subject: isFinal
+      ? `Last nudge: your ${args.teamName} design is waiting on you (${args.reference})`
+      : `Your ${args.teamName} proof is still waiting for a look (${args.reference})`,
+    html: brandedEmail({
+      preheader: `One click to review - approve it or tell us what to change.`,
+      heading: isFinal ? `Don't leave your design hanging!` : `Just checking in, ${esc(args.teamName)}`,
+      intro: `Reference: <strong>${esc(args.reference)}</strong>`,
+      bodyHtml: `
+        <p style="margin:0 0 12px;">Your custom design proof is ready and waiting for your review. Approve it and we move straight into production, or drop a pin on anything you'd like changed.</p>
+        ${deadline ? `<p style="margin:0 0 12px;">Heads up: you told us you need your gear by <strong>${deadline}</strong>. Production takes 2-3 weeks after approval, so a quick review keeps you on schedule.</p>` : ""}
+        <p style="margin:0;">Questions first? Just reply to this email or use the message box on your design page.</p>
+      `,
+      ctaText: "Review your proof",
+      ctaUrl: args.statusUrl,
+    }),
+    replyTo: CONTACT_INBOX,
+  });
+}
+
 /** Email the client that the designer sent them a message/question. */
 export async function emailDesignerMessage(args: {
   to: string;
