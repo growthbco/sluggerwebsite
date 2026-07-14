@@ -9,6 +9,7 @@ import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
 import { AdminLogout } from "@/components/admin-logout";
 import { AdminInvoiceButton } from "@/components/admin-invoice-button";
+import { AdminArchiveButton } from "@/components/admin-archive-button";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -79,6 +80,8 @@ export default async function AdminPage() {
         quotedTotalCents: teamOrders.quotedTotalCents,
         invoiceUrl: teamOrders.invoiceUrl,
         invoicePaidAt: teamOrders.invoicePaidAt,
+        archivedAt: teamOrders.archivedAt,
+        archivedNote: teamOrders.archivedNote,
         updatedAt: teamOrders.updatedAt,
       })
       .from(teamOrders)
@@ -107,10 +110,13 @@ export default async function AdminPage() {
       .limit(15),
   ]);
 
+  const activeOrders = torders.filter((o) => !o.archivedAt);
+  const archivedOrders = torders.filter((o) => o.archivedAt);
+
   // Price each unpaid team order from its roster so "Send invoice" can show
   // the number upfront. Roster fetches are per-order but the list is small.
   const orderEstimates = new Map<string, number>();
-  for (const o of torders) {
+  for (const o of activeOrders) {
     if (o.status === "paid" || o.invoicePaidAt) continue;
     try {
       const roster = await getRoster(o.id);
@@ -189,7 +195,7 @@ export default async function AdminPage() {
       </section>
 
       <section className="mt-10">
-        <h2 className="display text-xl text-foreground">Team orders ({torders.length})</h2>
+        <h2 className="display text-xl text-foreground">Team orders ({activeOrders.length})</h2>
         <div className="mt-3 overflow-x-auto border border-line">
           <table className="w-full text-sm">
             <thead>
@@ -204,7 +210,7 @@ export default async function AdminPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[color:var(--line)]">
-              {torders.map((o) => {
+              {activeOrders.map((o) => {
                 const estimate = o.quotedTotalCents ?? orderEstimates.get(o.id);
                 const paid = o.status === "paid" || Boolean(o.invoicePaidAt);
                 return (
@@ -222,18 +228,21 @@ export default async function AdminPage() {
                       {estimate && !o.quotedTotalCents ? <span className="text-xs text-muted"> est.</span> : null}
                     </td>
                     <td className="px-3 py-2">
-                      {paid ? (
-                        <span className="text-xs display text-green-400">PAID</span>
-                      ) : estimate ? (
-                        <AdminInvoiceButton
-                          teamOrderId={o.id}
-                          teamName={o.teamName}
-                          estimateCents={estimate}
-                          resend={Boolean(o.invoiceUrl)}
-                        />
-                      ) : (
-                        <span className="text-xs text-muted">no roster</span>
-                      )}
+                      <span className="flex items-center gap-2">
+                        {paid ? (
+                          <span className="text-xs display text-green-400">PAID</span>
+                        ) : estimate ? (
+                          <AdminInvoiceButton
+                            teamOrderId={o.id}
+                            teamName={o.teamName}
+                            estimateCents={estimate}
+                            resend={Boolean(o.invoiceUrl)}
+                          />
+                        ) : (
+                          <span className="text-xs text-muted">no roster</span>
+                        )}
+                        <AdminArchiveButton teamOrderId={o.id} archived={false} />
+                      </span>
                     </td>
                     <td className="px-3 py-2 text-muted">{fmtDate(o.updatedAt)}</td>
                   </tr>
@@ -243,6 +252,31 @@ export default async function AdminPage() {
           </table>
         </div>
       </section>
+
+      {archivedOrders.length > 0 && (
+        <details className="mt-6 border border-line bg-steel/50 group">
+          <summary className="flex cursor-pointer items-center justify-between px-4 py-3 list-none">
+            <span className="display text-sm text-muted">Archived team orders ({archivedOrders.length})</span>
+            <span className="text-brand transition-transform group-open:rotate-45">+</span>
+          </summary>
+          <div className="divide-y divide-[color:var(--line)] border-t border-line">
+            {archivedOrders.map((o) => (
+              <div key={o.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <div>
+                  <Link href={`/team-order/manage/${o.manageToken}`} className="font-mono text-xs text-brand hover:underline">
+                    {o.reference}
+                  </Link>
+                  <span className="ml-2 text-foreground">{o.teamName}</span>
+                  <span className="ml-2 text-muted">{o.contactEmail}</span>
+                  {o.archivedNote && <span className="ml-2 text-xs text-amber-400/90">"{o.archivedNote}"</span>}
+                  <span className="ml-2 text-xs text-muted">archived {fmtDate(o.archivedAt)}</span>
+                </div>
+                <AdminArchiveButton teamOrderId={o.id} archived={true} />
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
 
       <div className="mt-10 grid gap-10 lg:grid-cols-2">
         <section>

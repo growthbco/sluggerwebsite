@@ -392,6 +392,11 @@ export const teamOrders = pgTable(
     invoiceUrl: text("invoice_url"),
     invoicePaidAt: timestamp("invoice_paid_at", { withTimezone: true }),
 
+    // Admin archive: hides the order from the active list without deleting it,
+    // with a note ("lost - went with competitor") for later follow-up.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    archivedNote: text("archived_note"),
+
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
