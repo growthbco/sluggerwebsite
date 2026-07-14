@@ -37,11 +37,22 @@ export const STORE_ITEM_PRESETS: StoreItem[] = [
   { key: "snapback_hat", label: "Snapback Hat", priceCents: 2500, sizes: ["One Size"], weightOz: 5 },
 ];
 
-// Weight-based shipping: $7 covers the first 3 lb, then $1 per additional lb.
-// Local pickup in Ocala is always free (offered as a checkout option).
-export function shippingCentsFor(totalOz: number): number {
+// Shipping margin: customers are charged carrier cost + 25% (covers
+// packaging/handling with profit). Applies to the weight formula below and,
+// later, to live Shippo rates.
+export const SHIPPING_MARGIN = 0.25;
+
+/** Estimated carrier cost: $7 covers the first 3 lb, then $1 per lb. */
+export function shippingCostCentsFor(totalOz: number): number {
   const lbs = Math.max(1, Math.ceil(totalOz / 16));
   return 700 + Math.max(0, lbs - 3) * 100;
+}
+
+// What the customer is charged: cost + margin, rounded up to a clean quarter.
+// Local pickup in Ocala stays free (offered as a checkout option).
+export function shippingCentsFor(totalOz: number): number {
+  const cost = shippingCostCentsFor(totalOz);
+  return Math.ceil((cost * (1 + SHIPPING_MARGIN)) / 25) * 25;
 }
 
 const token = () => randomUUID().replace(/-/g, "");
