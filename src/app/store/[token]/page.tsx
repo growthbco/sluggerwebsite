@@ -27,10 +27,17 @@ function themeVars(hex: string | null | undefined): React.CSSProperties | undefi
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   const darken = (v: number) => Math.max(0, Math.round(v * 0.8));
   const darkHex = `#${[darken(r), darken(g), darken(b)].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+  // Tailwind compiles brand utilities down to the base tokens (--brand-gold
+  // etc.), so those are what we must override; the --color-* aliases are set
+  // too for anything that still references them.
+  const onBrand = luminance > 0.55 ? "#13160b" : "#ffffff";
   return {
+    "--brand-gold": hex,
+    "--brand-gold-dark": darkHex,
+    "--on-brand": onBrand,
     "--color-brand": hex,
     "--color-brand-dark": darkHex,
-    "--color-on-brand": luminance > 0.55 ? "#13160b" : "#ffffff",
+    "--color-on-brand": onBrand,
   } as React.CSSProperties;
 }
 
