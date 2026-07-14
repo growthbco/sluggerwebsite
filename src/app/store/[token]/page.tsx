@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { dbEnabled } from "@/db";
 import { getByStoreToken } from "@/lib/team-stores";
+import { getById } from "@/lib/design-requests";
 import { TeamStoreShop } from "@/components/team-store-shop";
+import { ProofGallery } from "@/components/proof-gallery";
+import { AllSizeCharts } from "@/components/size-charts";
 
 export const metadata: Metadata = { title: "Team Store", robots: { index: false } };
 
@@ -30,6 +32,13 @@ export default async function TeamStorePage({ params }: { params: Promise<{ toke
     );
   }
 
+  // Gallery: the approved design first, then every proof view from the linked
+  // design request (front/back/detail shots), deduped.
+  const design = store.designRequestId ? await getById(store.designRequestId) : null;
+  const galleryImages = Array.from(
+    new Set([store.approvedDesignUrl, design?.approvedDesignUrl, ...(design?.proofImages ?? [])].filter(Boolean)),
+  ) as string[];
+
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 py-14">
       <header className="text-center">
@@ -41,22 +50,29 @@ export default async function TeamStorePage({ params }: { params: Promise<{ toke
         </p>
       </header>
 
-      {store.approvedDesignUrl && (
-        <div className="mt-8 relative bg-white border border-line mx-auto max-w-2xl" style={{ aspectRatio: "4 / 3" }}>
-          <Image
-            src={store.approvedDesignUrl}
-            alt={`${store.name} approved design`}
-            fill
-            sizes="(max-width: 768px) 100vw, 672px"
-            className="object-contain p-2"
-            unoptimized
-          />
+      {galleryImages.length > 0 && (
+        <div className="mt-8">
+          <ProofGallery images={galleryImages} teamName={store.name} />
         </div>
       )}
 
       <div className="mt-10">
         <TeamStoreShop token={token} items={store.storeItems ?? []} />
       </div>
+
+      <details className="mt-12 border border-line bg-steel group">
+        <summary className="flex cursor-pointer items-center justify-between px-5 py-4 list-none">
+          <span className="display text-lg text-foreground">📏 Size Charts</span>
+          <span className="text-brand text-xl transition-transform group-open:rotate-45">+</span>
+        </summary>
+        <div className="px-5 pb-6">
+          <p className="text-sm text-muted mb-5">
+            All measurements in inches. Jerseys have a relaxed fit and run slightly large -
+            when in doubt, size down or text us at (352) 660-1232.
+          </p>
+          <AllSizeCharts />
+        </div>
+      </details>
     </div>
   );
 }

@@ -2,59 +2,20 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { readdirSync } from "node:fs";
 import path from "node:path";
+import {
+  ChartTable,
+  JERSEYS_ADULT,
+  JERSEYS_YOUTH,
+  HOODIES,
+  PANTS_ADULT,
+  PANTS_YOUTH,
+} from "@/components/size-charts";
 
 export const metadata: Metadata = {
   title: "Size Guide - Jerseys, Hoodies & Pants",
   description:
     "Sizing charts for Slugger Athletics custom jerseys, hoodies, and pants. Measurements in inches for youth and adult sizes.",
 };
-
-// Measurements from Slugger Athletics' official size charts (inches).
-const JERSEYS_ADULT = [
-  ["AS", "22", "28.5"], ["AM", "23", "29.5"], ["AL", "24", "30.5"], ["AXL", "25", "31.5"],
-  ["A2XL", "26", "32.5"], ["A3XL", "27", "33.5"], ["A4XL", "28", "34.5"], ["A5XL", "29", "35.5"],
-];
-const JERSEYS_YOUTH = [
-  ["YS", "18.5", "24"], ["YM", "19", "24.5"], ["YL", "19.5", "25"], ["YXL", "20", "25.5"],
-];
-const HOODIES = [
-  ["S", "23", "29"], ["M", "24.5", "30"], ["L", "26", "32"], ["XL", "27.5", "33"],
-  ["2XL", "29", "35"], ["3XL", "31.5", "36"], ["4XL", "33", "37"], ["5XL", "34", "38"],
-];
-const PANTS_ADULT = [
-  ["XS", "26-28", "29"], ["S", "29-31", "30"], ["M", "32-34", "31"],
-  ["L", "35-37", "32"], ["XL", "38-40", "33"], ["XXL", "41-43", "33"],
-];
-const PANTS_YOUTH = [
-  ["S", "23-25", "26"], ["M", "25-27", "26.5"], ["L", "27-29", "27"], ["XL", "29-31", "27.5"],
-];
-
-function ChartTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
-  return (
-    <div className="overflow-x-auto border border-line">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="bg-brand text-on-brand display">
-            {headers.map((h) => (
-              <th key={h} className="px-4 py-2.5 font-normal">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={r[0]} className={i % 2 ? "bg-steel" : "bg-ink"}>
-              {r.map((cell, j) => (
-                <td key={j} className={`px-4 py-2.5 ${j === 0 ? "display text-foreground" : "text-muted"}`}>
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 function getUploadedCharts(): { file: string; title: string }[] {
   try {
