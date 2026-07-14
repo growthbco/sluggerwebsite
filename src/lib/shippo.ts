@@ -46,15 +46,14 @@ type ShippoRate = {
 };
 
 function parcelFor(weightOz: number) {
-  // Box size must scale with the order: USPS "cubic" pricing makes small
-  // boxes cheap regardless of weight, so declaring a slim pack for a 19-item
-  // order would massively under-quote. Tiers by rough apparel volume.
+  // One box class up to 10 lb (16x12x8 is just over the USPS "cubic" volume
+  // threshold, so everything prices by weight): keeps quotes monotonic -
+  // adding an item can never make shipping cheaper, which buyers read as a
+  // bug. Above 10 lb, a large box (dim-weight applies, real for big hauls).
   const dims =
-    weightOz <= 64
-      ? { length: "15", width: "12", height: "4" } // soft pack: up to ~5 pieces
-      : weightOz <= 160
-      ? { length: "16", width: "12", height: "8" } // medium box: up to ~10 lb
-      : { length: "18", width: "16", height: "12" }; // large box
+    weightOz <= 160
+      ? { length: "16", width: "12", height: "8" }
+      : { length: "18", width: "16", height: "12" };
   return {
     ...dims,
     distance_unit: "in",
@@ -127,6 +126,28 @@ export async function getLabelRates(
 ): Promise<QuotedRate[]> {
   if (!labelReady()) throw new Error("Set SHIP_FROM_STREET (your ship-from address) before buying labels.");
   return getRates(to, weightOz);
+}
+
+/** Cheapest ground charge for a ZIP + weight, with a monotonicity guard:
+ *  carrier tables sometimes price a heavier package LOWER (USPS quirks),
+ *  which buyers read as a bug when adding items drops the price. We floor
+ *  the charge at the 1.5 lb quote so it never decreases as the cart grows. */
+export async function quoteChargedShipping(
+  zip: string,
+  weightOz: number,
+): Promise<{ chargedCents: number; carrier: string; service: string } | null> {
+  const rates = await getRates({ zip }, weightOz);
+  if (rates.length === 0) return null;
+  let best = rates[0];
+  if (weightOz > 24) {
+    try {
+      const light = await getRates({ zip }, 24);
+      if (light.length > 0 && light[0].chargedCents > best.chargedCents) {
+        best = { ...best, chargedCents: light[0].chargedCents };
+      }
+    } catch {}
+  }
+  return { chargedCents: best.chargedCents, carrier: best.provider, service: best.service };
 }
 
 /** Buy the label for a previously quoted rate. Returns tracking + label PDF. */

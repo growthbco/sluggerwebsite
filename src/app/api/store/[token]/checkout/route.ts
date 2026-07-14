@@ -20,15 +20,18 @@ async function shipOptions(totalOz: number, zip?: string): Promise<{ label: stri
   const options: { label: string; amountCents: number }[] = [];
   if (zip && /^\d{5}$/.test(zip)) {
     try {
-      const { getRates, shippoEnabled } = await import("@/lib/shippo");
+      const { getRates, quoteChargedShipping, shippoEnabled } = await import("@/lib/shippo");
       if (shippoEnabled()) {
-        const rates = await getRates({ zip }, totalOz);
-        if (rates.length > 0) {
-          options.push({ label: `Standard shipping to ${zip}`, amountCents: rates[0].chargedCents });
+        // Same monotonic-guarded charge as the on-page quote, so the Stripe
+        // page matches what the buyer was shown.
+        const best = await quoteChargedShipping(zip, totalOz);
+        if (best) {
+          options.push({ label: `Standard shipping to ${zip}`, amountCents: best.chargedCents });
+          const rates = await getRates({ zip }, totalOz);
           const priority = rates.find(
             (r) => r.provider === "USPS" && /priority mail(?! express)/i.test(r.service),
           );
-          if (priority && priority.chargedCents > rates[0].chargedCents) {
+          if (priority && priority.chargedCents > best.chargedCents) {
             options.push({ label: "Faster shipping (USPS Priority, 1-3 days)", amountCents: priority.chargedCents });
           }
         }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRates, shippoEnabled } from "@/lib/shippo";
+import { quoteChargedShipping, shippoEnabled } from "@/lib/shippo";
 import { shippingCentsFor } from "@/lib/team-stores";
 
 export const runtime = "nodejs";
@@ -30,14 +30,13 @@ export async function POST(req: Request) {
 
   if (shippoEnabled()) {
     try {
-      const rates = await getRates({ zip }, weightOz);
-      if (rates.length > 0) {
-        const best = rates[0];
+      const best = await quoteChargedShipping(zip, weightOz);
+      if (best) {
         return NextResponse.json({
           ok: true,
           live: true,
           amountCents: best.chargedCents,
-          carrier: best.provider,
+          carrier: best.carrier,
           service: best.service,
           place,
         });
