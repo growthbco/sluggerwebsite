@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
 import Image from "next/image";
 import { upload } from "@vercel/blob/client";
 import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
@@ -21,6 +22,19 @@ export function DesignIntakeForm() {
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
   const [statusUrl, setStatusUrl] = useState<string | null>(null);
+  const [welcomeBack, setWelcomeBack] = useState(false);
+
+  // Returning customer on the same device: prefill contact info so they don't
+  // retype it. Saved (locally only) after each successful submit.
+  useEffect(() => {
+    const saved = loadRememberedContact();
+    if (saved) {
+      setContactName((v) => v || saved.name);
+      setContactEmail((v) => v || saved.email);
+      setContactPhone((v) => v || saved.phone);
+      setWelcomeBack(true);
+    }
+  }, []);
 
   const inputCls =
     "w-full bg-steel border border-line px-3 py-2.5 text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none";
@@ -84,6 +98,7 @@ export function DesignIntakeForm() {
       }
       setStatus("done");
       setStatusUrl(data.statusUrl);
+      saveRememberedContact({ name: contactName, email: contactEmail, phone: contactPhone });
       if (data.waived) setMessage(data.waivedReason || "waived");
     } catch (e) {
       setStatus("error");
@@ -134,6 +149,9 @@ export function DesignIntakeForm() {
         </div>
         <div>
           <label className="display text-sm text-foreground">Your Name *</label>
+          {welcomeBack && (
+            <p className="mt-1 text-xs text-brand">Welcome back! We filled in your info from last time - double-check it&apos;s still right.</p>
+          )}
           <input className={`mt-2 ${inputCls}`} value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Your name" />
         </div>
         <div className="grid grid-cols-2 gap-4">

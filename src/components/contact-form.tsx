@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
 
 const SUBJECTS = ["Team order", "Custom design / quote", "Order status", "Returns & exchanges", "Something else"];
 
@@ -12,6 +13,16 @@ export function ContactForm() {
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [error, setError] = useState("");
+
+  // Prefill for returning visitors (stored in their own browser only).
+  useEffect(() => {
+    const saved = loadRememberedContact();
+    if (saved) {
+      setName((v) => v || saved.name);
+      setEmail((v) => v || saved.email);
+      setPhone((v) => v || saved.phone);
+    }
+  }, []);
 
   const inputCls =
     "w-full bg-steel border border-line px-3 py-2.5 text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none";
@@ -28,6 +39,7 @@ export function ContactForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not send your message.");
       setStatus("done");
+      saveRememberedContact({ name, email, phone });
     } catch (e) {
       setStatus("error");
       setError((e as Error).message);

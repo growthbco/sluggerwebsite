@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ITEM_TYPES, JERSEY_MATERIALS } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
+import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
 
 const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button"];
 
@@ -34,6 +35,19 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [links, setLinks] = useState<{ shareUrl: string; manageUrl: string } | null>(null);
   const [copied, setCopied] = useState("");
 
+  // Returning visitor prefill (browser-local). Skipped when the identity is
+  // already locked from an approved design.
+  useEffect(() => {
+    if (prefill) return;
+    const saved = loadRememberedContact();
+    if (saved) {
+      setContactName((v) => v || saved.name);
+      setContactEmail((v) => v || saved.email);
+      setContactPhone((v) => v || saved.phone);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const inputCls =
     "w-full bg-steel border border-line px-3 py-2.5 text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none";
 
@@ -64,6 +78,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
       setStatus("done");
+      saveRememberedContact({ name: contactName, email: contactEmail, phone: contactPhone });
       setMessage(`Order ${data.reference} submitted! We'll be in touch with your total and proof.`);
     } catch (e) { setStatus("error"); setMessage((e as Error).message); }
   }
