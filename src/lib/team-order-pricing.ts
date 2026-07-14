@@ -15,17 +15,20 @@ const ITEM_PRICES: Record<string, number> = {
 
 export const RUSH_FEE_CENTS = 500; // per piece, when rushShipping is set
 
-export function jerseyPriceCents(jerseyStyle?: string | null): number {
+// Ocala league-family price for standard (crew/v-neck) jerseys.
+export const LOCAL_JERSEY_CENTS = 2500;
+
+export function jerseyPriceCents(jerseyStyle?: string | null, localPricing?: boolean | null): number {
   const s = (jerseyStyle ?? "").toLowerCase();
   if (s.includes("full")) return 3800;
   if (s.includes("two")) return 3500;
-  return 2800; // crew / v-neck / unspecified
+  return localPricing ? LOCAL_JERSEY_CENTS : 2800; // crew / v-neck / unspecified
 }
 
 /** Retail price for one piece of an order item ("jersey" follows the order's
  *  jersey style). Returns 0 for unknown keys. */
-export function itemPriceCents(key: string, jerseyStyle?: string | null): number {
-  if (key === "jersey") return jerseyPriceCents(jerseyStyle);
+export function itemPriceCents(key: string, jerseyStyle?: string | null, localPricing?: boolean | null): number {
+  if (key === "jersey") return jerseyPriceCents(jerseyStyle, localPricing);
   return ITEM_PRICES[key] ?? 0;
 }
 
@@ -47,7 +50,7 @@ type RosterRow = {
 /** Count what each player actually ordered (their per-item sizes) and price
  *  it. A row with only the legacy `size` field counts as one jersey. */
 export function computeTeamOrderQuote(
-  order: { jerseyStyle?: string | null; items?: string[] | null; rushShipping?: boolean | null },
+  order: { jerseyStyle?: string | null; items?: string[] | null; rushShipping?: boolean | null; localPricing?: boolean | null },
   roster: RosterRow[],
 ): TeamOrderQuote {
   const counts = new Map<string, number>();
@@ -67,7 +70,7 @@ export function computeTeamOrderQuote(
   const keys = Array.from(counts.keys()).sort((a, b) => (a === "jersey" ? -1 : b === "jersey" ? 1 : a.localeCompare(b)));
   for (const key of keys) {
     const quantity = counts.get(key)!;
-    const unit = key === "jersey" ? jerseyPriceCents(order.jerseyStyle) : ITEM_PRICES[key];
+    const unit = key === "jersey" ? jerseyPriceCents(order.jerseyStyle, order.localPricing) : ITEM_PRICES[key];
     if (!unit) continue; // unknown item type: leave for a manual quote
     const label =
       key === "jersey" && order.jerseyStyle ? `${order.jerseyStyle} Jersey` : itemLabel(key);

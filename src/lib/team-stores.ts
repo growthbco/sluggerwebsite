@@ -69,6 +69,8 @@ export async function createTeamStore(input: {
   approvedDesignUrl?: string | null;
   designRequestId: string;
   itemKeys: string[];
+  /** Ocala league-family team: round-neck jerseys snapshot at $25. */
+  localPricing?: boolean;
 }) {
   const db = getDb();
 
@@ -80,7 +82,9 @@ export async function createTeamStore(input: {
     .limit(1);
   if (existing) return existing;
 
-  const items = STORE_ITEM_PRESETS.filter((p) => input.itemKeys.includes(p.key));
+  const items = STORE_ITEM_PRESETS.filter((p) => input.itemKeys.includes(p.key)).map((p) =>
+    input.localPricing && p.key === "round_neck_jersey" ? { ...p, priceCents: 2500 } : p,
+  );
   const base = slugify(input.name) || "team";
   const [row] = await db
     .insert(teams)

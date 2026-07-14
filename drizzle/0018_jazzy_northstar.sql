@@ -1,0 +1,1 @@
+ALTER TABLE "team_orders" ADD COLUMN "local_pricing" boolean DEFAULT false NOT NULL;

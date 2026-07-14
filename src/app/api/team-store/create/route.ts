@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
 
-  let body: { manageToken?: string; itemKeys?: string[] } = {};
+  let body: { manageToken?: string; itemKeys?: string[]; localPricing?: boolean } = {};
   try {
     body = await req.json();
   } catch {}
@@ -36,6 +36,7 @@ export async function POST(req: Request) {
       approvedDesignUrl: request.approvedDesignUrl ?? request.proofImages?.[request.proofImages.length - 1] ?? null,
       designRequestId: request.id,
       itemKeys,
+      localPricing: body.localPricing === true,
     });
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const storeUrl = `${SITE}/store/${store.storeToken}`;

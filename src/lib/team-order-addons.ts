@@ -44,14 +44,14 @@ export type AddonRow = {
 
 /** Validate + price requested add-on rows against the order's item types. */
 export function priceAddonRows(
-  order: { jerseyStyle?: string | null; items?: string[] | null },
+  order: { jerseyStyle?: string | null; items?: string[] | null; localPricing?: boolean | null },
   inputs: AddonRowInput[],
 ): { rows: AddonRow[]; totalCents: number } {
   const allowed = new Set(order.items?.length ? order.items : ["jersey"]);
   const rows: AddonRow[] = [];
   for (const r of inputs.slice(0, 50)) {
     if (!allowed.has(r.key)) continue;
-    const unit = itemPriceCents(r.key, order.jerseyStyle);
+    const unit = itemPriceCents(r.key, order.jerseyStyle, order.localPricing);
     if (!unit) continue;
     const sizes = sizesFor(r.key);
     rows.push({

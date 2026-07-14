@@ -347,6 +347,9 @@ export const teamOrders = pgTable(
 
     sport: text("sport"),
     jerseyStyle: text("jersey_style"), // crew / v-neck / full button / two button
+    // Ocala league-family pricing: standard jerseys at $25 instead of $28.
+    // Set by staff for teams that play in our leagues.
+    localPricing: boolean("local_pricing").notNull().default(false),
     jerseyMaterial: text("jersey_material"), // birdseye mesh / pro smooth
     // Which item types this order covers, e.g. ["jersey","pants","socks"].
     items: jsonb("items").$type<string[]>().default(["jersey"]),

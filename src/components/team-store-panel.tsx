@@ -28,6 +28,7 @@ export function TeamStorePanel({
   initialStore: StoreInfo | null;
 }) {
   const [store, setStore] = useState<StoreInfo | null>(initialStore);
+  const [localPricing, setLocalPricing] = useState(false);
   // Appearance controls (URL / color / logo)
   const [slugDraft, setSlugDraft] = useState(initialStore?.slug ?? "");
   const [colorDraft, setColorDraft] = useState(initialStore?.color ?? "#b8a36c");
@@ -93,7 +94,7 @@ export function TeamStorePanel({
       const res = await fetch("/api/team-store/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ manageToken, itemKeys: Array.from(picked) }),
+        body: JSON.stringify({ manageToken, itemKeys: Array.from(picked), localPricing }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create the store");
@@ -252,6 +253,17 @@ export function TeamStorePanel({
               </label>
             ))}
           </div>
+          <label className="mt-3 flex items-start gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={localPricing}
+              onChange={(e) => setLocalPricing(e.target.checked)}
+              className="mt-0.5 accent-[color:var(--brand-gold)]"
+            />
+            <span className="text-foreground">
+              Ocala league team <span className="text-muted">(they play with us: round-neck jerseys at $25 instead of $28)</span>
+            </span>
+          </label>
           <p className="mt-3 text-sm text-foreground display">2. Open the store and share the link with the coach:</p>
           <button
             type="button"

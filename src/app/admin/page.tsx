@@ -12,6 +12,7 @@ import { AdminInvoiceButton } from "@/components/admin-invoice-button";
 import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
 import { AdminArchiveButton } from "@/components/admin-archive-button";
+import { AdminLocalToggle } from "@/components/admin-local-toggle";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -89,6 +90,7 @@ export default async function AdminPage() {
         manageToken: teamOrders.manageToken,
         jerseyStyle: teamOrders.jerseyStyle,
         rushShipping: teamOrders.rushShipping,
+        localPricing: teamOrders.localPricing,
         quotedTotalCents: teamOrders.quotedTotalCents,
         invoiceUrl: teamOrders.invoiceUrl,
         depositCents: teamOrders.depositCents,
@@ -279,8 +281,18 @@ export default async function AdminPage() {
                     <td className="px-3 py-2"><Badge label={o.status} /></td>
                     <td className="px-3 py-2 text-muted">{o.contactEmail}</td>
                     <td className="px-3 py-2 text-foreground">
-                      {estimate ? money(estimate) : "-"}
-                      {estimate && !o.quotedTotalCents ? <span className="text-xs text-muted"> est.</span> : null}
+                      <span className="flex items-center gap-1.5">
+                        <span>
+                          {estimate ? money(estimate) : "-"}
+                          {estimate && !o.quotedTotalCents ? <span className="text-xs text-muted"> est.</span> : null}
+                        </span>
+                        {!o.invoiceUrl && !paid && (
+                          <AdminLocalToggle teamOrderId={o.id} local={o.localPricing} />
+                        )}
+                        {o.localPricing && (o.invoiceUrl || paid) && (
+                          <span className="text-xs display text-brand">OCALA</span>
+                        )}
+                      </span>
                     </td>
                     <td className="px-3 py-2">
                       <span className="flex items-center gap-2">

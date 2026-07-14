@@ -82,7 +82,7 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
           token={token}
           items={order.items ?? ["jersey"]}
           prices={Object.fromEntries(
-            (order.items ?? ["jersey"]).map((k) => [k, itemPriceCents(k, order.jerseyStyle)]),
+            (order.items ?? ["jersey"]).map((k) => [k, itemPriceCents(k, order.jerseyStyle, order.localPricing)]),
           )}
           shipped={order.status === "shipped"}
         />
