@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
 import { dbEnabled } from "@/db";
-import { getByStoreToken, shippingCentsFor } from "@/lib/team-stores";
+import { getStoreByHandle, shippingCentsFor } from "@/lib/team-stores";
 
 export const runtime = "nodejs";
 
@@ -34,7 +34,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     return NextResponse.json({ error: "Checkout isn't configured yet." }, { status: 503 });
   }
   const { token } = await params;
-  const store = await getByStoreToken(token);
+  const store = await getStoreByHandle(token);
   if (!store) return NextResponse.json({ error: "Store not found" }, { status: 404 });
   if (!store.storeActive) return NextResponse.json({ error: "This store is currently closed." }, { status: 409 });
 

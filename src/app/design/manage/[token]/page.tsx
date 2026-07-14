@@ -72,9 +72,12 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
             initialStore={
               store
                 ? {
-                    url: `${SITE}/store/${store.storeToken}`,
+                    url: `${SITE}/store/${store.slug ?? store.storeToken}`,
                     active: store.storeActive,
                     itemLabels: (store.storeItems ?? []).map((i) => i.label),
+                    slug: store.slug ?? undefined,
+                    color: store.primaryColor,
+                    logoUrl: store.logoUrl,
                   }
                 : null
             }

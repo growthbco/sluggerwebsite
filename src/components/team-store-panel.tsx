@@ -1,8 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { upload } from "@vercel/blob/client";
 
 type Preset = { key: string; label: string; priceCents: number };
+
+type StoreInfo = {
+  url: string;
+  active: boolean;
+  itemLabels: string[];
+  slug?: string;
+  color?: string | null;
+  logoUrl?: string | null;
+};
 
 const money = (c: number) => `$${(c / 100).toFixed(0)}`;
 
@@ -15,9 +25,53 @@ export function TeamStorePanel({
 }: {
   manageToken: string;
   presets: Preset[];
-  initialStore: { url: string; active: boolean; itemLabels: string[] } | null;
+  initialStore: StoreInfo | null;
 }) {
-  const [store, setStore] = useState(initialStore);
+  const [store, setStore] = useState<StoreInfo | null>(initialStore);
+  // Appearance controls (URL / color / logo)
+  const [slugDraft, setSlugDraft] = useState(initialStore?.slug ?? "");
+  const [colorDraft, setColorDraft] = useState(initialStore?.color ?? "#b8a36c");
+  const logoRef = useRef<HTMLInputElement>(null);
+  const [appearanceBusy, setAppearanceBusy] = useState(false);
+  const [appearanceMsg, setAppearanceMsg] = useState("");
+
+  async function saveAppearance(extra: { logoUrl?: string | null } = {}) {
+    setAppearanceBusy(true);
+    setAppearanceMsg("");
+    try {
+      const res = await fetch("/api/team-store/customize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manageToken, slug: slugDraft || undefined, color: colorDraft, ...extra }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not save");
+      setStore((s) => (s ? { ...s, url: data.storeUrl, slug: slugDraft, color: colorDraft, ...(extra.logoUrl !== undefined ? { logoUrl: extra.logoUrl } : {}) } : s));
+      setAppearanceMsg("Saved ✓");
+      setTimeout(() => setAppearanceMsg(""), 2500);
+    } catch (e) {
+      setAppearanceMsg((e as Error).message);
+    } finally {
+      setAppearanceBusy(false);
+    }
+  }
+
+  async function uploadLogo() {
+    const file = logoRef.current?.files?.[0];
+    if (!file) return;
+    setAppearanceBusy(true);
+    setAppearanceMsg("Uploading logo...");
+    try {
+      const blob = await upload(`team-logos/${file.name}`, file, {
+        access: "public",
+        handleUploadUrl: "/api/design-request/upload",
+      });
+      await saveAppearance({ logoUrl: blob.url });
+    } catch (e) {
+      setAppearanceMsg((e as Error).message);
+      setAppearanceBusy(false);
+    }
+  }
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -117,6 +171,54 @@ export function TeamStorePanel({
             >
               {store.active ? "Close store" : "Reopen store"}
             </button>
+          </div>
+
+          {/* Appearance: friendly URL, team color, logo */}
+          <div className="pt-3 border-t border-line">
+            <p className="text-sm text-foreground display">Make it theirs (optional)</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted">…/store/</span>
+              <input
+                value={slugDraft}
+                onChange={(e) => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+                placeholder="rookies"
+                maxLength={60}
+                className="w-40 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                aria-label="Custom store URL"
+              />
+              <label className="flex items-center gap-1.5 text-xs text-muted">
+                Team color
+                <input
+                  type="color"
+                  value={colorDraft || "#b8a36c"}
+                  onChange={(e) => setColorDraft(e.target.value)}
+                  className="h-8 w-10 bg-ink border border-line cursor-pointer"
+                  aria-label="Team color"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => logoRef.current?.click()}
+                disabled={appearanceBusy}
+                className="text-xs display text-foreground border border-line px-3 py-2 hover:border-brand/50 disabled:opacity-50"
+              >
+                {store.logoUrl ? "Replace logo" : "Add logo"}
+              </button>
+              <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={uploadLogo} />
+              <button
+                type="button"
+                onClick={() => saveAppearance()}
+                disabled={appearanceBusy}
+                className="clip-slant bg-brand text-on-brand display text-xs px-4 py-2 hover:bg-brand-dark disabled:opacity-50"
+              >
+                {appearanceBusy ? "Saving..." : "Save look"}
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs text-muted">
+              Custom URL is easier to share ("sluggerathletics.com/store/rookies"); the color themes
+              the store's buttons and accents; the logo shows at the top of the store.
+              {appearanceMsg && <span className="ml-2 text-brand">{appearanceMsg}</span>}
+            </p>
           </div>
         </div>
       ) : (

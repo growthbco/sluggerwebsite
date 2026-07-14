@@ -106,6 +106,45 @@ export async function getByStoreToken(tkn: string) {
   return row ?? null;
 }
 
+/** Resolve a store by its private token OR its friendly slug - custom URLs
+ *  like /store/rookies share fine; storeActive still gates purchases. */
+export async function getStoreByHandle(handle: string) {
+  const byToken = await getByStoreToken(handle);
+  if (byToken) return byToken;
+  const db = getDb();
+  const [row] = await db.select().from(teams).where(eq(teams.slug, handle.toLowerCase())).limit(1);
+  return row ?? null;
+}
+
+export function sanitizeSlug(raw: string): string {
+  return raw.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+}
+
+/** Staff customization: friendly URL, team color, logo. */
+export async function updateStoreAppearance(
+  id: string,
+  patch: { slug?: string; primaryColor?: string | null; logoUrl?: string | null },
+): Promise<{ ok: true } | { ok: false; reason: "slug_taken" }> {
+  const db = getDb();
+  try {
+    await db
+      .update(teams)
+      .set({
+        ...(patch.slug ? { slug: patch.slug } : {}),
+        ...(patch.primaryColor !== undefined ? { primaryColor: patch.primaryColor } : {}),
+        ...(patch.logoUrl !== undefined ? { logoUrl: patch.logoUrl } : {}),
+      })
+      .where(eq(teams.id, id));
+    return { ok: true };
+  } catch (e) {
+    // Unique index on slug: another team already claimed it.
+    if (String(e).includes("teams_slug_idx") || String(e).toLowerCase().includes("duplicate")) {
+      return { ok: false, reason: "slug_taken" };
+    }
+    throw e;
+  }
+}
+
 export async function getStoreByDesignRequestId(designRequestId: string) {
   const db = getDb();
   const [row] = await db.select().from(teams).where(eq(teams.designRequestId, designRequestId)).limit(1);
