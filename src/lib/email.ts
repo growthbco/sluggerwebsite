@@ -169,6 +169,7 @@ export async function emailTeamOrderInvoice(args: {
   totalCents: number;
   dueCents: number;
   payUrl: string;
+  payFullUrl?: string;
 }): Promise<boolean> {
   const money = (c: number) => `$${(c / 100).toFixed(2)}`;
   const rows = args.lines
@@ -206,6 +207,11 @@ export async function emailTeamOrderInvoice(args: {
           isDeposit
             ? `<p style="margin:0;">Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} is due before your order ships. Questions or roster changes first? Just reply to this email.</p>`
             : `<p style="margin:0;">Your gear is in production! Settling the balance now means we ship the moment it's ready - no waiting. Questions? Just reply to this email.</p>`
+        }
+        ${
+          isDeposit && args.payFullUrl
+            ? `<p style="margin:14px 0 0;text-align:center;">Prefer one payment? <a href="${args.payFullUrl}" style="color:#b8a36c;font-weight:bold;">Pay in full (${money(args.totalCents)}) instead →</a></p>`
+            : ""
         }
       `,
       ctaText: isDeposit ? "Pay your deposit" : "Pay the balance",

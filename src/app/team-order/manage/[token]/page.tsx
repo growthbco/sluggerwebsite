@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { dbEnabled } from "@/db";
 import { getByManageToken, getRoster, getLinkedDesignPreview } from "@/lib/team-orders";
+import { itemPriceCents } from "@/lib/team-order-pricing";
 import { TeamOrderManage } from "@/components/team-order-manage";
+import { TeamOrderAddon } from "@/components/team-order-addon";
 
 export const metadata: Metadata = { title: "Manage Team Order", robots: { index: false } };
 
@@ -71,8 +73,19 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
           sizes: r.sizes,
           notes: r.notes,
         }))}
-        submitted={order.status === "submitted"}
+        submitted={!["draft", "collecting"].includes(order.status)}
       />
+
+      {/* Post-submission add-ons: pay for extra pieces on this same order. */}
+      {!["draft", "collecting", "cancelled"].includes(order.status) && (
+        <TeamOrderAddon
+          token={token}
+          items={order.items ?? ["jersey"]}
+          prices={Object.fromEntries(
+            (order.items ?? ["jersey"]).map((k) => [k, itemPriceCents(k, order.jerseyStyle)]),
+          )}
+        />
+      )}
     </div>
   );
 }

@@ -87,21 +87,62 @@ export async function POST(req: Request) {
       return NextResponse.json({ received: true });
     }
 
+    // Post-submission add-on paid: append the pieces to the roster, tell the
+    // team channel, and email the coach a receipt.
+    if (session.metadata?.kind === "team_order_addon" && session.metadata?.addonId && dbEnabled()) {
+      try {
+        const { markAddonPaid } = await import("@/lib/team-order-addons");
+        const result = await markAddonPaid(session.metadata.addonId, session.id);
+        if (result) {
+          await postTeamOrderPaidToDiscord({
+            reference: `${result.order.reference} ADD-ON`,
+            teamName: `➕ ${result.order.teamName} — ${result.summary}`,
+            totalCents: session.amount_total ?? 0,
+            stage: "balance",
+          });
+          const buyerEmail = session.customer_details?.email ?? result.order.contactEmail;
+          if (buyerEmail) {
+            await emailOrderConfirmation({
+              to: buyerEmail,
+              customerName: session.customer_details?.name ?? result.order.contactName,
+              reference: `${result.order.reference} (add-on)`,
+              lines: result.addon.rows.map((r) => ({
+                name: `${r.label} - ${[r.size, r.name, r.number ? `#${r.number}` : null].filter(Boolean).join(" - ")}`,
+                quantity: r.quantity,
+                amountCents: r.unitPriceCents * r.quantity,
+              })),
+              totalCents: session.amount_total ?? 0,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("team order addon webhook failed:", e);
+      }
+      return NextResponse.json({ received: true });
+    }
+
     // Team-order invoice paid (Stripe Payment Link created from the admin
     // dashboard): flip the order to paid and tell the team channel.
     if (session.metadata?.kind === "team_order_invoice" && session.metadata?.teamOrderId && dbEnabled()) {
       try {
         const db = getDb();
         const now = new Date();
-        // Deposit (50%) flips the order into production; the balance payment
-        // (or a legacy full invoice with no stage) marks it fully paid.
+        // Deposit (50%) flips the order into production; "full" or "balance"
+        // (or a legacy invoice with no stage) marks it fully paid.
         const isDeposit = session.metadata.stage === "deposit";
+        const isFull = session.metadata.stage === "full";
         const [row] = await db
           .update(teamOrders)
           .set(
             isDeposit
               ? { status: "in_production", depositPaidAt: now, invoiceRemindersSent: 0, updatedAt: now }
-              : { status: "paid", invoicePaidAt: now, invoiceRemindersSent: 0, updatedAt: now },
+              : {
+                  status: "paid",
+                  invoicePaidAt: now,
+                  ...(isFull ? { depositPaidAt: now } : {}),
+                  invoiceRemindersSent: 0,
+                  updatedAt: now,
+                },
           )
           .where(eq(teamOrders.id, session.metadata.teamOrderId))
           .returning({ reference: teamOrders.reference, teamName: teamOrders.teamName });
@@ -112,6 +153,15 @@ export async function POST(req: Request) {
             totalCents: session.amount_total ?? 0,
             stage: isDeposit ? "deposit" : "balance",
           });
+        }
+        // The deposit and pay-in-full links are siblings: paying one kills the
+        // other so nobody can double-pay.
+        if (session.metadata.siblingLinkId) {
+          try {
+            await getStripe().paymentLinks.update(session.metadata.siblingLinkId, { active: false });
+          } catch (e) {
+            console.error("sibling link deactivation failed:", e);
+          }
         }
       } catch (e) {
         console.error("team order invoice webhook failed:", e);

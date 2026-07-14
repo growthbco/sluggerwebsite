@@ -22,6 +22,13 @@ export function jerseyPriceCents(jerseyStyle?: string | null): number {
   return 2800; // crew / v-neck / unspecified
 }
 
+/** Retail price for one piece of an order item ("jersey" follows the order's
+ *  jersey style). Returns 0 for unknown keys. */
+export function itemPriceCents(key: string, jerseyStyle?: string | null): number {
+  if (key === "jersey") return jerseyPriceCents(jerseyStyle);
+  return ITEM_PRICES[key] ?? 0;
+}
+
 export type QuoteLine = { label: string; quantity: number; unitPriceCents: number; totalCents: number };
 
 export type TeamOrderQuote = {

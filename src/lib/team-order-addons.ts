@@ -1,0 +1,97 @@
+// Post-submission add-ons: a coach pays for a few extra pieces on an existing
+// team order. Rows are held pending until Stripe confirms payment, then
+// appended to the roster so production and print-file QA see them.
+
+import { eq } from "drizzle-orm";
+import { getDb } from "@/db";
+import { teamOrderAddons, teamOrders } from "@/db/schema";
+import { addRosterRow } from "@/lib/team-orders";
+import { itemPriceCents } from "@/lib/team-order-pricing";
+import { itemLabel, sizesFor } from "@/lib/order-items";
+
+export type AddonRowInput = {
+  key: string;
+  size?: string;
+  name?: string;
+  number?: string;
+  quantity?: number;
+};
+
+export type AddonRow = {
+  key: string;
+  label: string;
+  size: string;
+  name?: string;
+  number?: string;
+  quantity: number;
+  unitPriceCents: number;
+};
+
+/** Validate + price requested add-on rows against the order's item types. */
+export function priceAddonRows(
+  order: { jerseyStyle?: string | null; items?: string[] | null },
+  inputs: AddonRowInput[],
+): { rows: AddonRow[]; totalCents: number } {
+  const allowed = new Set(order.items?.length ? order.items : ["jersey"]);
+  const rows: AddonRow[] = [];
+  for (const r of inputs.slice(0, 50)) {
+    if (!allowed.has(r.key)) continue;
+    const unit = itemPriceCents(r.key, order.jerseyStyle);
+    if (!unit) continue;
+    const sizes = sizesFor(r.key);
+    rows.push({
+      key: r.key,
+      label: itemLabel(r.key),
+      size: sizes.includes(r.size ?? "") ? (r.size as string) : sizes[0],
+      name: (r.name ?? "").trim().slice(0, 30) || undefined,
+      number: (r.number ?? "").trim().replace(/[^0-9]/g, "").slice(0, 4) || undefined,
+      quantity: Math.max(1, Math.min(50, Number(r.quantity) || 1)),
+      unitPriceCents: unit,
+    });
+  }
+  const totalCents = rows.reduce((s, r) => s + r.unitPriceCents * r.quantity, 0);
+  return { rows, totalCents };
+}
+
+export async function createAddon(teamOrderId: string, rows: AddonRow[], totalCents: number) {
+  const db = getDb();
+  const [row] = await db.insert(teamOrderAddons).values({ teamOrderId, rows, totalCents }).returning();
+  return row;
+}
+
+export async function setAddonSession(addonId: string, sessionId: string) {
+  const db = getDb();
+  await db.update(teamOrderAddons).set({ stripeCheckoutSessionId: sessionId }).where(eq(teamOrderAddons.id, addonId));
+}
+
+/** Webhook: mark paid (idempotent) and append the pieces to the roster. */
+export async function markAddonPaid(addonId: string, sessionId: string) {
+  const db = getDb();
+  const [addon] = await db.select().from(teamOrderAddons).where(eq(teamOrderAddons.id, addonId)).limit(1);
+  if (!addon || addon.status === "paid") return null; // retry or unknown: skip
+  const [order] = await db.select().from(teamOrders).where(eq(teamOrders.id, addon.teamOrderId)).limit(1);
+  if (!order) return null;
+
+  await db
+    .update(teamOrderAddons)
+    .set({ status: "paid", paidAt: new Date(), stripeCheckoutSessionId: sessionId })
+    .where(eq(teamOrderAddons.id, addonId));
+
+  for (const r of addon.rows) {
+    for (let i = 0; i < r.quantity; i++) {
+      await addRosterRow(
+        addon.teamOrderId,
+        {
+          playerName: r.name,
+          playerNumber: r.number,
+          sizes: { [r.key]: r.size },
+          notes: "PAID ADD-ON",
+        },
+        "addon",
+      );
+    }
+  }
+
+  const summary = addon.rows.map((r) => `${r.quantity}× ${r.label}`).join(", ");
+  return { addon, order, summary };
+}

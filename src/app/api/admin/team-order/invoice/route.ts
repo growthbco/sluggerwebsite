@@ -61,28 +61,38 @@ export async function POST(req: Request) {
 
   try {
     const stripe = getStripe();
-    const label =
-      stage === "deposit"
-        ? `50% Production Deposit — ${order.teamName} (${order.reference})`
-        : `Final Balance — ${order.teamName} (${order.reference})`;
-    const price = await stripe.prices.create({
-      currency: "usd",
-      unit_amount: dueCents,
-      product_data: { name: label },
-    });
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
-    const link = await stripe.paymentLinks.create({
-      line_items: [{ price: price.id, quantity: 1 }],
-      restrictions: { completed_sessions: { limit: 1 } },
-      metadata: { kind: "team_order_invoice", stage, teamOrderId: order.id, teamName: order.teamName },
-      after_completion: { type: "redirect", redirect: { url: `${SITE}/checkout/success` } },
-    });
+    const makeLink = async (name: string, amountCents: number, linkStage: string, extraMeta: Record<string, string> = {}) => {
+      const price = await stripe.prices.create({
+        currency: "usd",
+        unit_amount: amountCents,
+        product_data: { name },
+      });
+      return stripe.paymentLinks.create({
+        line_items: [{ price: price.id, quantity: 1 }],
+        restrictions: { completed_sessions: { limit: 1 } },
+        metadata: { kind: "team_order_invoice", stage: linkStage, teamOrderId: order.id, teamName: order.teamName, ...extraMeta },
+        after_completion: { type: "redirect", redirect: { url: `${SITE}/checkout/success` } },
+      });
+    };
+
+    let link;
+    let fullLink = null;
+    if (stage === "deposit") {
+      // Deposit + a pay-in-full sibling. Whichever is paid first deactivates
+      // the other (via siblingLinkId in the webhook) so nobody double-pays.
+      link = await makeLink(`50% Production Deposit — ${order.teamName} (${order.reference})`, dueCents, "deposit");
+      fullLink = await makeLink(`Pay in Full — ${order.teamName} (${order.reference})`, totalCents, "full", { siblingLinkId: link.id });
+      await stripe.paymentLinks.update(link.id, { metadata: { ...link.metadata, siblingLinkId: fullLink.id } });
+    } else {
+      link = await makeLink(`Final Balance — ${order.teamName} (${order.reference})`, dueCents, "balance");
+    }
 
     await db
       .update(teamOrders)
       .set({
         ...(stage === "deposit"
-          ? { status: "quoted", quotedTotalCents: totalCents, depositCents, invoiceUrl: link.url }
+          ? { status: "quoted", quotedTotalCents: totalCents, depositCents, invoiceUrl: link.url, fullInvoiceUrl: fullLink?.url ?? null }
           : { balanceInvoiceUrl: link.url }),
         invoiceRemindersSent: 0,
         lastInvoiceReminderAt: null,
@@ -99,9 +109,10 @@ export async function POST(req: Request) {
       totalCents,
       dueCents,
       payUrl: link.url,
+      payFullUrl: fullLink?.url ?? undefined,
     });
 
-    return NextResponse.json({ ok: true, stage, totalCents, dueCents, invoiceUrl: link.url, emailed });
+    return NextResponse.json({ ok: true, stage, totalCents, dueCents, invoiceUrl: link.url, fullInvoiceUrl: fullLink?.url, emailed });
   } catch (e) {
     console.error("send invoice failed:", e);
     return NextResponse.json({ error: "Could not create the invoice" }, { status: 500 });

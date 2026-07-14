@@ -396,6 +396,7 @@ export const teamOrders = pgTable(
     // collected when the order is ready. Each is a one-time Stripe Payment
     // Link; payment lands via webhook.
     invoiceUrl: text("invoice_url"), // deposit link
+    fullInvoiceUrl: text("full_invoice_url"), // optional pay-in-full link (sibling of deposit)
     depositCents: integer("deposit_cents"),
     depositPaidAt: timestamp("deposit_paid_at", { withTimezone: true }),
     balanceInvoiceUrl: text("balance_invoice_url"),
@@ -423,6 +424,28 @@ export const teamOrders = pgTable(
     index("team_orders_status_idx").on(t.status),
     index("team_orders_design_request_idx").on(t.designRequestId),
   ],
+);
+
+// Post-submission add-ons: a coach pays for a few extra pieces on an existing
+// order (no new design/order). Rows land on the roster once the Stripe
+// checkout completes.
+export const teamOrderAddons = pgTable(
+  "team_order_addons",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    teamOrderId: uuid("team_order_id")
+      .notNull()
+      .references(() => teamOrders.id, { onDelete: "cascade" }),
+    rows: jsonb("rows")
+      .$type<Array<{ key: string; label: string; size: string; name?: string; number?: string; quantity: number; unitPriceCents: number }>>()
+      .notNull(),
+    totalCents: integer("total_cents").notNull(),
+    status: text("status").notNull().default("pending"), // pending | paid
+    stripeCheckoutSessionId: text("stripe_checkout_session_id"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("team_order_addons_order_idx").on(t.teamOrderId)],
 );
 
 // One row per player on a team order (Name / Number / Size / Notes).
