@@ -62,6 +62,9 @@ export async function POST(req: Request) {
   try {
     const stripe = getStripe();
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+    // Collect the delivery address on the payment page unless we already have
+    // one - it's required for buying the shipping label later.
+    const needsAddress = !order.shippingAddress?.line1;
     const makeLink = async (name: string, amountCents: number, linkStage: string, extraMeta: Record<string, string> = {}) => {
       const price = await stripe.prices.create({
         currency: "usd",
@@ -71,6 +74,7 @@ export async function POST(req: Request) {
       return stripe.paymentLinks.create({
         line_items: [{ price: price.id, quantity: 1 }],
         restrictions: { completed_sessions: { limit: 1 } },
+        ...(needsAddress ? { shipping_address_collection: { allowed_countries: ["US"] } } : {}),
         metadata: { kind: "team_order_invoice", stage: linkStage, teamOrderId: order.id, teamName: order.teamName, ...extraMeta },
         after_completion: { type: "redirect", redirect: { url: `${SITE}/checkout/success` } },
       });

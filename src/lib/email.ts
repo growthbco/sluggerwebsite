@@ -205,7 +205,7 @@ export async function emailTeamOrderInvoice(args: {
         </table>
         ${
           isDeposit
-            ? `<p style="margin:0;">Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} is due before your order ships. Questions or roster changes first? Just reply to this email.</p>`
+            ? `<p style="margin:0;">Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} is due before your order ships. You'll enter your <strong>shipping address</strong> on the payment page so we know exactly where your gear is headed. Questions or roster changes first? Just reply to this email.</p>`
             : `<p style="margin:0;">Your gear is in production! Settling the balance now means we ship the moment it's ready - no waiting. Questions? Just reply to this email.</p>`
         }
         ${

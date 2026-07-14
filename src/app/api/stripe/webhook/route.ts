@@ -131,17 +131,37 @@ export async function POST(req: Request) {
         // (or a legacy invoice with no stage) marks it fully paid.
         const isDeposit = session.metadata.stage === "deposit";
         const isFull = session.metadata.stage === "full";
+        // Save the delivery address collected on the payment page (needed for
+        // label buying). Newer API versions expose it via collected_information.
+        const shipTo =
+          (session as { shipping_details?: { address?: Stripe.Address } }).shipping_details?.address ??
+          (session as { collected_information?: { shipping_details?: { address?: Stripe.Address } } })
+            .collected_information?.shipping_details?.address ??
+          session.customer_details?.address;
+        const addressPatch = shipTo?.line1
+          ? {
+              shippingAddress: {
+                line1: shipTo.line1 ?? undefined,
+                line2: shipTo.line2 ?? undefined,
+                city: shipTo.city ?? undefined,
+                state: shipTo.state ?? undefined,
+                postalCode: shipTo.postal_code ?? undefined,
+                country: shipTo.country ?? undefined,
+              },
+            }
+          : {};
         const [row] = await db
           .update(teamOrders)
           .set(
             isDeposit
-              ? { status: "in_production", depositPaidAt: now, invoiceRemindersSent: 0, updatedAt: now }
+              ? { status: "in_production", depositPaidAt: now, invoiceRemindersSent: 0, updatedAt: now, ...addressPatch }
               : {
                   status: "paid",
                   invoicePaidAt: now,
                   ...(isFull ? { depositPaidAt: now } : {}),
                   invoiceRemindersSent: 0,
                   updatedAt: now,
+                  ...addressPatch,
                 },
           )
           .where(eq(teamOrders.id, session.metadata.teamOrderId))
