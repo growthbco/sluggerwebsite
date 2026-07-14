@@ -16,6 +16,7 @@ export async function markShipped(
   kind: "team_order" | "order",
   id: string,
   trackingNumber: string,
+  labelUrl?: string,
 ): Promise<{ reference: string; emailed: boolean } | null> {
   const db = getDb();
   const now = new Date();
@@ -23,7 +24,7 @@ export async function markShipped(
   if (kind === "team_order") {
     const [row] = await db
       .update(teamOrders)
-      .set({ status: "shipped", trackingNumber, shippedAt: now, updatedAt: now })
+      .set({ status: "shipped", trackingNumber, labelUrl, shippedAt: now, updatedAt: now })
       .where(eq(teamOrders.id, id))
       .returning({ reference: teamOrders.reference, email: teamOrders.contactEmail, name: teamOrders.contactName });
     if (!row) return null;
@@ -39,7 +40,7 @@ export async function markShipped(
 
   const [row] = await db
     .update(orders)
-    .set({ status: "fulfilled", trackingNumber, shippedAt: now })
+    .set({ status: "fulfilled", trackingNumber, labelUrl, shippedAt: now })
     .where(eq(orders.id, id))
     .returning({ reference: orders.reference, email: orders.customerEmail, name: orders.customerName });
   if (!row) return null;

@@ -156,7 +156,8 @@ export async function buyLabel(rateId: string): Promise<{ trackingNumber: string
   const res = await fetch(`${API}/transactions/`, {
     method: "POST",
     headers: headers(),
-    body: JSON.stringify({ rate: rateId, label_file_type: "PDF", async: false }),
+    // 4x6 PDF prints natively on thermal label printers (and fine on paper).
+    body: JSON.stringify({ rate: rateId, label_file_type: "PDF_4x6", async: false }),
   });
   if (!res.ok) {
     console.error("Shippo transaction failed:", res.status, await res.text());

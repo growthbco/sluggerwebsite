@@ -27,12 +27,18 @@ async function shipOptions(totalOz: number, zip?: string): Promise<{ label: stri
         const best = await quoteChargedShipping(zip, totalOz);
         if (best) {
           options.push({ label: `Standard shipping to ${zip}`, amountCents: best.chargedCents });
+          // Expedited: cheapest 1-3 day service across BOTH carriers.
           const rates = await getRates({ zip }, totalOz);
-          const priority = rates.find(
-            (r) => r.provider === "USPS" && /priority mail(?! express)/i.test(r.service),
-          );
-          if (priority && priority.chargedCents > best.chargedCents) {
-            options.push({ label: "Faster shipping (USPS Priority, 1-3 days)", amountCents: priority.chargedCents });
+          const expedited = rates
+            .filter((r) =>
+              /priority mail(?! express)|3 day select|2nd day air(?!.*a\.m)/i.test(r.service),
+            )
+            .sort((a, b) => a.chargedCents - b.chargedCents)[0];
+          if (expedited && expedited.chargedCents > best.chargedCents) {
+            options.push({
+              label: `Faster shipping (${expedited.provider} ${expedited.service}, 1-3 days)`,
+              amountCents: expedited.chargedCents,
+            });
           }
         }
       }

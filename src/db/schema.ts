@@ -287,8 +287,10 @@ export const orders = pgTable(
     // Set true once successfully pushed to Discord so retries don't double-post.
     discordNotifiedAt: timestamp("discord_notified_at", { withTimezone: true }),
 
-    // Fulfillment (Pirate Ship tracking, emailed to the buyer on ship).
+    // Fulfillment (tracking emailed to the buyer on ship; labelUrl is the
+    // Shippo PDF for reprints).
     trackingNumber: text("tracking_number"),
+    labelUrl: text("label_url"),
     shippedAt: timestamp("shipped_at", { withTimezone: true }),
 
     // Origin context (drop or team store) when applicable.
@@ -404,8 +406,9 @@ export const teamOrders = pgTable(
     // Unpaid-invoice reminders (deposit or balance); reset on each new invoice.
     invoiceRemindersSent: integer("invoice_reminders_sent").notNull().default(0),
     lastInvoiceReminderAt: timestamp("last_invoice_reminder_at", { withTimezone: true }),
-    // Fulfillment
+    // Fulfillment (labelUrl = Shippo PDF for reprints)
     trackingNumber: text("tracking_number"),
+    labelUrl: text("label_url"),
     shippedAt: timestamp("shipped_at", { withTimezone: true }),
 
     // Admin archive: hides the order from the active list without deleting it,

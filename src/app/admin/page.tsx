@@ -96,6 +96,7 @@ export default async function AdminPage() {
         balanceInvoiceUrl: teamOrders.balanceInvoiceUrl,
         invoicePaidAt: teamOrders.invoicePaidAt,
         trackingNumber: teamOrders.trackingNumber,
+        labelUrl: teamOrders.labelUrl,
         shippedAt: teamOrders.shippedAt,
         archivedAt: teamOrders.archivedAt,
         archivedNote: teamOrders.archivedNote,
@@ -123,6 +124,7 @@ export default async function AdminPage() {
         customerName: orders.customerName,
         totalCents: orders.totalCents,
         trackingNumber: orders.trackingNumber,
+        labelUrl: orders.labelUrl,
         shippedAt: orders.shippedAt,
         createdAt: orders.createdAt,
       })
@@ -283,9 +285,21 @@ export default async function AdminPage() {
                     <td className="px-3 py-2">
                       <span className="flex items-center gap-2">
                         {o.shippedAt ? (
-                          <span className="text-xs display text-green-400" title={o.trackingNumber ?? undefined}>
-                            🚚 SHIPPED
-                          </span>
+                          <>
+                            <span className="text-xs display text-green-400" title={o.trackingNumber ?? undefined}>
+                              🚚 SHIPPED
+                            </span>
+                            {o.labelUrl && (
+                              <a
+                                href={o.labelUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs display text-brand border border-brand/40 px-2 py-0.5 hover:bg-brand/10"
+                              >
+                                🖨 Label
+                              </a>
+                            )}
+                          </>
                         ) : paid ? (
                           <>
                             <span className="text-xs display text-green-400">PAID</span>
@@ -390,7 +404,19 @@ export default async function AdminPage() {
                     {money(o.totalCents)} <span className="text-muted text-xs">{fmtDate(o.createdAt)}</span>
                   </span>
                   {o.shippedAt ? (
-                    <span className="text-xs display text-green-400" title={o.trackingNumber ?? undefined}>🚚</span>
+                    <>
+                      <span className="text-xs display text-green-400" title={o.trackingNumber ?? undefined}>🚚</span>
+                      {o.labelUrl && (
+                        <a
+                          href={o.labelUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs display text-brand border border-brand/40 px-2 py-0.5 hover:bg-brand/10"
+                        >
+                          🖨
+                        </a>
+                      )}
+                    </>
                   ) : o.status === "paid" ? (
                     <>
                       <AdminLabelButton kind="order" id={o.id} who={o.customerName ?? o.reference} />

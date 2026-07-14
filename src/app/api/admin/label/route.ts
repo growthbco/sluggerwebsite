@@ -68,7 +68,7 @@ export async function POST(req: Request) {
     if (!body.rateId) return NextResponse.json({ error: "Missing rateId" }, { status: 400 });
     try {
       const label = await buyLabel(body.rateId);
-      const shipped = await markShipped(kind, body.id, label.trackingNumber);
+      const shipped = await markShipped(kind, body.id, label.trackingNumber, label.labelUrl);
       return NextResponse.json({
         ok: true,
         trackingNumber: label.trackingNumber,
