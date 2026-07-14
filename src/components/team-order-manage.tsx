@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { itemLabel } from "@/lib/order-items";
+import { itemLabel, sizesFor } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 
 type RosterRow = {
@@ -50,6 +50,29 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, items
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Could not add players");
     router.refresh();
+  }
+
+  // Manual single-player add (besides the share link and the AI import).
+  const [manual, setManual] = useState<{ name: string; number: string; sizes: Record<string, string> }>({
+    name: "",
+    number: "",
+    sizes: {},
+  });
+  const [manualBusy, setManualBusy] = useState(false);
+  const [manualError, setManualError] = useState("");
+
+  async function addManual() {
+    if (!manual.name.trim()) return;
+    setManualBusy(true);
+    setManualError("");
+    try {
+      await importRows([{ name: manual.name, number: manual.number, sizes: manual.sizes }]);
+      setManual({ name: "", number: "", sizes: {} });
+    } catch (e) {
+      setManualError((e as Error).message);
+    } finally {
+      setManualBusy(false);
+    }
   }
 
   async function copy() {
@@ -101,8 +124,53 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, items
           <h2 className="display text-xl text-foreground">Roster</h2>
           <span className="text-sm text-muted">{roster.length} players</span>
         </div>
+        {status !== "done" && (
+          <div className="mt-3 bg-steel border border-line p-3">
+            <p className="text-sm text-muted mb-2">Or add a player yourself:</p>
+            <div className="flex flex-wrap gap-2 items-center">
+              <input
+                value={manual.name}
+                onChange={(e) => setManual((m) => ({ ...m, name: e.target.value }))}
+                placeholder="Player name"
+                maxLength={60}
+                className="flex-1 min-w-32 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+              />
+              <input
+                value={manual.number}
+                onChange={(e) => setManual((m) => ({ ...m, number: e.target.value }))}
+                placeholder="#"
+                maxLength={4}
+                className="w-14 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+              />
+              {items.map((k) => (
+                <select
+                  key={k}
+                  value={manual.sizes[k] ?? ""}
+                  onChange={(e) => setManual((m) => ({ ...m, sizes: { ...m.sizes, [k]: e.target.value } }))}
+                  className="bg-ink border border-line px-2 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
+                  aria-label={`${itemLabel(k)} size`}
+                >
+                  <option value="">{itemLabel(k)}: -</option>
+                  {sizesFor(k).map((s) => (
+                    <option key={s}>{s}</option>
+                  ))}
+                </select>
+              ))}
+              <button
+                type="button"
+                onClick={addManual}
+                disabled={manualBusy || !manual.name.trim()}
+                className="clip-slant bg-brand text-on-brand display text-sm px-4 py-2 hover:bg-brand-dark disabled:opacity-50"
+              >
+                {manualBusy ? "Adding..." : "Add player"}
+              </button>
+            </div>
+            {manualError && <p className="mt-2 text-sm text-brand">{manualError}</p>}
+          </div>
+        )}
+
         {roster.length === 0 ? (
-          <p className="mt-3 text-muted text-sm">No players yet - share the link above to start collecting.</p>
+          <p className="mt-3 text-muted text-sm">No players yet - share the link above, import, or add them here.</p>
         ) : (
           <div className="mt-4 border border-line divide-y divide-[color:var(--line)]">
             {roster.map((r, i) => (
