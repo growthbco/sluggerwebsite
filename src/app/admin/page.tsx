@@ -10,6 +10,7 @@ import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
 import { AdminLogout } from "@/components/admin-logout";
 import { AdminInvoiceButton } from "@/components/admin-invoice-button";
 import { AdminShipButton } from "@/components/admin-ship-button";
+import { AdminLabelButton } from "@/components/admin-label-button";
 import { AdminArchiveButton } from "@/components/admin-archive-button";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
@@ -288,6 +289,7 @@ export default async function AdminPage() {
                         ) : paid ? (
                           <>
                             <span className="text-xs display text-green-400">PAID</span>
+                            <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />
                             <AdminShipButton kind="team_order" id={o.id} who={o.teamName} />
                           </>
                         ) : o.depositPaidAt && estimate ? (
@@ -390,7 +392,10 @@ export default async function AdminPage() {
                   {o.shippedAt ? (
                     <span className="text-xs display text-green-400" title={o.trackingNumber ?? undefined}>🚚</span>
                   ) : o.status === "paid" ? (
-                    <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} />
+                    <>
+                      <AdminLabelButton kind="order" id={o.id} who={o.customerName ?? o.reference} />
+                      <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} />
+                    </>
                   ) : null}
                 </span>
               </div>

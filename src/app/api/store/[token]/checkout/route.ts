@@ -13,6 +13,22 @@ type IncomingItem = {
   quantity: number;
 };
 
+// Live Shippo rate (+margin) when the buyer gave us a ZIP; formula otherwise.
+async function shippingChargeCents(totalOz: number, zip?: string): Promise<number> {
+  if (zip && /^\d{5}$/.test(zip)) {
+    try {
+      const { getRates, shippoEnabled } = await import("@/lib/shippo");
+      if (shippoEnabled()) {
+        const rates = await getRates({ zip }, totalOz);
+        if (rates.length > 0) return rates[0].chargedCents;
+      }
+    } catch (e) {
+      console.error("live rate failed, using formula:", e);
+    }
+  }
+  return shippingCentsFor(totalOz);
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
   if (!stripeEnabled() || !dbEnabled()) {
     return NextResponse.json({ error: "Checkout isn't configured yet." }, { status: 503 });
@@ -23,8 +39,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (!store.storeActive) return NextResponse.json({ error: "This store is currently closed." }, { status: 409 });
 
   let items: IncomingItem[];
+  let shipZip: string | undefined;
   try {
-    ({ items } = await req.json());
+    const body = await req.json();
+    items = body.items;
+    shipZip = typeof body.shipZip === "string" ? body.shipZip.trim() : undefined;
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
@@ -75,13 +94,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       cancel_url: `${SITE}/store/${token}`,
       shipping_address_collection: { allowed_countries: ["US"] },
       phone_number_collection: { enabled: true },
-      // Buyer picks: weight-based shipping or free local pickup in Ocala.
+      // Buyer picks: shipping (live carrier rate when they gave a ZIP) or
+      // free local pickup in Ocala.
       shipping_options: [
         {
           shipping_rate_data: {
-            display_name: "Shipping (by weight)",
+            display_name: shipZip ? `Shipping to ${shipZip}` : "Shipping (by weight)",
             type: "fixed_amount",
-            fixed_amount: { amount: shippingCentsFor(totalOz), currency: "usd" },
+            fixed_amount: { amount: await shippingChargeCents(totalOz, shipZip), currency: "usd" },
           },
         },
         {
