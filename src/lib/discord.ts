@@ -56,6 +56,9 @@ export async function postOrderToDiscord(order: OrderPayload): Promise<boolean> 
 
   const body: Record<string, unknown> = {
     username: "Slugger Orders",
+    // Paid order = money moment: ping the team.
+    content: "@here 🧾 New paid order",
+    allowed_mentions: { parse: ["everyone"] },
     embeds: [
       {
         title,
@@ -108,6 +111,9 @@ export async function postTeamOrderPaidToDiscord(args: {
   const isDeposit = args.stage === "deposit";
   return send(url, {
     username: "Slugger Team Orders",
+    // Payments always ping - these gate production and shipping.
+    content: isDeposit ? "@here 💰 Deposit paid - clear to start" : "@here 💰 Paid in full",
+    allowed_mentions: { parse: ["everyone"] },
     embeds: [
       {
         title: isDeposit
@@ -163,6 +169,9 @@ export async function postTeamOrderToDiscord(order: TeamOrderPayload): Promise<b
 
   const body: Record<string, unknown> = {
     username: "Slugger Team Orders",
+    // Money moment: a submitted roster needs eyes, so actually ping the team.
+    content: "@here 📋 New roster submitted",
+    allowed_mentions: { parse: ["everyone"] },
     embeds: [{ title: `📋 ${order.teamName}`, color: GOLD, fields, timestamp: new Date().toISOString() }],
   };
 
