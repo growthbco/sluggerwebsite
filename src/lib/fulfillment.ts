@@ -3,8 +3,9 @@
 
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { teamOrders, orders } from "@/db/schema";
+import { teamOrders, orders, designRequests } from "@/db/schema";
 import { emailOrderShipped } from "@/lib/email";
+import { archiveDiscordThread } from "@/lib/discord-bot";
 
 export function trackingUrlFor(num: string): string {
   const n = num.replace(/\s/g, "");
@@ -26,7 +27,12 @@ export async function markShipped(
       .update(teamOrders)
       .set({ status: "shipped", trackingNumber, labelUrl, shippedAt: now, updatedAt: now })
       .where(eq(teamOrders.id, id))
-      .returning({ reference: teamOrders.reference, email: teamOrders.contactEmail, name: teamOrders.contactName });
+      .returning({
+        reference: teamOrders.reference,
+        email: teamOrders.contactEmail,
+        name: teamOrders.contactName,
+        designRequestId: teamOrders.designRequestId,
+      });
     if (!row) return null;
     const emailed = await emailOrderShipped({
       to: row.email,
@@ -35,6 +41,16 @@ export async function markShipped(
       trackingNumber,
       trackingUrl: trackingUrlFor(trackingNumber),
     });
+    // Shipped = this project's Discord thread is done; archive it (no-op
+    // without a bot token).
+    if (row.designRequestId) {
+      const [d] = await db
+        .select({ threadId: designRequests.discordThreadId })
+        .from(designRequests)
+        .where(eq(designRequests.id, row.designRequestId))
+        .limit(1);
+      await archiveDiscordThread(d?.threadId);
+    }
     return { reference: row.reference, emailed };
   }
 

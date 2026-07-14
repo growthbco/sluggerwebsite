@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders, designRequests } from "@/db/schema";
 import { isAdmin } from "@/lib/admin-auth";
+import { archiveDiscordThread } from "@/lib/discord-bot";
 
 export const runtime = "nodejs";
 
@@ -29,5 +30,17 @@ export async function POST(req: Request) {
   const table = body.kind === "team_order" ? teamOrders : designRequests;
   const [row] = await db.update(table).set(values).where(eq(table.id, body.id)).returning({ id: table.id });
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Archiving a design also archives its Discord thread (bot token required;
+  // no-ops silently without one). Restoring doesn't unarchive - posting into
+  // the thread un-archives it automatically on Discord's side.
+  if (body.archive && body.kind === "design_request") {
+    const [d] = await db
+      .select({ threadId: designRequests.discordThreadId })
+      .from(designRequests)
+      .where(eq(designRequests.id, body.id))
+      .limit(1);
+    await archiveDiscordThread(d?.threadId);
+  }
   return NextResponse.json({ ok: true });
 }
