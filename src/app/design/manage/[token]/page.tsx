@@ -5,6 +5,7 @@ import { getByDesignRequestId, getRoster } from "@/lib/team-orders";
 import { getStoreByDesignRequestId, STORE_ITEM_PRESETS } from "@/lib/team-stores";
 import { DesignManagePanel } from "@/components/design-manage-panel";
 import { DesignMessages } from "@/components/design-messages";
+import { DesignProgress } from "@/components/design-progress";
 import { TeamStorePanel } from "@/components/team-store-panel";
 import { PrintFileQA } from "@/components/print-file-qa";
 
@@ -60,7 +61,14 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         neededBy={request.neededBy ? request.neededBy.toISOString() : null}
       />
 
-      <div className="pt-6 border-t border-line">
+      <div className="pt-6 border-t border-line space-y-4">
+        {/* Status right where staff write to the client - so nobody asks the
+            customer "is it approved?" when the answer is on screen. */}
+        <DesignProgress
+          status={request.status}
+          orderStatus={linkedOrder?.status}
+          orderReference={linkedOrder?.reference}
+        />
         <DesignMessages token={token} role="designer" initialMessages={request.messages ?? []} status={request.status} />
       </div>
 
