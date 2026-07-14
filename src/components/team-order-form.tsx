@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ITEM_TYPES, JERSEY_MATERIALS } from "@/lib/order-items";
+import { RosterImport, type ImportedRow } from "@/components/roster-import";
 
 const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button"];
 
@@ -206,6 +207,26 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
               <span className="text-sm text-muted">{filledRows.length} players</span>
             </div>
             <p className="text-sm text-muted mt-1">Name, number, and a size for each item. Names print in CAPS.</p>
+
+            <div className="mt-4">
+              <RosterImport
+                itemKeys={items}
+                confirmLabel={undefined}
+                onConfirm={(imported: ImportedRow[]) => {
+                  const asRows: Row[] = imported.map((r) => ({
+                    name: r.name,
+                    number: r.number,
+                    sizes: r.sizes,
+                    notes: r.notes ?? "",
+                  }));
+                  // Replace untouched empty rows; keep anything already typed.
+                  setRows((prev) => [
+                    ...prev.filter((row) => row.name || row.number || Object.keys(row.sizes).length),
+                    ...asRows,
+                  ]);
+                }}
+              />
+            </div>
 
             <div className="mt-4 space-y-3">
               {rows.map((row, i) => (

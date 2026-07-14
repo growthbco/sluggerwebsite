@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { itemLabel } from "@/lib/order-items";
+import { RosterImport, type ImportedRow } from "@/components/roster-import";
 
 type RosterRow = {
   id: string;
@@ -34,9 +36,21 @@ function rowSizes(r: RosterRow, items: string[]): string {
 }
 
 export function TeamOrderManage({ token, reference, teamName, jerseyStyle, items, shareUrl, roster, submitted }: Props) {
+  const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">(submitted ? "done" : "idle");
   const [message, setMessage] = useState("");
+
+  async function importRows(rows: ImportedRow[]) {
+    const res = await fetch(`/api/team-order/${token}/import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rows }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Could not add players");
+    router.refresh();
+  }
 
   async function copy() {
     await navigator.clipboard.writeText(shareUrl);
@@ -77,6 +91,9 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, items
           </button>
         </div>
       </div>
+
+      {/* Coach bulk import: paste or photograph the roster they were sent. */}
+      {status !== "done" && <RosterImport itemKeys={items} onConfirm={importRows} />}
 
       {/* Roster */}
       <div>
