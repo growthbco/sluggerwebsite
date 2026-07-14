@@ -52,7 +52,7 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
   const [justAdded, setJustAdded] = useState("");
   // Optional ZIP -> live carrier rate shown before checkout.
   const [zip, setZip] = useState("");
-  const [shipQuote, setShipQuote] = useState<{ amountCents: number; live: boolean } | null>(null);
+  const [shipQuote, setShipQuote] = useState<{ amountCents: number; live: boolean; place?: string } | null>(null);
   const [quoting, setQuoting] = useState(false);
 
   const totalOz = selections.reduce((s, sel) => {
@@ -76,7 +76,7 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
           body: JSON.stringify({ zip, weightOz: Math.max(1, totalOz) }),
         });
         const data = await res.json();
-        if (res.ok) setShipQuote({ amountCents: data.amountCents, live: data.live });
+        if (res.ok) setShipQuote({ amountCents: data.amountCents, live: data.live, place: data.place });
       } catch {
       } finally {
         setQuoting(false);
@@ -272,6 +272,9 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
             </span>
           )}
         </div>
+        {shipQuote?.place && !quoting && (
+          <p className="mt-1 text-xs text-muted">Shipping to {shipQuote.place}</p>
+        )}
         {shipQuote && !quoting && selections.length > 0 && (
           <div className="mt-2 flex justify-between text-sm">
             <span className="text-muted">Total before tax</span>

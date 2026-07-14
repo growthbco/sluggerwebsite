@@ -46,12 +46,17 @@ type ShippoRate = {
 };
 
 function parcelFor(weightOz: number) {
-  // Default soft-pack dimensions; weight is what carriers actually price on
-  // for these package sizes.
+  // Box size must scale with the order: USPS "cubic" pricing makes small
+  // boxes cheap regardless of weight, so declaring a slim pack for a 19-item
+  // order would massively under-quote. Tiers by rough apparel volume.
+  const dims =
+    weightOz <= 64
+      ? { length: "15", width: "12", height: "4" } // soft pack: up to ~5 pieces
+      : weightOz <= 160
+      ? { length: "16", width: "12", height: "8" } // medium box: up to ~10 lb
+      : { length: "18", width: "16", height: "12" }; // large box
   return {
-    length: "15",
-    width: "12",
-    height: "4",
+    ...dims,
     distance_unit: "in",
     weight: String(Math.max(1, Math.round(weightOz))),
     mass_unit: "oz",
