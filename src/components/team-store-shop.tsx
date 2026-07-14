@@ -30,6 +30,9 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
   const [selections, setSelections] = useState<Selection[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Flash "✓ Added" on the tapped button - on phones the order summary is
+  // below the fold, so the button itself must confirm the add.
+  const [justAdded, setJustAdded] = useState("");
   // Per-item draft state, keyed by item key.
   const [drafts, setDrafts] = useState<Record<string, { size: string; playerName: string; playerNumber: string }>>({});
 
@@ -52,6 +55,8 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
       },
     ]);
     setError("");
+    setJustAdded(item.key);
+    setTimeout(() => setJustAdded((k) => (k === item.key ? "" : k)), 1500);
   }
 
   const subtotal = selections.reduce((sum, s) => sum + s.priceCents * s.quantity, 0);
@@ -122,7 +127,7 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
                   onClick={() => add(item)}
                   className="clip-slant bg-brand text-on-brand display text-sm px-5 py-2 hover:bg-brand-dark"
                 >
-                  Add
+                  {justAdded === item.key ? "✓ Added" : "Add"}
                 </button>
               </div>
             </div>

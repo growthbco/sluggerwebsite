@@ -136,7 +136,7 @@ export default async function AdminPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-14">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <span className="display text-brand text-sm">Staff Dashboard</span>
           <h1 className="display text-4xl text-foreground mt-1">All Projects</h1>
