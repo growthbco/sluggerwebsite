@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type StoreItem = {
   key: string;
@@ -53,29 +53,38 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
   // Optional ZIP -> live carrier rate shown before checkout.
   const [zip, setZip] = useState("");
   const [shipQuote, setShipQuote] = useState<{ amountCents: number; live: boolean } | null>(null);
+  const [quoting, setQuoting] = useState(false);
 
-  const totalOz = selectionsWeightOz();
-  function selectionsWeightOz() {
-    const w: Record<string, number> = {};
-    for (const i of items) w[i.key] = i.weightOz;
-    return selections.reduce((s, sel) => s + (w[sel.key] ?? 12) * sel.quantity, 0);
-  }
+  const totalOz = selections.reduce((s, sel) => {
+    const w = items.find((i) => i.key === sel.key)?.weightOz ?? 12;
+    return s + w * sel.quantity;
+  }, 0);
 
-  async function quoteShipping(z: string) {
-    if (!/^\d{5}$/.test(z) || selections.length === 0) {
+  // Re-quote automatically whenever the cart or the ZIP changes, so the
+  // number shown always matches what checkout will actually charge.
+  useEffect(() => {
+    if (!/^\d{5}$/.test(zip) || selections.length === 0) {
       setShipQuote(null);
       return;
     }
-    try {
-      const res = await fetch("/api/shipping/quote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ zip: z, weightOz: Math.max(1, totalOz) }),
-      });
-      const data = await res.json();
-      if (res.ok) setShipQuote({ amountCents: data.amountCents, live: data.live });
-    } catch {}
-  }
+    setQuoting(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/shipping/quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ zip, weightOz: Math.max(1, totalOz) }),
+        });
+        const data = await res.json();
+        if (res.ok) setShipQuote({ amountCents: data.amountCents, live: data.live });
+      } catch {
+      } finally {
+        setQuoting(false);
+      }
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zip, totalOz]);
   // Per-item draft state, keyed by item key.
   const [drafts, setDrafts] = useState<Record<string, { size: string; playerName: string; playerNumber: string }>>({});
 
@@ -230,19 +239,23 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
         <div className="mt-3 flex items-center gap-2">
           <input
             value={zip}
-            onChange={(e) => {
-              const z = e.target.value.replace(/[^0-9]/g, "").slice(0, 5);
-              setZip(z);
-              quoteShipping(z);
-            }}
+            onChange={(e) => setZip(e.target.value.replace(/[^0-9]/g, "").slice(0, 5))}
             placeholder="ZIP for shipping quote"
             inputMode="numeric"
             className="flex-1 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
           />
-          {shipQuote && selections.length > 0 && (
-            <span className="text-sm text-foreground shrink-0">+ {money(shipQuote.amountCents)} ship</span>
+          {selections.length > 0 && /^\d{5}$/.test(zip) && (
+            <span className="text-sm text-foreground shrink-0">
+              {quoting ? "..." : shipQuote ? `+ ${money(shipQuote.amountCents)} ship` : ""}
+            </span>
           )}
         </div>
+        {shipQuote && !quoting && selections.length > 0 && (
+          <div className="mt-2 flex justify-between text-sm">
+            <span className="text-muted">Total before tax</span>
+            <span className="display text-foreground">{money(subtotal + shipQuote.amountCents)}</span>
+          </div>
+        )}
         <p className="mt-2 text-xs text-muted">
           {shipQuote?.live
             ? "Live carrier rate to your ZIP - or choose free local pickup in Ocala at checkout. Plus tax."
