@@ -23,6 +23,23 @@ type Selection = {
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
+// Visual identity per item so cards read as products, not form rows.
+const ITEM_ICONS: Record<string, string> = {
+  round_neck_jersey: "👕",
+  long_sleeve_shirt: "👕",
+  two_button_jersey: "👕",
+  full_button_jersey: "👕",
+  reversible_basketball: "🏀",
+  hoodie: "🧥",
+  baseball_pants: "👖",
+  microfiber_pants: "👖",
+  knickers: "👖",
+  shorts: "🩳",
+  socks: "🧦",
+  fitted_hat: "🧢",
+  snapback_hat: "🧢",
+};
+
 /** Buyer-facing team store: pick items, personalize, pay via Stripe.
  *  Prices shown here are display-only - the checkout endpoint re-prices
  *  everything from the store's server-side snapshot. */
@@ -108,63 +125,77 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
-      <div className="space-y-4">
+      <div className="grid sm:grid-cols-2 gap-4 content-start">
         {items.map((item) => {
           const d = draft(item.key, item.sizes);
           return (
-            <div key={item.key} className="bg-steel border border-line p-4">
-              <div className="flex items-baseline justify-between gap-4">
-                <h2 className="display text-lg text-foreground">{item.label}</h2>
-                <p className="display text-xl text-foreground">{money(item.priceCents)}</p>
+            <div key={item.key} className="bg-steel border border-line p-4 flex flex-col hover:border-brand/40 transition-colors">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid place-items-center h-10 w-10 bg-ink border border-line text-xl shrink-0" aria-hidden>
+                    {ITEM_ICONS[item.key] ?? "👕"}
+                  </span>
+                  <h3 className="display text-foreground leading-tight">{item.label}</h3>
+                </div>
+                <p className="display text-xl text-brand shrink-0">{money(item.priceCents)}</p>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
+
+              <div className="mt-3 space-y-2 flex-1">
                 <select
                   value={d.size}
                   onChange={(e) => setDraft(item.key, { size: e.target.value })}
-                  className="bg-ink border border-line px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
+                  className="w-full bg-ink border border-line px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
                   aria-label={`${item.label} size`}
                 >
                   {item.sizes.map((s) => (
                     <option key={s} value={s}>
-                      {s}
+                      Size: {s}
                     </option>
                   ))}
                 </select>
                 {item.nameNumber && (
-                  <>
+                  <div className="flex gap-2">
                     <input
                       value={d.playerName}
                       onChange={(e) => setDraft(item.key, { playerName: e.target.value })}
-                      placeholder="Name on jersey (optional)"
+                      placeholder="Name (optional)"
                       maxLength={30}
-                      className="flex-1 min-w-40 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                      className="flex-1 min-w-0 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
                     />
                     <input
                       value={d.playerNumber}
                       onChange={(e) => setDraft(item.key, { playerNumber: e.target.value })}
                       placeholder="#"
                       maxLength={4}
-                      className="w-16 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                      className="w-14 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
                     />
-                  </>
+                  </div>
                 )}
-                <button
-                  type="button"
-                  onClick={() => add(item)}
-                  className="clip-slant bg-brand text-on-brand display text-sm px-5 py-2 hover:bg-brand-dark"
-                >
-                  {justAdded === item.key ? "✓ Added" : "Add"}
-                </button>
               </div>
+
+              <button
+                type="button"
+                onClick={() => add(item)}
+                className="mt-3 w-full clip-slant bg-brand text-on-brand display text-sm px-5 py-2.5 hover:bg-brand-dark"
+              >
+                {justAdded === item.key ? "✓ Added to order" : "Add to order"}
+              </button>
             </div>
           );
         })}
       </div>
 
       <aside className="lg:sticky lg:top-24 h-fit bg-steel border border-line p-5">
-        <h2 className="display text-lg text-foreground">Your order</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="display text-lg text-foreground">Your order</h2>
+          {selections.length > 0 && (
+            <span className="grid place-items-center h-6 min-w-6 px-1.5 rounded-full bg-brand text-on-brand display text-xs">
+              {selections.length}
+            </span>
+          )}
+        </div>
         {selections.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">Nothing added yet. Pick your gear on the left.</p>
+          <p className="mt-3 text-sm text-muted">Nothing added yet - hit "Add to order" on any item.</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {selections.map((s, i) => (
