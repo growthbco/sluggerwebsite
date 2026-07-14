@@ -11,10 +11,12 @@ export function TeamOrderAddon({
   token,
   items,
   prices,
+  shipped,
 }: {
   token: string;
   items: string[];
   prices: Record<string, number>;
+  shipped?: boolean;
 }) {
   const first = items[0] ?? "jersey";
   const [lines, setLines] = useState<Line[]>([]);
@@ -137,7 +139,11 @@ export function TeamOrderAddon({
           >
             {busy ? "Starting checkout..." : `Pay ${money(total)} for ${lines.length} item${lines.length === 1 ? "" : "s"}`}
           </button>
-          <p className="mt-2 text-xs text-muted">Plus tax. Add-ons ship with your order - no extra shipping.</p>
+          <p className="mt-2 text-xs text-muted">
+            {shipped
+              ? "Plus tax. Your order already shipped, so at checkout you'll pick weight-based shipping or free local pickup in Ocala."
+              : "Plus tax. Add-ons ship with your order - no extra shipping."}
+          </p>
         </div>
       )}
       {error && <p className="mt-2 text-sm text-brand">{error}</p>}

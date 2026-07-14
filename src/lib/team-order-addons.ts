@@ -9,6 +9,21 @@ import { addRosterRow } from "@/lib/team-orders";
 import { itemPriceCents } from "@/lib/team-order-pricing";
 import { itemLabel, sizesFor } from "@/lib/order-items";
 
+// Approx shipping weight per piece in ounces - used when an add-on comes in
+// AFTER the main order shipped (it can't ride with the batch anymore).
+export const ITEM_WEIGHT_OZ: Record<string, number> = {
+  jersey: 11,
+  knickers: 14,
+  long_pants: 16,
+  shorts: 10,
+  hoodie: 24,
+  socks: 3,
+};
+
+export function addonWeightOz(rows: { key: string; quantity: number }[]): number {
+  return rows.reduce((s, r) => s + (ITEM_WEIGHT_OZ[r.key] ?? 12) * r.quantity, 0);
+}
+
 export type AddonRowInput = {
   key: string;
   size?: string;

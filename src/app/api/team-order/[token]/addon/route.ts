@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { getByManageToken } from "@/lib/team-orders";
-import { priceAddonRows, createAddon, setAddonSession, type AddonRowInput } from "@/lib/team-order-addons";
+import { priceAddonRows, createAddon, setAddonSession, addonWeightOz, type AddonRowInput } from "@/lib/team-order-addons";
+import { shippingCentsFor } from "@/lib/team-stores";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
 
 export const runtime = "nodejs";
@@ -36,6 +37,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     const addon = await createAddon(order.id, rows, totalCents);
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const stripe = getStripe();
+
+    // Before the main order ships, add-ons ride with the batch (no shipping).
+    // After it ships, they need their own delivery: weight-based rate or free
+    // local pickup, with an address collected.
+    const shipsSeparately = order.status === "shipped";
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: rows.map((r) => ({
@@ -51,6 +57,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       success_url: `${SITE}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${SITE}/team-order/manage/${token}`,
       phone_number_collection: { enabled: false },
+      ...(shipsSeparately
+        ? {
+            shipping_address_collection: { allowed_countries: ["US"] as const },
+            shipping_options: [
+              {
+                shipping_rate_data: {
+                  display_name: "Shipping (by weight)",
+                  type: "fixed_amount" as const,
+                  fixed_amount: { amount: shippingCentsFor(addonWeightOz(rows)), currency: "usd" },
+                },
+              },
+              {
+                shipping_rate_data: {
+                  display_name: "Free local pickup (Ocala, FL)",
+                  type: "fixed_amount" as const,
+                  fixed_amount: { amount: 0, currency: "usd" },
+                },
+              },
+            ],
+          }
+        : {}),
       metadata: { kind: "team_order_addon", addonId: addon.id, teamOrderId: order.id, teamName: order.teamName },
     });
     await setAddonSession(addon.id, session.id);
