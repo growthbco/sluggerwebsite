@@ -58,8 +58,6 @@ export default async function AdminCustomersPage() {
         name: designRequests.contactName,
         phone: designRequests.contactPhone,
         team: designRequests.teamName,
-        feeCents: designRequests.designFeeAmountCents,
-        feePaidAt: designRequests.designFeePaidAt,
         at: designRequests.updatedAt,
       })
       .from(designRequests),
@@ -103,7 +101,8 @@ export default async function AdminCustomersPage() {
     c.designs += 1;
     if (r.team?.trim()) c.teams.add(r.team.trim());
     if (r.phone?.trim()) c.phone = r.phone.trim();
-    if (r.feePaidAt) c.spendCents += r.feeCents ?? 0;
+    // Design fees are NOT counted as spend: they're credited back to the
+    // final order, so counting them would double-track revenue.
     touch(c, r.at);
   }
 
@@ -123,7 +122,7 @@ export default async function AdminCustomersPage() {
           <p className="mt-2 text-sm text-muted">
             Everyone who has ordered, started a team order, or requested a design.
             Tracked revenue: <strong className="text-foreground">{money(totalRevenue)}</strong>
-            <span className="text-xs"> (paid orders, paid invoices, and design fees)</span>
+            <span className="text-xs"> (paid shop orders and paid team-order invoices; design fees excluded)</span>
           </p>
         </div>
         <AdminLogout />
