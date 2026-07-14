@@ -1,0 +1,242 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { desc, sql } from "drizzle-orm";
+import { dbEnabled, getDb } from "@/db";
+import { designRequests, teamOrders, teams, orders } from "@/db/schema";
+import { isAdmin, adminEnabled } from "@/lib/admin-auth";
+import { AdminLogout } from "@/components/admin-logout";
+
+export const metadata: Metadata = { title: "Admin", robots: { index: false } };
+export const dynamic = "force-dynamic";
+
+const STATUS_TONE: Record<string, string> = {
+  pending_payment: "border-amber-500/50 text-amber-400",
+  submitted: "border-brand/50 text-brand",
+  in_design: "border-brand/50 text-brand",
+  proof_sent: "border-sky-500/50 text-sky-400",
+  changes_requested: "border-amber-500/50 text-amber-400",
+  approved: "border-green-500/50 text-green-400",
+  ordered: "border-green-500/50 text-green-400",
+  cancelled: "border-line text-muted",
+};
+
+function Badge({ label }: { label: string }) {
+  return (
+    <span className={`inline-block border px-2 py-0.5 text-xs display ${STATUS_TONE[label] ?? "border-line text-muted"}`}>
+      {label.replace(/_/g, " ")}
+    </span>
+  );
+}
+
+function fmtDate(d: Date | string | null | undefined) {
+  if (!d) return "-";
+  const date = typeof d === "string" ? new Date(d) : d;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+
+export default async function AdminPage() {
+  if (!adminEnabled()) {
+    return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Set ADMIN_PASSWORD to enable the dashboard.</div>;
+  }
+  if (!(await isAdmin())) redirect("/admin/login");
+  if (!dbEnabled()) {
+    return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Database not configured.</div>;
+  }
+
+  const db = getDb();
+  const [designs, torders, stores, recentOrders] = await Promise.all([
+    db
+      .select({
+        reference: designRequests.reference,
+        teamName: designRequests.teamName,
+        status: designRequests.status,
+        contactName: designRequests.contactName,
+        contactEmail: designRequests.contactEmail,
+        revisionsUsed: designRequests.revisionsUsed,
+        neededBy: designRequests.neededBy,
+        messages: designRequests.messages,
+        manageToken: designRequests.manageToken,
+        updatedAt: designRequests.updatedAt,
+      })
+      .from(designRequests)
+      .orderBy(desc(designRequests.updatedAt)),
+    db
+      .select({
+        reference: teamOrders.reference,
+        teamName: teamOrders.teamName,
+        status: teamOrders.status,
+        contactEmail: teamOrders.contactEmail,
+        manageToken: teamOrders.manageToken,
+        updatedAt: teamOrders.updatedAt,
+      })
+      .from(teamOrders)
+      .orderBy(desc(teamOrders.updatedAt)),
+    db
+      .select({
+        id: teams.id,
+        name: teams.name,
+        storeActive: teams.storeActive,
+        storeToken: teams.storeToken,
+        orderCount: sql<number>`(select count(*) from ${orders} where ${orders.teamId} = ${teams.id})`,
+        revenueCents: sql<number>`coalesce((select sum(${orders.totalCents}) from ${orders} where ${orders.teamId} = ${teams.id}), 0)`,
+      })
+      .from(teams)
+      .orderBy(desc(teams.createdAt)),
+    db
+      .select({
+        reference: orders.reference,
+        type: orders.type,
+        customerName: orders.customerName,
+        totalCents: orders.totalCents,
+        createdAt: orders.createdAt,
+      })
+      .from(orders)
+      .orderBy(desc(orders.createdAt))
+      .limit(15),
+  ]);
+
+  const needsAction = designs.filter((d) => {
+    const lastMsg = d.messages?.[d.messages.length - 1];
+    return d.status === "changes_requested" || d.status === "submitted" || lastMsg?.from === "client";
+  });
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-14">
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="display text-brand text-sm">Staff Dashboard</span>
+          <h1 className="display text-4xl text-foreground mt-1">All Projects</h1>
+        </div>
+        <AdminLogout />
+      </div>
+
+      {needsAction.length > 0 && (
+        <p className="mt-4 text-sm text-amber-400">
+          ⚠ {needsAction.length} design{needsAction.length === 1 ? "" : "s"} waiting on us:{" "}
+          {needsAction.map((d) => d.reference).join(", ")}
+        </p>
+      )}
+
+      <section className="mt-10">
+        <h2 className="display text-xl text-foreground">Design requests ({designs.length})</h2>
+        <div className="mt-3 overflow-x-auto border border-line">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-steel text-left text-xs text-muted uppercase">
+                <th className="px-3 py-2">Ref</th>
+                <th className="px-3 py-2">Team</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Contact</th>
+                <th className="px-3 py-2">Rev</th>
+                <th className="px-3 py-2">Needed by</th>
+                <th className="px-3 py-2">Last msg</th>
+                <th className="px-3 py-2">Updated</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[color:var(--line)]">
+              {designs.map((d) => {
+                const lastMsg = d.messages?.[d.messages.length - 1];
+                return (
+                  <tr key={d.reference} className="hover:bg-steel/60">
+                    <td className="px-3 py-2 font-mono text-xs">
+                      <Link href={`/design/manage/${d.manageToken}`} className="text-brand hover:underline">
+                        {d.reference}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2 text-foreground">{d.teamName}</td>
+                    <td className="px-3 py-2"><Badge label={d.status} /></td>
+                    <td className="px-3 py-2 text-muted">{d.contactName}</td>
+                    <td className="px-3 py-2 text-muted">{d.revisionsUsed ?? 0}/5</td>
+                    <td className="px-3 py-2 text-muted">{fmtDate(d.neededBy)}</td>
+                    <td className="px-3 py-2 text-muted">
+                      {lastMsg ? (lastMsg.from === "client" ? "⚠ client waiting" : lastMsg.name ?? "staff") : "-"}
+                    </td>
+                    <td className="px-3 py-2 text-muted">{fmtDate(d.updatedAt)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="display text-xl text-foreground">Team orders ({torders.length})</h2>
+        <div className="mt-3 overflow-x-auto border border-line">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-steel text-left text-xs text-muted uppercase">
+                <th className="px-3 py-2">Ref</th>
+                <th className="px-3 py-2">Team</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Contact</th>
+                <th className="px-3 py-2">Updated</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[color:var(--line)]">
+              {torders.map((o) => (
+                <tr key={o.reference} className="hover:bg-steel/60">
+                  <td className="px-3 py-2 font-mono text-xs">
+                    <Link href={`/team-order/manage/${o.manageToken}`} className="text-brand hover:underline">
+                      {o.reference}
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2 text-foreground">{o.teamName}</td>
+                  <td className="px-3 py-2"><Badge label={o.status} /></td>
+                  <td className="px-3 py-2 text-muted">{o.contactEmail}</td>
+                  <td className="px-3 py-2 text-muted">{fmtDate(o.updatedAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div className="mt-10 grid gap-10 lg:grid-cols-2">
+        <section>
+          <h2 className="display text-xl text-foreground">Team stores ({stores.length})</h2>
+          <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
+            {stores.length === 0 && <p className="px-3 py-3 text-sm text-muted">No stores yet.</p>}
+            {stores.map((s) => (
+              <div key={s.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                <div>
+                  <Link href={`/store/${s.storeToken}`} className="text-brand hover:underline">
+                    {s.name}
+                  </Link>
+                  <span className={`ml-2 text-xs display ${s.storeActive ? "text-green-400" : "text-muted"}`}>
+                    {s.storeActive ? "OPEN" : "CLOSED"}
+                  </span>
+                </div>
+                <p className="text-muted shrink-0">
+                  {s.orderCount} orders · {money(Number(s.revenueCents))}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="display text-xl text-foreground">Recent paid orders</h2>
+          <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
+            {recentOrders.length === 0 && <p className="px-3 py-3 text-sm text-muted">No orders yet.</p>}
+            {recentOrders.map((o) => (
+              <div key={o.reference} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                <div>
+                  <span className="font-mono text-xs text-foreground">{o.reference}</span>
+                  <span className="ml-2 text-muted">{o.customerName ?? "-"}</span>
+                  <span className="ml-2 text-xs text-muted">({o.type})</span>
+                </div>
+                <p className="text-foreground shrink-0">
+                  {money(o.totalCents)} <span className="text-muted text-xs">{fmtDate(o.createdAt)}</span>
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}

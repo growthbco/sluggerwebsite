@@ -210,9 +210,32 @@ export const teams = pgTable(
     storeActive: boolean("store_active").notNull().default(false),
     storeOpensAt: timestamp("store_opens_at", { withTimezone: true }),
     storeClosesAt: timestamp("store_closes_at", { withTimezone: true }),
+
+    // Per-person team store: private link where players/parents buy their own
+    // gear at list prices. Created from an approved design request.
+    storeToken: text("store_token"),
+    approvedDesignUrl: text("approved_design_url"),
+    designRequestId: uuid("design_request_id"),
+    // Items purchasable in this store (label/price/sizes snapshot so catalog
+    // edits never change a live store).
+    storeItems: jsonb("store_items").$type<
+      Array<{
+        key: string;
+        label: string;
+        priceCents: number;
+        sizes: string[];
+        nameNumber?: boolean;
+        weightOz: number;
+      }>
+    >(),
+
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("teams_slug_idx").on(t.slug)],
+  (t) => [
+    uniqueIndex("teams_slug_idx").on(t.slug),
+    uniqueIndex("teams_store_token_idx").on(t.storeToken),
+    index("teams_design_request_idx").on(t.designRequestId),
+  ],
 );
 
 export const teamStoreProducts = pgTable(
@@ -450,7 +473,7 @@ export const designRequests = pgTable(
     // client answers from the status page. Distinct from changeRequests:
     // messages don't burn a revision.
     messages: jsonb("messages")
-      .$type<Array<{ at: string; from: "designer" | "client"; text: string }>>()
+      .$type<Array<{ at: string; from: "designer" | "client"; text: string; name?: string }>>()
       .default([]),
 
     // Inspiration uploaded by the client (Vercel Blob URLs).

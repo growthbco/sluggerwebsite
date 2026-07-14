@@ -137,6 +137,7 @@ export async function POST(req: Request) {
             subtotalCents: session.amount_subtotal ?? 0,
             shippingCents: session.total_details?.amount_shipping ?? 0,
             totalCents: session.amount_total ?? 0,
+            teamId: session.metadata?.teamId || undefined,
             lines: lineItems.data.map((li) => ({
               name: li.description ?? "Item",
               quantity: li.quantity ?? 1,
@@ -150,8 +151,9 @@ export async function POST(req: Request) {
       }
 
       if (isNewOrder) {
-        // Group orders by drop: thread title = primary product (drop) name.
-        const threadName = lines[0]?.name;
+        // Thread grouping: team stores group by team name; drops group by the
+        // primary product (drop) name.
+        const threadName = session.metadata?.teamName || lines[0]?.name;
 
         await postOrderToDiscord({
           reference,

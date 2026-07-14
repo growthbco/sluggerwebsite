@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
 import { getByManageToken, MAX_REVISIONS } from "@/lib/design-requests";
 import { getByDesignRequestId, getRoster } from "@/lib/team-orders";
+import { getStoreByDesignRequestId, STORE_ITEM_PRESETS } from "@/lib/team-stores";
 import { DesignManagePanel } from "@/components/design-manage-panel";
 import { DesignMessages } from "@/components/design-messages";
+import { TeamStorePanel } from "@/components/team-store-panel";
 import { PrintFileQA } from "@/components/print-file-qa";
 
 export const metadata: Metadata = { title: "Manage Design Request", robots: { index: false } };
@@ -34,6 +36,10 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
   const linkedOrder = await getByDesignRequestId(request.id);
   const linkedRoster = linkedOrder ? await getRoster(linkedOrder.id) : [];
 
+  // Per-person team store (only offered once the design is approved).
+  const storeEligible = request.status === "approved" || request.status === "ordered";
+  const store = storeEligible ? await getStoreByDesignRequestId(request.id) : null;
+
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 py-14 space-y-10">
       <DesignManagePanel
@@ -57,6 +63,24 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
       <div className="pt-6 border-t border-line">
         <DesignMessages token={token} role="designer" initialMessages={request.messages ?? []} />
       </div>
+
+      {storeEligible && (
+        <div className="pt-6 border-t border-line">
+          <TeamStorePanel
+            manageToken={token}
+            presets={STORE_ITEM_PRESETS.map((p) => ({ key: p.key, label: p.label, priceCents: p.priceCents }))}
+            initialStore={
+              store
+                ? {
+                    url: `${SITE}/store/${store.storeToken}`,
+                    active: store.storeActive,
+                    itemLabels: (store.storeItems ?? []).map((i) => i.label),
+                  }
+                : null
+            }
+          />
+        </div>
+      )}
 
       {linkedOrder && linkedRoster.length > 0 && (
         <PrintFileQA
