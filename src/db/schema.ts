@@ -388,6 +388,9 @@ export const teamOrders = pgTable(
     designRequestId: uuid("design_request_id"),
 
     quotedTotalCents: integer("quoted_total_cents"),
+    // One-time Stripe Payment Link sent as the invoice; paid via webhook.
+    invoiceUrl: text("invoice_url"),
+    invoicePaidAt: timestamp("invoice_paid_at", { withTimezone: true }),
 
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

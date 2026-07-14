@@ -95,6 +95,27 @@ type TeamOrderPayload = {
   roster: RosterRow[];
 };
 
+/** Announce an invoice payment in the #team-orders channel. */
+export async function postTeamOrderPaidToDiscord(args: {
+  reference: string;
+  teamName: string;
+  totalCents: number;
+}): Promise<boolean> {
+  const url = process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
+  if (!url) return false;
+  return send(url, {
+    username: "Slugger Team Orders",
+    embeds: [
+      {
+        title: `💰 PAID — ${args.teamName} (${args.reference})`,
+        description: `Invoice paid: **$${(args.totalCents / 100).toFixed(2)}**. Clear for production.`,
+        color: GOLD,
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  });
+}
+
 /** Post a team order's roster (no pricing) to the #team-orders channel. */
 export async function postTeamOrderToDiscord(order: TeamOrderPayload): Promise<boolean> {
   const url = process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;

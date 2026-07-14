@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
-import { postOrderToDiscord, postDesignRequestToDiscord } from "@/lib/discord";
-import { dbEnabled } from "@/db";
+import { eq } from "drizzle-orm";
+import { postOrderToDiscord, postDesignRequestToDiscord, postTeamOrderPaidToDiscord } from "@/lib/discord";
+import { dbEnabled, getDb } from "@/db";
+import { teamOrders } from "@/db/schema";
 import { getById, markDesignFeePaid, setDiscordThreadId } from "@/lib/design-requests";
 import { emailDesignRequestToDesigner, emailDesignRequestConfirmation, emailOrderConfirmation } from "@/lib/email";
 import { persistPaidOrder } from "@/lib/orders";
@@ -81,6 +83,30 @@ export async function POST(req: Request) {
         }
       } catch (e) {
         console.error("Design fee webhook failed:", e);
+      }
+      return NextResponse.json({ received: true });
+    }
+
+    // Team-order invoice paid (Stripe Payment Link created from the admin
+    // dashboard): flip the order to paid and tell the team channel.
+    if (session.metadata?.kind === "team_order_invoice" && session.metadata?.teamOrderId && dbEnabled()) {
+      try {
+        const db = getDb();
+        const now = new Date();
+        const [row] = await db
+          .update(teamOrders)
+          .set({ status: "paid", invoicePaidAt: now, updatedAt: now })
+          .where(eq(teamOrders.id, session.metadata.teamOrderId))
+          .returning({ reference: teamOrders.reference, teamName: teamOrders.teamName });
+        if (row) {
+          await postTeamOrderPaidToDiscord({
+            reference: row.reference,
+            teamName: row.teamName,
+            totalCents: session.amount_total ?? 0,
+          });
+        }
+      } catch (e) {
+        console.error("team order invoice webhook failed:", e);
       }
       return NextResponse.json({ received: true });
     }

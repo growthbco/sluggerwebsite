@@ -159,6 +159,52 @@ export async function emailProofReady(args: {
   });
 }
 
+/** Team-order invoice: itemized roster total + a Stripe payment link. */
+export async function emailTeamOrderInvoice(args: {
+  to: string;
+  teamName: string;
+  reference: string;
+  lines: { label: string; quantity: number; unitPriceCents: number; totalCents: number }[];
+  rushFeeCents: number;
+  totalCents: number;
+  payUrl: string;
+}): Promise<boolean> {
+  const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+  const rows = args.lines
+    .map(
+      (l) => `
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #e6e2d6;">${esc(l.label)} × ${l.quantity} <span style="color:#8a8570;">(${money(l.unitPriceCents)} each)</span></td>
+          <td style="padding:8px 0;border-bottom:1px solid #e6e2d6;text-align:right;">${money(l.totalCents)}</td>
+        </tr>`,
+    )
+    .join("");
+  return sendEmail({
+    to: args.to,
+    subject: `Your ${args.teamName} team order total: $${(args.totalCents / 100).toFixed(2)} (${args.reference})`,
+    html: brandedEmail({
+      preheader: `Your roster is priced and ready - pay online to start production.`,
+      heading: `Your team order is ready to pay, ${esc(args.teamName)}!`,
+      intro: `Order reference: <strong>${esc(args.reference)}</strong>`,
+      bodyHtml: `
+        <table style="width:100%;border-collapse:collapse;margin:0 0 14px;">
+          ${rows}
+          ${args.rushFeeCents > 0 ? `<tr><td style="padding:8px 0;border-bottom:1px solid #e6e2d6;">Rush production ($5/item)</td><td style="padding:8px 0;border-bottom:1px solid #e6e2d6;text-align:right;">${money(args.rushFeeCents)}</td></tr>` : ""}
+          <tr>
+            <td style="padding:10px 0;"><strong>Total (plus tax)</strong></td>
+            <td style="padding:10px 0;text-align:right;"><strong>${money(args.totalCents)}</strong></td>
+          </tr>
+        </table>
+        <p style="margin:0;">Pay securely online with the button below - production starts as soon as payment lands. Questions or need to adjust the roster first? Just reply to this email.</p>
+      `,
+      ctaText: "Pay your invoice",
+      ctaUrl: args.payUrl,
+      footerNote: "Standard 2-3 week turnaround after payment · Free local pickup in Ocala",
+    }),
+    replyTo: CONTACT_INBOX,
+  });
+}
+
 /** Friendly reminder that a proof is waiting on the client's review. */
 export async function emailProofFollowUp(args: {
   to: string;

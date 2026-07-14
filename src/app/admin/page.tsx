@@ -5,7 +5,10 @@ import { desc, sql } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { designRequests, teamOrders, teams, orders } from "@/db/schema";
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
+import { getRoster } from "@/lib/team-orders";
+import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
 import { AdminLogout } from "@/components/admin-logout";
+import { AdminInvoiceButton } from "@/components/admin-invoice-button";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -65,11 +68,17 @@ export default async function AdminPage() {
       .orderBy(desc(designRequests.updatedAt)),
     db
       .select({
+        id: teamOrders.id,
         reference: teamOrders.reference,
         teamName: teamOrders.teamName,
         status: teamOrders.status,
         contactEmail: teamOrders.contactEmail,
         manageToken: teamOrders.manageToken,
+        jerseyStyle: teamOrders.jerseyStyle,
+        rushShipping: teamOrders.rushShipping,
+        quotedTotalCents: teamOrders.quotedTotalCents,
+        invoiceUrl: teamOrders.invoiceUrl,
+        invoicePaidAt: teamOrders.invoicePaidAt,
         updatedAt: teamOrders.updatedAt,
       })
       .from(teamOrders)
@@ -98,6 +107,17 @@ export default async function AdminPage() {
       .limit(15),
   ]);
 
+  // Price each unpaid team order from its roster so "Send invoice" can show
+  // the number upfront. Roster fetches are per-order but the list is small.
+  const orderEstimates = new Map<string, number>();
+  for (const o of torders) {
+    if (o.status === "paid" || o.invoicePaidAt) continue;
+    try {
+      const roster = await getRoster(o.id);
+      if (roster.length) orderEstimates.set(o.id, computeTeamOrderQuote(o, roster).totalCents);
+    } catch {}
+  }
+
   const needsAction = designs.filter((d) => {
     const lastMsg = d.messages?.[d.messages.length - 1];
     return d.status === "changes_requested" || d.status === "submitted" || lastMsg?.from === "client";
@@ -110,7 +130,12 @@ export default async function AdminPage() {
           <span className="display text-brand text-sm">Staff Dashboard</span>
           <h1 className="display text-4xl text-foreground mt-1">All Projects</h1>
         </div>
-        <AdminLogout />
+        <div className="flex items-center gap-3">
+          <Link href="/admin/customers" className="text-xs display text-foreground border border-line px-3 py-1.5 hover:border-brand/50">
+            Customers →
+          </Link>
+          <AdminLogout />
+        </div>
       </div>
 
       {needsAction.length > 0 && (
@@ -173,23 +198,47 @@ export default async function AdminPage() {
                 <th className="px-3 py-2">Team</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Contact</th>
+                <th className="px-3 py-2">Total</th>
+                <th className="px-3 py-2">Invoice</th>
                 <th className="px-3 py-2">Updated</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[color:var(--line)]">
-              {torders.map((o) => (
-                <tr key={o.reference} className="hover:bg-steel/60">
-                  <td className="px-3 py-2 font-mono text-xs">
-                    <Link href={`/team-order/manage/${o.manageToken}`} className="text-brand hover:underline">
-                      {o.reference}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 text-foreground">{o.teamName}</td>
-                  <td className="px-3 py-2"><Badge label={o.status} /></td>
-                  <td className="px-3 py-2 text-muted">{o.contactEmail}</td>
-                  <td className="px-3 py-2 text-muted">{fmtDate(o.updatedAt)}</td>
-                </tr>
-              ))}
+              {torders.map((o) => {
+                const estimate = o.quotedTotalCents ?? orderEstimates.get(o.id);
+                const paid = o.status === "paid" || Boolean(o.invoicePaidAt);
+                return (
+                  <tr key={o.reference} className="hover:bg-steel/60">
+                    <td className="px-3 py-2 font-mono text-xs">
+                      <Link href={`/team-order/manage/${o.manageToken}`} className="text-brand hover:underline">
+                        {o.reference}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2 text-foreground">{o.teamName}</td>
+                    <td className="px-3 py-2"><Badge label={o.status} /></td>
+                    <td className="px-3 py-2 text-muted">{o.contactEmail}</td>
+                    <td className="px-3 py-2 text-foreground">
+                      {estimate ? money(estimate) : "-"}
+                      {estimate && !o.quotedTotalCents ? <span className="text-xs text-muted"> est.</span> : null}
+                    </td>
+                    <td className="px-3 py-2">
+                      {paid ? (
+                        <span className="text-xs display text-green-400">PAID</span>
+                      ) : estimate ? (
+                        <AdminInvoiceButton
+                          teamOrderId={o.id}
+                          teamName={o.teamName}
+                          estimateCents={estimate}
+                          resend={Boolean(o.invoiceUrl)}
+                        />
+                      ) : (
+                        <span className="text-xs text-muted">no roster</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-muted">{fmtDate(o.updatedAt)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

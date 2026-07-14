@@ -1,0 +1,74 @@
+// Auto-pricing for quote-first team orders: roster rows x the public price
+// list. Jersey price follows the order's jersey style; rush adds $5/piece.
+
+import { itemLabel } from "@/lib/order-items";
+
+// Per-item retail prices in cents (mirrors src/lib/pricing.ts).
+const ITEM_PRICES: Record<string, number> = {
+  jersey: 2800, // crew / v-neck default; overridden by style below
+  knickers: 4000,
+  long_pants: 4000,
+  shorts: 2500,
+  hoodie: 4000,
+  socks: 1500,
+};
+
+export const RUSH_FEE_CENTS = 500; // per piece, when rushShipping is set
+
+export function jerseyPriceCents(jerseyStyle?: string | null): number {
+  const s = (jerseyStyle ?? "").toLowerCase();
+  if (s.includes("full")) return 3800;
+  if (s.includes("two")) return 3500;
+  return 2800; // crew / v-neck / unspecified
+}
+
+export type QuoteLine = { label: string; quantity: number; unitPriceCents: number; totalCents: number };
+
+export type TeamOrderQuote = {
+  lines: QuoteLine[];
+  pieces: number;
+  rushFeeCents: number;
+  totalCents: number;
+};
+
+type RosterRow = {
+  size?: string | null;
+  sizes?: Record<string, string> | null;
+  quantity?: number | null;
+};
+
+/** Count what each player actually ordered (their per-item sizes) and price
+ *  it. A row with only the legacy `size` field counts as one jersey. */
+export function computeTeamOrderQuote(
+  order: { jerseyStyle?: string | null; items?: string[] | null; rushShipping?: boolean | null },
+  roster: RosterRow[],
+): TeamOrderQuote {
+  const counts = new Map<string, number>();
+  for (const row of roster) {
+    const qty = Math.max(1, row.quantity ?? 1);
+    const sized = Object.entries(row.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
+    if (sized.length) {
+      for (const [key] of sized) counts.set(key, (counts.get(key) ?? 0) + qty);
+    } else if ((row.size ?? "").trim()) {
+      counts.set("jersey", (counts.get("jersey") ?? 0) + qty);
+    }
+  }
+
+  const lines: QuoteLine[] = [];
+  let pieces = 0;
+  // Stable order: jersey first, then the rest alphabetically.
+  const keys = Array.from(counts.keys()).sort((a, b) => (a === "jersey" ? -1 : b === "jersey" ? 1 : a.localeCompare(b)));
+  for (const key of keys) {
+    const quantity = counts.get(key)!;
+    const unit = key === "jersey" ? jerseyPriceCents(order.jerseyStyle) : ITEM_PRICES[key];
+    if (!unit) continue; // unknown item type: leave for a manual quote
+    const label =
+      key === "jersey" && order.jerseyStyle ? `${order.jerseyStyle} Jersey` : itemLabel(key);
+    lines.push({ label, quantity, unitPriceCents: unit, totalCents: unit * quantity });
+    pieces += quantity;
+  }
+
+  const rushFeeCents = order.rushShipping ? pieces * RUSH_FEE_CENTS : 0;
+  const totalCents = lines.reduce((s, l) => s + l.totalCents, 0) + rushFeeCents;
+  return { lines, pieces, rushFeeCents, totalCents };
+}
