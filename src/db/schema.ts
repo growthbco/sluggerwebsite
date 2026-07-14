@@ -515,6 +515,11 @@ export const designRequests = pgTable(
     followUpsSent: integer("follow_ups_sent").notNull().default(0),
     lastFollowUpAt: timestamp("last_follow_up_at", { withTimezone: true }),
 
+    // Admin archive: hides the request from the active list (and stops auto
+    // follow-ups) without deleting it. Note is for later follow-up context.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    archivedNote: text("archived_note"),
+
     // Timestamps
     proofSentAt: timestamp("proof_sent_at", { withTimezone: true }),
     approvedAt: timestamp("approved_at", { withTimezone: true }),

@@ -61,7 +61,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
       />
 
       <div className="pt-6 border-t border-line">
-        <DesignMessages token={token} role="designer" initialMessages={request.messages ?? []} />
+        <DesignMessages token={token} role="designer" initialMessages={request.messages ?? []} status={request.status} />
       </div>
 
       {storeEligible && (

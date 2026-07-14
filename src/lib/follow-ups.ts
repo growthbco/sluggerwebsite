@@ -34,6 +34,7 @@ export async function findProofFollowUpCandidates(now = new Date()): Promise<Fol
 
   const due: FollowUpCandidate[] = [];
   for (const r of rows) {
+    if (r.archivedAt) continue; // archived = deliberately parked, no robots
     if (!r.proofSentAt || !r.contactEmail) continue;
     const sent = r.followUpsSent ?? 0;
     if (sent >= MAX_FOLLOW_UPS) continue;

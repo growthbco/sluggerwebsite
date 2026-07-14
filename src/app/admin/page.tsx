@@ -54,6 +54,7 @@ export default async function AdminPage() {
   const [designs, torders, stores, recentOrders] = await Promise.all([
     db
       .select({
+        id: designRequests.id,
         reference: designRequests.reference,
         teamName: designRequests.teamName,
         status: designRequests.status,
@@ -63,6 +64,8 @@ export default async function AdminPage() {
         neededBy: designRequests.neededBy,
         messages: designRequests.messages,
         manageToken: designRequests.manageToken,
+        archivedAt: designRequests.archivedAt,
+        archivedNote: designRequests.archivedNote,
         updatedAt: designRequests.updatedAt,
       })
       .from(designRequests)
@@ -110,6 +113,8 @@ export default async function AdminPage() {
       .limit(15),
   ]);
 
+  const activeDesigns = designs.filter((d) => !d.archivedAt);
+  const archivedDesigns = designs.filter((d) => d.archivedAt);
   const activeOrders = torders.filter((o) => !o.archivedAt);
   const archivedOrders = torders.filter((o) => o.archivedAt);
 
@@ -124,7 +129,7 @@ export default async function AdminPage() {
     } catch {}
   }
 
-  const needsAction = designs.filter((d) => {
+  const needsAction = activeDesigns.filter((d) => {
     const lastMsg = d.messages?.[d.messages.length - 1];
     return d.status === "changes_requested" || d.status === "submitted" || lastMsg?.from === "client";
   });
@@ -152,7 +157,7 @@ export default async function AdminPage() {
       )}
 
       <section className="mt-10">
-        <h2 className="display text-xl text-foreground">Design requests ({designs.length})</h2>
+        <h2 className="display text-xl text-foreground">Design requests ({activeDesigns.length})</h2>
         <div className="mt-3 overflow-x-auto border border-line">
           <table className="w-full text-sm">
             <thead>
@@ -165,10 +170,11 @@ export default async function AdminPage() {
                 <th className="px-3 py-2">Needed by</th>
                 <th className="px-3 py-2">Last msg</th>
                 <th className="px-3 py-2">Updated</th>
+                <th className="px-3 py-2"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[color:var(--line)]">
-              {designs.map((d) => {
+              {activeDesigns.map((d) => {
                 const lastMsg = d.messages?.[d.messages.length - 1];
                 return (
                   <tr key={d.reference} className="hover:bg-steel/60">
@@ -186,6 +192,9 @@ export default async function AdminPage() {
                       {lastMsg ? (lastMsg.from === "client" ? "⚠ client waiting" : lastMsg.name ?? "staff") : "-"}
                     </td>
                     <td className="px-3 py-2 text-muted">{fmtDate(d.updatedAt)}</td>
+                    <td className="px-3 py-2">
+                      <AdminArchiveButton kind="design_request" id={d.id} archived={false} />
+                    </td>
                   </tr>
                 );
               })}
@@ -193,6 +202,31 @@ export default async function AdminPage() {
           </table>
         </div>
       </section>
+
+      {archivedDesigns.length > 0 && (
+        <details className="mt-6 border border-line bg-steel/50 group">
+          <summary className="flex cursor-pointer items-center justify-between px-4 py-3 list-none">
+            <span className="display text-sm text-muted">Archived design requests ({archivedDesigns.length})</span>
+            <span className="text-brand transition-transform group-open:rotate-45">+</span>
+          </summary>
+          <div className="divide-y divide-[color:var(--line)] border-t border-line">
+            {archivedDesigns.map((d) => (
+              <div key={d.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <div>
+                  <Link href={`/design/manage/${d.manageToken}`} className="font-mono text-xs text-brand hover:underline">
+                    {d.reference}
+                  </Link>
+                  <span className="ml-2 text-foreground">{d.teamName}</span>
+                  <span className="ml-2 text-muted">{d.contactName}</span>
+                  {d.archivedNote && <span className="ml-2 text-xs text-amber-400/90">"{d.archivedNote}"</span>}
+                  <span className="ml-2 text-xs text-muted">archived {fmtDate(d.archivedAt)}</span>
+                </div>
+                <AdminArchiveButton kind="design_request" id={d.id} archived={true} />
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
 
       <section className="mt-10">
         <h2 className="display text-xl text-foreground">Team orders ({activeOrders.length})</h2>
@@ -241,7 +275,7 @@ export default async function AdminPage() {
                         ) : (
                           <span className="text-xs text-muted">no roster</span>
                         )}
-                        <AdminArchiveButton teamOrderId={o.id} archived={false} />
+                        <AdminArchiveButton kind="team_order" id={o.id} archived={false} />
                       </span>
                     </td>
                     <td className="px-3 py-2 text-muted">{fmtDate(o.updatedAt)}</td>
@@ -271,7 +305,7 @@ export default async function AdminPage() {
                   {o.archivedNote && <span className="ml-2 text-xs text-amber-400/90">"{o.archivedNote}"</span>}
                   <span className="ml-2 text-xs text-muted">archived {fmtDate(o.archivedAt)}</span>
                 </div>
-                <AdminArchiveButton teamOrderId={o.id} archived={true} />
+                <AdminArchiveButton kind="team_order" id={o.id} archived={true} />
               </div>
             ))}
           </div>

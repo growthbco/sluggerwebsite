@@ -8,6 +8,45 @@ const NAME_KEY = "slugger-sender-name";
 // Staff who reply to clients. Picking one is required so every reply is attributed.
 const STAFF_NAMES = ["Gary", "Justin", "Bonans"];
 
+// Pre-built follow-ups, picked by where the design is in the funnel. Clicking
+// one fills the draft (editable) - it never sends by itself.
+const QUICK_REPLIES: Record<string, { label: string; text: string }[]> = {
+  proof_sent: [
+    {
+      label: "Checking in on proof",
+      text: "Hey! Just checking in - your proof is ready and waiting for your review. Anything you'd like tweaked, or are we good to go?",
+    },
+    {
+      label: "Ready when you are",
+      text: "Haven't heard back on your proof - no rush, but we're ready to move into production the moment you approve. Want us to adjust anything?",
+    },
+  ],
+  changes_requested: [
+    {
+      label: "Working on changes",
+      text: "Got your change requests - we're working on the updated proof now and will ping you the moment it's ready!",
+    },
+  ],
+  approved: [
+    {
+      label: "Next step: roster",
+      text: "Congrats on approving your design! Next step is getting your roster in - need a hand with sizes or the player link? We're here.",
+    },
+  ],
+  ordered: [
+    {
+      label: "Order update",
+      text: "Quick update on your order - everything is moving along. Let us know if anything changed on your end!",
+    },
+  ],
+  default: [
+    {
+      label: "Just checking in",
+      text: "Hey, just checking in - anything we can help with to keep your order moving?",
+    },
+  ],
+};
+
 /** Designer <-> client Q&A thread. Rendered on both the designer manage page
  *  (role="designer") and the client status page (role="client"); the shared
  *  token-authed endpoint infers the sender from which link posted. */
@@ -15,10 +54,12 @@ export function DesignMessages({
   token,
   role,
   initialMessages,
+  status,
 }: {
   token: string;
   role: "designer" | "client";
   initialMessages: DesignMessage[];
+  status?: string;
 }) {
   const [messages, setMessages] = useState<DesignMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
@@ -131,6 +172,21 @@ export function DesignMessages({
         </div>
       )}
 
+      {role === "designer" && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {[...(QUICK_REPLIES[status ?? ""] ?? []), ...QUICK_REPLIES.default].map((q) => (
+            <button
+              key={q.label}
+              type="button"
+              onClick={() => setDraft(q.text)}
+              className="text-xs display text-muted border border-line px-3 py-1.5 hover:border-brand/50 hover:text-foreground"
+              title="Fills the message box - edit before sending"
+            >
+              💬 {q.label}
+            </button>
+          ))}
+        </div>
+      )}
       {role === "designer" && (
         <select
           value={senderName}
