@@ -13,21 +13,38 @@ type IncomingItem = {
   quantity: number;
 };
 
-// Live Shippo rate (+margin) when the buyer gave us a ZIP; formula otherwise.
-async function shippingChargeCents(totalOz: number, zip?: string): Promise<number> {
+// Shipping choices for the Stripe page: standard ground (live rate + margin
+// when a ZIP was given, formula otherwise), an expedited option when live
+// rates are available, and free local pickup.
+async function shipOptions(totalOz: number, zip?: string): Promise<{ label: string; amountCents: number }[]> {
+  const options: { label: string; amountCents: number }[] = [];
   if (zip && /^\d{5}$/.test(zip)) {
     try {
       const { getRates, shippoEnabled } = await import("@/lib/shippo");
       if (shippoEnabled()) {
         const rates = await getRates({ zip }, totalOz);
-        if (rates.length > 0) return rates[0].chargedCents;
+        if (rates.length > 0) {
+          options.push({ label: `Standard shipping to ${zip}`, amountCents: rates[0].chargedCents });
+          const priority = rates.find(
+            (r) => r.provider === "USPS" && /priority mail(?! express)/i.test(r.service),
+          );
+          if (priority && priority.chargedCents > rates[0].chargedCents) {
+            options.push({ label: "Faster shipping (USPS Priority, 1-3 days)", amountCents: priority.chargedCents });
+          }
+        }
       }
     } catch (e) {
       console.error("live rate failed, using formula:", e);
     }
   }
-  return shippingCentsFor(totalOz);
+  if (options.length === 0) {
+    options.push({ label: "Shipping (by weight)", amountCents: shippingCentsFor(totalOz) });
+  }
+  options.push({ label: "Free local pickup (Ocala, FL)", amountCents: 0 });
+  return options;
 }
+
+const RUSH_FEE_CENTS = 500; // per piece, matches the site-wide rush policy
 
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
   if (!stripeEnabled() || !dbEnabled()) {
@@ -40,10 +57,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   let items: IncomingItem[];
   let shipZip: string | undefined;
+  let rush = false;
   try {
     const body = await req.json();
     items = body.items;
     shipZip = typeof body.shipZip === "string" ? body.shipZip.trim() : undefined;
+    rush = body.rush === true;
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
@@ -85,6 +104,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     return NextResponse.json({ error: "No valid items selected" }, { status: 400 });
   }
 
+  // Rush production: $5/piece, shows as its own line so Discord/email flag it.
+  if (rush) {
+    const pieces = lineItems.reduce((s, l) => s + l.quantity, 0);
+    lineItems.push({
+      quantity: pieces,
+      price_data: {
+        currency: "usd",
+        unit_amount: RUSH_FEE_CENTS,
+        product_data: { name: "🚨 RUSH production (~1 week)" },
+      },
+    });
+  }
+
   try {
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
@@ -94,25 +126,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       cancel_url: `${SITE}/store/${token}`,
       shipping_address_collection: { allowed_countries: ["US"] },
       phone_number_collection: { enabled: true },
-      // Buyer picks: shipping (live carrier rate when they gave a ZIP) or
-      // free local pickup in Ocala.
-      shipping_options: [
-        {
-          shipping_rate_data: {
-            display_name: shipZip ? `Shipping to ${shipZip}` : "Shipping (by weight)",
-            type: "fixed_amount",
-            fixed_amount: { amount: await shippingChargeCents(totalOz, shipZip), currency: "usd" },
-          },
+      // Buyer picks: standard ground, expedited (when live-rated), or pickup.
+      shipping_options: (await shipOptions(totalOz, shipZip)).map((o) => ({
+        shipping_rate_data: {
+          display_name: o.label,
+          type: "fixed_amount" as const,
+          fixed_amount: { amount: o.amountCents, currency: "usd" },
         },
-        {
-          shipping_rate_data: {
-            display_name: "Free local pickup (Ocala, FL)",
-            type: "fixed_amount",
-            fixed_amount: { amount: 0, currency: "usd" },
-          },
-        },
-      ],
-      metadata: { orderType: "team_store", teamId: store.id, teamName: store.name },
+      })),
+      metadata: { orderType: "team_store", teamId: store.id, teamName: store.name, ...(rush ? { rush: "true" } : {}) },
     });
     return NextResponse.json({ url: session.url });
   } catch (e) {

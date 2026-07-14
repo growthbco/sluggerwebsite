@@ -111,7 +111,10 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
     setTimeout(() => setJustAdded((k) => (k === item.key ? "" : k)), 1500);
   }
 
-  const subtotal = selections.reduce((sum, s) => sum + s.priceCents * s.quantity, 0);
+  const [rush, setRush] = useState(false);
+  const pieces = selections.reduce((sum, s) => sum + s.quantity, 0);
+  const rushFeeCents = rush ? pieces * 500 : 0;
+  const subtotal = selections.reduce((sum, s) => sum + s.priceCents * s.quantity, 0) + rushFeeCents;
 
   async function checkout() {
     if (selections.length === 0) return;
@@ -121,7 +124,7 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
       const res = await fetch(`/api/store/${token}/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: selections, shipZip: /^\d{5}$/.test(zip) ? zip : undefined }),
+        body: JSON.stringify({ items: selections, rush, shipZip: /^\d{5}$/.test(zip) ? zip : undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not start checkout");
@@ -231,6 +234,25 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
               </li>
             ))}
           </ul>
+        )}
+        {selections.length > 0 && (
+          <label className="mt-3 flex items-start gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={rush}
+              onChange={(e) => setRush(e.target.checked)}
+              className="mt-0.5 accent-[color:var(--brand-gold)]"
+            />
+            <span className="text-foreground">
+              🚨 Rush my order <span className="text-muted">(+$5/item · ~1 week instead of 2-3)</span>
+            </span>
+          </label>
+        )}
+        {rush && pieces > 0 && (
+          <div className="mt-2 flex justify-between text-sm">
+            <span className="text-muted">Rush fee ({pieces} × $5)</span>
+            <span className="text-foreground">{money(rushFeeCents)}</span>
+          </div>
         )}
         <div className="mt-4 pt-3 border-t border-line flex justify-between text-sm">
           <span className="text-muted">Subtotal</span>
