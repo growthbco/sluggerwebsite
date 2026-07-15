@@ -43,6 +43,27 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 py-14 space-y-10">
+      {/* Status first, then the active production gate (print-file QA), then
+          everything else - the page reads in the order the work happens. */}
+      <DesignProgress
+        status={request.status}
+        orderStatus={linkedOrder?.status}
+        orderReference={linkedOrder?.reference}
+        printFileVerified={Boolean(linkedOrder?.printFileVerifiedAt)}
+      />
+
+      {linkedOrder && linkedRoster.length > 0 && (
+        <PrintFileQA
+          // Auth: the verify endpoint accepts the team-order's manage token.
+          // The designer reaches this page from the Discord thread (which only
+          // staff can see), so it's safe to surface the team-order token here.
+          token={linkedOrder.manageToken!}
+          rosterCount={linkedRoster.length}
+          initialPrintFileUrl={linkedOrder.printFileUrl}
+          initialResult={linkedOrder.printFileVerification ?? null}
+        />
+      )}
+
       <DesignManagePanel
         token={token}
         reference={request.reference}
@@ -61,15 +82,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         neededBy={request.neededBy ? request.neededBy.toISOString() : null}
       />
 
-      <div className="pt-6 border-t border-line space-y-4">
-        {/* Status right where staff write to the client - so nobody asks the
-            customer "is it approved?" when the answer is on screen. */}
-        <DesignProgress
-          status={request.status}
-          orderStatus={linkedOrder?.status}
-          orderReference={linkedOrder?.reference}
-          printFileVerified={Boolean(linkedOrder?.printFileVerifiedAt)}
-        />
+      <div className="pt-6 border-t border-line">
         <DesignMessages token={token} role="designer" initialMessages={request.messages ?? []} status={request.status} />
       </div>
 
@@ -94,22 +107,10 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         </div>
       )}
 
-      {linkedOrder && linkedRoster.length > 0 && (
-        <PrintFileQA
-          // Auth: the verify endpoint accepts the team-order's manage token.
-          // The designer reaches this page from the Discord thread (which only
-          // staff can see), so it's safe to surface the team-order token here.
-          token={linkedOrder.manageToken!}
-          rosterCount={linkedRoster.length}
-          initialPrintFileUrl={linkedOrder.printFileUrl}
-          initialResult={linkedOrder.printFileVerification ?? null}
-        />
-      )}
-
       {linkedOrder && linkedRoster.length === 0 && (
         <p className="text-sm text-muted text-center">
-          Print file QA will appear here once the team submits at least one player on their roster
-          (team order <span className="font-mono">{linkedOrder.reference}</span>).
+          Print file QA will appear at the top once the team submits at least one player on their
+          roster (team order <span className="font-mono">{linkedOrder.reference}</span>).
         </p>
       )}
     </div>
