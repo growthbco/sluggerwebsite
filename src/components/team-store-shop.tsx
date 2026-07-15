@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { RosterImport, type ImportedRow } from "@/components/roster-import";
 
 type StoreItem = {
   key: string;
@@ -105,7 +106,9 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
         // the store snapshot at checkout regardless.
         priceCents: item.priceCents + (number && item.numberAddOnCents ? item.numberAddOnCents : 0),
         size: d.size,
-        playerName: item.nameNumber ? d.playerName.trim() || undefined : undefined,
+        // On print items the name goes ON the gear; on everything else it's a
+        // tracking-only "whose is this" label.
+        playerName: d.playerName.trim() || undefined,
         playerNumber: number,
         quantity: 1,
       },
@@ -139,9 +142,47 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
     }
   }
 
+  // Whole-team import: parsed rows become one selection per item/size, with
+  // the person's name kept for tracking.
+  function importRows(rows: ImportedRow[]) {
+    const next: Selection[] = [];
+    for (const r of rows) {
+      for (const [key, size] of Object.entries(r.sizes)) {
+        const def = items.find((i) => i.key === key);
+        if (!def || !size) continue;
+        const number = r.number && (def.nameNumber || def.numberAddOnCents) ? r.number : undefined;
+        next.push({
+          key,
+          label: def.label,
+          priceCents: def.priceCents + (number && def.numberAddOnCents ? def.numberAddOnCents : 0),
+          size: def.sizes.includes(size) ? size : def.sizes[0],
+          playerName: r.name || undefined,
+          playerNumber: number,
+          quantity: 1,
+        });
+      }
+    }
+    setSelections((s) => [...s, ...next]);
+  }
+
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
-      <div className="grid sm:grid-cols-2 gap-4 content-start">
+      <div className="space-y-4">
+        <details className="bg-steel border border-brand/30 group">
+          <summary className="cursor-pointer px-4 py-3 list-none flex items-center justify-between">
+            <span className="display text-sm text-foreground">⚡ Ordering for the whole team? Paste your list</span>
+            <span className="text-brand transition-transform group-open:rotate-45">+</span>
+          </summary>
+          <div className="px-4 pb-4">
+            <RosterImport
+              itemKeys={items.map((i) => i.key)}
+              itemDefs={items.map((i) => ({ key: i.key, label: i.label, sizes: i.sizes }))}
+              confirmLabel={undefined}
+              onConfirm={importRows}
+            />
+          </div>
+        </details>
+        <div className="grid sm:grid-cols-2 gap-4 content-start">
         {items.map((item) => {
           const d = draft(item.key, item.sizes);
           return (
@@ -187,14 +228,26 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
                     />
                   </div>
                 )}
-                {!item.nameNumber && item.numberAddOnCents ? (
-                  <input
-                    value={d.playerNumber}
-                    onChange={(e) => setDraft(item.key, { playerNumber: e.target.value.replace(/[^0-9]/g, "").slice(0, 4) })}
-                    placeholder={`# on back (+${money(item.numberAddOnCents)})`}
-                    maxLength={4}
-                    className="w-full bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-                  />
+                {!item.nameNumber ? (
+                  <div className="flex gap-2">
+                    <input
+                      value={d.playerName}
+                      onChange={(e) => setDraft(item.key, { playerName: e.target.value })}
+                      placeholder="Who's it for? (not printed)"
+                      maxLength={30}
+                      className="flex-1 min-w-0 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                    />
+                    {item.numberAddOnCents ? (
+                      <input
+                        value={d.playerNumber}
+                        onChange={(e) => setDraft(item.key, { playerNumber: e.target.value.replace(/[^0-9]/g, "").slice(0, 4) })}
+                        placeholder={`# +${money(item.numberAddOnCents)}`}
+                        maxLength={4}
+                        className="w-20 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                        title={`Number on the back (+${money(item.numberAddOnCents)})`}
+                      />
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
 
@@ -208,6 +261,7 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
             </div>
           );
         })}
+        </div>
       </div>
 
       <aside className="lg:sticky lg:top-24 h-fit bg-steel border border-line p-5">

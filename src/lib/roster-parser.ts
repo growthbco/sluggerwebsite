@@ -15,18 +15,31 @@ export type ParsedRosterRow = {
   notes?: string;
 };
 
+export type ParseItemDef = { key: string; label: string; sizes: string[] };
+
 export async function parseRoster(input: {
   text?: string;
   image?: { mime: string; base64: string };
   itemKeys: string[];
+  /** Explicit item definitions (e.g. store items like hats). Falls back to
+   *  the team-order item types when absent. */
+  itemDefs?: ParseItemDef[];
 }): Promise<ParsedRosterRow[]> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY is not configured");
   if (!input.text && !input.image) throw new Error("Nothing to parse");
 
-  const items = input.itemKeys.length ? input.itemKeys : ["jersey"];
-  const sizeRules = items
-    .map((k) => `  - "${k}" (${itemLabel(k)}): allowed sizes are exactly: ${sizesFor(k).join(", ")}`)
+  const defs: ParseItemDef[] =
+    input.itemDefs?.length
+      ? input.itemDefs
+      : (input.itemKeys.length ? input.itemKeys : ["jersey"]).map((k) => ({
+          key: k,
+          label: itemLabel(k),
+          sizes: sizesFor(k),
+        }));
+  const items = defs.map((d) => d.key);
+  const sizeRules = defs
+    .map((d) => `  - "${d.key}" (${d.label}): allowed sizes are exactly: ${d.sizes.join(", ")}`)
     .join("\n");
 
   const prompt = [

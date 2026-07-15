@@ -108,6 +108,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         unitCents += def.numberAddOnCents;
       }
     }
+    // Tracking-only name on non-print items ("whose hat is this") - labeled so
+    // production knows it does NOT print.
+    if (!def.nameNumber) {
+      const nm = (item.playerName ?? "").trim().slice(0, 30);
+      if (nm) details.push(`(for ${nm} - not printed)`);
+    }
     totalOz += def.weightOz * qty;
     lineItems.push({
       quantity: qty,

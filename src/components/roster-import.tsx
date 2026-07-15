@@ -12,15 +12,22 @@ export type ImportedRow = {
 
 /** AI roster import: paste text or add a photo, review the parsed rows, then
  *  confirm. The AI only fills the preview - the coach always approves. */
+export type ImportItemDef = { key: string; label: string; sizes: string[] };
+
 export function RosterImport({
   itemKeys,
+  itemDefs,
   onConfirm,
   confirmLabel,
 }: {
   itemKeys: string[];
+  /** Explicit item definitions (store items). Defaults to team-order types. */
+  itemDefs?: ImportItemDef[];
   onConfirm: (rows: ImportedRow[]) => Promise<void> | void;
   confirmLabel?: string;
 }) {
+  const defs: ImportItemDef[] =
+    itemDefs ?? itemKeys.map((k) => ({ key: k, label: itemLabel(k), sizes: sizesFor(k) }));
   const [text, setText] = useState("");
   const [fileName, setFileName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -34,7 +41,8 @@ export function RosterImport({
     try {
       const form = new FormData();
       form.set("text", text);
-      form.set("items", JSON.stringify(itemKeys));
+      form.set("items", JSON.stringify(defs.map((d) => d.key)));
+      if (itemDefs) form.set("itemDefs", JSON.stringify(itemDefs));
       const file = fileRef.current?.files?.[0];
       if (file) form.set("image", file);
       const res = await fetch("/api/roster/parse", { method: "POST", body: form });
@@ -140,20 +148,20 @@ export function RosterImport({
                   placeholder="#"
                   className="w-14 bg-steel border border-line px-2 py-1.5 text-sm text-foreground"
                 />
-                {itemKeys.map((k) => {
-                  const allowed = sizesFor(k);
-                  const val = r.sizes[k] ?? "";
+                {defs.map((def) => {
+                  const allowed = def.sizes;
+                  const val = r.sizes[def.key] ?? "";
                   return (
                     <select
-                      key={k}
+                      key={def.key}
                       value={val}
-                      onChange={(e) => updateSize(i, k, e.target.value)}
-                      title={itemLabel(k)}
+                      onChange={(e) => updateSize(i, def.key, e.target.value)}
+                      title={def.label}
                       className={`bg-steel border px-2 py-1.5 text-sm ${
                         val && !allowed.includes(val) ? "border-amber-500 text-amber-400" : "border-line text-foreground"
                       }`}
                     >
-                      <option value="">{itemLabel(k)}: -</option>
+                      <option value="">{def.label}: -</option>
                       {val && !allowed.includes(val) && <option value={val}>⚠ {val}</option>}
                       {allowed.map((s) => (
                         <option key={s} value={s}>

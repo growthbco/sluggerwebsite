@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { parseRoster } from "@/lib/roster-parser";
+import { parseRoster, type ParseItemDef } from "@/lib/roster-parser";
 
 export const runtime = "nodejs";
 
@@ -11,6 +11,7 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 export async function POST(req: Request) {
   let text = "";
   let itemKeys: string[] = ["jersey"];
+  let itemDefs: ParseItemDef[] | undefined;
   let image: { mime: string; base64: string } | undefined;
 
   try {
@@ -19,6 +20,15 @@ export async function POST(req: Request) {
     try {
       const items = JSON.parse(String(form.get("items") ?? "[]"));
       if (Array.isArray(items) && items.length) itemKeys = items.map(String).slice(0, 10);
+    } catch {}
+    try {
+      const defs = JSON.parse(String(form.get("itemDefs") ?? "null"));
+      if (Array.isArray(defs) && defs.length) {
+        itemDefs = defs
+          .filter((d) => d?.key && d?.label && Array.isArray(d?.sizes))
+          .slice(0, 15)
+          .map((d) => ({ key: String(d.key), label: String(d.label).slice(0, 60), sizes: d.sizes.map(String).slice(0, 30) }));
+      }
     } catch {}
     const file = form.get("image");
     if (file instanceof File && file.size > 0) {
@@ -40,7 +50,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const rows = await parseRoster({ text: text.trim() || undefined, image, itemKeys });
+    const rows = await parseRoster({ text: text.trim() || undefined, image, itemKeys, itemDefs });
     if (rows.length === 0) {
       return NextResponse.json({ error: "Couldn't find any players in that - try a clearer photo or paste the list as text." }, { status: 422 });
     }

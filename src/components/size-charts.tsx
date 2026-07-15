@@ -27,7 +27,7 @@ export const FITTED_HATS = [
   ["L/XL", '7 3/8" - 7 7/8"', '7 3/8" - 8"'],
   ["XXL", '7 7/8" - 8 1/4"', "-"],
 ];
-export const FITTED_HAT_HEADERS = ["Size", "Flexfit", "Pacific Headwear"];
+export const FITTED_HAT_HEADERS = ["Size", "Cap America", "Pacific Headwear"];
 
 export function ChartTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
   return (
@@ -80,10 +80,14 @@ export function AllSizeCharts() {
         </div>
       </section>
       <section>
-        <h3 className="display text-lg text-foreground">Fitted Hats</h3>
-        <div className="mt-3 max-w-md">
+        <h3 className="display text-lg text-foreground">Hats</h3>
+        <p className="mt-2 text-foreground">
+          🧢 <strong>Snapback Hats: one size fits most</strong>{" "}
+          <span className="text-muted">- adjustable, no size to pick.</span>
+        </p>
+        <p className="mt-3 text-sm text-muted">Fitted hats by hat size:</p>
+        <div className="mt-2 max-w-md">
           <ChartTable headers={FITTED_HAT_HEADERS} rows={FITTED_HATS} />
-          <p className="mt-2 text-xs text-muted">Snapbacks are one-size adjustable.</p>
         </div>
       </section>
       <section>
