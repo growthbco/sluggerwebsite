@@ -133,7 +133,8 @@ export async function getLinkedDesignPreview(designRequestId: string | null | un
     reference: d.reference,
     status: d.status,
     imageUrl: approved ?? latestProof,
-    pending: d.status !== "approved",
+    // "ordered" comes AFTER approval - it's still an approved design.
+    pending: d.status !== "approved" && d.status !== "ordered",
   };
 }
 

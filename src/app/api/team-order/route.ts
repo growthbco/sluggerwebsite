@@ -98,9 +98,11 @@ export async function POST(req: Request) {
       }
     }
 
-    // 2. Notify (never the source of truth).
-    const posted = await postTeamOrderToDiscord({
-      reference: created.reference,
+    // 2. Notify (never the source of truth). Linked orders post into the
+    // design's existing thread so the whole project stays in one place.
+    const posted = await postTeamOrderToDiscord(
+      {
+        reference: created.reference,
       teamName,
       contactName,
       contactEmail,
@@ -108,14 +110,16 @@ export async function POST(req: Request) {
       jerseyStyle: body.jerseyStyle,
       jerseyMaterial: body.jerseyMaterial,
       items,
-      roster: roster.map((r) => ({
-        name: r.name,
-        number: r.number,
-        size: r.sizes?.jersey ?? r.size,
-        sizes: r.sizes,
-        notes: r.notes,
-      })),
-    });
+        roster: roster.map((r) => ({
+          name: r.name,
+          number: r.number,
+          size: r.sizes?.jersey ?? r.size,
+          sizes: r.sizes,
+          notes: r.notes,
+        })),
+      },
+      { designThreadId: design?.discordThreadId },
+    );
 
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     return NextResponse.json({

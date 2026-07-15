@@ -13,6 +13,8 @@ import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
 import { AdminArchiveButton } from "@/components/admin-archive-button";
 import { AdminLocalToggle } from "@/components/admin-local-toggle";
+import { AdminNewStore } from "@/components/admin-new-store";
+import { STORE_ITEM_PRESETS } from "@/lib/team-stores";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -379,7 +381,17 @@ export default async function AdminPage() {
 
       <div className="mt-10 grid gap-10 lg:grid-cols-2">
         <section>
-          <h2 className="display text-xl text-foreground">Team stores ({stores.length})</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="display text-xl text-foreground">Team stores ({stores.length})</h2>
+          </div>
+          <details className="mt-3 group">
+            <summary className="cursor-pointer text-xs display text-brand hover:underline list-none">
+              ➕ Open a standalone store (no design needed)
+            </summary>
+            <AdminNewStore
+              presets={STORE_ITEM_PRESETS.map((p) => ({ key: p.key, label: p.label, priceCents: p.priceCents }))}
+            />
+          </details>
           <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
             {stores.length === 0 && <p className="px-3 py-3 text-sm text-muted">No stores yet.</p>}
             {stores.map((s) => (

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { getByManageToken, getRoster, submitTeamOrder } from "@/lib/team-orders";
 import { postTeamOrderToDiscord } from "@/lib/discord";
-import { markOrdered } from "@/lib/design-requests";
+import { markOrdered, getById } from "@/lib/design-requests";
 
 export const runtime = "nodejs";
 
@@ -27,23 +27,29 @@ export async function POST(_req: Request, { params }: { params: Promise<{ token:
 
   try {
     await submitTeamOrder(order.id);
-    await postTeamOrderToDiscord({
-      reference: order.reference,
-      teamName: order.teamName,
-      contactName: order.contactName,
-      contactEmail: order.contactEmail ?? undefined,
-      contactPhone: order.contactPhone ?? undefined,
-      jerseyStyle: order.jerseyStyle ?? undefined,
-      jerseyMaterial: order.jerseyMaterial ?? undefined,
-      items: order.items ?? ["jersey"],
-      roster: roster.map((r) => ({
-        name: r.playerName ?? undefined,
-        number: r.playerNumber ?? undefined,
-        size: r.size ?? undefined,
-        sizes: r.sizes ?? undefined,
-        notes: r.notes ?? undefined,
-      })),
-    });
+    // Linked orders post into the design's existing thread (one project, one
+    // thread); standalone orders go to #team-orders.
+    const design = order.designRequestId ? await getById(order.designRequestId) : null;
+    await postTeamOrderToDiscord(
+      {
+        reference: order.reference,
+        teamName: order.teamName,
+        contactName: order.contactName,
+        contactEmail: order.contactEmail ?? undefined,
+        contactPhone: order.contactPhone ?? undefined,
+        jerseyStyle: order.jerseyStyle ?? undefined,
+        jerseyMaterial: order.jerseyMaterial ?? undefined,
+        items: order.items ?? ["jersey"],
+        roster: roster.map((r) => ({
+          name: r.playerName ?? undefined,
+          number: r.playerNumber ?? undefined,
+          size: r.size ?? undefined,
+          sizes: r.sizes ?? undefined,
+          notes: r.notes ?? undefined,
+        })),
+      },
+      { designThreadId: design?.discordThreadId },
+    );
     // If this team order is linked to a design request, flip the design to
     // "ordered" so the funnel reflects the linked outcome.
     if (order.designRequestId) {

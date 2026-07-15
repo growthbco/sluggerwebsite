@@ -98,14 +98,20 @@ type TeamOrderPayload = {
   roster: RosterRow[];
 };
 
-/** Announce an invoice payment in the #team-orders channel. */
+/** Announce an invoice payment - into the design's thread when linked,
+ *  otherwise the #team-orders channel. */
 export async function postTeamOrderPaidToDiscord(args: {
   reference: string;
   teamName: string;
   totalCents: number;
   stage?: "deposit" | "balance";
+  designThreadId?: string | null;
 }): Promise<boolean> {
-  const url = process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
+  const designUrl = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
+  const url =
+    args.designThreadId && designUrl
+      ? `${designUrl}?thread_id=${args.designThreadId}`
+      : process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
   if (!url) return false;
   const amt = `$${(args.totalCents / 100).toFixed(2)}`;
   const isDeposit = args.stage === "deposit";
@@ -129,9 +135,18 @@ export async function postTeamOrderPaidToDiscord(args: {
   });
 }
 
-/** Post a team order's roster (no pricing) to the #team-orders channel. */
-export async function postTeamOrderToDiscord(order: TeamOrderPayload): Promise<boolean> {
-  const url = process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
+/** Post a team order's roster (no pricing). Linked orders land INSIDE the
+ *  design's existing thread so a project's whole story lives in one place;
+ *  standalone orders go to the #team-orders channel. */
+export async function postTeamOrderToDiscord(
+  order: TeamOrderPayload,
+  opts: { designThreadId?: string | null } = {},
+): Promise<boolean> {
+  const designUrl = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
+  const useDesignThread = Boolean(opts.designThreadId && designUrl);
+  const url = useDesignThread
+    ? `${designUrl}?thread_id=${opts.designThreadId}`
+    : process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
   if (!url) {
     console.warn("DISCORD_TEAM_ORDERS_WEBHOOK_URL not set - skipping team-order Discord post");
     return false;
@@ -175,9 +190,9 @@ export async function postTeamOrderToDiscord(order: TeamOrderPayload): Promise<b
     embeds: [{ title: `📋 ${order.teamName}`, color: GOLD, fields, timestamp: new Date().toISOString() }],
   };
 
-  // When #team-orders is a Forum channel, give each order its own thread so the
-  // mockup → approval back-and-forth lives in one place.
-  if (process.env.DISCORD_TEAM_ORDERS_FORUM === "true") {
+  // Standalone orders in a Forum #team-orders channel get their own thread;
+  // linked orders are already targeting the design thread via ?thread_id.
+  if (!useDesignThread && process.env.DISCORD_TEAM_ORDERS_FORUM === "true") {
     body.thread_name = `${order.teamName} (${order.reference})`.slice(0, 100);
   }
 

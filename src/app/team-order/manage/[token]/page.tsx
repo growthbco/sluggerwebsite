@@ -34,16 +34,24 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
       {design?.imageUrl && (
         <section className="rounded-xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
           <div className="flex flex-col sm:flex-row">
-            <div className="sm:w-56 aspect-[4/3] sm:aspect-auto sm:h-44 relative bg-black/5 shrink-0">
+            {/* Click-through to full size - the inline preview is small. */}
+            <a
+              href={design.imageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Click to view full size"
+              className="sm:w-72 aspect-[4/3] sm:aspect-auto sm:h-56 relative bg-white shrink-0 block hover:opacity-90 transition-opacity"
+            >
               <Image
                 src={design.imageUrl}
                 alt={`${order.teamName} approved design`}
                 fill
-                sizes="(max-width: 640px) 100vw, 224px"
-                className="object-contain"
+                sizes="(max-width: 640px) 100vw, 288px"
+                className="object-contain p-1"
                 unoptimized
               />
-            </div>
+              <span className="absolute bottom-1 right-1 text-[10px] bg-ink/80 text-foreground px-1.5 py-0.5">🔍 enlarge</span>
+            </a>
             <div className="px-4 py-3 flex-1">
               <p className="text-xs text-muted uppercase tracking-wider">
                 {design.pending ? "Latest proof (pending approval)" : "Approved design"}

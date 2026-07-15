@@ -67,7 +67,9 @@ export async function createTeamStore(input: {
   sport?: string | null;
   contactEmail?: string | null;
   approvedDesignUrl?: string | null;
-  designRequestId: string;
+  /** Optional: standalone stores (repeat customers, hat-only orders) have no
+   *  design request in the system. */
+  designRequestId?: string;
   itemKeys: string[];
   /** Ocala league-family team: round-neck jerseys snapshot at $25. */
   localPricing?: boolean;
@@ -75,12 +77,14 @@ export async function createTeamStore(input: {
   const db = getDb();
 
   // One store per design: reuse if it already exists.
-  const [existing] = await db
-    .select()
-    .from(teams)
-    .where(eq(teams.designRequestId, input.designRequestId))
-    .limit(1);
-  if (existing) return existing;
+  if (input.designRequestId) {
+    const [existing] = await db
+      .select()
+      .from(teams)
+      .where(eq(teams.designRequestId, input.designRequestId))
+      .limit(1);
+    if (existing) return existing;
+  }
 
   const items = STORE_ITEM_PRESETS.filter((p) => input.itemKeys.includes(p.key)).map((p) =>
     input.localPricing && p.key === "round_neck_jersey" ? { ...p, priceCents: 2500 } : p,

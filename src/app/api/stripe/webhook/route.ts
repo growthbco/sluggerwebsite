@@ -94,11 +94,14 @@ export async function POST(req: Request) {
         const { markAddonPaid } = await import("@/lib/team-order-addons");
         const result = await markAddonPaid(session.metadata.addonId, session.id);
         if (result) {
+          const { getById } = await import("@/lib/design-requests");
+          const design = result.order.designRequestId ? await getById(result.order.designRequestId) : null;
           await postTeamOrderPaidToDiscord({
             reference: `${result.order.reference} ADD-ON`,
             teamName: `➕ ${result.order.teamName} — ${result.summary}`,
             totalCents: session.amount_total ?? 0,
             stage: "balance",
+            designThreadId: design?.discordThreadId,
           });
           const buyerEmail = session.customer_details?.email ?? result.order.contactEmail;
           if (buyerEmail) {
@@ -165,13 +168,20 @@ export async function POST(req: Request) {
                 },
           )
           .where(eq(teamOrders.id, session.metadata.teamOrderId))
-          .returning({ reference: teamOrders.reference, teamName: teamOrders.teamName });
+          .returning({
+            reference: teamOrders.reference,
+            teamName: teamOrders.teamName,
+            designRequestId: teamOrders.designRequestId,
+          });
         if (row) {
+          const { getById } = await import("@/lib/design-requests");
+          const design = row.designRequestId ? await getById(row.designRequestId) : null;
           await postTeamOrderPaidToDiscord({
             reference: row.reference,
             teamName: row.teamName,
             totalCents: session.amount_total ?? 0,
             stage: isDeposit ? "deposit" : "balance",
+            designThreadId: design?.discordThreadId,
           });
         }
         // The deposit and pay-in-full links are siblings: paying one kills the
