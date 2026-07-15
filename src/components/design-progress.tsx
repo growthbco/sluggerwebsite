@@ -103,7 +103,13 @@ export function DesignProgress({
       {orderStatus && (
         <p className="mt-2 text-xs text-foreground">
           🧾 Team order{orderReference ? ` ${orderReference}` : ""}:{" "}
-          <strong className="text-brand">{ORDER_LABELS[orderStatus] ?? orderStatus}</strong>
+          <strong className="text-brand">
+            {orderStatus === "submitted" && !printFileVerified
+              ? "Roster submitted - print file QA is the next step"
+              : orderStatus === "submitted" && printFileVerified
+              ? "Print file verified - ready to send the deposit invoice"
+              : ORDER_LABELS[orderStatus] ?? orderStatus}
+          </strong>
         </p>
       )}
       {(status === "approved" || status === "ordered") && !orderStatus && (
