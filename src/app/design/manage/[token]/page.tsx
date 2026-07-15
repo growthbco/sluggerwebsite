@@ -68,6 +68,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
           status={request.status}
           orderStatus={linkedOrder?.status}
           orderReference={linkedOrder?.reference}
+          printFileVerified={Boolean(linkedOrder?.printFileVerifiedAt)}
         />
         <DesignMessages token={token} role="designer" initialMessages={request.messages ?? []} status={request.status} />
       </div>

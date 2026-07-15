@@ -7,7 +7,8 @@ const DESIGN_STEPS = [
   { key: "in_design", label: "In Design" },
   { key: "proof_sent", label: "Proof Sent" },
   { key: "approved", label: "APPROVED" },
-  { key: "ordered", label: "Ordered" },
+  { key: "roster_in", label: "Roster In" },
+  { key: "print_qa", label: "Print File QA" },
 ];
 
 const ORDER_LABELS: Record<string, string> = {
@@ -25,10 +26,12 @@ export function DesignProgress({
   status,
   orderStatus,
   orderReference,
+  printFileVerified,
 }: {
   status: string;
   orderStatus?: string | null;
   orderReference?: string | null;
+  printFileVerified?: boolean;
 }) {
   if (status === "cancelled") {
     return (
@@ -40,7 +43,20 @@ export function DesignProgress({
 
   // changes_requested is a loop back to the designer between proof and approval.
   const effective = status === "changes_requested" ? "proof_sent" : status === "pending_payment" ? "submitted" : status;
-  const currentIdx = Math.max(0, DESIGN_STEPS.findIndex((s) => s.key === effective));
+  const rosterIn = Boolean(orderStatus && !["draft", "collecting", "cancelled"].includes(orderStatus));
+
+  // The last two steps are operational, not design-status driven: the roster
+  // landing, then the print file passing AI verification before production.
+  let currentIdx: number;
+  if (printFileVerified) {
+    currentIdx = DESIGN_STEPS.length; // everything done
+  } else if (rosterIn) {
+    currentIdx = 5; // waiting on print file + QA
+  } else if (effective === "ordered" || effective === "approved") {
+    currentIdx = 4; // approved; waiting on the roster
+  } else {
+    currentIdx = Math.max(0, DESIGN_STEPS.findIndex((s) => s.key === effective));
+  }
 
   return (
     <div className="bg-steel border border-line p-4">
@@ -76,13 +92,21 @@ export function DesignProgress({
       {status === "pending_payment" && (
         <p className="mt-2 text-xs text-amber-400">⏳ Waiting on the design fee before work starts.</p>
       )}
-      {(status === "approved" || status === "ordered") && orderStatus && (
+      {rosterIn && !printFileVerified && (
+        <p className="mt-2 text-xs text-amber-400">
+          🖨 Next: upload the print file below - the AI check against the roster must pass before production.
+        </p>
+      )}
+      {printFileVerified && (
+        <p className="mt-2 text-xs text-green-400">✓ Print file verified against the roster - clear for production.</p>
+      )}
+      {orderStatus && (
         <p className="mt-2 text-xs text-foreground">
           🧾 Team order{orderReference ? ` ${orderReference}` : ""}:{" "}
           <strong className="text-brand">{ORDER_LABELS[orderStatus] ?? orderStatus}</strong>
         </p>
       )}
-      {status === "approved" && !orderStatus && (
+      {(status === "approved" || status === "ordered") && !orderStatus && (
         <p className="mt-2 text-xs text-foreground">
           ✅ Design is <strong className="text-green-400">APPROVED</strong> - no team order started yet.
         </p>
