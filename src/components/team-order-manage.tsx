@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { itemLabel, sizesFor } from "@/lib/order-items";
+import { itemLabel, sizesFor, JERSEY_MATERIALS } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 
 type RosterRow = {
@@ -19,6 +19,7 @@ type Props = {
   reference: string;
   teamName: string;
   jerseyStyle: string | null;
+  jerseyMaterial: string | null;
   items: string[];
   shareUrl: string;
   roster: RosterRow[];
@@ -35,7 +36,10 @@ function rowSizes(r: RosterRow, items: string[]): string {
     .join(" · ");
 }
 
-export function TeamOrderManage({ token, reference, teamName, jerseyStyle, items, shareUrl, roster, submitted }: Props) {
+export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerseyMaterial, items, shareUrl, roster, submitted }: Props) {
+  const materialLabel = jerseyMaterial
+    ? JERSEY_MATERIALS.find((m) => m.key === jerseyMaterial)?.label ?? jerseyMaterial
+    : null;
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">(submitted ? "done" : "idle");
@@ -100,7 +104,9 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, items
       <header>
         <span className="display text-brand text-sm">{teamName} · {reference}</span>
         <h1 className="display text-3xl sm:text-4xl text-foreground mt-1">Manage Team Order</h1>
-        {jerseyStyle && <p className="text-muted mt-1">{jerseyStyle}</p>}
+        {(jerseyStyle || materialLabel) && (
+          <p className="text-muted mt-1">{[jerseyStyle, materialLabel].filter(Boolean).join(" · ")}</p>
+        )}
       </header>
 
       {/* Share link */}

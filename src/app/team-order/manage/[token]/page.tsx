@@ -71,6 +71,7 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
         reference={order.reference}
         teamName={order.teamName}
         jerseyStyle={order.jerseyStyle}
+        jerseyMaterial={order.jerseyMaterial}
         items={order.items ?? ["jersey"]}
         shareUrl={shareUrl}
         roster={roster.map((r) => ({
