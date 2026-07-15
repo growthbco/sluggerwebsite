@@ -19,6 +19,15 @@ export const PANTS_ADULT = [
 export const PANTS_YOUTH = [
   ["S", "23-25", "26"], ["M", "25-27", "26.5"], ["L", "27-29", "27"], ["XL", "29-31", "27.5"],
 ];
+// Fitted hats: hat-size ranges for the two cap brands we use. We match the
+// brand to the team's design, so both are listed.
+export const FITTED_HATS = [
+  ["XS", '6 1/2" - 6 7/8"', '6 3/8" - 6 7/8"'],
+  ["S/M", '7" - 7 3/8"', '6 7/8" - 7 1/4"'],
+  ["L/XL", '7 3/8" - 7 7/8"', '7 3/8" - 8"'],
+  ["XXL", '7 7/8" - 8 1/4"', "-"],
+];
+export const FITTED_HAT_HEADERS = ["Size", "Flexfit", "Pacific Headwear"];
 
 export function ChartTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
   return (
@@ -68,6 +77,13 @@ export function AllSizeCharts() {
         <h3 className="display text-lg text-foreground">Hoodies</h3>
         <div className="mt-3 max-w-md">
           <ChartTable headers={["Size", "Width", "Length"]} rows={HOODIES} />
+        </div>
+      </section>
+      <section>
+        <h3 className="display text-lg text-foreground">Fitted Hats</h3>
+        <div className="mt-3 max-w-md">
+          <ChartTable headers={FITTED_HAT_HEADERS} rows={FITTED_HATS} />
+          <p className="mt-2 text-xs text-muted">Snapbacks are one-size adjustable.</p>
         </div>
       </section>
       <section>

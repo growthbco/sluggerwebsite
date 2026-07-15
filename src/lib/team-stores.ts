@@ -35,7 +35,8 @@ export const STORE_ITEM_PRESETS: StoreItem[] = [
   { key: "knickers", label: "Knickers", priceCents: 4000, sizes: APPAREL_SIZES, weightOz: 14 },
   { key: "shorts", label: "Shorts", priceCents: 2500, sizes: APPAREL_SIZES, weightOz: 10 },
   { key: "socks", label: "Custom Socks", priceCents: 1500, sizes: SOCK_SIZES, weightOz: 3 },
-  { key: "fitted_hat", label: "Fitted Hat", priceCents: 3000, sizes: ["S/M", "L/XL"], weightOz: 5, numberAddOnCents: 500 },
+  // Flexfit i8503 size range.
+  { key: "fitted_hat", label: "Fitted Hat", priceCents: 3000, sizes: ["XS", "S/M", "L/XL", "XXL"], weightOz: 5, numberAddOnCents: 500 },
   { key: "snapback_hat", label: "Snapback Hat", priceCents: 2500, sizes: ["One Size"], weightOz: 5, numberAddOnCents: 500 },
 ];
 

@@ -9,6 +9,8 @@ import {
   HOODIES,
   PANTS_ADULT,
   PANTS_YOUTH,
+  FITTED_HATS,
+  FITTED_HAT_HEADERS,
 } from "@/components/size-charts";
 
 export const metadata: Metadata = {
@@ -62,6 +64,14 @@ export default function SizeGuidePage() {
           <h2 className="display text-2xl text-foreground">Hoodies</h2>
           <div className="mt-4 max-w-md">
             <ChartTable headers={["Size", "Width", "Length"]} rows={HOODIES} />
+          </div>
+        </section>
+
+        <section>
+          <h2 className="display text-2xl text-foreground">Fitted Hats</h2>
+          <div className="mt-4 max-w-md">
+            <ChartTable headers={FITTED_HAT_HEADERS} rows={FITTED_HATS} />
+            <p className="mt-2 text-sm text-muted">Snapbacks are one-size adjustable.</p>
           </div>
         </section>
 
