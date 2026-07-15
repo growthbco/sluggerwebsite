@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
 import { getByManageToken, MAX_REVISIONS } from "@/lib/design-requests";
 import { getByDesignRequestId, getRoster } from "@/lib/team-orders";
+import { JERSEY_MATERIALS, itemLabel } from "@/lib/order-items";
 import { getStoreByDesignRequestId, STORE_ITEM_PRESETS } from "@/lib/team-stores";
 import { DesignManagePanel } from "@/components/design-manage-panel";
 import { DesignMessages } from "@/components/design-messages";
@@ -49,6 +50,19 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         status={request.status}
         orderStatus={linkedOrder?.status}
         orderReference={linkedOrder?.reference}
+        orderSpec={
+          linkedOrder
+            ? [
+                linkedOrder.jerseyStyle,
+                linkedOrder.jerseyMaterial
+                  ? JERSEY_MATERIALS.find((m) => m.key === linkedOrder.jerseyMaterial)?.label ?? linkedOrder.jerseyMaterial
+                  : null,
+                (linkedOrder.items ?? []).map(itemLabel).join(" + "),
+              ]
+                .filter(Boolean)
+                .join(" · ")
+            : null
+        }
         printFileVerified={Boolean(linkedOrder?.printFileVerifiedAt)}
       />
 

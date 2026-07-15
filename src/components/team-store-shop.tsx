@@ -229,25 +229,32 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
                   </div>
                 )}
                 {!item.nameNumber ? (
-                  <div className="flex gap-2">
-                    <input
-                      value={d.playerName}
-                      onChange={(e) => setDraft(item.key, { playerName: e.target.value })}
-                      placeholder="Who's it for? (not printed)"
-                      maxLength={30}
-                      className="flex-1 min-w-0 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-                    />
-                    {item.numberAddOnCents ? (
+                  <>
+                    <div className="flex gap-2">
                       <input
-                        value={d.playerNumber}
-                        onChange={(e) => setDraft(item.key, { playerNumber: e.target.value.replace(/[^0-9]/g, "").slice(0, 4) })}
-                        placeholder={`# +${money(item.numberAddOnCents)}`}
-                        maxLength={4}
-                        className="w-20 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-                        title={`Number on the back (+${money(item.numberAddOnCents)})`}
+                        value={d.playerName}
+                        onChange={(e) => setDraft(item.key, { playerName: e.target.value })}
+                        placeholder="Optional: who's this for?"
+                        maxLength={30}
+                        className="flex-1 min-w-0 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
                       />
-                    ) : null}
-                  </div>
+                      {item.numberAddOnCents ? (
+                        <input
+                          value={d.playerNumber}
+                          onChange={(e) => setDraft(item.key, { playerNumber: e.target.value.replace(/[^0-9]/g, "").slice(0, 4) })}
+                          placeholder="#"
+                          maxLength={4}
+                          className="w-16 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                        />
+                      ) : null}
+                    </div>
+                    <p className="text-xs text-muted">
+                      Name is just so you know whose it is - it won&apos;t be printed.
+                      {item.numberAddOnCents
+                        ? ` Want a number embroidered on the back? Enter it in the # box (+${money(item.numberAddOnCents)}). Leave blank for none.`
+                        : ""}
+                    </p>
+                  </>
                 ) : null}
               </div>
 

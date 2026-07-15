@@ -26,11 +26,14 @@ export function DesignProgress({
   status,
   orderStatus,
   orderReference,
+  orderSpec,
   printFileVerified,
 }: {
   status: string;
   orderStatus?: string | null;
   orderReference?: string | null;
+  /** What's being made: jersey style, material, items. */
+  orderSpec?: string | null;
   printFileVerified?: boolean;
 }) {
   if (status === "cancelled") {
@@ -99,6 +102,11 @@ export function DesignProgress({
       )}
       {printFileVerified && (
         <p className="mt-2 text-xs text-green-400">✓ Print file verified against the roster - clear for production.</p>
+      )}
+      {orderSpec && (
+        <p className="mt-2 text-xs text-foreground">
+          👕 Making: <strong className="text-brand">{orderSpec}</strong>
+        </p>
       )}
       {orderStatus && (
         <p className="mt-2 text-xs text-foreground">
