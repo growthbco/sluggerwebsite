@@ -225,6 +225,7 @@ export const teams = pgTable(
         priceCents: number;
         sizes: string[];
         nameNumber?: boolean;
+        numberAddOnCents?: number;
         weightOz: number;
       }>
     >(),

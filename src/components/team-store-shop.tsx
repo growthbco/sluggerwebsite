@@ -8,6 +8,7 @@ type StoreItem = {
   priceCents: number;
   sizes: string[];
   nameNumber?: boolean;
+  numberAddOnCents?: number;
   weightOz: number;
 };
 
@@ -94,15 +95,18 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
 
   function add(item: StoreItem) {
     const d = draft(item.key, item.sizes);
+    const number = (item.nameNumber || item.numberAddOnCents) && d.playerNumber.trim() ? d.playerNumber.trim() : undefined;
     setSelections((s) => [
       ...s,
       {
         key: item.key,
         label: item.label,
-        priceCents: item.priceCents,
+        // Number-on-hat upcharge shown at add time; the server re-prices from
+        // the store snapshot at checkout regardless.
+        priceCents: item.priceCents + (number && item.numberAddOnCents ? item.numberAddOnCents : 0),
         size: d.size,
         playerName: item.nameNumber ? d.playerName.trim() || undefined : undefined,
-        playerNumber: item.nameNumber ? d.playerNumber.trim() || undefined : undefined,
+        playerNumber: number,
         quantity: 1,
       },
     ]);
@@ -183,6 +187,15 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
                     />
                   </div>
                 )}
+                {!item.nameNumber && item.numberAddOnCents ? (
+                  <input
+                    value={d.playerNumber}
+                    onChange={(e) => setDraft(item.key, { playerNumber: e.target.value.replace(/[^0-9]/g, "").slice(0, 4) })}
+                    placeholder={`# on back (+${money(item.numberAddOnCents)})`}
+                    maxLength={4}
+                    className="w-full bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                  />
+                ) : null}
               </div>
 
               <button

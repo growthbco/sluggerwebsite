@@ -27,8 +27,8 @@ export const PRICE_LIST: PriceGroup[] = [
   {
     group: "Headwear",
     rows: [
-      { item: "Fitted Hat", priceCents: 3000, note: "Custom embroidered" },
-      { item: "Snapback Hat", priceCents: 2500, note: "Custom embroidered" },
+      { item: "Fitted Hat", priceCents: 3000, note: "Custom embroidered - add a number on the back for $5" },
+      { item: "Snapback Hat", priceCents: 2500, note: "Custom embroidered - add a number on the back for $5" },
     ],
   },
   {

@@ -93,18 +93,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     const qty = Math.max(1, Math.min(99, Number(item.quantity) || 1));
     const size = def.sizes.includes(item.size ?? "") ? item.size : def.sizes[0];
     const details = [size];
+    let unitCents = def.priceCents;
     if (def.nameNumber) {
       const nm = (item.playerName ?? "").trim().slice(0, 30);
       const num = (item.playerNumber ?? "").trim().slice(0, 4);
       if (nm) details.push(nm.toUpperCase());
       if (num) details.push(`#${num}`);
     }
+    // Number-on-back upcharge (hats): priced from the store snapshot.
+    if (def.numberAddOnCents && !def.nameNumber) {
+      const num = (item.playerNumber ?? "").trim().replace(/[^0-9]/g, "").slice(0, 4);
+      if (num) {
+        details.push(`#${num} on back`);
+        unitCents += def.numberAddOnCents;
+      }
+    }
     totalOz += def.weightOz * qty;
     lineItems.push({
       quantity: qty,
       price_data: {
         currency: "usd",
-        unit_amount: def.priceCents,
+        unit_amount: unitCents,
         product_data: { name: `${def.label} - ${details.join(" - ")}` },
       },
     });
