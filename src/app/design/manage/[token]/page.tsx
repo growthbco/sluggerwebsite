@@ -6,7 +6,7 @@ import { getStoreByDesignRequestId, STORE_ITEM_PRESETS } from "@/lib/team-stores
 import { DesignManagePanel } from "@/components/design-manage-panel";
 import { DesignMessages } from "@/components/design-messages";
 import { DesignProgress } from "@/components/design-progress";
-import { TeamStorePanel } from "@/components/team-store-panel";
+import { TeamStoreTeaser } from "@/components/team-store-teaser";
 import { PrintFileQA } from "@/components/print-file-qa";
 
 export const metadata: Metadata = { title: "Manage Design Request", robots: { index: false } };
@@ -88,21 +88,10 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
 
       {storeEligible && (
         <div className="pt-6 border-t border-line">
-          <TeamStorePanel
+          {/* Compact teaser only - the full setup lives on its own page. */}
+          <TeamStoreTeaser
             manageToken={token}
-            presets={STORE_ITEM_PRESETS.map((p) => ({ key: p.key, label: p.label, priceCents: p.priceCents }))}
-            initialStore={
-              store
-                ? {
-                    url: `${SITE}/store/${store.slug ?? store.storeToken}`,
-                    active: store.storeActive,
-                    itemLabels: (store.storeItems ?? []).map((i) => i.label),
-                    slug: store.slug ?? undefined,
-                    color: store.primaryColor,
-                    logoUrl: store.logoUrl,
-                  }
-                : null
-            }
+            store={store ? { url: `${SITE}/store/${store.slug ?? store.storeToken}`, active: store.storeActive } : null}
           />
         </div>
       )}
