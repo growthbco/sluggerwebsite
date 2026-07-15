@@ -11,12 +11,15 @@ export function AdminInvoiceButton({
   dueCents,
   stage,
   resend,
+  warnPrintFile,
 }: {
   teamOrderId: string;
   teamName: string;
   dueCents: number;
   stage: "deposit" | "balance";
   resend?: boolean;
+  /** True when this order's print file hasn't passed QA yet. */
+  warnPrintFile?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -26,7 +29,10 @@ export function AdminInvoiceButton({
 
   async function send() {
     const total = `$${(dueCents / 100).toFixed(2)}`;
-    if (!window.confirm(`Email ${teamName}'s coach the ${label} for ${total} with a Stripe payment link?`)) return;
+    const warning = warnPrintFile
+      ? `⚠️ HEADS UP: the print file for ${teamName} has NOT passed AI verification yet. Normal order is print file QA first, then the invoice.\n\n`
+      : "";
+    if (!window.confirm(`${warning}Email ${teamName}'s coach the ${label} for ${total} with a Stripe payment link?`)) return;
     setBusy(true);
     setError("");
     try {

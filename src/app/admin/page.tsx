@@ -93,6 +93,8 @@ export default async function AdminPage() {
         jerseyStyle: teamOrders.jerseyStyle,
         rushShipping: teamOrders.rushShipping,
         localPricing: teamOrders.localPricing,
+        designRequestId: teamOrders.designRequestId,
+        printFileVerifiedAt: teamOrders.printFileVerifiedAt,
         quotedTotalCents: teamOrders.quotedTotalCents,
         invoiceUrl: teamOrders.invoiceUrl,
         depositCents: teamOrders.depositCents,
@@ -338,6 +340,7 @@ export default async function AdminPage() {
                             dueCents={deposit}
                             stage="deposit"
                             resend={Boolean(o.invoiceUrl)}
+                            warnPrintFile={Boolean(o.designRequestId) && !o.printFileVerifiedAt}
                           />
                         ) : (
                           <span className="text-xs text-muted">no roster</span>
