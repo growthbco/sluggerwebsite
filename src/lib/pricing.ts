@@ -27,8 +27,8 @@ export const PRICE_LIST: PriceGroup[] = [
   {
     group: "Headwear",
     rows: [
-      { item: "Fitted Hat", priceCents: 3000, note: "Cap America perforated performance cap with Flexfit, XS-XXL - add a number on the back for $5" },
-      { item: "Snapback Hat", priceCents: 2500, note: "Cap America premium trucker with Flexfit 110, one size fits most - add a number on the back for $5" },
+      { item: "Fitted Hat", priceCents: 3000, note: "Cap America / Pacific Headwear performance cap with Flexfit, XS-XXL - add a number on the back for $5" },
+      { item: "Snapback Hat", priceCents: 2500, note: "Cap America / Pacific Headwear premium trucker, one size fits most - add a number on the back for $5" },
     ],
   },
   {
