@@ -7,7 +7,10 @@
  * proof" step that historically caused costly reprints.
  */
 
-const MODEL = "gemini-2.5-flash";
+// Pro reads stylized fonts + busy layouts far more accurately than Flash;
+// this QA runs once per order so the extra latency/cost is worth it.
+// Override with GEMINI_QA_MODEL if needed.
+const MODEL = process.env.GEMINI_QA_MODEL || "gemini-2.5-pro";
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 export type RosterEntry = {
@@ -150,12 +153,17 @@ async function extractJerseysFromImage(imageUrl: string): Promise<Extracted[]> {
   const prompt = [
     "You are reading a jersey print-file layout (an image or a PDF page).",
     "The image shows jerseys grouped under size labels (e.g. 'SMALL-2', 'MEDIUM-4', 'LARGE-4', '6T-2', '3T-1', 'XLARGE-1', '2XLARGE-1').",
-    "Each jersey shows the player NAME (large, across the upper back) and NUMBER (large, below the name).",
-    "Ignore jerseys that show only a logo or wordmark on the back (those are the front of the jersey, not a player back).",
+    "Each player jersey (the BACK) shows the player NAME (large, arched across the upper back) and their NUMBER (very large, centered below the name).",
     "",
-    "For every jersey with a player name + number, return one object with:",
-    "  name   – uppercase player name as printed (string)",
-    "  number – the printed jersey number (string of digits, no leading zero unless printed)",
+    "CRITICAL - read each jersey carefully:",
+    "- A team LOGO, MONOGRAM, or WORDMARK (small initials/emblem such as 'GA', 'SA', a mascot, or a team name at the top collar or on the chest) is NOT part of the player's name. NEVER prepend or append it. If a jersey shows a monogram above the name, ignore the monogram and return only the actual player name.",
+    "- The NUMBER belongs to the SAME jersey as the name directly above it. Do not borrow a number from an adjacent jersey. Two different jerseys may share the same number - that is fine, read each independently.",
+    "- Ignore the FRONT of jerseys (they show only the team name/logo, no player name+number). Only return backs that have BOTH a player name AND a number.",
+    "- Read digits exactly as printed, including stylized fonts. If a digit is genuinely ambiguous, still give your single best reading.",
+    "",
+    "For every player jersey back, return one object with:",
+    "  name   – the player name only, uppercase, WITHOUT any logo/monogram text",
+    "  number – the printed jersey number (digits only)",
     "  size   – the size label of the group it belongs to. Use only: 2T, 3T, 4T, 5T, 6T, YS, YM, YL, S, M, L, XL, 2XL, 3XL.",
     "          (so 'SMALL' → 'S', 'MEDIUM' → 'M', 'LARGE' → 'L', 'XLARGE' → 'XL', '2XLARGE' → '2XL').",
     "",
