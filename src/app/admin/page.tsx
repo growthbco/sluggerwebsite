@@ -178,7 +178,7 @@ export default async function AdminPage() {
       {needsAction.length > 0 && (
         <p className="mt-4 text-sm text-amber-400">
           ⚠ {needsAction.length} design{needsAction.length === 1 ? "" : "s"} waiting on us:{" "}
-          {needsAction.map((d) => d.reference).join(", ")}
+          {needsAction.map((d) => d.teamName.trim()).join(", ")}
         </p>
       )}
 
