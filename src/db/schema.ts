@@ -570,6 +570,9 @@ export const designRequests = pgTable(
     // the last one went out. Capped so clients never get spammed.
     followUpsSent: integer("follow_ups_sent").notNull().default(0),
     lastFollowUpAt: timestamp("last_follow_up_at", { withTimezone: true }),
+    // Internal SLA: last time we pinged the designer that this design has been
+    // waiting with no first proof sent (>24h).
+    designerRemindedAt: timestamp("designer_reminded_at", { withTimezone: true }),
 
     // Admin archive: hides the request from the active list (and stops auto
     // follow-ups) without deleting it. Note is for later follow-up context.

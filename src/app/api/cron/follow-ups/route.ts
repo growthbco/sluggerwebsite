@@ -7,6 +7,8 @@ import {
   findInvoiceReminderCandidates,
   recordInvoiceReminder,
   MAX_INVOICE_REMINDERS,
+  findStaleDesigns,
+  recordDesignerReminder,
 } from "@/lib/follow-ups";
 import { emailProofFollowUp, emailInvoiceReminder } from "@/lib/email";
 import { postDesignThreadUpdate } from "@/lib/discord";
@@ -88,10 +90,41 @@ export async function GET(req: Request) {
     }
   }
 
+  // Designer SLA: designs sitting >24h with no first proof sent get an @here
+  // ping in their Discord thread so the designer picks them up.
+  const stale = await findStaleDesigns();
+  const staleResults: { reference: string; team: string; hours: number; pinged?: boolean }[] = [];
+  for (const d of stale) {
+    if (dryRun) {
+      staleResults.push({ reference: d.reference, team: d.teamName, hours: d.waitingHours });
+      continue;
+    }
+    const deadline =
+      d.neededBy && !isNaN(d.neededBy.getTime())
+        ? d.neededBy.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+        : null;
+    const pinged = await postDesignThreadUpdate({
+      threadId: d.discordThreadId ?? undefined,
+      title: `⏰ Needs a first proof — ${d.teamName} (${d.reference})`,
+      description: [
+        `This design has been waiting **${d.waitingHours}h** with no proof sent to the client yet.`,
+        deadline ? `Needed by **${deadline}**.` : "",
+        "Send a first draft, or reply here if it's blocked.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      mention: true,
+      username: "Slugger Design SLA",
+    });
+    if (pinged) await recordDesignerReminder(d.id);
+    staleResults.push({ reference: d.reference, team: d.teamName, hours: d.waitingHours, pinged });
+  }
+
   return NextResponse.json({
     dryRun,
-    count: results.length + invoiceResults.length,
+    count: results.length + invoiceResults.length + staleResults.length,
     results,
     invoiceReminders: invoiceResults,
+    designerReminders: staleResults,
   });
 }

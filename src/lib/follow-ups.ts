@@ -146,6 +146,59 @@ export async function recordInvoiceReminder(id: string, now = new Date()) {
     .where(eq(teamOrders.id, id));
 }
 
+/* ------------------------------------------------------------------ */
+/* Designer SLA: no first proof sent within 24h                        */
+/* ------------------------------------------------------------------ */
+
+const DESIGN_SLA_HOURS = 24;
+const REMIND_EVERY_HOURS = 20; // don't re-ping more often than this
+
+export type StaleDesign = {
+  id: string;
+  reference: string;
+  teamName: string;
+  discordThreadId: string | null;
+  neededBy: Date | null;
+  waitingHours: number;
+};
+
+/** Designs sitting with no first proof sent past the SLA - ping the designer. */
+export async function findStaleDesigns(now = new Date()): Promise<StaleDesign[]> {
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(designRequests)
+    .where(eq(designRequests.status, "submitted")); // ready-to-design queue
+
+  const inDesign = await db.select().from(designRequests).where(eq(designRequests.status, "in_design"));
+
+  const due: StaleDesign[] = [];
+  for (const r of [...rows, ...inDesign]) {
+    if (r.archivedAt || r.proofSentAt) continue;
+    // Clock starts when it entered the design queue (fee paid or waived).
+    const start = r.designFeePaidAt ?? r.createdAt;
+    const waitingHours = (now.getTime() - start.getTime()) / (1000 * 60 * 60);
+    if (waitingHours < DESIGN_SLA_HOURS) continue;
+    if (r.designerRemindedAt && (now.getTime() - r.designerRemindedAt.getTime()) / (1000 * 60 * 60) < REMIND_EVERY_HOURS) {
+      continue;
+    }
+    due.push({
+      id: r.id,
+      reference: r.reference,
+      teamName: r.teamName,
+      discordThreadId: r.discordThreadId,
+      neededBy: r.neededBy,
+      waitingHours: Math.round(waitingHours),
+    });
+  }
+  return due;
+}
+
+export async function recordDesignerReminder(id: string, now = new Date()) {
+  const db = getDb();
+  await db.update(designRequests).set({ designerRemindedAt: now }).where(eq(designRequests.id, id));
+}
+
 export async function recordFollowUp(id: string, now = new Date()) {
   const db = getDb();
   const [row] = await db

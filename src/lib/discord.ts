@@ -368,12 +368,14 @@ export async function postDesignThreadUpdate(opts: {
   fields?: { name: string; value: string; inline?: boolean }[];
   imageUrl?: string;
   username?: string;
+  mention?: boolean; // @here ping for time-sensitive items
 }): Promise<boolean> {
   const baseUrl = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
   if (!baseUrl) return false;
   const url = opts.threadId ? `${baseUrl}?thread_id=${opts.threadId}` : baseUrl;
   const body: Record<string, unknown> = {
     username: opts.username ?? "Slugger Design Requests",
+    ...(opts.mention ? { content: "@here", allowed_mentions: { parse: ["everyone"] } } : {}),
     embeds: [
       {
         title: opts.title,
