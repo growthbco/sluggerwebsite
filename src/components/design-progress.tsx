@@ -87,42 +87,52 @@ export function DesignProgress({
           );
         })}
       </ol>
+      {/* The facts: what's being made + the order's plain state. */}
+      {(orderSpec || orderStatus || (!orderStatus && (status === "approved" || status === "ordered"))) && (
+        <div className="mt-3 pt-3 border-t border-line/60 space-y-1 text-xs text-foreground">
+          {orderSpec && (
+            <p>
+              👕 Making: <strong className="text-foreground">{orderSpec}</strong>
+            </p>
+          )}
+          {orderStatus ? (
+            <p>
+              🧾 Order{orderReference ? ` ${orderReference}` : ""}:{" "}
+              <span className="text-muted">
+                {orderStatus === "submitted"
+                  ? printFileVerified
+                    ? "roster in, print file verified"
+                    : "roster in"
+                  : ORDER_LABELS[orderStatus] ?? orderStatus}
+              </span>
+            </p>
+          ) : (
+            (status === "approved" || status === "ordered") && (
+              <p className="text-muted">🧾 Design approved - no team order started yet.</p>
+            )
+          )}
+        </div>
+      )}
+
+      {/* The one thing to do next. */}
       {status === "changes_requested" && (
-        <p className="mt-2 text-xs text-amber-400">
-          ✏️ Client requested changes - the ball is with the designer for an updated proof.
+        <p className="mt-3 text-sm text-amber-400">
+          ⏭ <strong>Next:</strong> send the client an updated proof (they requested changes).
         </p>
       )}
       {status === "pending_payment" && (
-        <p className="mt-2 text-xs text-amber-400">⏳ Waiting on the design fee before work starts.</p>
+        <p className="mt-3 text-sm text-amber-400">
+          ⏭ <strong>Next:</strong> waiting on the design fee before work starts.
+        </p>
       )}
       {rosterIn && !printFileVerified && (
-        <p className="mt-2 text-xs text-amber-400">
-          🖨 Next: upload the print file below - the AI check against the roster must pass before production.
+        <p className="mt-3 text-sm text-amber-400">
+          ⏭ <strong>Next:</strong> upload the print file below and run the AI check.
         </p>
       )}
-      {printFileVerified && (
-        <p className="mt-2 text-xs text-green-400">✓ Print file verified against the roster - clear for production.</p>
-      )}
-      {orderSpec && (
-        <p className="mt-2 text-xs text-foreground">
-          👕 Making: <strong className="text-brand">{orderSpec}</strong>
-        </p>
-      )}
-      {orderStatus && (
-        <p className="mt-2 text-xs text-foreground">
-          🧾 Team order{orderReference ? ` ${orderReference}` : ""}:{" "}
-          <strong className="text-brand">
-            {orderStatus === "submitted" && !printFileVerified
-              ? "Roster submitted - print file QA is the next step"
-              : orderStatus === "submitted" && printFileVerified
-              ? "Print file verified - ready to send the deposit invoice"
-              : ORDER_LABELS[orderStatus] ?? orderStatus}
-          </strong>
-        </p>
-      )}
-      {(status === "approved" || status === "ordered") && !orderStatus && (
-        <p className="mt-2 text-xs text-foreground">
-          ✅ Design is <strong className="text-green-400">APPROVED</strong> - no team order started yet.
+      {printFileVerified && orderStatus === "submitted" && (
+        <p className="mt-3 text-sm text-green-400">
+          ⏭ <strong>Next:</strong> print file passed - send the deposit invoice from the dashboard.
         </p>
       )}
     </div>
