@@ -123,6 +123,11 @@ export function PrintFileQA({ token, rosterCount, roster = [], initialPrintFileU
           roster, flagging typos, wrong sizes, or missing players before production. The submitted
           roster is below so you can also eyeball it yourself, and every uploaded file stays openable.
         </p>
+        <p className="text-sm text-foreground mt-3 bg-brand/10 border border-brand/40 px-3 py-2">
+          ⚠ <strong>What you see is what you get.</strong> Everything on the print file — every name, number,
+          size, logo, and detail — prints on the jerseys exactly as shown. This is the final layout, so review
+          it carefully before approving.
+        </p>
       </header>
 
       {/* Side-by-side compare: what the coach submitted vs what's on the print

@@ -11,6 +11,7 @@ import { AdminLogout } from "@/components/admin-logout";
 import { AdminInvoiceButton } from "@/components/admin-invoice-button";
 import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
+import { TrackingInfo } from "@/components/tracking-info";
 import { AdminArchiveButton } from "@/components/admin-archive-button";
 import { AdminLocalToggle } from "@/components/admin-local-toggle";
 import { AdminTaxToggle } from "@/components/admin-tax-toggle";
@@ -158,7 +159,12 @@ export default async function AdminPage() {
     } catch {}
   }
 
+  // "Waiting on us" = the design work still needs Slugger. Once a design is
+  // approved / ordered / cancelled the work is done, so a trailing client
+  // message ("thanks!", "approved") must NOT keep flagging it.
+  const DESIGN_DONE = new Set(["approved", "ordered", "cancelled"]);
   const needsAction = activeDesigns.filter((d) => {
+    if (DESIGN_DONE.has(d.status)) return false;
     const lastMsg = d.messages?.[d.messages.length - 1];
     return d.status === "changes_requested" || d.status === "submitted" || lastMsg?.from === "client";
   });
@@ -385,26 +391,23 @@ export default async function AdminPage() {
                       <span className="flex items-center gap-2">
                         {o.shippedAt ? (
                           <>
-                            <span className="text-xs display text-green-400" title={o.trackingNumber ?? undefined}>
-                              🚚 SHIPPED
-                            </span>
-                            {o.labelUrl && (
-                              <a
-                                href={o.labelUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs display text-brand border border-brand/40 px-2 py-0.5 hover:bg-brand/10"
-                              >
-                                🖨 Label
-                              </a>
-                            )}
+                            <span className="text-xs display text-green-400">🚚 SHIPPED</span>
+                            {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
                           </>
                         ) : paid ? (
-                          <>
-                            <span className="text-xs display text-green-400">PAID</span>
-                            <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />
-                            <AdminShipButton kind="team_order" id={o.id} who={o.teamName} />
-                          </>
+                          o.trackingNumber ? (
+                            <>
+                              <span className="text-xs display text-amber-400" title="Label/tracking ready - customer not emailed yet">READY TO SHIP</span>
+                              <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
+                              <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email" />
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-xs display text-green-400">PAID</span>
+                              <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />
+                              <AdminShipButton kind="team_order" id={o.id} who={o.teamName} label="➕ Add tracking" />
+                            </>
+                          )
                         ) : o.depositPaidAt && estimate ? (
                           <>
                             <span className="text-xs display text-sky-400" title="50% deposit received">DEPOSIT ✓</span>
@@ -415,6 +418,17 @@ export default async function AdminPage() {
                               stage="balance"
                               resend={Boolean(o.balanceInvoiceUrl)}
                             />
+                            {o.trackingNumber ? (
+                              <>
+                                <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
+                                <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email" />
+                              </>
+                            ) : (
+                              <>
+                                <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />
+                                <AdminShipButton kind="team_order" id={o.id} who={o.teamName} label="➕ Add tracking" />
+                              </>
+                            )}
                           </>
                         ) : estimate ? (
                           <AdminInvoiceButton
@@ -515,23 +529,22 @@ export default async function AdminPage() {
                   </span>
                   {o.shippedAt ? (
                     <>
-                      <span className="text-xs display text-green-400" title={o.trackingNumber ?? undefined}>🚚</span>
-                      {o.labelUrl && (
-                        <a
-                          href={o.labelUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs display text-brand border border-brand/40 px-2 py-0.5 hover:bg-brand/10"
-                        >
-                          🖨
-                        </a>
-                      )}
+                      <span className="text-xs display text-green-400">🚚</span>
+                      {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
                     </>
                   ) : o.status === "paid" ? (
-                    <>
-                      <AdminLabelButton kind="order" id={o.id} who={o.customerName ?? o.reference} />
-                      <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} />
-                    </>
+                    o.trackingNumber ? (
+                      <>
+                        <span className="text-xs display text-amber-400" title="Label/tracking ready - customer not emailed yet">READY</span>
+                        <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
+                        <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email" />
+                      </>
+                    ) : (
+                      <>
+                        <AdminLabelButton kind="order" id={o.id} who={o.customerName ?? o.reference} />
+                        <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} label="➕ Add tracking" />
+                      </>
+                    )
                   ) : null}
                 </span>
               </div>

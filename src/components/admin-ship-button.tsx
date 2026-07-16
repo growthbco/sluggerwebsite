@@ -11,20 +11,26 @@ export function AdminShipButton({
   kind,
   id,
   who,
+  existingTracking,
+  label,
 }: {
   kind: "team_order" | "order";
   id: string;
   who: string;
+  /** Tracking already on file (e.g. from a bought label) - pre-fills the box. */
+  existingTracking?: string | null;
+  /** Override the trigger button text. */
+  label?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [tracking, setTracking] = useState("");
+  const [tracking, setTracking] = useState(existingTracking ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   function reset() {
     setOpen(false);
-    setTracking("");
+    setTracking(existingTracking ?? "");
     setError("");
   }
 
@@ -57,7 +63,7 @@ export function AdminShipButton({
         onClick={() => setOpen(true)}
         className="text-xs display text-foreground border border-brand/50 px-2.5 py-1 hover:bg-brand/10 disabled:opacity-50"
       >
-        🚚 Mark shipped
+        {label ?? "🚚 Mark shipped"}
       </button>
 
       {open && (

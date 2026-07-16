@@ -177,7 +177,7 @@ export function AdminLabelButton({
                     <p className="display text-foreground">{confirming.provider} {confirming.service}</p>
                     <p className="text-xs text-muted mt-0.5">{arrivalLabel(confirming.estimatedDays)}</p>
                     <p className="display text-2xl text-foreground mt-2">{money(confirming.costCents)}</p>
-                    <p className="text-xs text-muted mt-1">Charges your Shippo account and emails the customer their tracking.</p>
+                    <p className="text-xs text-muted mt-1">Charges your Shippo account and saves the label + tracking. The customer isn&apos;t emailed until you hit &ldquo;Mark shipped.&rdquo;</p>
                   </div>
                   <button
                     type="button"

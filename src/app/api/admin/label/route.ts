@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders, orders } from "@/db/schema";
 import { getLabelRates, buyLabel, shippoEnabled, labelReady } from "@/lib/shippo";
-import { markShipped } from "@/lib/fulfillment";
+import { saveLabelPurchase } from "@/lib/fulfillment";
 import { isAdmin } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
@@ -26,8 +26,8 @@ async function addressFor(kind: "team_order" | "order", id: string): Promise<Add
 
 // Two-step label buying (admin-only):
 //   { action: "quote", kind, id, weightOz }        -> cheapest USPS/UPS rate
-//   { action: "buy",   kind, id, rateId }          -> purchases the label,
-//     saves tracking, flips status, emails the customer, returns label PDF url
+//   { action: "buy",   kind, id, rateId }          -> purchases the label and
+//     saves tracking + PDF. Does NOT ship or email - "Mark shipped" does that.
 export async function POST(req: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
@@ -77,13 +77,14 @@ export async function POST(req: Request) {
     if (!body.rateId) return NextResponse.json({ error: "Missing rateId" }, { status: 400 });
     try {
       const label = await buyLabel(body.rateId);
-      const shipped = await markShipped(kind, body.id, label.trackingNumber, label.labelUrl);
+      // Save the label + tracking, but don't ship or email yet - buying the
+      // label ahead of time is a separate step from actually sending the box.
+      await saveLabelPurchase(kind, body.id, label.trackingNumber, label.labelUrl);
       return NextResponse.json({
         ok: true,
         trackingNumber: label.trackingNumber,
         labelUrl: label.labelUrl,
         costCents: label.costCents,
-        emailed: shipped?.emailed ?? false,
       });
     } catch (e) {
       return NextResponse.json({ error: (e as Error).message }, { status: 502 });

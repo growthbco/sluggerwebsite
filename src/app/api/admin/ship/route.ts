@@ -15,12 +15,16 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {}
+  // Tracking is optional: if a label was already bought, "Mark shipped" reuses
+  // the tracking on file. Otherwise the admin pastes one (e.g. Pirate Ship).
   const tracking = (body.trackingNumber ?? "").trim().slice(0, 60);
-  if (!body.id || !tracking || !["team_order", "order"].includes(body.kind ?? "")) {
+  if (!body.id || !["team_order", "order"].includes(body.kind ?? "")) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const result = await markShipped(body.kind as "team_order" | "order", body.id, tracking);
-  if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const result = await markShipped(body.kind as "team_order" | "order", body.id, tracking || undefined);
+  if (!result) {
+    return NextResponse.json({ error: "Order not found, or no tracking number on file. Enter one to ship." }, { status: 404 });
+  }
   return NextResponse.json({ ok: true, emailed: result.emailed });
 }
