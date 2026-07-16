@@ -378,6 +378,10 @@ export const teamOrders = pgTable(
         printed?: { name?: string; number?: string; size?: string };
         detail: string;
       }[];
+      // Indexes of mismatches a human reviewed and marked as actually fine
+      // (e.g. the AI misread a funky font). When every mismatch is dismissed,
+      // the order counts as verified.
+      dismissed?: number[];
       verifiedAt: string;
       model: string;
     }>(),

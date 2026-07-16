@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { upload } from "@vercel/blob/client";
 
@@ -16,6 +17,7 @@ type VerifyResult = {
   summary: string;
   extracted: { name: string; number: string; size: string }[];
   mismatches: Mismatch[];
+  dismissed?: number[];
   verifiedAt: string;
   model: string;
 };
@@ -45,6 +47,24 @@ export function PrintFileQA({ token, rosterCount, roster = [], initialPrintFileU
   );
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VerifyResult | null>(initialResult ?? null);
+  const [dismissed, setDismissed] = useState<number[]>(initialResult?.dismissed ?? []);
+  const router = useRouter();
+
+  // A flagged issue the human marks OK (e.g. the AI misread a funky font).
+  async function toggleDismiss(i: number) {
+    const next = dismissed.includes(i) ? dismissed.filter((x) => x !== i) : [...dismissed, i];
+    setDismissed(next);
+    try {
+      await fetch(`/api/team-order/${token}/print-file-override`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dismissed: next }),
+      });
+      router.refresh(); // update the pipeline gate above
+    } catch {
+      /* local state already updated; a reload will re-sync */
+    }
+  }
 
   // Upload one or more sheets; each is appended to the list.
   async function onFilesChange(files: FileList | null) {
@@ -85,6 +105,7 @@ export function PrintFileQA({ token, rosterCount, roster = [], initialPrintFileU
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Verification failed");
       setResult(data.result);
+      setDismissed(data.result?.dismissed ?? []); // fresh run clears overrides
       setStatus("done");
     } catch (e) {
       setError((e as Error).message);
@@ -179,37 +200,70 @@ export function PrintFileQA({ token, rosterCount, roster = [], initialPrintFileU
       {error && <p className="text-sm text-red-400">⚠ {error}</p>}
 
       {/* Result */}
-      {result && (
-        <div
-          className={`rounded border p-4 ${
-            result.ok ? "border-green-500/40 bg-green-500/5" : "border-amber-500/40 bg-amber-500/5"
-          }`}
-        >
-          <p className="display text-foreground">
-            {result.ok ? "✅ " : "⚠️ "}{result.summary}
-          </p>
-          <p className="text-xs text-muted mt-1">
-            Verified {new Date(result.verifiedAt).toLocaleString()}
-          </p>
+      {result &&
+        (() => {
+          const unresolved = result.mismatches.filter((_, i) => !dismissed.includes(i)).length;
+          const effectiveOk = result.ok || unresolved === 0;
+          const clearedByOverride = !result.ok && unresolved === 0;
+          return (
+            <div
+              className={`rounded border p-4 ${
+                effectiveOk ? "border-green-500/40 bg-green-500/5" : "border-amber-500/40 bg-amber-500/5"
+              }`}
+            >
+              <p className="display text-foreground">
+                {effectiveOk ? "✅ " : "⚠️ "}
+                {clearedByOverride
+                  ? `All ${result.mismatches.length} flagged item${result.mismatches.length === 1 ? "" : "s"} reviewed and marked OK — clear for production.`
+                  : unresolved > 0 && dismissed.length > 0
+                  ? `${unresolved} issue${unresolved === 1 ? "" : "s"} left (${dismissed.length} marked OK).`
+                  : result.summary}
+              </p>
+              <p className="text-xs text-muted mt-1">
+                Verified {new Date(result.verifiedAt).toLocaleString()}
+              </p>
 
-          {result.mismatches.length > 0 && (
-            <ul className="mt-3 space-y-2">
-              {result.mismatches.map((m, i) => (
-                <li key={i} className="text-sm border-l-2 border-amber-500/60 pl-3">
-                  <span className="display text-xs uppercase tracking-wider text-amber-300">
-                    {KIND_LABEL[m.kind]}
-                  </span>
-                  <p className="text-foreground/90">{m.detail}</p>
-                </li>
-              ))}
-            </ul>
-          )}
+              {result.mismatches.length > 0 && (
+                <ul className="mt-3 space-y-2">
+                  {result.mismatches.map((m, i) => {
+                    const isOk = dismissed.includes(i);
+                    return (
+                      <li
+                        key={i}
+                        className={`text-sm border-l-2 pl-3 flex items-start justify-between gap-3 ${
+                          isOk ? "border-green-500/40 opacity-60" : "border-amber-500/60"
+                        }`}
+                      >
+                        <div>
+                          <span
+                            className={`display text-xs uppercase tracking-wider ${
+                              isOk ? "text-green-400" : "text-amber-300"
+                            }`}
+                          >
+                            {isOk ? "Marked OK" : KIND_LABEL[m.kind]}
+                          </span>
+                          <p className={`text-foreground/90 ${isOk ? "line-through" : ""}`}>{m.detail}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleDismiss(i)}
+                          className="shrink-0 text-xs display border border-line px-2.5 py-1 hover:border-brand/50"
+                        >
+                          {isOk ? "Undo" : "This is correct"}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
 
-          <p className="text-xs text-muted mt-3">
-            Full comparison is in the two tables above (submitted roster vs. print file).
-          </p>
-        </div>
-      )}
+              <p className="text-xs text-muted mt-3">
+                The AI can misread funky fonts — use “This is correct” on anything it flagged wrongly.
+                Full comparison is in the two tables above.
+              </p>
+            </div>
+          );
+        })()}
     </section>
   );
 }
