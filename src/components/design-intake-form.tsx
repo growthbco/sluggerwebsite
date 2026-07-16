@@ -14,6 +14,9 @@ export function DesignIntakeForm() {
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+  const [productTypes, setProductTypes] = useState<string[]>([]);
+  const [jerseyStyle, setJerseyStyle] = useState("");
+  const [otherProduct, setOtherProduct] = useState("");
   const [vision, setVision] = useState("");
   const [colors, setColors] = useState("");
   const [neededBy, setNeededBy] = useState("");
@@ -38,6 +41,17 @@ export function DesignIntakeForm() {
 
   const inputCls =
     "w-full bg-steel border border-line px-3 py-2.5 text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none";
+
+  // What the customer wants us to mock up. "Jersey" reveals a cut dropdown;
+  // "Other" reveals a free-text box.
+  const PRODUCT_OPTIONS = ["Jersey / Shirt", "Shorts", "Pants", "Hoodie", "Hat", "Socks", "Bag", "Other"];
+  const JERSEY_STYLES = ["Full-button", "Two-button", "Crew neck", "V-neck", "Sleeveless / Tank"];
+  const wantsJersey = productTypes.includes("Jersey / Shirt");
+  const wantsOther = productTypes.includes("Other");
+
+  function toggleProduct(p: string) {
+    setProductTypes((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+  }
 
   async function handleFiles(files: FileList | null) {
     if (!files?.length) return;
@@ -71,6 +85,10 @@ export function DesignIntakeForm() {
     setStatus("sending");
     setMessage("");
     try {
+      // Send "Other" as the typed text (falls back to the literal "Other").
+      const sendProducts = productTypes.map((p) =>
+        p === "Other" ? (otherProduct.trim() || "Other") : p,
+      );
       const res = await fetch("/api/design-request/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -80,6 +98,8 @@ export function DesignIntakeForm() {
           contactName,
           contactEmail,
           contactPhone,
+          productTypes: sendProducts,
+          jerseyStyle: wantsJersey && jerseyStyle ? jerseyStyle : undefined,
           vision,
           colors,
           inspirationImages: images.map((i) => i.url),
@@ -133,7 +153,12 @@ export function DesignIntakeForm() {
   }
 
   const canSubmit =
-    teamName && contactName && contactEmail && (vision.trim() || images.length > 0) && !uploading;
+    teamName &&
+    contactName &&
+    contactEmail &&
+    productTypes.length > 0 &&
+    (vision.trim() || images.length > 0) &&
+    !uploading;
 
   return (
     <div className="space-y-6">
@@ -164,6 +189,63 @@ export function DesignIntakeForm() {
             <input className={`mt-2 ${inputCls}`} type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(000) 000-0000" />
           </div>
         </div>
+      </div>
+
+      {/* What to mock up */}
+      <div>
+        <label className="display text-sm text-foreground">What do you want us to mock up? *</label>
+        <p className="text-sm text-muted mt-1">Pick everything you&apos;d like designed. You can choose more than one.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {PRODUCT_OPTIONS.map((p) => {
+            const on = productTypes.includes(p);
+            return (
+              <button
+                key={p}
+                type="button"
+                onClick={() => toggleProduct(p)}
+                aria-pressed={on}
+                className={`display text-sm px-3.5 py-2 border transition-colors ${
+                  on
+                    ? "bg-brand text-on-brand border-brand"
+                    : "bg-steel text-foreground border-line hover:border-brand/50"
+                }`}
+              >
+                {on ? "✓ " : ""}
+                {p}
+              </button>
+            );
+          })}
+        </div>
+
+        {wantsJersey && (
+          <div className="mt-4">
+            <label className="display text-sm text-foreground">Jersey / shirt style</label>
+            <select
+              className={`mt-2 ${inputCls} max-w-xs`}
+              value={jerseyStyle}
+              onChange={(e) => setJerseyStyle(e.target.value)}
+            >
+              <option value="">Not sure yet — recommend one</option>
+              {JERSEY_STYLES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {wantsOther && (
+          <div className="mt-4">
+            <label className="display text-sm text-foreground">Tell us what else</label>
+            <input
+              className={`mt-2 ${inputCls}`}
+              value={otherProduct}
+              onChange={(e) => setOtherProduct(e.target.value)}
+              placeholder="e.g. bags, beanies, warmup jackets..."
+            />
+          </div>
+        )}
       </div>
 
       {/* Brief */}

@@ -71,6 +71,7 @@ export async function emailDesignRequestToDesigner(req: {
   contactName: string;
   contactEmail: string;
   contactPhone?: string;
+  products?: string;
   vision?: string;
   colors?: string;
   inspirationImages?: string[];
@@ -92,6 +93,7 @@ export async function emailDesignRequestToDesigner(req: {
     <p style="margin:0 0 10px;"><strong>Team:</strong> ${esc(req.teamName)} ${req.sport ? `(${esc(req.sport)})` : ""}</p>
     ${neededByStr ? `<p style="margin:0 0 10px;"><strong>Needed by:</strong> ${neededByStr}</p>` : ""}
     <p style="margin:0 0 10px;"><strong>Contact:</strong> ${esc(req.contactName)} · ${esc(req.contactEmail)}${req.contactPhone ? ` · ${esc(req.contactPhone)}` : ""}</p>
+    ${req.products ? `<p style="margin:0 0 10px;"><strong>🎨 Mock up:</strong> ${esc(req.products)}</p>` : ""}
     ${req.colors ? `<p style="margin:0 0 10px;"><strong>Colors:</strong> ${esc(req.colors)}</p>` : ""}
     ${req.vision ? `<p style="margin:14px 0 6px;"><strong>Vision:</strong></p><p style="margin:0;">${esc(req.vision).replace(/\n/g, "<br>")}</p>` : ""}
     ${imgs ? `<p style="margin:14px 0 6px;"><strong>Inspiration:</strong></p><ul style="margin:0;padding-left:18px;">${imgs}</ul>` : ""}

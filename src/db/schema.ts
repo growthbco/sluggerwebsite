@@ -515,6 +515,12 @@ export const designRequests = pgTable(
     colors: text("colors"),
     notes: text("notes"),
 
+    // What the customer wants mocked up: product labels the client picked
+    // ("Jersey", "Shorts", "Hat", "Hoodie", or their own "Other" text) and the
+    // jersey cut when a jersey is requested (Two-button, Crew neck, V-neck...).
+    productTypes: jsonb("product_types").$type<string[]>().default([]),
+    jerseyStyle: text("jersey_style"),
+
     // When the customer needs the uniforms in hand. Anything < 14 days triggers
     // the rush flag and surfaces a $5/item rush fee to both customer + team.
     neededBy: timestamp("needed_by", { withTimezone: true }),

@@ -17,6 +17,7 @@ type Props = {
   reference: string;
   teamName: string;
   status: string;
+  products: string | null;
   vision: string | null;
   colors: string | null;
   contact: { name: string; email: string; phone: string | null };
@@ -35,6 +36,7 @@ export function DesignManagePanel({
   reference,
   teamName,
   status,
+  products,
   vision,
   colors,
   contact,
@@ -133,6 +135,12 @@ export function DesignManagePanel({
           <div className="text-muted">{contact.email}</div>
           {contact.phone && <div className="text-muted">{contact.phone}</div>}
         </div>
+        {products && (
+          <div className="sm:col-span-2">
+            <div className="display text-foreground text-xs">🎨 Mock up</div>
+            <div className="text-foreground">{products}</div>
+          </div>
+        )}
         {colors && (
           <div>
             <div className="display text-foreground text-xs">Colors</div>

@@ -7,6 +7,14 @@ import { designRequests, teamOrders } from "@/db/schema";
 // who would otherwise shop our designs elsewhere. Credited to the final order.
 export const DESIGN_FEE_CENTS = Number(process.env.DESIGN_FEE_CENTS) || 3500;
 
+/** Human-readable "what to mock up" line: "Jersey (Two-button), Shorts, Hat".
+ *  The jersey cut rides along on the jersey/shirt entry. */
+export function formatProducts(productTypes?: string[] | null, jerseyStyle?: string | null): string {
+  return (productTypes ?? [])
+    .map((p) => (/jersey|shirt/i.test(p) && jerseyStyle ? `${p} (${jerseyStyle})` : p))
+    .join(", ");
+}
+
 export type NewDesignRequest = {
   teamName: string;
   sport?: string;
@@ -17,6 +25,9 @@ export type NewDesignRequest = {
   colors?: string;
   notes?: string;
   inspirationImages?: string[];
+  /** What the customer wants mocked up (product labels) + jersey cut. */
+  productTypes?: string[];
+  jerseyStyle?: string;
   /** When the customer needs the uniforms in hand. ISO date string. */
   neededBy?: string;
   /** Fee state — set by the create-request route based on returning-customer
@@ -121,6 +132,8 @@ export async function createDesignRequest(input: NewDesignRequest) {
       vision: input.vision,
       colors: input.colors,
       notes: input.notes,
+      productTypes: input.productTypes ?? [],
+      jerseyStyle: input.jerseyStyle ?? null,
       inspirationImages: input.inspirationImages ?? [],
       neededBy: neededByDate && !isNaN(neededByDate.getTime()) ? neededByDate : null,
       rush,

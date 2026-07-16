@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
-import { getByManageToken, MAX_REVISIONS } from "@/lib/design-requests";
+import { getByManageToken, MAX_REVISIONS, formatProducts } from "@/lib/design-requests";
 import { getByDesignRequestId, getRoster } from "@/lib/team-orders";
 import { JERSEY_MATERIALS, itemLabel } from "@/lib/order-items";
 import { getStoreByDesignRequestId, STORE_ITEM_PRESETS } from "@/lib/team-stores";
@@ -90,6 +90,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         reference={request.reference}
         teamName={request.teamName}
         status={request.status}
+        products={formatProducts(request.productTypes, request.jerseyStyle) || null}
         vision={request.vision}
         colors={request.colors}
         contact={{ name: request.contactName, email: request.contactEmail, phone: request.contactPhone }}

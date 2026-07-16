@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { postOrderToDiscord, postDesignRequestToDiscord, postTeamOrderPaidToDiscord } from "@/lib/discord";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
-import { getById, markDesignFeePaid, setDiscordThreadId } from "@/lib/design-requests";
+import { getById, markDesignFeePaid, setDiscordThreadId, formatProducts } from "@/lib/design-requests";
 import { emailDesignRequestToDesigner, emailDesignRequestConfirmation, emailOrderConfirmation } from "@/lib/email";
 import { persistPaidOrder } from "@/lib/orders";
 
@@ -44,10 +44,12 @@ export async function POST(req: Request) {
           const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
           const statusUrl = `${SITE}/design/status/${request.statusToken}`;
           const manageUrl = `${SITE}/design/manage/${request.manageToken}`;
+          const products = formatProducts(request.productTypes, request.jerseyStyle);
           const discordResult = await postDesignRequestToDiscord({
             reference: request.reference,
             teamName: request.teamName,
             sport: request.sport ?? undefined,
+            products,
             vision: request.vision ?? undefined,
             colors: request.colors ?? undefined,
             inspirationImages: request.inspirationImages ?? [],
@@ -66,6 +68,7 @@ export async function POST(req: Request) {
               contactName: request.contactName,
               contactEmail: request.contactEmail,
               contactPhone: request.contactPhone ?? undefined,
+              products,
               vision: request.vision ?? undefined,
               colors: request.colors ?? undefined,
               inspirationImages: request.inspirationImages ?? [],

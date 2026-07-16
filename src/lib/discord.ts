@@ -208,6 +208,8 @@ type DesignRequestPayload = {
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
+  /** What the customer wants mocked up, e.g. "Jersey (Two-button), Shorts, Hat". */
+  products?: string;
   vision?: string;
   colors?: string;
   inspirationImages?: string[];
@@ -250,6 +252,7 @@ export async function postDesignRequestToDiscord(req: DesignRequestPayload): Pro
       inline: true,
     });
   }
+  if (req.products) fields.push({ name: "🎨 Mock up", value: req.products.slice(0, 1024), inline: false });
   if (req.colors) fields.push({ name: "Colors", value: req.colors.slice(0, 200), inline: false });
   if (req.vision) fields.push({ name: "Vision", value: req.vision.slice(0, 1024), inline: false });
   if (req.inspirationImages?.length) {
