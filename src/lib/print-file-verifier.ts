@@ -99,7 +99,7 @@ async function extractJerseysFromImage(imageUrl: string): Promise<Extracted[]> {
   const b64 = buf.toString("base64");
 
   const prompt = [
-    "You are reading a jersey print-file layout image.",
+    "You are reading a jersey print-file layout (an image or a PDF page).",
     "The image shows jerseys grouped under size labels (e.g. 'SMALL-2', 'MEDIUM-4', 'LARGE-4', '6T-2', '3T-1', 'XLARGE-1', '2XLARGE-1').",
     "Each jersey shows the player NAME (large, across the upper back) and NUMBER (large, below the name).",
     "Ignore jerseys that show only a logo or wordmark on the back (those are the front of the jersey, not a player back).",

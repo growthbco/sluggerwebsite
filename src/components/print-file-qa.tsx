@@ -118,9 +118,10 @@ export function PrintFileQA({ token, rosterCount, roster = [], initialPrintFileU
       <header>
         <h2 className="display text-lg text-foreground">Print File QA</h2>
         <p className="text-sm text-muted mt-1">
-          Upload the print-file layout. Our AI reads every jersey on it and cross-checks it against
-          the submitted roster — so typos, wrong sizes, or missing players get flagged before
-          production. The submitted roster is below so you can also eyeball it yourself.
+          Upload the print-file layout — <strong className="text-foreground">a high-quality PDF reads best</strong>{" "}
+          (photos can be blurry). Our AI reads every jersey and cross-checks it against the submitted
+          roster, flagging typos, wrong sizes, or missing players before production. The submitted
+          roster is below so you can also eyeball it yourself, and every uploaded file stays openable.
         </p>
       </header>
 
@@ -170,30 +171,49 @@ export function PrintFileQA({ token, rosterCount, roster = [], initialPrintFileU
 
       {printFileUrls.length > 0 && (
         <div className="grid sm:grid-cols-2 gap-3">
-          {printFileUrls.map((url, i) => (
-            <div key={url} className="relative aspect-[16/9] bg-black/10 border border-line">
-              <Image
-                src={url}
-                alt={`Print file sheet ${i + 1}`}
-                fill
-                sizes="(max-width: 768px) 100vw, 360px"
-                className="object-contain"
-                unoptimized
-              />
-              <span className="absolute top-1 left-1 text-[10px] bg-ink/80 text-foreground px-1.5 py-0.5">
-                Sheet {i + 1}
-              </span>
-              <button
-                type="button"
-                onClick={() => removeFile(url)}
-                disabled={status === "verifying" || status === "uploading"}
-                className="absolute top-1 right-1 text-xs bg-ink/80 text-muted hover:text-brand px-1.5 py-0.5"
-                aria-label={`Remove sheet ${i + 1}`}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
+          {printFileUrls.map((url, i) => {
+            const isPdf = /\.pdf(\?|$)/i.test(url);
+            return (
+              <div key={url} className="relative aspect-[16/9] bg-black/10 border border-line">
+                {isPdf ? (
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute inset-0 grid place-items-center hover:bg-foreground/5"
+                  >
+                    <span className="text-center">
+                      <span className="block text-2xl">📄</span>
+                      <span className="text-xs text-brand underline">Open PDF (sheet {i + 1})</span>
+                    </span>
+                  </a>
+                ) : (
+                  <a href={url} target="_blank" rel="noopener noreferrer" title="Open full size">
+                    <Image
+                      src={url}
+                      alt={`Print file sheet ${i + 1}`}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 360px"
+                      className="object-contain"
+                      unoptimized
+                    />
+                  </a>
+                )}
+                <span className="absolute top-1 left-1 text-[10px] bg-ink/80 text-foreground px-1.5 py-0.5">
+                  Sheet {i + 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeFile(url)}
+                  disabled={status === "verifying" || status === "uploading"}
+                  className="absolute top-1 right-1 text-xs bg-ink/80 text-muted hover:text-brand px-1.5 py-0.5"
+                  aria-label={`Remove sheet ${i + 1}`}
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
