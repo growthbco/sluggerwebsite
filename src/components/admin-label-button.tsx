@@ -7,6 +7,20 @@ type Rate = { rateId: string; provider: string; service: string; costCents: numb
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
+/** Estimated arrival = today + N business days (carriers quote business days). */
+function arrivalLabel(days: number | null): string {
+  if (days == null) return "delivery estimate varies";
+  const d = new Date();
+  let added = 0;
+  while (added < days) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) added += 1;
+  }
+  const date = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return `Arrives ~${date} (${days} ${days === 1 ? "day" : "days"})`;
+}
+
 /** Buy a real USPS/UPS label via Shippo: enter the package weight, pick the
  *  rate, confirm. Tracking saves + customer email fires automatically. */
 export function AdminLabelButton({
@@ -67,44 +81,62 @@ export function AdminLabelButton({
     }
   }
 
-  if (rates) {
-    const speed = (d: number | null) => (d == null ? "" : d <= 1 ? "1 day" : `${d} days`);
-    return (
-      <div className="inline-flex flex-col gap-1.5 min-w-52">
-        {rates.map((r) => (
-          <button
-            key={r.rateId}
-            type="button"
-            onClick={() => buy(r)}
-            disabled={busy}
-            className="flex items-center justify-between gap-3 border border-brand/50 px-3 py-2 text-left hover:bg-brand/10 disabled:opacity-50"
-          >
-            <span>
-              <span className="display text-sm text-foreground">{r.provider} {r.service}</span>
-              {r.estimatedDays != null && <span className="block text-xs text-muted">{speed(r.estimatedDays)} delivery</span>}
-            </span>
-            <span className="display text-sm text-foreground shrink-0">{money(r.costCents)}</span>
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => setRates(null)}
-          className="text-xs text-muted hover:text-foreground self-start px-1"
-        >
-          ✕ cancel
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <button
-      type="button"
-      onClick={quote}
-      disabled={busy}
-      className="text-xs display text-foreground border border-brand/50 px-2.5 py-1 hover:bg-brand/10 disabled:opacity-50"
-    >
-      {busy ? "..." : "🏷 Buy label"}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={quote}
+        disabled={busy}
+        className="text-xs display text-foreground border border-brand/50 px-2.5 py-1 hover:bg-brand/10 disabled:opacity-50"
+      >
+        {busy && !rates ? "..." : "🏷 Buy label"}
+      </button>
+
+      {/* Rates in a centered overlay so the table row never stretches or clips. */}
+      {rates && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
+          onClick={() => !busy && setRates(null)}
+        >
+          <div
+            className="w-full max-w-md bg-ink border border-line max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-line sticky top-0 bg-ink">
+              <p className="display text-foreground">Buy label — {who}</p>
+              <button type="button" onClick={() => setRates(null)} disabled={busy} className="text-muted hover:text-foreground text-lg leading-none">✕</button>
+            </div>
+            <p className="px-4 pt-3 text-xs text-muted">Pick a service. The label buys at cost; the customer was already charged shipping on their invoice.</p>
+            <div className="p-4 space-y-2">
+              {rates.map((r) => (
+                <button
+                  key={r.rateId}
+                  type="button"
+                  onClick={() => buy(r)}
+                  disabled={busy}
+                  className="w-full flex items-center justify-between gap-3 border border-line hover:border-brand/60 hover:bg-brand/5 px-4 py-3 text-left disabled:opacity-50"
+                >
+                  <span>
+                    <span className="display text-sm text-foreground">{r.provider} {r.service}</span>
+                    <span className="block text-xs text-muted mt-0.5">{arrivalLabel(r.estimatedDays)}</span>
+                  </span>
+                  <span className="display text-base text-foreground shrink-0">{money(r.costCents)}</span>
+                </button>
+              ))}
+            </div>
+            <div className="px-4 pb-4">
+              <button
+                type="button"
+                onClick={() => setRates(null)}
+                disabled={busy}
+                className="w-full text-xs display text-muted border border-line py-2 hover:border-brand/50"
+              >
+                {busy ? "Buying label…" : "Cancel"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
