@@ -20,9 +20,12 @@ type VerifyResult = {
   model: string;
 };
 
+type RosterEntry = { name: string; number: string; size: string };
+
 type Props = {
   token: string; // team order manage token
   rosterCount: number;
+  roster?: RosterEntry[];
   initialPrintFileUrl?: string | null;
   initialResult?: VerifyResult | null;
 };
@@ -35,7 +38,7 @@ const KIND_LABEL: Record<Mismatch["kind"], string> = {
   name_typo: "Name typo",
 };
 
-export function PrintFileQA({ token, rosterCount, initialPrintFileUrl, initialResult }: Props) {
+export function PrintFileQA({ token, rosterCount, roster = [], initialPrintFileUrl, initialResult }: Props) {
   const [printFileUrl, setPrintFileUrl] = useState<string | null>(initialPrintFileUrl ?? null);
   const [status, setStatus] = useState<"idle" | "uploading" | "verifying" | "done" | "error">(
     initialResult ? "done" : "idle",
@@ -87,9 +90,21 @@ export function PrintFileQA({ token, rosterCount, initialPrintFileUrl, initialRe
         <p className="text-sm text-muted mt-1">
           Upload the print-file layout. Gemini reads every jersey on it and cross-checks
           against the {rosterCount} roster {rosterCount === 1 ? "entry" : "entries"} — so typos,
-          wrong sizes, or missing players get flagged before production.
+          wrong sizes, or missing players get flagged before production. The submitted roster is
+          below so you can also eyeball it yourself.
         </p>
       </header>
+
+      {/* Side-by-side compare: what the coach submitted vs what's on the print
+          file, so staff can double-check the AI (or catch anything it misses). */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        <RosterTable title={`Submitted roster (${roster.length})`} rows={roster} emptyText="No roster on file." />
+        <RosterTable
+          title={result ? `On the print file (${result.extracted.length})` : "On the print file"}
+          rows={result?.extracted ?? []}
+          emptyText="Upload + verify to read the print file."
+        />
+      </div>
 
       {/* Upload + preview */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -156,35 +171,43 @@ export function PrintFileQA({ token, rosterCount, initialPrintFileUrl, initialRe
             </ul>
           )}
 
-          {result.extracted.length > 0 && (
-            <details className="mt-3">
-              <summary className="text-xs text-muted cursor-pointer hover:text-foreground">
-                Show what Gemini extracted ({result.extracted.length} jerseys)
-              </summary>
-              <table className="mt-2 w-full text-xs">
-                <thead>
-                  <tr className="text-left text-muted">
-                    <th className="py-1">#</th>
-                    <th className="py-1">Name</th>
-                    <th className="py-1">Number</th>
-                    <th className="py-1">Size</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.extracted.map((e, i) => (
-                    <tr key={i} className="border-t border-line/50">
-                      <td className="py-1 text-muted">{i + 1}</td>
-                      <td className="py-1">{e.name}</td>
-                      <td className="py-1">{e.number}</td>
-                      <td className="py-1">{e.size}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </details>
-          )}
+          <p className="text-xs text-muted mt-3">
+            Full comparison is in the two tables above (submitted roster vs. print file).
+          </p>
         </div>
       )}
     </section>
+  );
+}
+
+function RosterTable({ title, rows, emptyText }: { title: string; rows: RosterEntry[]; emptyText: string }) {
+  return (
+    <div className="border border-line">
+      <p className="display text-xs text-foreground bg-ink px-3 py-2 border-b border-line">{title}</p>
+      {rows.length === 0 ? (
+        <p className="text-xs text-muted px-3 py-3">{emptyText}</p>
+      ) : (
+        <div className="max-h-72 overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-muted sticky top-0 bg-steel">
+                <th className="px-3 py-1.5">Name</th>
+                <th className="px-3 py-1.5">#</th>
+                <th className="px-3 py-1.5">Size</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i} className="border-t border-line/50">
+                  <td className="px-3 py-1.5 text-foreground uppercase">{r.name || "-"}</td>
+                  <td className="px-3 py-1.5 text-muted">{r.number || "-"}</td>
+                  <td className="px-3 py-1.5 text-muted">{r.size || "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }

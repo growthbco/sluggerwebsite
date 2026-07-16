@@ -73,6 +73,11 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
           // staff can see), so it's safe to surface the team-order token here.
           token={linkedOrder.manageToken!}
           rosterCount={linkedRoster.length}
+          roster={linkedRoster.map((r) => ({
+            name: r.playerName ?? "",
+            number: r.playerNumber ?? "",
+            size: r.sizes?.jersey ?? r.size ?? "",
+          }))}
           initialPrintFileUrl={linkedOrder.printFileUrl}
           initialResult={linkedOrder.printFileVerification ?? null}
         />

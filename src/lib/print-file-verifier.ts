@@ -41,23 +41,31 @@ function normName(s: string | undefined | null): string {
 function normNumber(s: string | undefined | null): string {
   return (s ?? "").toString().replace(/[^0-9]/g, "");
 }
-/** Map jersey sizes onto a canonical form. */
+/** Map jersey sizes onto a canonical form so equivalent spellings match
+ *  ("2X" = "2XL" = "2X-Large" = "2XLarge", "Large" = "L", etc.). */
 function normSize(s: string | undefined | null): string {
-  const raw = (s ?? "").toString().toUpperCase().trim();
-  // strip suffixes like "-2" that some files include as counts ("MEDIUM-4")
-  const head = raw.split(/[-\s]/)[0];
-  // common synonyms
+  let raw = (s ?? "").toString().toUpperCase().trim();
+  // Print files label groups with a trailing count ("2XLARGE-2", "MEDIUM-4");
+  // drop that count so only the size remains.
+  raw = raw.replace(/[-\s]\d+$/, "");
+  // Collapse separators so "2X-LARGE" / "2X LARGE" / "2XLARGE" all match.
+  const t = raw.replace(/[^A-Z0-9]/g, "");
   const map: Record<string, string> = {
-    SM: "S", S: "S", SMALL: "S",
-    MD: "M", M: "M", MED: "M", MEDIUM: "M",
-    LG: "L", L: "L", LARGE: "L",
-    XL: "XL", XLARGE: "XL", "1XL": "XL",
-    XXL: "2XL", "2XL": "2XL", "2XLARGE": "2XL",
-    XXXL: "3XL", "3XL": "3XL", "3XLARGE": "3XL",
-    YS: "YS", YM: "YM", YL: "YL",
+    YOUTHSMALL: "YS", YSMALL: "YS", YS: "YS",
+    YOUTHMEDIUM: "YM", YMEDIUM: "YM", YMED: "YM", YM: "YM",
+    YOUTHLARGE: "YL", YLARGE: "YL", YL: "YL",
+    YOUTHXLARGE: "YXL", YXLARGE: "YXL", YXL: "YXL",
+    SMALL: "S", SM: "S", S: "S",
+    MEDIUM: "M", MED: "M", MD: "M", M: "M",
+    LARGE: "L", LG: "L", L: "L",
+    XLARGE: "XL", XL: "XL", "1XL": "XL", "1XLARGE": "XL",
+    XXLARGE: "2XL", XXL: "2XL", "2XLARGE": "2XL", "2XL": "2XL", "2X": "2XL",
+    XXXLARGE: "3XL", XXXL: "3XL", "3XLARGE": "3XL", "3XL": "3XL", "3X": "3XL",
+    "4XLARGE": "4XL", "4XL": "4XL", "4X": "4XL",
+    "5XLARGE": "5XL", "5XL": "5XL", "5X": "5XL",
     "2T": "2T", "3T": "3T", "4T": "4T", "5T": "5T", "6T": "6T",
   };
-  return map[head] ?? head;
+  return map[t] ?? t;
 }
 
 /** Levenshtein distance for spotting near-miss name typos. */
