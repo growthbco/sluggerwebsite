@@ -32,7 +32,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         // Public access so we can display proofs/inspiration without auth headers.
         access: "public",
         allowedContentTypes: ALLOWED,
-        maximumSizeInBytes: 100 * 1024 * 1024, // 100 MB per file (high-res print PDFs)
+        maximumSizeInBytes: 225 * 1024 * 1024, // 225 MB per file (high-res print PDFs)
         addRandomSuffix: true,
         // Namespace uploads by section.
         tokenPayload: JSON.stringify({ pathname }),
