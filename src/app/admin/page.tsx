@@ -14,6 +14,7 @@ import { AdminLabelButton } from "@/components/admin-label-button";
 import { AdminArchiveButton } from "@/components/admin-archive-button";
 import { AdminLocalToggle } from "@/components/admin-local-toggle";
 import { AdminTaxToggle } from "@/components/admin-tax-toggle";
+import { AdminSearch } from "@/components/admin-search";
 import { AdminNewStore } from "@/components/admin-new-store";
 import { STORE_ITEM_PRESETS } from "@/lib/team-stores";
 
@@ -162,6 +163,27 @@ export default async function AdminPage() {
     return d.status === "changes_requested" || d.status === "submitted" || lastMsg?.from === "client";
   });
 
+  // Money view. Shop/store revenue comes from the orders table (real Stripe
+  // amounts incl. tax); team-order revenue rides on quotedTotalCents.
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const paidThisMonth = recentOrders.filter((o) => o.createdAt >= monthStart && (o.status === "paid" || o.status === "fulfilled"));
+  // Outstanding invoices: an invoice was sent but the money isn't fully in.
+  const outstanding = activeOrders
+    .filter((o) => o.invoiceUrl && !o.invoicePaidAt)
+    .map((o) => {
+      const total = o.quotedTotalCents ?? 0;
+      const deposit = o.depositCents ?? Math.round(total / 2);
+      const stage = o.depositPaidAt ? "balance" : "deposit";
+      const goodsDue = stage === "deposit" ? deposit : total - deposit;
+      const due = o.taxExempt ? goodsDue : goodsDue + Math.round(goodsDue * 0.07);
+      return { id: o.id, ref: o.reference, team: o.teamName.trim(), stage, due, token: o.manageToken, since: o.updatedAt };
+    })
+    .filter((o) => o.due > 0);
+  const outstandingTotal = outstanding.reduce((s, o) => s + o.due, 0);
+  const inProduction = activeOrders.filter((o) => o.status === "in_production").length;
+  const daysAgo = (d: Date) => Math.max(0, Math.floor((now.getTime() - d.getTime()) / 86400000));
+
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-14">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -184,7 +206,48 @@ export default async function AdminPage() {
         </p>
       )}
 
-      <section className="mt-10">
+      {/* Money snapshot */}
+      <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Paid this month", value: money(paidThisMonth.reduce((s, o) => s + o.totalCents, 0)), sub: `${paidThisMonth.length} order${paidThisMonth.length === 1 ? "" : "s"}` },
+          { label: "Outstanding invoices", value: money(outstandingTotal), sub: `${outstanding.length} awaiting payment`, warn: outstanding.length > 0 },
+          { label: "In production", value: String(inProduction), sub: "team orders" },
+          { label: "Team stores", value: String(stores.filter((s) => s.storeActive).length), sub: "open now" },
+        ].map((t) => (
+          <div key={t.label} className={`border p-3 ${t.warn ? "border-amber-500/50 bg-amber-500/5" : "border-line bg-steel"}`}>
+            <p className="text-xs text-muted">{t.label}</p>
+            <p className="display text-2xl text-foreground mt-1">{t.value}</p>
+            <p className="text-xs text-muted mt-0.5">{t.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {outstanding.length > 0 && (
+        <details className="mt-4 border border-amber-500/40 bg-amber-500/5 group" open>
+          <summary className="flex cursor-pointer items-center justify-between px-4 py-2.5 list-none">
+            <span className="display text-sm text-amber-300">💸 Awaiting payment ({outstanding.length})</span>
+            <span className="text-amber-300 transition-transform group-open:rotate-45">+</span>
+          </summary>
+          <div className="divide-y divide-[color:var(--line)] border-t border-amber-500/20">
+            {outstanding.map((o) => (
+              <div key={o.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
+                <span>
+                  <Link href={`/team-order/manage/${o.token}`} className="font-mono text-xs text-brand hover:underline">{o.ref}</Link>
+                  <span className="ml-2 text-foreground">{o.team}</span>
+                  <span className="ml-2 text-xs text-muted">{o.stage} · sent {daysAgo(o.since)}d ago</span>
+                </span>
+                <span className="display text-foreground">{money(o.due)} due</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
+      <AdminSearch
+        statuses={Array.from(new Set([...activeDesigns.map((d) => d.status), ...activeOrders.map((o) => o.status)]))}
+      />
+
+      <section className="mt-6">
         <h2 className="display text-xl text-foreground">Design requests ({activeDesigns.length})</h2>
         <div className="mt-3 overflow-x-auto border border-line">
           <table className="w-full text-sm">
@@ -205,7 +268,13 @@ export default async function AdminPage() {
               {activeDesigns.map((d) => {
                 const lastMsg = d.messages?.[d.messages.length - 1];
                 return (
-                  <tr key={d.reference} className="hover:bg-steel/60">
+                  <tr
+                    key={d.reference}
+                    className="hover:bg-steel/60"
+                    data-section="designs"
+                    data-status={d.status}
+                    data-search={`${d.teamName} ${d.reference} ${d.contactName} ${d.contactEmail}`.toLowerCase()}
+                  >
                     <td className="px-3 py-2 font-mono text-xs">
                       <Link href={`/design/manage/${d.manageToken}`} className="text-brand hover:underline">
                         {d.reference}
@@ -277,7 +346,13 @@ export default async function AdminPage() {
                 const paid = Boolean(o.invoicePaidAt) || o.status === "paid" || o.status === "shipped";
                 const deposit = o.depositCents ?? (estimate ? Math.round(estimate / 2) : 0);
                 return (
-                  <tr key={o.reference} className="hover:bg-steel/60">
+                  <tr
+                    key={o.reference}
+                    className="hover:bg-steel/60"
+                    data-section="orders"
+                    data-status={o.status}
+                    data-search={`${o.teamName} ${o.reference} ${o.contactEmail}`.toLowerCase()}
+                  >
                     <td className="px-3 py-2 font-mono text-xs">
                       <Link href={`/team-order/manage/${o.manageToken}`} className="text-brand hover:underline">
                         {o.reference}
