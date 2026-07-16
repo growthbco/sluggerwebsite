@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
 import { getProduct, primaryImage } from "@/lib/catalog";
+import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 
 export const runtime = "nodejs";
 
@@ -74,6 +75,16 @@ export async function POST(req: Request) {
 
   if (lineItems.length === 0) {
     return NextResponse.json({ error: "No valid items in cart" }, { status: 400 });
+  }
+
+  // Flat 7% FL sales tax on the goods, as its own line.
+  const goodsCents = lineItems.reduce((s, li) => s + li.price_data.unit_amount * li.quantity, 0);
+  const tax = taxCents(goodsCents);
+  if (tax > 0) {
+    lineItems.push({
+      quantity: 1,
+      price_data: { currency: "usd", unit_amount: tax, product_data: { name: SALES_TAX_LABEL } },
+    });
   }
 
   try {

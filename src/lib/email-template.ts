@@ -30,13 +30,11 @@ export function brandedEmail(opts: {
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:${COLORS.surface};padding:24px 0;">
     <tr><td align="center">
       <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border:1px solid ${COLORS.line};">
-        <!-- Header / wordmark -->
+        <!-- Header / logo -->
         <tr>
-          <td style="background:${COLORS.ink};padding:22px 28px;text-align:left;">
-            <div style="font-family:Impact,'Arial Narrow',sans-serif;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;font-size:22px;line-height:1;">
-              <span style="color:#ffffff;">SLUGGER</span>&nbsp;<span style="color:${COLORS.brand};">ATHLETICS</span>
-            </div>
-            <div style="color:#bdbab0;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-top:4px;">Custom Team Gear · Ocala, FL</div>
+          <td style="background:${COLORS.ink};padding:24px 28px;text-align:center;">
+            <img src="https://www.sluggerathletics.com/slugger-logo.png" alt="Slugger Athletics" width="200" style="width:200px;max-width:70%;height:auto;display:inline-block;" />
+            <div style="color:#bdbab0;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-top:8px;">Custom Team Gear · Ocala, FL</div>
           </td>
         </tr>
         <!-- Gold accent bar -->
@@ -49,7 +47,7 @@ export function brandedEmail(opts: {
             ${bodyHtml ? `<div style="font-size:15px;line-height:1.55;color:${COLORS.text};">${bodyHtml}</div>` : ""}
             ${
               ctaText && ctaUrl
-                ? `<div style="margin:28px 0 8px;"><a href="${ctaUrl}" style="display:inline-block;background:${COLORS.brand};color:${COLORS.ink};text-decoration:none;padding:14px 26px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;font-family:Impact,'Arial Narrow',sans-serif;font-size:15px;border:0;">${ctaText} →</a></div>`
+                ? `<div style="margin:28px 0 8px;text-align:center;"><a href="${ctaUrl}" style="display:inline-block;background:${COLORS.brand};color:${COLORS.ink};text-decoration:none;padding:14px 32px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;font-family:Impact,'Arial Narrow',sans-serif;font-size:15px;border:0;">${ctaText} →</a></div>`
                 : ""
             }
           </td>

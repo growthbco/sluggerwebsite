@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
 import { dbEnabled } from "@/db";
 import { getStoreByHandle, shippingCentsFor } from "@/lib/team-stores";
+import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 
 export const runtime = "nodejs";
 
@@ -139,6 +140,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         product_data: { name: "🚨 RUSH production (~1 week)" },
       },
     });
+  }
+
+  // Flat 7% FL sales tax on the full goods total (incl. rush), as its own line.
+  {
+    const goodsCents = lineItems.reduce((s, li) => s + li.price_data.unit_amount * li.quantity, 0);
+    const tax = taxCents(goodsCents);
+    if (tax > 0) {
+      lineItems.push({
+        quantity: 1,
+        price_data: { currency: "usd", unit_amount: tax, product_data: { name: SALES_TAX_LABEL } },
+      });
+    }
   }
 
   try {

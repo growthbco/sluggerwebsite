@@ -3,6 +3,7 @@ import { dbEnabled } from "@/db";
 import { getByManageToken } from "@/lib/team-orders";
 import { priceAddonRows, createAddon, setAddonSession, addonWeightOz, type AddonRowInput } from "@/lib/team-order-addons";
 import { shippingCentsFor } from "@/lib/team-stores";
+import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
 
 export const runtime = "nodejs";
@@ -42,18 +43,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     // After it ships, they need their own delivery: weight-based rate or free
     // local pickup, with an address collected.
     const shipsSeparately = order.status === "shipped";
+    const goodsLineItems = rows.map((r) => ({
+      quantity: r.quantity,
+      price_data: {
+        currency: "usd" as const,
+        unit_amount: r.unitPriceCents,
+        product_data: {
+          name: `${r.label} - ${[r.size, r.name?.toUpperCase(), r.number ? `#${r.number}` : null].filter(Boolean).join(" - ")} (add-on ${order.reference})`,
+        },
+      },
+    }));
+    const addonTax = taxCents(goodsLineItems.reduce((s, li) => s + li.price_data.unit_amount * li.quantity, 0));
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      line_items: rows.map((r) => ({
-        quantity: r.quantity,
-        price_data: {
-          currency: "usd",
-          unit_amount: r.unitPriceCents,
-          product_data: {
-            name: `${r.label} - ${[r.size, r.name?.toUpperCase(), r.number ? `#${r.number}` : null].filter(Boolean).join(" - ")} (add-on ${order.reference})`,
-          },
-        },
-      })),
+      line_items: addonTax > 0
+        ? [...goodsLineItems, { quantity: 1, price_data: { currency: "usd" as const, unit_amount: addonTax, product_data: { name: SALES_TAX_LABEL } } }]
+        : goodsLineItems,
       success_url: `${SITE}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${SITE}/team-order/manage/${token}`,
       phone_number_collection: { enabled: false },

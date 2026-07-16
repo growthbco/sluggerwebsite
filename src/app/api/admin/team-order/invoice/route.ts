@@ -4,6 +4,7 @@ import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
 import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
+import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 import { emailTeamOrderInvoice } from "@/lib/email";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
 import { isAdmin } from "@/lib/admin-auth";
@@ -65,14 +66,23 @@ export async function POST(req: Request) {
     // Collect the delivery address on the payment page unless we already have
     // one - it's required for buying the shipping label later.
     const needsAddress = !order.shippingAddress?.line1;
-    const makeLink = async (name: string, amountCents: number, linkStage: string, extraMeta: Record<string, string> = {}) => {
-      const price = await stripe.prices.create({
+    // Each link charges the goods amount + 7% FL sales tax as its own line.
+    const makeLink = async (name: string, goodsCents: number, linkStage: string, extraMeta: Record<string, string> = {}) => {
+      const goodsPrice = await stripe.prices.create({
         currency: "usd",
-        unit_amount: amountCents,
+        unit_amount: goodsCents,
         product_data: { name },
       });
+      const taxPrice = await stripe.prices.create({
+        currency: "usd",
+        unit_amount: taxCents(goodsCents),
+        product_data: { name: SALES_TAX_LABEL },
+      });
       return stripe.paymentLinks.create({
-        line_items: [{ price: price.id, quantity: 1 }],
+        line_items: [
+          { price: goodsPrice.id, quantity: 1 },
+          { price: taxPrice.id, quantity: 1 },
+        ],
         restrictions: { completed_sessions: { limit: 1 } },
         ...(needsAddress ? { shipping_address_collection: { allowed_countries: ["US"] } } : {}),
         metadata: { kind: "team_order_invoice", stage: linkStage, teamOrderId: order.id, teamName: order.teamName, ...extraMeta },
@@ -112,11 +122,12 @@ export async function POST(req: Request) {
       lines: quoteLines,
       totalCents,
       dueCents,
+      taxDueCents: taxCents(dueCents),
       payUrl: link.url,
       payFullUrl: fullLink?.url ?? undefined,
     });
 
-    return NextResponse.json({ ok: true, stage, totalCents, dueCents, invoiceUrl: link.url, fullInvoiceUrl: fullLink?.url, emailed });
+    return NextResponse.json({ ok: true, stage, totalCents, dueCents, taxDueCents: taxCents(dueCents), invoiceUrl: link.url, fullInvoiceUrl: fullLink?.url, emailed });
   } catch (e) {
     console.error("send invoice failed:", e);
     return NextResponse.json({ error: "Could not create the invoice" }, { status: 500 });

@@ -28,7 +28,8 @@ export function AdminInvoiceButton({
   const label = stage === "deposit" ? "50% deposit" : "final invoice";
 
   async function send() {
-    const total = `$${(dueCents / 100).toFixed(2)}`;
+    const withTax = Math.round(dueCents * 1.07);
+    const total = `$${(dueCents / 100).toFixed(2)} + 7% tax = $${(withTax / 100).toFixed(2)}`;
     const warning = warnPrintFile
       ? `⚠️ HEADS UP: the print file for ${teamName} has NOT passed AI verification yet. Normal order is print file QA first, then the invoice.\n\n`
       : "";

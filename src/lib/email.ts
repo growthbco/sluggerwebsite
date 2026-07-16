@@ -168,6 +168,7 @@ export async function emailTeamOrderInvoice(args: {
   lines: { label: string; quantity: number; unitPriceCents: number; totalCents: number }[];
   totalCents: number;
   dueCents: number;
+  taxDueCents: number;
   payUrl: string;
   payFullUrl?: string;
 }): Promise<boolean> {
@@ -195,17 +196,25 @@ export async function emailTeamOrderInvoice(args: {
       intro: `Order reference: <strong>${esc(args.reference)}</strong>`,
       bodyHtml: `
         ${rows ? `<table style="width:100%;border-collapse:collapse;margin:0 0 14px;">${rows}
-          <tr><td style="padding:10px 0;"><strong>Order total (plus tax)</strong></td><td style="padding:10px 0;text-align:right;"><strong>${money(args.totalCents)}</strong></td></tr>
+          <tr><td style="padding:10px 0;"><strong>Order subtotal</strong></td><td style="padding:10px 0;text-align:right;"><strong>${money(args.totalCents)}</strong></td></tr>
         </table>` : ""}
         <table style="width:100%;border-collapse:collapse;margin:0 0 14px;">
           <tr>
-            <td style="padding:10px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;"><strong>${isDeposit ? "Due now (50% deposit)" : "Final balance due"}</strong></td>
-            <td style="padding:10px 14px;background:#f6f4ee;text-align:right;"><strong>${money(args.dueCents)}</strong></td>
+            <td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">${isDeposit ? "50% deposit" : "Final balance"}</td>
+            <td style="padding:6px 14px;background:#f6f4ee;text-align:right;">${money(args.dueCents)}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Sales tax (7%)</td>
+            <td style="padding:6px 14px;background:#f6f4ee;text-align:right;">${money(args.taxDueCents)}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;"><strong>Due now</strong></td>
+            <td style="padding:10px 14px;background:#f6f4ee;text-align:right;"><strong>${money(args.dueCents + args.taxDueCents)}</strong></td>
           </tr>
         </table>
         ${
           isDeposit
-            ? `<p style="margin:0;">Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} is due before your order ships. You'll enter your <strong>shipping address</strong> on the payment page so we know exactly where your gear is headed. Questions or roster changes first? Just reply to this email.</p>`
+            ? `<p style="margin:0;">Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} plus tax is due before your order ships. You'll enter your <strong>shipping address</strong> on the payment page so we know exactly where your gear is headed. Questions or roster changes first? Just reply to this email.</p>`
             : `<p style="margin:0;">Your gear is in production! Settling the balance now means we ship the moment it's ready - no waiting. Questions? Just reply to this email.</p>`
         }
         ${

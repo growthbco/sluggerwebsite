@@ -43,3 +43,10 @@ export const PRICE_LIST: PriceGroup[] = [
 export function formatDollars(cents: number) {
   return `$${(cents / 100).toFixed(0)}`;
 }
+
+// Flat Florida / Marion County sales tax applied to goods on every order.
+export const SALES_TAX_RATE = 0.07;
+export const SALES_TAX_LABEL = "FL Sales Tax (7%)";
+export function taxCents(subtotalCents: number): number {
+  return Math.round(subtotalCents * SALES_TAX_RATE);
+}

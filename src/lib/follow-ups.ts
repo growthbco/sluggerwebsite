@@ -111,8 +111,9 @@ export async function findInvoiceReminderCandidates(now = new Date()): Promise<I
 
     const total = o.quotedTotalCents ?? 0;
     const deposit = o.depositCents ?? Math.round(total / 2);
-    const dueCents = stage === "deposit" ? deposit : total - deposit;
-    if (dueCents <= 0) continue;
+    const dueGoods = stage === "deposit" ? deposit : total - deposit;
+    if (dueGoods <= 0) continue;
+    const dueCents = dueGoods + Math.round(dueGoods * 0.07); // + 7% FL tax
 
     const since = o.lastInvoiceReminderAt ?? o.updatedAt;
     const waitDays = sent === 0 ? INVOICE_FIRST_AFTER_DAYS : INVOICE_NEXT_AFTER_DAYS;
