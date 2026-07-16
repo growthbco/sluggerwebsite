@@ -141,14 +141,15 @@ export async function getLinkedDesignPreview(designRequestId: string | null | un
 /** Persist a print-file verification result. */
 export async function savePrintFileVerification(
   teamOrderId: string,
-  printFileUrl: string,
+  printFileUrls: string[],
   verification: NonNullable<typeof teamOrders.$inferSelect.printFileVerification>,
 ) {
   const db = getDb();
   await db
     .update(teamOrders)
     .set({
-      printFileUrl,
+      printFileUrl: printFileUrls[0] ?? null,
+      printFileUrls,
       printFileVerification: verification,
       printFileVerifiedAt: verification.ok ? new Date() : null,
       updatedAt: new Date(),

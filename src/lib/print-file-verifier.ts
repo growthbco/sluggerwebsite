@@ -273,7 +273,20 @@ export async function verifyPrintFile(
   imageUrl: string,
   roster: RosterEntry[],
 ): Promise<VerifyResult> {
-  const extracted = await extractJerseysFromImage(imageUrl);
+  return verifyPrintFiles([imageUrl], roster);
+}
+
+/** Verify one or more print-file sheets against the roster. Jerseys are read
+ *  from every sheet and combined before the diff, so a roster split across
+ *  multiple files still checks out as one. */
+export async function verifyPrintFiles(
+  imageUrls: string[],
+  roster: RosterEntry[],
+): Promise<VerifyResult> {
+  const urls = imageUrls.filter(Boolean);
+  if (urls.length === 0) throw new Error("No print files to verify.");
+  const perFile = await Promise.all(urls.map((u) => extractJerseysFromImage(u)));
+  const extracted = perFile.flat();
   const { ok, summary, mismatches } = diffPrintFileVsRoster(extracted, roster);
   return {
     ok,

@@ -134,6 +134,13 @@
       "when": 1784052024769,
       "tag": "0018_jazzy_northstar",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1784167059674,
+      "tag": "0019_flawless_microchip",
+      "breakpoints": true
     }
   ]
 }

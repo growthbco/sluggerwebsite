@@ -364,6 +364,9 @@ export const teamOrders = pgTable(
     // Print-file QA: the designer uploads the print-file layout, we OCR it with
     // Gemini and compare against the submitted roster to catch typos before printing.
     printFileUrl: text("print_file_url"),
+    // Print files can span several sheets; all are stored, printFileUrl keeps
+    // the first for back-compat.
+    printFileUrls: jsonb("print_file_urls").$type<string[]>(),
     printFileVerifiedAt: timestamp("print_file_verified_at", { withTimezone: true }),
     printFileVerification: jsonb("print_file_verification").$type<{
       ok: boolean;

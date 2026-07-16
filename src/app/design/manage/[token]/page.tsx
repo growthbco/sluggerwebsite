@@ -78,7 +78,9 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
             number: r.playerNumber ?? "",
             size: r.sizes?.jersey ?? r.size ?? "",
           }))}
-          initialPrintFileUrl={linkedOrder.printFileUrl}
+          initialPrintFileUrls={
+            linkedOrder.printFileUrls ?? (linkedOrder.printFileUrl ? [linkedOrder.printFileUrl] : [])
+          }
           initialResult={linkedOrder.printFileVerification ?? null}
         />
       )}

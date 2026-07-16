@@ -5,7 +5,7 @@ import {
   getRoster,
   savePrintFileVerification,
 } from "@/lib/team-orders";
-import { verifyPrintFile, type RosterEntry } from "@/lib/print-file-verifier";
+import { verifyPrintFiles, type RosterEntry } from "@/lib/print-file-verifier";
 import { getById as getDesignById } from "@/lib/design-requests";
 import { postDesignThreadUpdate } from "@/lib/discord";
 
@@ -21,10 +21,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const order = await getByManageToken(token);
   if (!order) return NextResponse.json({ error: "Link not found" }, { status: 404 });
 
-  let body: { printFileUrl?: string } = {};
+  let body: { printFileUrl?: string; printFileUrls?: string[] } = {};
   try { body = await req.json(); } catch {}
-  const printFileUrl = body.printFileUrl?.trim();
-  if (!printFileUrl) {
+  // Accept a single URL (legacy) or a list of sheets.
+  const printFileUrls = (body.printFileUrls ?? (body.printFileUrl ? [body.printFileUrl] : []))
+    .map((u) => (u ?? "").trim())
+    .filter(Boolean)
+    .slice(0, 10);
+  if (printFileUrls.length === 0) {
     return NextResponse.json({ error: "Upload a print file first." }, { status: 400 });
   }
 
@@ -47,8 +51,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   }
 
   try {
-    const result = await verifyPrintFile(printFileUrl, roster);
-    await savePrintFileVerification(order.id, printFileUrl, result);
+    const result = await verifyPrintFiles(printFileUrls, roster);
+    await savePrintFileVerification(order.id, printFileUrls, result);
 
     // Post to the linked design Discord thread (if any) so the designer/team
     // get an auditable "Print file verified" message.
@@ -71,10 +75,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
             ? `🔍 Print file verified — ${order.teamName} (${order.reference})`
             : `🔍 Print file QA — ${order.teamName} (${order.reference})`,
           description: result.ok
-            ? "Gemini cross-checked the print file against the submitted roster. Safe to send to production."
-            : "Gemini found discrepancies between the print file and the submitted roster — fix and re-verify before printing.",
+            ? `Cross-checked ${printFileUrls.length} print ${printFileUrls.length === 1 ? "file" : "files"} against the submitted roster. Safe to send to production.`
+            : "Found discrepancies between the print file and the submitted roster — fix and re-verify before printing.",
           fields,
-          imageUrl: printFileUrl,
+          imageUrl: printFileUrls[0],
           username: "Slugger Print QA",
         });
       }
