@@ -18,6 +18,36 @@ export const RUSH_FEE_CENTS = 500; // per piece, when rushShipping is set
 // Ocala league-family price for standard (crew/v-neck) jerseys.
 export const LOCAL_JERSEY_CENTS = 2500;
 
+// Approx shipping weight per item, ounces. The order's items are known, so the
+// package weight - and thus shipping - is deterministic from the roster.
+export const ITEM_WEIGHT_OZ: Record<string, number> = {
+  jersey: 11,
+  knickers: 14,
+  long_pants: 16,
+  shorts: 10,
+  hoodie: 24,
+  socks: 3,
+};
+
+/** Total estimated package weight (oz) for an order's roster. Each player's
+ *  sized items count; a legacy row with only a jersey size counts as 1 jersey.
+ *  Adds ~8oz packaging. */
+export function estimateOrderWeightOz(
+  roster: { size?: string | null; sizes?: Record<string, string> | null; quantity?: number | null }[],
+): number {
+  let oz = 0;
+  for (const r of roster) {
+    const qty = Math.max(1, r.quantity ?? 1);
+    const sized = Object.entries(r.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
+    if (sized.length) {
+      for (const [key] of sized) oz += (ITEM_WEIGHT_OZ[key] ?? 12) * qty;
+    } else if ((r.size ?? "").trim()) {
+      oz += ITEM_WEIGHT_OZ.jersey * qty;
+    }
+  }
+  return oz > 0 ? oz + 8 : 0; // + packaging
+}
+
 export function jerseyPriceCents(jerseyStyle?: string | null, localPricing?: boolean | null): number {
   const s = (jerseyStyle ?? "").toLowerCase();
   if (s.includes("full")) return 3800;

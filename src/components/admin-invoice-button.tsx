@@ -29,34 +29,29 @@ export function AdminInvoiceButton({
 
   async function send() {
     const withTax = Math.round(dueCents * 1.07);
-    let shipWeightOz = 0;
-    // Final invoice: add shipping the customer pays (weight is known now).
+    // Final invoice: shipping is auto-calculated from the order weight and
+    // added for the customer. Cancel = free local pickup (no shipping).
+    let ship: "auto" | "pickup" = "pickup";
     if (stage === "balance") {
-      const answer = window.prompt(
-        `Shipping for ${teamName}: enter package weight in POUNDS to add live-rate shipping (customer pays it).\n\nLeave blank for free local pickup - no shipping charge.`,
-        "2",
-      );
-      if (answer === null) return; // cancelled
-      const lb = parseFloat(answer);
-      if (answer.trim() && (!lb || lb <= 0)) {
-        window.alert("Enter a weight in pounds like 2.5, or leave blank for pickup.");
-        return;
-      }
-      shipWeightOz = lb > 0 ? Math.round(lb * 16) : 0;
+      ship = window.confirm(
+        `Add shipping to ${teamName}'s final invoice?\n\nOK = add auto-calculated shipping (customer pays live carrier rate).\nCancel = free local pickup, no shipping charge.`,
+      )
+        ? "auto"
+        : "pickup";
     }
-    const shipNote = shipWeightOz > 0 ? " + live shipping" : stage === "balance" ? " (free pickup)" : "";
+    const shipNote = stage === "balance" ? (ship === "auto" ? " + auto shipping" : " (free pickup)") : "";
     const total = `$${(dueCents / 100).toFixed(2)} + 7% tax = $${(withTax / 100).toFixed(2)}${shipNote}`;
     const warning = warnPrintFile
       ? `⚠️ HEADS UP: the print file for ${teamName} has NOT passed AI verification yet. Normal order is print file QA first, then the invoice.\n\n`
       : "";
-    if (!window.confirm(`${warning}Email ${teamName}'s coach the ${label} for ${total} with a Stripe payment link?`)) return;
+    if (!window.confirm(`${warning}Email ${teamName}'s coach the ${label} for ${total}?`)) return;
     setBusy(true);
     setError("");
     try {
       const res = await fetch("/api/admin/team-order/invoice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamOrderId, stage, shipWeightOz }),
+        body: JSON.stringify({ teamOrderId, stage, ship }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not send invoice");

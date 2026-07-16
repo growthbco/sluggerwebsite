@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
 import { getRoster } from "@/lib/team-orders";
-import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
+import { computeTeamOrderQuote, estimateOrderWeightOz } from "@/lib/team-order-pricing";
 import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 import { emailTeamOrderInvoice } from "@/lib/email";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Database or Stripe not configured" }, { status: 503 });
   }
 
-  let body: { teamOrderId?: string; stage?: string; shipWeightOz?: number } = {};
+  let body: { teamOrderId?: string; stage?: string; ship?: "auto" | "pickup"; shipWeightOz?: number } = {};
   try {
     body = await req.json();
   } catch {}
@@ -63,27 +63,32 @@ export async function POST(req: Request) {
   const depositCents = stage === "deposit" ? Math.round(totalCents / 2) : order.depositCents ?? Math.round(totalCents / 2);
   const dueCents = stage === "deposit" ? depositCents : totalCents - depositCents;
 
-  // Shipping charged to the customer (final invoice only). Weight from staff;
-  // rate is the same live carrier rate + margin used on the storefront, quoted
-  // to the address already on file. 0 weight = free local pickup.
+  // Shipping charged to the customer (final invoice only). The package weight
+  // is computed automatically from the roster (we know every item's weight),
+  // so shipping is deterministic - no manual entry. "pickup" = $0. A manual
+  // shipWeightOz still overrides if ever needed.
   let shipCents = 0;
-  if (stage === "balance" && body.shipWeightOz && body.shipWeightOz > 0) {
-    const zip = order.shippingAddress?.postalCode;
-    if (!zip) {
-      return NextResponse.json({ error: "No shipping address on file - collect one or use local pickup." }, { status: 409 });
-    }
-    try {
-      const { quoteChargedShipping, shippoEnabled } = await import("@/lib/shippo");
-      if (shippoEnabled()) {
-        const q = await quoteChargedShipping(zip, Math.min(1120, Math.round(body.shipWeightOz)));
-        if (q) shipCents = q.chargedCents;
+  const wantShip = stage === "balance" && body.ship !== "pickup";
+  if (wantShip) {
+    const weightOz = body.shipWeightOz && body.shipWeightOz > 0 ? Math.round(body.shipWeightOz) : estimateOrderWeightOz(roster);
+    if (weightOz > 0) {
+      const zip = order.shippingAddress?.postalCode;
+      if (!zip) {
+        return NextResponse.json({ error: "No shipping address on file - collect one or use local pickup." }, { status: 409 });
       }
-    } catch (e) {
-      console.error("invoice shipping quote failed:", e);
-    }
-    if (shipCents === 0) {
-      const { shippingCentsFor } = await import("@/lib/team-stores");
-      shipCents = shippingCentsFor(Math.round(body.shipWeightOz)); // formula fallback
+      try {
+        const { quoteChargedShipping, shippoEnabled } = await import("@/lib/shippo");
+        if (shippoEnabled()) {
+          const q = await quoteChargedShipping(zip, Math.min(1120, weightOz));
+          if (q) shipCents = q.chargedCents;
+        }
+      } catch (e) {
+        console.error("invoice shipping quote failed:", e);
+      }
+      if (shipCents === 0) {
+        const { shippingCentsFor } = await import("@/lib/team-stores");
+        shipCents = shippingCentsFor(weightOz); // formula fallback
+      }
     }
   }
 
