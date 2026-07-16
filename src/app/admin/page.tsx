@@ -13,6 +13,7 @@ import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
 import { AdminArchiveButton } from "@/components/admin-archive-button";
 import { AdminLocalToggle } from "@/components/admin-local-toggle";
+import { AdminTaxToggle } from "@/components/admin-tax-toggle";
 import { AdminNewStore } from "@/components/admin-new-store";
 import { STORE_ITEM_PRESETS } from "@/lib/team-stores";
 
@@ -93,6 +94,7 @@ export default async function AdminPage() {
         jerseyStyle: teamOrders.jerseyStyle,
         rushShipping: teamOrders.rushShipping,
         localPricing: teamOrders.localPricing,
+        taxExempt: teamOrders.taxExempt,
         designRequestId: teamOrders.designRequestId,
         printFileVerifiedAt: teamOrders.printFileVerifiedAt,
         quotedTotalCents: teamOrders.quotedTotalCents,
@@ -291,10 +293,16 @@ export default async function AdminPage() {
                           {estimate && !o.quotedTotalCents ? <span className="text-xs text-muted"> est.</span> : null}
                         </span>
                         {!o.invoiceUrl && !paid && (
-                          <AdminLocalToggle teamOrderId={o.id} local={o.localPricing} />
+                          <>
+                            <AdminLocalToggle teamOrderId={o.id} local={o.localPricing} />
+                            <AdminTaxToggle teamOrderId={o.id} exempt={o.taxExempt} />
+                          </>
                         )}
                         {o.localPricing && (o.invoiceUrl || paid) && (
                           <span className="text-xs display text-brand">OCALA</span>
+                        )}
+                        {o.taxExempt && (o.invoiceUrl || paid) && (
+                          <span className="text-xs display text-brand">TAX-EXEMPT</span>
                         )}
                       </span>
                     </td>

@@ -76,6 +76,8 @@ export async function createTeamStore(input: {
   itemKeys: string[];
   /** Ocala league-family team: round-neck jerseys snapshot at $25. */
   localPricing?: boolean;
+  /** Tax-exempt org: store buyers pay no sales tax. */
+  taxExempt?: boolean;
 }) {
   const db = getDb();
 
@@ -102,6 +104,7 @@ export async function createTeamStore(input: {
       sport: input.sport ?? undefined,
       contactEmail: input.contactEmail ?? undefined,
       storeActive: true,
+      taxExempt: input.taxExempt ?? false,
       storeToken: token(),
       approvedDesignUrl: input.approvedDesignUrl ?? undefined,
       designRequestId: input.designRequestId,

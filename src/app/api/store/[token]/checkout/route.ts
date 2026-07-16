@@ -143,7 +143,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   }
 
   // Flat 7% FL sales tax on the full goods total (incl. rush), as its own line.
-  {
+  // Skipped for tax-exempt org stores.
+  if (!store.taxExempt) {
     const goodsCents = lineItems.reduce((s, li) => s + li.price_data.unit_amount * li.quantity, 0);
     const tax = taxCents(goodsCents);
     if (tax > 0) {

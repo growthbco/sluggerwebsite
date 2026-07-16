@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
 
-  let body: { name?: string; itemKeys?: string[]; localPricing?: boolean; imageUrl?: string } = {};
+  let body: { name?: string; itemKeys?: string[]; localPricing?: boolean; taxExempt?: boolean; imageUrl?: string } = {};
   try {
     body = await req.json();
   } catch {}
@@ -32,6 +32,7 @@ export async function POST(req: Request) {
       name,
       itemKeys,
       localPricing: body.localPricing === true,
+      taxExempt: body.taxExempt === true,
       approvedDesignUrl: imageUrl || null,
     });
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";

@@ -169,6 +169,8 @@ export async function emailTeamOrderInvoice(args: {
   totalCents: number;
   dueCents: number;
   taxDueCents: number;
+  taxExempt?: boolean;
+  roster?: { name: string; number: string; size: string }[];
   payUrl: string;
   payFullUrl?: string;
 }): Promise<boolean> {
@@ -205,13 +207,28 @@ export async function emailTeamOrderInvoice(args: {
           </tr>
           <tr>
             <td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Sales tax (7%)</td>
-            <td style="padding:6px 14px;background:#f6f4ee;text-align:right;">${money(args.taxDueCents)}</td>
+            <td style="padding:6px 14px;background:#f6f4ee;text-align:right;">${args.taxExempt ? "Exempt" : money(args.taxDueCents)}</td>
           </tr>
           <tr>
             <td style="padding:10px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;"><strong>Due now</strong></td>
             <td style="padding:10px 14px;background:#f6f4ee;text-align:right;"><strong>${money(args.dueCents + args.taxDueCents)}</strong></td>
           </tr>
         </table>
+        ${
+          args.roster && args.roster.length
+            ? `<p style="margin:18px 0 6px;font-size:13px;color:#666;"><strong>Your roster (${args.roster.length}):</strong></p>
+               <table style="width:100%;border-collapse:collapse;font-size:13px;margin:0 0 14px;">
+                 <tr style="color:#666;"><td style="padding:4px 0;border-bottom:1px solid #e6e0cf;">Player</td><td style="padding:4px 0;border-bottom:1px solid #e6e0cf;">#</td><td style="padding:4px 0;border-bottom:1px solid #e6e0cf;">Size</td></tr>
+                 ${args.roster
+                   .map(
+                     (r) =>
+                       `<tr><td style="padding:4px 0;border-bottom:1px solid #f0ece0;">${esc((r.name || "-").toUpperCase())}</td><td style="padding:4px 0;border-bottom:1px solid #f0ece0;">${esc(r.number || "-")}</td><td style="padding:4px 0;border-bottom:1px solid #f0ece0;">${esc(r.size || "-")}</td></tr>`,
+                   )
+                   .join("")}
+               </table>
+               <p style="margin:0 0 14px;font-size:12px;color:#888;">Names and numbers print exactly as shown above - reply if anything needs a fix before we produce.</p>`
+            : ""
+        }
         ${
           isDeposit
             ? `<p style="margin:0;">Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} plus tax is due before your order ships. You'll enter your <strong>shipping address</strong> on the payment page so we know exactly where your gear is headed. Questions or roster changes first? Just reply to this email.</p>`

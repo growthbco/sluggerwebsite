@@ -208,6 +208,8 @@ export const teams = pgTable(
     secondaryColor: text("secondary_color"),
     contactEmail: text("contact_email"),
     storeActive: boolean("store_active").notNull().default(false),
+    // Tax-exempt org: store buyers pay no sales tax.
+    taxExempt: boolean("tax_exempt").notNull().default(false),
     storeOpensAt: timestamp("store_opens_at", { withTimezone: true }),
     storeClosesAt: timestamp("store_closes_at", { withTimezone: true }),
 
@@ -351,6 +353,8 @@ export const teamOrders = pgTable(
     // Ocala league-family pricing: standard jerseys at $25 instead of $28.
     // Set by staff for teams that play in our leagues.
     localPricing: boolean("local_pricing").notNull().default(false),
+    // Tax-exempt org/company: no sales tax on this order's invoices.
+    taxExempt: boolean("tax_exempt").notNull().default(false),
     jerseyMaterial: text("jersey_material"), // birdseye mesh / pro smooth
     // Which item types this order covers, e.g. ["jersey","pants","socks"].
     items: jsonb("items").$type<string[]>().default(["jersey"]),

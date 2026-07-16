@@ -42,10 +42,13 @@ export async function POST(req: Request) {
 
   // Price from the roster; the balance stage reuses the locked-in quote so a
   // late roster edit can't silently change what was already deposited against.
+  // Roster recap goes on every invoice so the coach can reference exactly
+  // what they're paying for.
+  const roster = await getRoster(order.id);
+
   let totalCents = order.quotedTotalCents ?? 0;
   let quoteLines: { label: string; quantity: number; unitPriceCents: number; totalCents: number }[] = [];
   if (stage === "deposit") {
-    const roster = await getRoster(order.id);
     if (roster.length === 0) return NextResponse.json({ error: "Roster is empty - nothing to invoice." }, { status: 400 });
     const quote = computeTeamOrderQuote(order, roster);
     if (quote.totalCents <= 0) return NextResponse.json({ error: "Could not price this roster - quote it manually." }, { status: 400 });
@@ -66,23 +69,25 @@ export async function POST(req: Request) {
     // Collect the delivery address on the payment page unless we already have
     // one - it's required for buying the shipping label later.
     const needsAddress = !order.shippingAddress?.line1;
-    // Each link charges the goods amount + 7% FL sales tax as its own line.
+    const exempt = order.taxExempt;
+    // Each link charges the goods + 7% FL sales tax (skipped when tax-exempt).
     const makeLink = async (name: string, goodsCents: number, linkStage: string, extraMeta: Record<string, string> = {}) => {
       const goodsPrice = await stripe.prices.create({
         currency: "usd",
         unit_amount: goodsCents,
         product_data: { name },
       });
-      const taxPrice = await stripe.prices.create({
-        currency: "usd",
-        unit_amount: taxCents(goodsCents),
-        product_data: { name: SALES_TAX_LABEL },
-      });
+      const items = [{ price: goodsPrice.id, quantity: 1 }];
+      if (!exempt && taxCents(goodsCents) > 0) {
+        const taxPrice = await stripe.prices.create({
+          currency: "usd",
+          unit_amount: taxCents(goodsCents),
+          product_data: { name: SALES_TAX_LABEL },
+        });
+        items.push({ price: taxPrice.id, quantity: 1 });
+      }
       return stripe.paymentLinks.create({
-        line_items: [
-          { price: goodsPrice.id, quantity: 1 },
-          { price: taxPrice.id, quantity: 1 },
-        ],
+        line_items: items,
         restrictions: { completed_sessions: { limit: 1 } },
         ...(needsAddress ? { shipping_address_collection: { allowed_countries: ["US"] } } : {}),
         metadata: { kind: "team_order_invoice", stage: linkStage, teamOrderId: order.id, teamName: order.teamName, ...extraMeta },
@@ -122,12 +127,18 @@ export async function POST(req: Request) {
       lines: quoteLines,
       totalCents,
       dueCents,
-      taxDueCents: taxCents(dueCents),
+      taxDueCents: order.taxExempt ? 0 : taxCents(dueCents),
+      taxExempt: order.taxExempt,
+      roster: roster.map((r) => ({
+        name: (r.playerName ?? "").trim(),
+        number: (r.playerNumber ?? "").trim(),
+        size: (r.sizes?.jersey ?? r.size ?? "").trim(),
+      })),
       payUrl: link.url,
       payFullUrl: fullLink?.url ?? undefined,
     });
 
-    return NextResponse.json({ ok: true, stage, totalCents, dueCents, taxDueCents: taxCents(dueCents), invoiceUrl: link.url, fullInvoiceUrl: fullLink?.url, emailed });
+    return NextResponse.json({ ok: true, stage, totalCents, dueCents, taxDueCents: order.taxExempt ? 0 : taxCents(dueCents), invoiceUrl: link.url, fullInvoiceUrl: fullLink?.url, emailed });
   } catch (e) {
     console.error("send invoice failed:", e);
     return NextResponse.json({ error: "Could not create the invoice" }, { status: 500 });

@@ -13,6 +13,7 @@ export function AdminNewStore({ presets }: { presets: Preset[] }) {
   const [name, setName] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [localPricing, setLocalPricing] = useState(false);
+  const [taxExempt, setTaxExempt] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const imgRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -54,7 +55,7 @@ export function AdminNewStore({ presets }: { presets: Preset[] }) {
       const res = await fetch("/api/admin/team-store/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, itemKeys: Array.from(picked), localPricing, imageUrl: imageUrl || undefined }),
+        body: JSON.stringify({ name, itemKeys: Array.from(picked), localPricing, taxExempt, imageUrl: imageUrl || undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create");
@@ -146,6 +147,17 @@ export function AdminNewStore({ presets }: { presets: Preset[] }) {
         />
         <span className="text-foreground">
           Ocala league team <span className="text-muted">($25 round-neck jerseys)</span>
+        </span>
+      </label>
+      <label className="mt-2 flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={taxExempt}
+          onChange={(e) => setTaxExempt(e.target.checked)}
+          className="accent-[color:var(--brand-gold)]"
+        />
+        <span className="text-foreground">
+          Tax-exempt org <span className="text-muted">(buyers pay no sales tax)</span>
         </span>
       </label>
       <button
