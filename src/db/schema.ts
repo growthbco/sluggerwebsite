@@ -417,6 +417,8 @@ export const teamOrders = pgTable(
     depositCents: integer("deposit_cents"),
     depositPaidAt: timestamp("deposit_paid_at", { withTimezone: true }),
     balanceInvoiceUrl: text("balance_invoice_url"),
+    // Shipping charged to the customer on the final invoice (0 = local pickup).
+    shippingChargedCents: integer("shipping_charged_cents"),
     invoicePaidAt: timestamp("invoice_paid_at", { withTimezone: true }), // fully paid
     // Unpaid-invoice reminders (deposit or balance); reset on each new invoice.
     invoiceRemindersSent: integer("invoice_reminders_sent").notNull().default(0),

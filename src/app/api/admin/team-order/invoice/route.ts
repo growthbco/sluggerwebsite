@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Database or Stripe not configured" }, { status: 503 });
   }
 
-  let body: { teamOrderId?: string; stage?: string } = {};
+  let body: { teamOrderId?: string; stage?: string; shipWeightOz?: number } = {};
   try {
     body = await req.json();
   } catch {}
@@ -63,6 +63,30 @@ export async function POST(req: Request) {
   const depositCents = stage === "deposit" ? Math.round(totalCents / 2) : order.depositCents ?? Math.round(totalCents / 2);
   const dueCents = stage === "deposit" ? depositCents : totalCents - depositCents;
 
+  // Shipping charged to the customer (final invoice only). Weight from staff;
+  // rate is the same live carrier rate + margin used on the storefront, quoted
+  // to the address already on file. 0 weight = free local pickup.
+  let shipCents = 0;
+  if (stage === "balance" && body.shipWeightOz && body.shipWeightOz > 0) {
+    const zip = order.shippingAddress?.postalCode;
+    if (!zip) {
+      return NextResponse.json({ error: "No shipping address on file - collect one or use local pickup." }, { status: 409 });
+    }
+    try {
+      const { quoteChargedShipping, shippoEnabled } = await import("@/lib/shippo");
+      if (shippoEnabled()) {
+        const q = await quoteChargedShipping(zip, Math.min(1120, Math.round(body.shipWeightOz)));
+        if (q) shipCents = q.chargedCents;
+      }
+    } catch (e) {
+      console.error("invoice shipping quote failed:", e);
+    }
+    if (shipCents === 0) {
+      const { shippingCentsFor } = await import("@/lib/team-stores");
+      shipCents = shippingCentsFor(Math.round(body.shipWeightOz)); // formula fallback
+    }
+  }
+
   try {
     const stripe = getStripe();
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
@@ -71,7 +95,7 @@ export async function POST(req: Request) {
     const needsAddress = !order.shippingAddress?.line1;
     const exempt = order.taxExempt;
     // Each link charges the goods + 7% FL sales tax (skipped when tax-exempt).
-    const makeLink = async (name: string, goodsCents: number, linkStage: string, extraMeta: Record<string, string> = {}) => {
+    const makeLink = async (name: string, goodsCents: number, linkStage: string, extraMeta: Record<string, string> = {}, shippingCents = 0) => {
       const goodsPrice = await stripe.prices.create({
         currency: "usd",
         unit_amount: goodsCents,
@@ -85,6 +109,14 @@ export async function POST(req: Request) {
           product_data: { name: SALES_TAX_LABEL },
         });
         items.push({ price: taxPrice.id, quantity: 1 });
+      }
+      if (shippingCents > 0) {
+        const shipPrice = await stripe.prices.create({
+          currency: "usd",
+          unit_amount: shippingCents,
+          product_data: { name: "Shipping" },
+        });
+        items.push({ price: shipPrice.id, quantity: 1 });
       }
       return stripe.paymentLinks.create({
         line_items: items,
@@ -104,7 +136,7 @@ export async function POST(req: Request) {
       fullLink = await makeLink(`Pay in Full — ${order.teamName} (${order.reference})`, totalCents, "full", { siblingLinkId: link.id });
       await stripe.paymentLinks.update(link.id, { metadata: { ...link.metadata, siblingLinkId: fullLink.id } });
     } else {
-      link = await makeLink(`Final Balance — ${order.teamName} (${order.reference})`, dueCents, "balance");
+      link = await makeLink(`Final Balance — ${order.teamName} (${order.reference})`, dueCents, "balance", {}, shipCents);
     }
 
     await db
@@ -112,7 +144,7 @@ export async function POST(req: Request) {
       .set({
         ...(stage === "deposit"
           ? { status: "quoted", quotedTotalCents: totalCents, depositCents, invoiceUrl: link.url, fullInvoiceUrl: fullLink?.url ?? null }
-          : { balanceInvoiceUrl: link.url }),
+          : { balanceInvoiceUrl: link.url, shippingChargedCents: shipCents }),
         invoiceRemindersSent: 0,
         lastInvoiceReminderAt: null,
         updatedAt: new Date(),
@@ -129,6 +161,7 @@ export async function POST(req: Request) {
       dueCents,
       taxDueCents: order.taxExempt ? 0 : taxCents(dueCents),
       taxExempt: order.taxExempt,
+      shipCents,
       roster: roster.map((r) => ({
         name: (r.playerName ?? "").trim(),
         number: (r.playerNumber ?? "").trim(),
@@ -138,7 +171,7 @@ export async function POST(req: Request) {
       payFullUrl: fullLink?.url ?? undefined,
     });
 
-    return NextResponse.json({ ok: true, stage, totalCents, dueCents, taxDueCents: order.taxExempt ? 0 : taxCents(dueCents), invoiceUrl: link.url, fullInvoiceUrl: fullLink?.url, emailed });
+    return NextResponse.json({ ok: true, stage, totalCents, dueCents, shipCents, taxDueCents: order.taxExempt ? 0 : taxCents(dueCents), invoiceUrl: link.url, fullInvoiceUrl: fullLink?.url, emailed });
   } catch (e) {
     console.error("send invoice failed:", e);
     return NextResponse.json({ error: "Could not create the invoice" }, { status: 500 });

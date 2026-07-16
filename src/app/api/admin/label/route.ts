@@ -58,7 +58,16 @@ export async function POST(req: Request) {
     try {
       const rates = await getLabelRates(to, weightOz);
       if (rates.length === 0) return NextResponse.json({ error: "No USPS/UPS rates returned." }, { status: 502 });
-      return NextResponse.json({ ok: true, to, rates: rates.slice(0, 4) });
+      // Show a spread of speeds, not just the cheapest few: keep the two
+      // cheapest, then add distinct faster services by delivery estimate.
+      const byDays = [...rates].sort((a, b) => (a.estimatedDays ?? 99) - (b.estimatedDays ?? 99));
+      const picked = new Map<string, (typeof rates)[number]>();
+      for (const r of rates.slice(0, 2)) picked.set(r.rateId, r);
+      for (const r of byDays) {
+        if (picked.size >= 6) break;
+        picked.set(r.rateId, r);
+      }
+      return NextResponse.json({ ok: true, to, rates: Array.from(picked.values()) });
     } catch (e) {
       return NextResponse.json({ error: (e as Error).message }, { status: 502 });
     }

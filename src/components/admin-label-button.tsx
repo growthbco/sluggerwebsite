@@ -68,29 +68,32 @@ export function AdminLabelButton({
   }
 
   if (rates) {
+    const speed = (d: number | null) => (d == null ? "" : d <= 1 ? "1 day" : `${d} days`);
     return (
-      <span className="inline-flex flex-wrap items-center gap-1.5">
+      <div className="inline-flex flex-col gap-1.5 min-w-52">
         {rates.map((r) => (
           <button
             key={r.rateId}
             type="button"
             onClick={() => buy(r)}
             disabled={busy}
-            className="text-xs display text-foreground border border-brand/50 px-2 py-1 hover:bg-brand/10 disabled:opacity-50"
-            title={r.estimatedDays ? `~${r.estimatedDays} days` : undefined}
+            className="flex items-center justify-between gap-3 border border-brand/50 px-3 py-2 text-left hover:bg-brand/10 disabled:opacity-50"
           >
-            {r.provider} {money(r.costCents)}
+            <span>
+              <span className="display text-sm text-foreground">{r.provider} {r.service}</span>
+              {r.estimatedDays != null && <span className="block text-xs text-muted">{speed(r.estimatedDays)} delivery</span>}
+            </span>
+            <span className="display text-sm text-foreground shrink-0">{money(r.costCents)}</span>
           </button>
         ))}
         <button
           type="button"
           onClick={() => setRates(null)}
-          className="text-xs text-muted hover:text-foreground px-1"
-          aria-label="Cancel"
+          className="text-xs text-muted hover:text-foreground self-start px-1"
         >
-          ✕
+          ✕ cancel
         </button>
-      </span>
+      </div>
     );
   }
 

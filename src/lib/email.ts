@@ -170,6 +170,7 @@ export async function emailTeamOrderInvoice(args: {
   dueCents: number;
   taxDueCents: number;
   taxExempt?: boolean;
+  shipCents?: number;
   roster?: { name: string; number: string; size: string }[];
   payUrl: string;
   payFullUrl?: string;
@@ -209,9 +210,14 @@ export async function emailTeamOrderInvoice(args: {
             <td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Sales tax (7%)</td>
             <td style="padding:6px 14px;background:#f6f4ee;text-align:right;">${args.taxExempt ? "Exempt" : money(args.taxDueCents)}</td>
           </tr>
+          ${
+            args.shipCents && args.shipCents > 0
+              ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;">${money(args.shipCents)}</td></tr>`
+              : ""
+          }
           <tr>
             <td style="padding:10px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;"><strong>Due now</strong></td>
-            <td style="padding:10px 14px;background:#f6f4ee;text-align:right;"><strong>${money(args.dueCents + args.taxDueCents)}</strong></td>
+            <td style="padding:10px 14px;background:#f6f4ee;text-align:right;"><strong>${money(args.dueCents + args.taxDueCents + (args.shipCents ?? 0))}</strong></td>
           </tr>
         </table>
         ${
