@@ -87,16 +87,65 @@ function lev(a: string, b: string): number {
 }
 
 /** Ask Gemini to extract jerseys from the print-file image as structured JSON. */
+// Inline base64 is capped by Gemini's ~20MB request limit; above this we hand
+// the file to the Files API and reference it by URI instead.
+const INLINE_LIMIT_BYTES = 12 * 1024 * 1024;
+
+/** Upload bytes to the Gemini Files API and return an ACTIVE file URI. Used for
+ *  large print PDFs that can't be inlined. */
+async function uploadToGeminiFiles(key: string, buf: Buffer, mime: string): Promise<string> {
+  const base = "https://generativelanguage.googleapis.com/upload/v1beta/files";
+  // Resumable upload: start, then upload+finalize.
+  const start = await fetch(`${base}?key=${encodeURIComponent(key)}`, {
+    method: "POST",
+    headers: {
+      "X-Goog-Upload-Protocol": "resumable",
+      "X-Goog-Upload-Command": "start",
+      "X-Goog-Upload-Header-Content-Length": String(buf.length),
+      "X-Goog-Upload-Header-Content-Type": mime,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ file: { display_name: "print-file" } }),
+  });
+  const uploadUrl = start.headers.get("x-goog-upload-url");
+  if (!start.ok || !uploadUrl) {
+    throw new Error(`Gemini file upload start failed (${start.status})`);
+  }
+  const fin = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      "X-Goog-Upload-Command": "upload, finalize",
+      "X-Goog-Upload-Offset": "0",
+      "Content-Length": String(buf.length),
+    },
+    body: new Uint8Array(buf),
+  });
+  if (!fin.ok) throw new Error(`Gemini file upload failed (${fin.status})`);
+  const meta = await fin.json();
+  let file = meta?.file;
+  if (!file?.uri) throw new Error("Gemini file upload returned no URI");
+  // PDFs may need a moment to become ACTIVE before generateContent can use them.
+  for (let i = 0; file.state === "PROCESSING" && i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const poll = await fetch(`https://generativelanguage.googleapis.com/v1beta/${file.name}?key=${encodeURIComponent(key)}`);
+    file = await poll.json();
+  }
+  if (file.state === "FAILED") throw new Error("Gemini could not process the file");
+  return file.uri;
+}
+
 async function extractJerseysFromImage(imageUrl: string): Promise<Extracted[]> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY is not configured");
 
-  // Fetch the image and inline as base64; Gemini's REST API takes inline_data.
+  // Fetch the file. Small files inline as base64; large ones go via Files API.
   const imgRes = await fetch(imageUrl);
   if (!imgRes.ok) throw new Error(`Could not fetch print file (${imgRes.status})`);
   const mime = imgRes.headers.get("content-type") || "image/png";
   const buf = Buffer.from(await imgRes.arrayBuffer());
-  const b64 = buf.toString("base64");
+  const useFilesApi = buf.length > INLINE_LIMIT_BYTES;
+  const fileUri = useFilesApi ? await uploadToGeminiFiles(key, buf, mime) : null;
+  const b64 = useFilesApi ? "" : buf.toString("base64");
 
   const prompt = [
     "You are reading a jersey print-file layout (an image or a PDF page).",
@@ -114,14 +163,14 @@ async function extractJerseysFromImage(imageUrl: string): Promise<Extracted[]> {
     "No commentary, no markdown fences.",
   ].join("\n");
 
+  const filePart = fileUri
+    ? { file_data: { mime_type: mime, file_uri: fileUri } }
+    : { inline_data: { mime_type: mime, data: b64 } };
   const body = {
     contents: [
       {
         role: "user",
-        parts: [
-          { text: prompt },
-          { inline_data: { mime_type: mime, data: b64 } },
-        ],
+        parts: [{ text: prompt }, filePart],
       },
     ],
     generationConfig: {

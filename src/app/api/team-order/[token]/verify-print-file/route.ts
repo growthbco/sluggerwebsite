@@ -10,7 +10,7 @@ import { getById as getDesignById } from "@/lib/design-requests";
 import { postDesignThreadUpdate } from "@/lib/discord";
 
 export const runtime = "nodejs";
-export const maxDuration = 60; // Gemini call can take ~10–30s on large prints
+export const maxDuration = 300; // large PDFs: Files API upload + processing + read
 
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
   if (!dbEnabled()) {
