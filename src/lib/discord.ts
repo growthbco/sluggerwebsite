@@ -174,7 +174,7 @@ export async function postAddonToDesignerDiscord(args: {
     embeds: [
       {
         title: `➕ ADD TO PRINT FILE - ${args.teamName} (${args.reference})`,
-        description: `A paid add-on came in for an existing order. Please add these pieces to the print file:\n\n${lines}`,
+        description: `A paid add-on came in for an existing order. Please add these pieces to the print file:\n\n${lines}\n\n⚠️ Print-file QA has been reset for this order. Upload the updated print file and re-run the AI check before printing - even if the original file was already verified and approved.`,
         color: GOLD,
         timestamp: new Date().toISOString(),
       },
