@@ -5,7 +5,9 @@
 
 import { sizesFor, itemLabel } from "@/lib/order-items";
 
-const MODEL = "gemini-2.5-flash";
+// Moving alias to the current Flash model so a pinned version can't be
+// deprecated out from under us (as gemini-2.5-pro was).
+const MODEL = process.env.GEMINI_ROSTER_MODEL || "gemini-flash-latest";
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 export type ParsedRosterRow = {

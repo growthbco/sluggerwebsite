@@ -7,10 +7,13 @@
  * proof" step that historically caused costly reprints.
  */
 
-// Pro reads stylized fonts + busy layouts far more accurately than Flash;
-// this QA runs once per order so the extra latency/cost is worth it.
-// Override with GEMINI_QA_MODEL if needed.
-const MODEL = process.env.GEMINI_QA_MODEL || "gemini-2.5-pro";
+// Google retired gemini-2.5-pro for new API keys ("no longer available to new
+// users"), which broke QA. gemini-flash-latest is a moving alias that always
+// points at the current Flash model, so it won't get deprecated out from under
+// us, and it's newer/sharper than the 2.5-flash that used to misread fonts.
+// The manual "This is correct" override still backstops any misread.
+// Override with GEMINI_QA_MODEL (e.g. a pro model once billing is enabled).
+const MODEL = process.env.GEMINI_QA_MODEL || "gemini-flash-latest";
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 export type RosterEntry = {
