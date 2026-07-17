@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
+import { upload } from "@vercel/blob/client";
 
-export type DesignMessage = { at: string; from: "designer" | "client"; text: string; name?: string };
+export type DesignMessage = { at: string; from: "designer" | "client"; text: string; name?: string; attachments?: string[] };
+
+const isImageUrl = (u: string) => /\.(png|jpe?g|webp|gif)$/i.test(u);
+const fileLabel = (u: string) => decodeURIComponent(u.split("/").pop() ?? "file").replace(/-[a-zA-Z0-9]{20,}(\.\w+)$/, "$1");
 
 const NAME_KEY = "slugger-sender-name";
 // Staff who reply to clients. Picking one is required so every reply is attributed.
@@ -64,6 +69,8 @@ export function DesignMessages({
   const [messages, setMessages] = useState<DesignMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
   const [senderName, setSenderName] = useState("");
+  const [pending, setPending] = useState<{ url: string; name: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState<"" | "sending" | "refreshing">("");
   const [error, setError] = useState("");
 
@@ -83,9 +90,31 @@ export function DesignMessages({
       ? "Ask the client a question - they get an email with a link back here to answer."
       : "Have a question, or need to clarify something about your design? Ask here.";
 
+  async function handleFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setUploading(true);
+    setError("");
+    try {
+      const done: { url: string; name: string }[] = [];
+      for (const file of Array.from(files)) {
+        if (file.size > 25 * 1024 * 1024) throw new Error(`${file.name} is over 25MB.`);
+        const blob = await upload(`design-messages/${file.name}`, file, {
+          access: "public",
+          handleUploadUrl: "/api/design-request/upload",
+        });
+        done.push({ url: blob.url, name: file.name });
+      }
+      setPending((p) => [...p, ...done]);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function send() {
     const text = draft.trim();
-    if (!text) return;
+    if (!text && pending.length === 0) return;
     setBusy("sending");
     setError("");
     try {
@@ -98,12 +127,17 @@ export function DesignMessages({
       const res = await fetch(`/api/design-request/${token}/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, ...(role === "designer" && name ? { name } : {}) }),
+        body: JSON.stringify({
+          text,
+          ...(role === "designer" && name ? { name } : {}),
+          attachments: pending.map((p) => p.url),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not send");
       setMessages(data.messages);
       setDraft("");
+      setPending([]);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -165,7 +199,35 @@ export function DesignMessages({
                     : "Client"}{" "}
                   · {new Date(m.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                 </p>
-                <p className="text-foreground whitespace-pre-line">{m.text}</p>
+                {m.text && <p className="text-foreground whitespace-pre-line">{m.text}</p>}
+                {m.attachments && m.attachments.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {m.attachments.map((url, j) =>
+                      isImageUrl(url) ? (
+                        <a key={j} href={url} target="_blank" rel="noopener noreferrer" className="block" title="Open full size">
+                          <Image
+                            src={url}
+                            alt="attachment"
+                            width={112}
+                            height={112}
+                            unoptimized
+                            className="h-28 w-28 object-cover border border-line"
+                          />
+                        </a>
+                      ) : (
+                        <a
+                          key={j}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs display text-brand border border-brand/40 px-2 py-1 hover:bg-brand/10 max-w-[12rem]"
+                        >
+                          📎 <span className="truncate">{fileLabel(url)}</span>
+                        </a>
+                      ),
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -202,6 +264,24 @@ export function DesignMessages({
           ))}
         </select>
       )}
+      {/* Files staged to send with the next message. */}
+      {pending.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {pending.map((p, i) => (
+            <span key={i} className="inline-flex items-center gap-1.5 bg-steel border border-line px-2 py-1 text-xs text-foreground">
+              📎 <span className="max-w-[10rem] truncate">{p.name}</span>
+              <button
+                type="button"
+                onClick={() => setPending((prev) => prev.filter((_, idx) => idx !== i))}
+                className="text-muted hover:text-foreground"
+                aria-label={`Remove ${p.name}`}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
       <div className="mt-3 flex gap-2 items-end">
         <textarea
           value={draft}
@@ -210,16 +290,36 @@ export function DesignMessages({
           className="flex-1 bg-steel border border-line px-3 py-2.5 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none min-h-16"
           disabled={busy === "sending"}
         />
+        <label
+          title="Attach a photo or file"
+          className={`grid place-items-center border border-line px-3 py-3 text-lg ${
+            uploading || busy === "sending" ? "opacity-50" : "cursor-pointer hover:border-brand/50"
+          }`}
+        >
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            multiple
+            className="hidden"
+            disabled={uploading || busy === "sending"}
+            onChange={(e) => {
+              handleFiles(e.target.files);
+              e.target.value = "";
+            }}
+          />
+          {uploading ? "…" : "📎"}
+        </label>
         <button
           type="button"
           onClick={send}
-          disabled={busy !== "" || !draft.trim() || (role === "designer" && !senderName)}
+          disabled={busy !== "" || uploading || (!draft.trim() && pending.length === 0) || (role === "designer" && !senderName)}
           title={role === "designer" && !senderName ? "Pick who's replying first" : undefined}
           className="clip-slant bg-brand text-on-brand display text-sm px-5 py-3 hover:bg-brand-dark disabled:opacity-50"
         >
           {busy === "sending" ? "Sending..." : "Send"}
         </button>
       </div>
+      <p className="mt-1.5 text-xs text-muted">📎 Attach photos or PDFs (up to 25MB each).</p>
       {error && <p className="mt-2 text-sm text-brand">{error}</p>}
     </section>
   );

@@ -33,35 +33,47 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (!resolved) return NextResponse.json({ error: "Link not found" }, { status: 404 });
   const { request, from } = resolved;
 
-  let body: { text?: string; name?: string } = {};
+  let body: { text?: string; name?: string; attachments?: string[] } = {};
   try {
     body = await req.json();
   } catch {}
   const text = (body.text ?? "").trim().slice(0, MAX_MESSAGE_LENGTH);
-  if (!text) return NextResponse.json({ error: "Write a message first." }, { status: 400 });
+  // Only accept our own Blob URLs, cap the count. A message can be just files.
+  const attachments = (body.attachments ?? [])
+    .filter((u): u is string => typeof u === "string" && /^https:\/\/[^ ]+\.public\.blob\.vercel-storage\.com\//.test(u))
+    .slice(0, 10);
+  if (!text && attachments.length === 0) {
+    return NextResponse.json({ error: "Write a message or attach a file first." }, { status: 400 });
+  }
   // Sender name personalizes designer-side messages only ("Gary · Slugger Athletics").
   const name = from === "designer" ? (body.name ?? "").trim().slice(0, 40) || undefined : undefined;
 
   try {
-    const messages = await addDesignMessage(request.id, from, text, name);
+    const messages = await addDesignMessage(request.id, from, text, name, attachments);
     if (!messages) return NextResponse.json({ error: "Could not save" }, { status: 500 });
+
+    // Notifications describe attachments even when there's no text.
+    const attachNote = attachments.length ? `📎 ${attachments.length} attachment${attachments.length === 1 ? "" : "s"}` : "";
+    const notifyText = [text, attachNote].filter(Boolean).join("\n") || attachNote;
 
     // Nudge the other side. Failures here shouldn't fail the send itself.
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const firstImage = attachments.find((u) => /\.(png|jpe?g|webp|gif)$/i.test(u));
     if (from === "designer") {
       await Promise.allSettled([
         emailDesignerMessage({
           to: request.contactEmail,
           teamName: request.teamName,
           reference: request.reference,
-          text,
+          text: notifyText,
           fromName: name,
           statusUrl: `${SITE}/design/status/${request.statusToken}`,
         }),
         postDesignThreadUpdate({
           threadId: request.discordThreadId ?? undefined,
           title: `💬 ${name ? `${name} messaged the client` : "Question sent to client"} — ${request.teamName} (${request.reference})`,
-          description: text.slice(0, 2000),
+          description: notifyText.slice(0, 2000),
+          imageUrl: firstImage,
           username: "Slugger Design Requests",
         }),
       ]);
@@ -69,7 +81,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       await postDesignThreadUpdate({
         threadId: request.discordThreadId ?? undefined,
         title: `💬 Client replied — ${request.teamName} (${request.reference})`,
-        description: text.slice(0, 2000),
+        description: notifyText.slice(0, 2000),
+        imageUrl: firstImage,
         username: "Slugger Design Requests",
       });
     }
