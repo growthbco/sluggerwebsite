@@ -125,8 +125,8 @@ export async function postTeamOrderPaidToDiscord(args: {
     embeds: [
       {
         title: isDeposit
-          ? `💰 50% DEPOSIT PAID — ${args.teamName} (${args.reference})`
-          : `💰 PAID IN FULL — ${args.teamName} (${args.reference})`,
+          ? `💰 50% DEPOSIT PAID - ${args.teamName} (${args.reference})`
+          : `💰 PAID IN FULL - ${args.teamName} (${args.reference})`,
         description:
           (isDeposit
             ? `Deposit received: **${amt}**. Clear to START production.`
@@ -164,7 +164,7 @@ export async function postAddonToDesignerDiscord(args: {
     .map((r) => {
       const who = [r.name?.trim(), r.number ? `#${r.number}` : null].filter(Boolean).join(" ") || "(no name)";
       const qty = Math.max(1, r.quantity ?? 1);
-      return `• ${who} — ${r.label} (${r.size})${qty > 1 ? ` ×${qty}` : ""}`;
+      return `• ${who} - ${r.label} (${r.size})${qty > 1 ? ` ×${qty}` : ""}`;
     })
     .join("\n");
   return send(url, {
@@ -173,7 +173,7 @@ export async function postAddonToDesignerDiscord(args: {
     allowed_mentions: { parse: ["everyone"] },
     embeds: [
       {
-        title: `➕ ADD TO PRINT FILE — ${args.teamName} (${args.reference})`,
+        title: `➕ ADD TO PRINT FILE - ${args.teamName} (${args.reference})`,
         description: `A paid add-on came in for an existing order. Please add these pieces to the print file:\n\n${lines}`,
         color: GOLD,
         timestamp: new Date().toISOString(),
@@ -217,7 +217,7 @@ export async function postTeamOrderToDiscord(
     })
     .join("\n");
 
-  // NOTE: customer contact (email/phone) is intentionally NOT posted here — this
+  // NOTE: customer contact (email/phone) is intentionally NOT posted here - this
   // channel is designer/production-facing, and the business already has the
   // customer's contact from the initial inquiry. Keeps clients from being poached.
   const fields = [
@@ -295,7 +295,7 @@ export async function postDesignRequestToDiscord(req: DesignRequestPayload): Pro
   if (needed) {
     fields.push({
       name: req.rush ? "Needed by 🚨 RUSH" : "Needed by",
-      value: req.rush ? `${needed} — within 2 weeks (rush fee applies)` : needed,
+      value: req.rush ? `${needed} - within 2 weeks (rush fee applies)` : needed,
       inline: true,
     });
   }
@@ -487,7 +487,7 @@ export async function postDesignThreadUpdate(opts: {
     ],
   };
   // If we don't have a thread_id and the channel is a Forum, we'd need a
-  // thread_name to post — only do this fallback if forum mode is on.
+  // thread_name to post - only do this fallback if forum mode is on.
   if (!opts.threadId && process.env.DISCORD_DESIGN_REQUESTS_FORUM === "true") {
     body.thread_name = opts.title.slice(0, 100);
   }

@@ -118,7 +118,7 @@ export function PrintFileQA({ token, rosterCount, roster = [], initialPrintFileU
       <header>
         <h2 className="display text-lg text-foreground">Print File QA</h2>
         <p className="text-sm text-muted mt-1">
-          Upload the print-file layout — <strong className="text-foreground">a high-quality PDF reads best</strong>{" "}
+          Upload the print-file layout - <strong className="text-foreground">a high-quality PDF reads best</strong>{" "}
           (photos can be blurry). Our AI reads every jersey and cross-checks it against the submitted
           roster, flagging typos, wrong sizes, or missing players before production. The submitted
           roster is below so you can also eyeball it yourself, and every uploaded file stays openable.
@@ -234,7 +234,7 @@ export function PrintFileQA({ token, rosterCount, roster = [], initialPrintFileU
               <p className="display text-foreground">
                 {effectiveOk ? "✅ " : "⚠️ "}
                 {clearedByOverride
-                  ? `All ${result.mismatches.length} flagged item${result.mismatches.length === 1 ? "" : "s"} reviewed and marked OK — clear for production.`
+                  ? `All ${result.mismatches.length} flagged item${result.mismatches.length === 1 ? "" : "s"} reviewed and marked OK - clear for production.`
                   : unresolved > 0 && dismissed.length > 0
                   ? `${unresolved} issue${unresolved === 1 ? "" : "s"} left (${dismissed.length} marked OK).`
                   : result.summary}
@@ -278,7 +278,7 @@ export function PrintFileQA({ token, rosterCount, roster = [], initialPrintFileU
               )}
 
               <p className="text-xs text-muted mt-3">
-                The AI can misread funky fonts — use “This is correct” on anything it flagged wrongly.
+                The AI can misread funky fonts - use “This is correct” on anything it flagged wrongly.
                 Full comparison is in the two tables above.
               </p>
             </div>

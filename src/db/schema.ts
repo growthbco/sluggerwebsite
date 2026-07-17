@@ -558,7 +558,7 @@ export const designRequests = pgTable(
     inspirationImages: jsonb("inspiration_images").$type<string[]>().default([]),
     // Proof/mockup images uploaded by the designer.
     proofImages: jsonb("proof_images").$type<string[]>().default([]),
-    // The single approved proof URL (selected on approval) — attached to the team order.
+    // The single approved proof URL (selected on approval) - attached to the team order.
     approvedDesignUrl: text("approved_design_url"),
 
     // Tokens powering the public client + private staff links.
@@ -570,7 +570,7 @@ export const designRequests = pgTable(
     // instead of creating a new one per event.
     discordThreadId: text("discord_thread_id"),
 
-    // Design fee ($35 default) — captured upfront to filter out customers who
+    // Design fee ($35 default) - captured upfront to filter out customers who
     // would otherwise shop the design elsewhere. Waived automatically for
     // returning customers (matched by email against prior approved design or
     // submitted team order).

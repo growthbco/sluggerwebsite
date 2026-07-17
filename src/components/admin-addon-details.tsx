@@ -39,7 +39,7 @@ export function AdminAddonDetails({ addons, teamName }: { addons: Addon[]; teamN
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={() => setOpen(false)}>
           <div className="w-full max-w-lg bg-ink border border-line max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-line sticky top-0 bg-ink">
-              <p className="display text-foreground">＋ Add-on items — {teamName}</p>
+              <p className="display text-foreground">＋ Add-on items - {teamName}</p>
               <button type="button" onClick={() => setOpen(false)} className="text-muted hover:text-foreground text-xl leading-none">✕</button>
             </div>
             <div className="p-4">
@@ -60,10 +60,10 @@ export function AdminAddonDetails({ addons, teamName }: { addons: Addon[]; teamN
                 <tbody>
                   {rows.map((r, i) => (
                     <tr key={i} className="border-b border-line/50">
-                      <td className="py-1.5 pr-2 text-foreground">{r.name?.trim() || "—"}</td>
-                      <td className="py-1.5 pr-2 text-muted">{r.number?.trim() || "—"}</td>
+                      <td className="py-1.5 pr-2 text-foreground">{r.name?.trim() || "-"}</td>
+                      <td className="py-1.5 pr-2 text-muted">{r.number?.trim() || "-"}</td>
                       <td className="py-1.5 pr-2 text-foreground">{r.label}</td>
-                      <td className="py-1.5 pr-2 text-foreground">{r.size || "—"}</td>
+                      <td className="py-1.5 pr-2 text-foreground">{r.size || "-"}</td>
                       <td className="py-1.5 pr-2 text-right text-muted">{r.quantity ?? 1}</td>
                       <td className="py-1.5 text-right text-muted">{money(r.unitPriceCents * (r.quantity ?? 1))}</td>
                     </tr>

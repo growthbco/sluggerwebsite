@@ -34,7 +34,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
   // Designer-only print-file QA: only renders once the client has approved this
   // design AND started a linked team order with at least one roster entry.
   // The coach's view (/team-order/manage/...) deliberately does NOT show this
-  // — we don't want to put the print-file check in front of the customer.
+  // - we don't want to put the print-file check in front of the customer.
   const linkedOrder = await getByDesignRequestId(request.id);
   const linkedRoster = linkedOrder ? await getRoster(linkedOrder.id) : [];
 

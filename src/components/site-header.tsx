@@ -85,7 +85,7 @@ export function SiteHeader() {
                 Team Order
               </Link>
               <CartButton />
-              {/* Hamburger — shown on anything below lg (covers mobile + tablet
+              {/* Hamburger - shown on anything below lg (covers mobile + tablet
                   where text nav is hidden but CTAs are inline). */}
               <button
                 onClick={() => setOpen((v) => !v)}

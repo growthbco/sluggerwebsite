@@ -72,7 +72,7 @@ export function AdminInvoiceButton({
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={() => !busy && reset()}>
           <div className="w-full max-w-md bg-ink border border-line max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-line sticky top-0 bg-ink">
-              <p className="display text-foreground">{resend ? "Re-send" : "Send"} {label} — {teamName}</p>
+              <p className="display text-foreground">{resend ? "Re-send" : "Send"} {label} - {teamName}</p>
               <button type="button" onClick={reset} disabled={busy} className="text-muted hover:text-foreground text-xl leading-none">✕</button>
             </div>
 

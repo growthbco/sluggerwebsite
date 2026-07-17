@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   );
 
   // If a designToken is attached, the team/contact identity MUST come from the
-  // design — the customer can't rename their team mid-funnel or break the link
+  // design - the customer can't rename their team mid-funnel or break the link
   // between approved design → team order → print-file QA.
   let teamName = body.teamName;
   let contactName = body.contactName;

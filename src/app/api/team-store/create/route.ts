@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     const storeUrl = `${SITE}/store/${store.storeToken}`;
     await postDesignThreadUpdate({
       threadId: request.discordThreadId ?? undefined,
-      title: `🛒 Team store opened — ${request.teamName} (${request.reference})`,
+      title: `🛒 Team store opened - ${request.teamName} (${request.reference})`,
       description: `Players and parents can now buy their own gear:\n${storeUrl}`,
       username: "Slugger Design Requests",
     });

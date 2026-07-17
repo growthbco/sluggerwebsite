@@ -71,7 +71,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         }),
         postDesignThreadUpdate({
           threadId: request.discordThreadId ?? undefined,
-          title: `💬 ${name ? `${name} messaged the client` : "Question sent to client"} — ${request.teamName} (${request.reference})`,
+          title: `💬 ${name ? `${name} messaged the client` : "Question sent to client"} - ${request.teamName} (${request.reference})`,
           description: notifyText.slice(0, 2000),
           imageUrl: firstImage,
           username: "Slugger Design Requests",
@@ -80,7 +80,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     } else {
       await postDesignThreadUpdate({
         threadId: request.discordThreadId ?? undefined,
-        title: `💬 Client replied — ${request.teamName} (${request.reference})`,
+        title: `💬 Client replied - ${request.teamName} (${request.reference})`,
         description: notifyText.slice(0, 2000),
         imageUrl: firstImage,
         username: "Slugger Design Requests",

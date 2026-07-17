@@ -56,7 +56,7 @@ export default function RootLayout({
           <main className="flex-1">{children}</main>
           <SiteFooter />
         </CartProvider>
-        {/* LeadConnector chat widget — loaded after page is interactive so
+        {/* LeadConnector chat widget - loaded after page is interactive so
             it doesn't block first paint. */}
         <Script
           src="https://beta.leadconnectorhq.com/loader.js"

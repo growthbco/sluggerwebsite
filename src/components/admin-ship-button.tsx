@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-/** Admin action: paste a tracking number (no label purchase) — used when a
+/** Admin action: paste a tracking number (no label purchase) - used when a
  *  label was bought elsewhere or two orders ship in one box. The customer gets
  *  the "on the way" email with a tracking link and the order flips to shipped.
  *  Fully in-modal so it works cleanly on phones (Android + iOS). */
@@ -70,7 +70,7 @@ export function AdminShipButton({
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={() => !busy && reset()}>
           <div className="w-full max-w-md bg-ink border border-line" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-line">
-              <p className="display text-foreground">🚚 Mark shipped — {who}</p>
+              <p className="display text-foreground">🚚 Mark shipped - {who}</p>
               <button type="button" onClick={reset} disabled={busy} className="text-muted hover:text-foreground text-xl leading-none">✕</button>
             </div>
             <div className="p-4 space-y-4">

@@ -32,7 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     return NextResponse.json({ error: "Upload a print file first." }, { status: 400 });
   }
 
-  // Roster ground truth — pulled directly from the rows the team submitted via
+  // Roster ground truth - pulled directly from the rows the team submitted via
   // the join link. Jersey size only (verifier compares per-jersey).
   const rosterRows = await getRoster(order.id);
   const roster: RosterEntry[] = rosterRows
@@ -64,7 +64,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
           : [
               { name: "Result", value: `⚠️ ${result.summary}`, inline: false },
               ...result.mismatches.slice(0, 10).map((m, i) => ({
-                name: `Issue ${i + 1} — ${m.kind.replace("_", " ")}`,
+                name: `Issue ${i + 1} - ${m.kind.replace("_", " ")}`,
                 value: m.detail.slice(0, 1024),
                 inline: false,
               })),
@@ -72,11 +72,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         await postDesignThreadUpdate({
           threadId: design.discordThreadId,
           title: result.ok
-            ? `🔍 Print file verified — ${order.teamName} (${order.reference})`
-            : `🔍 Print file QA — ${order.teamName} (${order.reference})`,
+            ? `🔍 Print file verified - ${order.teamName} (${order.reference})`
+            : `🔍 Print file QA - ${order.teamName} (${order.reference})`,
           description: result.ok
             ? `Cross-checked ${printFileUrls.length} print ${printFileUrls.length === 1 ? "file" : "files"} against the submitted roster. Safe to send to production.`
-            : "Found discrepancies between the print file and the submitted roster — fix and re-verify before printing.",
+            : "Found discrepancies between the print file and the submitted roster - fix and re-verify before printing.",
           fields,
           imageUrl: printFileUrls[0],
           username: "Slugger Print QA",

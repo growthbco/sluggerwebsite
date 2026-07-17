@@ -76,7 +76,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
       </div>
 
       <p className="mt-4 text-center text-xs text-muted">
-        Not your team? Close this page — your coach can send you the right link.
+        Not your team? Close this page - your coach can send you the right link.
       </p>
     </div>
   );

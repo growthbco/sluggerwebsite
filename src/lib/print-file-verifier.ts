@@ -165,9 +165,9 @@ async function extractJerseysFromImage(imageUrl: string): Promise<Extracted[]> {
     "- Read digits exactly as printed, including stylized fonts. If a digit is genuinely ambiguous, still give your single best reading.",
     "",
     "For every player jersey back, return one object with:",
-    "  name   – the player name only, uppercase, WITHOUT any logo/monogram text",
-    "  number – the printed jersey number (digits only)",
-    "  size   – the size label of the group it belongs to. Use only: 2T, 3T, 4T, 5T, 6T, YS, YM, YL, S, M, L, XL, 2XL, 3XL.",
+    "  name   - the player name only, uppercase, WITHOUT any logo/monogram text",
+    "  number - the printed jersey number (digits only)",
+    "  size   - the size label of the group it belongs to. Use only: 2T, 3T, 4T, 5T, 6T, YS, YM, YL, S, M, L, XL, 2XL, 3XL.",
     "          (so 'SMALL' → 'S', 'MEDIUM' → 'M', 'LARGE' → 'L', 'XLARGE' → 'XL', '2XLARGE' → '2XL').",
     "",
     "Return ONLY valid JSON with shape: { \"jerseys\": [ { \"name\": \"...\", \"number\": \"...\", \"size\": \"...\" }, ... ] }.",
@@ -283,7 +283,7 @@ export function diffPrintFileVsRoster(
       continue;
     }
 
-    // 3. Match on number only — likely name typo. Use Levenshtein to confirm.
+    // 3. Match on number only - likely name typo. Use Levenshtein to confirm.
     idx = printedRemaining.findIndex((p) => !p.matched && p.nNum === rNum);
     if (idx >= 0) {
       const p = printedRemaining[idx];
@@ -301,7 +301,7 @@ export function diffPrintFileVsRoster(
       }
     }
 
-    // 4. Nothing matched — roster player is missing from the print file.
+    // 4. Nothing matched - roster player is missing from the print file.
     mismatches.push({
       kind: "missing",
       roster: { name: r.name, number: r.number, size: r.size },

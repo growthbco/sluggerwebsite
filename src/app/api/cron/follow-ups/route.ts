@@ -51,7 +51,7 @@ export async function GET(req: Request) {
         await recordFollowUp(c.id);
         await postDesignThreadUpdate({
           threadId: c.discordThreadId ?? undefined,
-          title: `⏰ Auto follow-up ${round}/${MAX_FOLLOW_UPS} emailed — ${c.teamName} (${c.reference})`,
+          title: `⏰ Auto follow-up ${round}/${MAX_FOLLOW_UPS} emailed - ${c.teamName} (${c.reference})`,
           description: `Client hasn't reviewed the proof sent ${c.proofSentAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}. Reminder email sent automatically.`,
           username: "Slugger Design Requests",
         });
@@ -105,7 +105,7 @@ export async function GET(req: Request) {
         : null;
     const pinged = await postDesignThreadUpdate({
       threadId: d.discordThreadId ?? undefined,
-      title: `⏰ Needs a first proof — ${d.teamName} (${d.reference})`,
+      title: `⏰ Needs a first proof - ${d.teamName} (${d.reference})`,
       description: [
         `This design has been waiting **${d.waitingHours}h** with no proof sent to the client yet.`,
         deadline ? `Needed by **${deadline}**.` : "",

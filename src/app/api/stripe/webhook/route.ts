@@ -110,7 +110,7 @@ export async function POST(req: Request) {
           const tax = taxCents(goods);
           const shipping = Math.max(0, paidTotal - goods - tax);
           const playerLines = result.addon.rows
-            .map((r) => `• ${[r.name?.trim(), r.number ? `#${r.number}` : null].filter(Boolean).join(" ") || "(no name)"} — ${r.label} (${r.size}) — ${money(r.unitPriceCents)}`)
+            .map((r) => `• ${[r.name?.trim(), r.number ? `#${r.number}` : null].filter(Boolean).join(" ") || "(no name)"} - ${r.label} (${r.size}) - ${money(r.unitPriceCents)}`)
             .join("\n");
           const details =
             `**Added pieces:**\n${playerLines}\n\n` +

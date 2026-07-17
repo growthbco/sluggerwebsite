@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Team Stores — Custom Online Store for Your Team",
+  title: "Team Stores - Custom Online Store for Your Team",
   description:
     "Set up a branded online team store with Slugger Athletics. Players and fans order custom gear directly. Great for teams, leagues, schools, and fundraisers in Ocala and Central Florida.",
   keywords: ["team stores", "online team store", "spirit wear store", "booster club fundraiser store"],
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 const PERKS = [
-  { t: "Your Own Branded Store", d: "A dedicated store page with your team's logo, colors, and gear — ready to share with players and fans." },
+  { t: "Your Own Branded Store", d: "A dedicated store page with your team's logo, colors, and gear - ready to share with players and fans." },
   { t: "No Upfront Inventory", d: "Players and parents order directly. No bulk buying, no leftover stock, no chasing payments." },
   { t: "Great for Fundraising", d: "Add a margin to each item and the store doubles as a fundraiser for your team or program." },
   { t: "Open When You Need It", d: "Run a timed store window for a season, or keep it open for ongoing reorders and new members." },

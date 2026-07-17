@@ -32,7 +32,7 @@ export type NewDesignRequest = {
   colorHexes?: string[];
   /** When the customer needs the uniforms in hand. ISO date string. */
   neededBy?: string;
-  /** Fee state — set by the create-request route based on returning-customer
+  /** Fee state - set by the create-request route based on returning-customer
    *  detection. Defaults to "pending_payment" if not provided. */
   feeWaivedReason?: string | null;
   feeWaivedRef?: string | null;
@@ -57,7 +57,7 @@ function makeRef() {
 const token = () => randomUUID().replace(/-/g, "");
 
 /** Look up a prior order (design or team-order) for this email. Used to
- *  auto-waive the design fee for returning customers — we don't want to
+ *  auto-waive the design fee for returning customers - we don't want to
  *  re-charge people we know are going to buy from us. */
 export async function findReturningCustomerRef(email: string): Promise<string | null> {
   if (!email) return null;

@@ -53,7 +53,7 @@ export default function Home() {
               chains. <span className="text-foreground font-semibold">Free designs, no obligation</span> -
               ready in 2-3 weeks, or as fast as one week with rush.
             </p>
-            {/* Two clearly distinct entry points — most customers fit one of
+            {/* Two clearly distinct entry points - most customers fit one of
                 these two buckets, and we never want them guessing which to
                 click. */}
             <div className="mt-9 grid sm:grid-cols-2 gap-3 max-w-2xl">
@@ -65,7 +65,7 @@ export default function Home() {
                 <p className="display text-xl sm:text-2xl mt-1">Get a Free Design →</p>
                 <p className="text-sm opacity-90 mt-1">
                   {DESIGN_FEE_WAIVED
-                    ? "No design fee right now — free to start, no commitment."
+                    ? "No design fee right now - free to start, no commitment."
                     : "$35 to start, credited 100% to your final order."}
                 </p>
               </Link>

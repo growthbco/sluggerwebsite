@@ -51,7 +51,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     if (design?.discordThreadId) {
       await postDesignThreadUpdate({
         threadId: design.discordThreadId,
-        title: `✍️ Print file manually approved — ${order.teamName} (${order.reference})`,
+        title: `✍️ Print file manually approved - ${order.teamName} (${order.reference})`,
         description: `Staff reviewed ${dismissed.length} AI-flagged item${dismissed.length === 1 ? "" : "s"} and marked ${dismissed.length === 1 ? "it" : "them"} correct. Clear for production.`,
         username: "Slugger Print QA",
       });

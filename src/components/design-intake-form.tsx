@@ -151,7 +151,7 @@ export function DesignIntakeForm() {
             : "Our in-house designer will get started on your mockup. You can track its progress here:"}
         </p>
         {!returning && DESIGN_FEE_WAIVED && message === "promo_campaign" && (
-          <p className="mt-2 text-sm text-brand">No design fee — it&apos;s on us right now. 🎉</p>
+          <p className="mt-2 text-sm text-brand">No design fee - it&apos;s on us right now. 🎉</p>
         )}
         {statusUrl && (
           <div className="mt-4">
@@ -241,7 +241,7 @@ export function DesignIntakeForm() {
               value={jerseyStyle}
               onChange={(e) => setJerseyStyle(e.target.value)}
             >
-              <option value="">Not sure yet — recommend one</option>
+              <option value="">Not sure yet - recommend one</option>
               {JERSEY_STYLES.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -338,10 +338,10 @@ export function DesignIntakeForm() {
           if (!neededBy) return null;
           const days = (new Date(neededBy).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
           if (days >= 14) return <p className="mt-2 text-sm text-muted">✓ You&apos;re within our standard 2-3 week turnaround.</p>;
-          if (days < 0) return <p className="mt-2 text-sm text-brand">That date is in the past — please pick a future date.</p>;
+          if (days < 0) return <p className="mt-2 text-sm text-brand">That date is in the past - please pick a future date.</p>;
           return (
             <p className="mt-2 text-sm bg-brand/10 border border-brand/40 text-foreground p-3">
-              ⚡ Heads up — that&apos;s within 2 weeks. A <strong>$5 per item rush fee</strong> applies to make this deadline.
+              ⚡ Heads up - that&apos;s within 2 weeks. A <strong>$5 per item rush fee</strong> applies to make this deadline.
             </p>
           );
         })()}

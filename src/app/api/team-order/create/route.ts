@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
   // If a designToken is attached, the team/contact identity MUST come from the
-  // design — the link between approved design → team order is the source of
+  // design - the link between approved design → team order is the source of
   // truth for which uniform belongs to which team.
   let teamName = body.teamName;
   let contactName = body.contactName;

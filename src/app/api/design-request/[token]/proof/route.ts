@@ -39,7 +39,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     // Log into the Discord thread so the team has a single timeline.
     await postDesignThreadUpdate({
       threadId: request.discordThreadId ?? undefined,
-      title: `📤 Proof sent — ${request.teamName} (${request.reference})`,
+      title: `📤 Proof sent - ${request.teamName} (${request.reference})`,
       description: `${urls.length} proof${urls.length === 1 ? "" : "s"} sent to the client for review.`,
       imageUrl: urls[urls.length - 1],
       username: "Slugger Design Requests",

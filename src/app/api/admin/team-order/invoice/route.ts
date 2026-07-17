@@ -137,11 +137,11 @@ export async function POST(req: Request) {
     if (stage === "deposit") {
       // Deposit + a pay-in-full sibling. Whichever is paid first deactivates
       // the other (via siblingLinkId in the webhook) so nobody double-pays.
-      link = await makeLink(`50% Production Deposit — ${order.teamName} (${order.reference})`, dueCents, "deposit");
-      fullLink = await makeLink(`Pay in Full — ${order.teamName} (${order.reference})`, totalCents, "full", { siblingLinkId: link.id });
+      link = await makeLink(`50% Production Deposit - ${order.teamName} (${order.reference})`, dueCents, "deposit");
+      fullLink = await makeLink(`Pay in Full - ${order.teamName} (${order.reference})`, totalCents, "full", { siblingLinkId: link.id });
       await stripe.paymentLinks.update(link.id, { metadata: { ...link.metadata, siblingLinkId: fullLink.id } });
     } else {
-      link = await makeLink(`Final Balance — ${order.teamName} (${order.reference})`, dueCents, "balance", {}, shipCents);
+      link = await makeLink(`Final Balance - ${order.teamName} (${order.reference})`, dueCents, "balance", {}, shipCents);
     }
 
     await db

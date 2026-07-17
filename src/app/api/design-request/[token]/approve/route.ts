@@ -31,7 +31,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     // Post into the same Discord thread so the team sees the approval inline.
     await postDesignThreadUpdate({
       threadId: request.discordThreadId ?? undefined,
-      title: `✅ Approved — ${request.teamName} (${request.reference})`,
+      title: `✅ Approved - ${request.teamName} (${request.reference})`,
       description: "Client approved the design. The customer is being routed into the Team Order form (their team + contact pre-filled, design auto-attached).",
       imageUrl: approvedUrl,
       username: "Slugger Design Requests",

@@ -53,7 +53,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     });
     await postDesignThreadUpdate({
       threadId: request.discordThreadId ?? undefined,
-      title: `✏️ Changes requested — ${request.teamName} (${request.reference})`,
+      title: `✏️ Changes requested - ${request.teamName} (${request.reference})`,
       description: pinFields.length
         ? "Pins are tied to specific spots on the proof. See the manage view for the visual overlay."
         : undefined,

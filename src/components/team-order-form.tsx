@@ -149,7 +149,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
         </button>
       </div>
 
-      {/* Team + contact — locked when arriving from an approved design so the
+      {/* Team + contact - locked when arriving from an approved design so the
           team-order stays tied to the design (same name = same job). */}
       {prefill ? (
         <div className="bg-steel border border-brand/40 p-4 space-y-2">
@@ -186,7 +186,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
         </div>
       )}
 
-      {/* Jersey style — editable in both flows */}
+      {/* Jersey style - editable in both flows */}
       <div>
         <label className="display text-sm text-foreground">Jersey Style *</label>
         <select className={`mt-2 ${inputCls}`} value={jerseyStyle} onChange={(e) => setJerseyStyle(e.target.value)}>

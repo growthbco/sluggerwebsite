@@ -28,14 +28,14 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
     ? {
         label:
           request.designFeeWaivedReason === "returning_customer"
-            ? "✓ Design fee waived — returning customer"
+            ? "✓ Design fee waived - returning customer"
             : "✓ Design fee waived",
         tone: "good",
       }
     : request.designFeePaidAt
-    ? { label: "✓ $35 design fee paid — credited 100% to your final order", tone: "good" }
+    ? { label: "✓ $35 design fee paid - credited 100% to your final order", tone: "good" }
     : request.status === "pending_payment"
-    ? { label: "⏳ Awaiting payment — your designer starts once the $35 lands", tone: "warn" }
+    ? { label: "⏳ Awaiting payment - your designer starts once the $35 lands", tone: "warn" }
     : { label: `$35 design fee on file (${request.status})`, tone: "good" };
 
   return (

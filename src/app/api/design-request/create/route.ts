@@ -70,7 +70,7 @@ export async function POST(req: Request) {
 
   // Auto-bypass the $35 fee for returning customers (matched by email against
   // any prior approved design or submitted team order). When the promo flag is
-  // on, waive for everyone (campaign mode) — returning customers still get
+  // on, waive for everyone (campaign mode) - returning customers still get
   // tagged as such for reporting.
   const priorRef = await findReturningCustomerRef(body.contactEmail);
   const feeWaivedReason = priorRef
@@ -170,7 +170,7 @@ export async function POST(req: Request) {
           price_data: {
             currency: "usd",
             product_data: {
-              name: "Custom Design — Slugger Athletics",
+              name: "Custom Design - Slugger Athletics",
               description: `Design brief for ${body.teamName}. Fully credited to your final team order.`,
             },
             unit_amount: DESIGN_FEE_CENTS,

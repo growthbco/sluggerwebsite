@@ -15,8 +15,8 @@ const FAQS = [
   { q: "How long does production take?", a: "Most orders ship in 2-3 weeks after you approve your design. Need it sooner? Rush gets you there in about a week. Specialty items like hoodies, pants, or long-sleeve jerseys may add a few days." },
   { q: "How does sizing work?", a: "Our signature jerseys have a relaxed fit and run slightly large. Every product page has a size guide, and on team orders each player picks their own size to cut down on returns." },
   { q: "Do you really design for free?", a: DESIGN_FEE_WAIVED
-      ? "Yes — and right now there's no fee at all. We're waiving the usual $35 design fee for a limited time, so you can start a custom design completely free, see a proof, and approve it with no commitment."
-      : "Yes — with one small step. We charge $35 upfront to start the design, then credit 100% of it back to your final team order, so the design is free with purchase. The $35 just keeps us from designing for people who shop our artwork elsewhere. Returning Slugger customers get it waived automatically." },
+      ? "Yes - and right now there's no fee at all. We're waiving the usual $35 design fee for a limited time, so you can start a custom design completely free, see a proof, and approve it with no commitment."
+      : "Yes - with one small step. We charge $35 upfront to start the design, then credit 100% of it back to your final team order, so the design is free with purchase. The $35 just keeps us from designing for people who shop our artwork elsewhere. Returning Slugger customers get it waived automatically." },
   { q: "Can I customize name and number?", a: "Absolutely. Jerseys and apparel let you add a player name and number right on the product page, and team orders capture them per player." },
   { q: "What's a Buy-In?", a: "A Buy-In is a limited, themed drop (like our horror or seasonal collections). You buy your size during the open window - once it closes, that drop is done." },
   { q: "How do I set up a team store?", a: "Reach out and we'll set up a branded store for your team so players and fans can order gear directly. Great for fundraisers and ongoing orders." },

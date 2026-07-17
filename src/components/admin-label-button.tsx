@@ -113,7 +113,7 @@ export function AdminLabelButton({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-line sticky top-0 bg-ink">
-              <p className="display text-foreground">🏷 Buy label — {who}</p>
+              <p className="display text-foreground">🏷 Buy label - {who}</p>
               <button type="button" onClick={reset} disabled={busy} className="text-muted hover:text-foreground text-xl leading-none">✕</button>
             </div>
 
@@ -148,7 +148,7 @@ export function AdminLabelButton({
               {step === "rates" && !confirming && (
                 <>
                   <p className="text-xs text-muted">
-                    Weighing {weightLb} lb. Pick a service — the label buys at cost; the customer already paid shipping on their invoice.
+                    Weighing {weightLb} lb. Pick a service - the label buys at cost; the customer already paid shipping on their invoice.
                   </p>
                   {rates.map((r) => (
                     <button
@@ -185,7 +185,7 @@ export function AdminLabelButton({
                     disabled={busy}
                     className="w-full clip-slant bg-brand text-on-brand display px-6 py-3 hover:bg-brand-dark disabled:opacity-50"
                   >
-                    {busy ? "Buying label…" : `Buy this label — ${money(confirming.costCents)}`}
+                    {busy ? "Buying label…" : `Buy this label - ${money(confirming.costCents)}`}
                   </button>
                   <button type="button" onClick={() => setConfirming(null)} disabled={busy} className="w-full text-xs display text-muted border border-line py-2 hover:border-brand/50">
                     ← Back to rates
