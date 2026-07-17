@@ -28,6 +28,8 @@ export type NewDesignRequest = {
   /** What the customer wants mocked up (product labels) + jersey cut. */
   productTypes?: string[];
   jerseyStyle?: string;
+  /** Exact hex colors picked from the wheel. */
+  colorHexes?: string[];
   /** When the customer needs the uniforms in hand. ISO date string. */
   neededBy?: string;
   /** Fee state — set by the create-request route based on returning-customer
@@ -134,6 +136,7 @@ export async function createDesignRequest(input: NewDesignRequest) {
       notes: input.notes,
       productTypes: input.productTypes ?? [],
       jerseyStyle: input.jerseyStyle ?? null,
+      colorHexes: input.colorHexes ?? [],
       inspirationImages: input.inspirationImages ?? [],
       neededBy: neededByDate && !isNaN(neededByDate.getTime()) ? neededByDate : null,
       rush,

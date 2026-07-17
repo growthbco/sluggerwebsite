@@ -520,6 +520,9 @@ export const designRequests = pgTable(
     // jersey cut when a jersey is requested (Two-button, Crew neck, V-neck...).
     productTypes: jsonb("product_types").$type<string[]>().default([]),
     jerseyStyle: text("jersey_style"),
+    // Exact colors the customer picked from the hex wheel (e.g. ["#EC4899",
+    // "#000000"]). The free-form `colors` text still holds names/notes.
+    colorHexes: jsonb("color_hexes").$type<string[]>().default([]),
 
     // When the customer needs the uniforms in hand. Anything < 14 days triggers
     // the rush flag and surfaces a $5/item rush fee to both customer + team.

@@ -30,6 +30,7 @@ export async function POST(req: Request) {
     contactPhone?: string;
     vision?: string;
     colors?: string;
+    colorHexes?: string[];
     notes?: string;
     productTypes?: string[];
     jerseyStyle?: string;
@@ -52,6 +53,14 @@ export async function POST(req: Request) {
   const jerseyStyle = body.jerseyStyle?.trim() || undefined;
   // Human-readable "what to mock up" line for the designer (Discord + email).
   const products = formatProducts(productTypes, jerseyStyle);
+
+  // Valid #RRGGBB hexes picked from the wheel; fold them into the designer's
+  // colors line so email/Discord show the exact codes alongside any notes.
+  const colorHexes = (body.colorHexes ?? [])
+    .map((h) => String(h).trim().toUpperCase())
+    .filter((h) => /^#[0-9A-F]{6}$/.test(h))
+    .slice(0, 12);
+  const colorsForDesigner = [colorHexes.join(", "), body.colors?.trim()].filter(Boolean).join(" · ");
   if (!body.vision && !(body.inspirationImages?.length)) {
     return NextResponse.json(
       { error: "Add a description of your vision, or upload at least one inspiration image." },
@@ -83,6 +92,7 @@ export async function POST(req: Request) {
       notes: body.notes,
       productTypes,
       jerseyStyle,
+      colorHexes,
       inspirationImages: body.inspirationImages ?? [],
       neededBy: body.neededBy,
       feeWaivedReason,
@@ -101,7 +111,7 @@ export async function POST(req: Request) {
         sport: body.sport,
         products,
         vision: body.vision,
-        colors: body.colors,
+        colors: colorsForDesigner || undefined,
         inspirationImages: body.inspirationImages ?? [],
         manageUrl,
         neededBy,
@@ -120,7 +130,7 @@ export async function POST(req: Request) {
           contactPhone: body.contactPhone,
           products,
           vision: body.vision,
-          colors: body.colors,
+          colors: colorsForDesigner || undefined,
           inspirationImages: body.inspirationImages ?? [],
           manageUrl,
           neededBy,

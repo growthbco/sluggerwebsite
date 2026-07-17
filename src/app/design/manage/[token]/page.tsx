@@ -93,6 +93,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         products={formatProducts(request.productTypes, request.jerseyStyle) || null}
         vision={request.vision}
         colors={request.colors}
+        colorHexes={request.colorHexes ?? []}
         contact={{ name: request.contactName, email: request.contactEmail, phone: request.contactPhone }}
         inspirationImages={request.inspirationImages ?? []}
         proofImages={request.proofImages ?? []}

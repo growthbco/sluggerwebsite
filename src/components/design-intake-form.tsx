@@ -19,6 +19,8 @@ export function DesignIntakeForm() {
   const [otherProduct, setOtherProduct] = useState("");
   const [vision, setVision] = useState("");
   const [colors, setColors] = useState("");
+  const [colorHexes, setColorHexes] = useState<string[]>([]);
+  const [pickerColor, setPickerColor] = useState("#B8A36C");
   const [neededBy, setNeededBy] = useState("");
   const [images, setImages] = useState<Uploaded[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -51,6 +53,14 @@ export function DesignIntakeForm() {
 
   function toggleProduct(p: string) {
     setProductTypes((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+  }
+
+  function addColor() {
+    const hex = pickerColor.toUpperCase();
+    setColorHexes((prev) => (prev.includes(hex) ? prev : [...prev, hex]));
+  }
+  function removeColor(hex: string) {
+    setColorHexes((prev) => prev.filter((c) => c !== hex));
   }
 
   async function handleFiles(files: FileList | null) {
@@ -102,6 +112,7 @@ export function DesignIntakeForm() {
           jerseyStyle: wantsJersey && jerseyStyle ? jerseyStyle : undefined,
           vision,
           colors,
+          colorHexes,
           inspirationImages: images.map((i) => i.url),
           neededBy: neededBy || undefined,
         }),
@@ -266,7 +277,52 @@ export function DesignIntakeForm() {
 
       <div>
         <label className="display text-sm text-foreground">Colors</label>
-        <input className={`mt-2 ${inputCls}`} value={colors} onChange={(e) => setColors(e.target.value)} placeholder="Team colors, hex codes, or 'we want pink and black'..." />
+        <p className="text-sm text-muted mt-1">Pick your exact colors from the wheel and add as many as you need.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <label className="inline-flex items-center gap-2 cursor-pointer bg-steel border border-line px-3 py-2 hover:border-brand/50">
+            <input
+              type="color"
+              value={pickerColor}
+              onChange={(e) => setPickerColor(e.target.value)}
+              className="h-8 w-8 cursor-pointer border-0 bg-transparent p-0"
+              aria-label="Color wheel"
+            />
+            <span className="text-xs font-mono text-muted">{pickerColor.toUpperCase()}</span>
+          </label>
+          <button
+            type="button"
+            onClick={addColor}
+            className="display text-sm px-4 py-2.5 border border-brand text-brand hover:bg-brand/10"
+          >
+            + Add color
+          </button>
+        </div>
+
+        {colorHexes.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {colorHexes.map((hex) => (
+              <span key={hex} className="inline-flex items-center gap-2 bg-steel border border-line pl-1.5 pr-1 py-1">
+                <span className="h-5 w-5 border border-line" style={{ backgroundColor: hex }} />
+                <span className="text-xs font-mono text-foreground">{hex}</span>
+                <button
+                  type="button"
+                  onClick={() => removeColor(hex)}
+                  className="grid h-5 w-5 place-items-center text-muted hover:bg-brand hover:text-on-brand text-xs"
+                  aria-label={`Remove ${hex}`}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <input
+          className={`mt-3 ${inputCls}`}
+          value={colors}
+          onChange={(e) => setColors(e.target.value)}
+          placeholder="Any color notes? e.g. 'gold should be metallic', 'match our logo teal'..."
+        />
       </div>
 
       <div>

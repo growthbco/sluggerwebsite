@@ -1,0 +1,1 @@
+ALTER TABLE "design_requests" ADD COLUMN "color_hexes" jsonb DEFAULT '[]'::jsonb;

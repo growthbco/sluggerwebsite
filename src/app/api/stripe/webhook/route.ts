@@ -45,13 +45,15 @@ export async function POST(req: Request) {
           const statusUrl = `${SITE}/design/status/${request.statusToken}`;
           const manageUrl = `${SITE}/design/manage/${request.manageToken}`;
           const products = formatProducts(request.productTypes, request.jerseyStyle);
+          const colorsForDesigner =
+            [(request.colorHexes ?? []).join(", "), request.colors?.trim()].filter(Boolean).join(" · ") || undefined;
           const discordResult = await postDesignRequestToDiscord({
             reference: request.reference,
             teamName: request.teamName,
             sport: request.sport ?? undefined,
             products,
             vision: request.vision ?? undefined,
-            colors: request.colors ?? undefined,
+            colors: colorsForDesigner,
             inspirationImages: request.inspirationImages ?? [],
             manageUrl,
             neededBy: request.neededBy ?? undefined,
@@ -70,7 +72,7 @@ export async function POST(req: Request) {
               contactPhone: request.contactPhone ?? undefined,
               products,
               vision: request.vision ?? undefined,
-              colors: request.colors ?? undefined,
+              colors: colorsForDesigner,
               inspirationImages: request.inspirationImages ?? [],
               manageUrl,
               neededBy: request.neededBy ?? undefined,

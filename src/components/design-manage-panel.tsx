@@ -20,6 +20,7 @@ type Props = {
   products: string | null;
   vision: string | null;
   colors: string | null;
+  colorHexes: string[];
   contact: { name: string; email: string; phone: string | null };
   inspirationImages: string[];
   proofImages: string[];
@@ -39,6 +40,7 @@ export function DesignManagePanel({
   products,
   vision,
   colors,
+  colorHexes,
   contact,
   inspirationImages,
   proofImages,
@@ -141,10 +143,20 @@ export function DesignManagePanel({
             <div className="text-foreground">{products}</div>
           </div>
         )}
-        {colors && (
+        {(colors || colorHexes.length > 0) && (
           <div>
             <div className="display text-foreground text-xs">Colors</div>
-            <div className="text-muted">{colors}</div>
+            {colorHexes.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-2">
+                {colorHexes.map((hex) => (
+                  <span key={hex} className="inline-flex items-center gap-1.5 border border-line px-1.5 py-1">
+                    <span className="h-4 w-4 border border-line" style={{ backgroundColor: hex }} />
+                    <span className="text-muted text-xs font-mono">{hex}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+            {colors && <div className="text-muted mt-1">{colors}</div>}
           </div>
         )}
         {vision && (
