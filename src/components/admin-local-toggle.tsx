@@ -31,7 +31,7 @@ export function AdminLocalToggle({ teamOrderId, local }: { teamOrderId: string; 
       onClick={toggle}
       disabled={busy}
       title="Ocala league teams get standard jerseys at $25 instead of $28"
-      className={`text-xs display px-2 py-0.5 border disabled:opacity-50 ${
+      className={`text-xs display px-2 py-0.5 border disabled:opacity-50 whitespace-nowrap ${
         local ? "border-brand/60 text-brand bg-brand/10" : "border-line text-muted hover:border-brand/40"
       }`}
     >

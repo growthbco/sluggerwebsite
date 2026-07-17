@@ -397,8 +397,8 @@ export default async function AdminPage() {
                     <td className="px-3 py-2"><Badge label={o.status} /></td>
                     <td className="px-3 py-2 text-muted">{o.contactEmail}</td>
                     <td className="px-3 py-2 text-foreground">
-                      <span className="flex items-center gap-1.5">
-                        <span>
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <span className="whitespace-nowrap">
                           {estimate ? money(estimate) : "-"}
                           {estimate && !o.quotedTotalCents ? <span className="text-xs text-muted"> est.</span> : null}
                         </span>
@@ -416,30 +416,30 @@ export default async function AdminPage() {
                         )}
                       </span>
                     </td>
-                    <td className="px-3 py-2">
-                      <span className="flex items-center gap-2">
+                    <td className="px-3 py-2 min-w-[16rem]">
+                      <span className="flex flex-wrap items-center gap-1.5">
                         {o.shippedAt ? (
                           <>
-                            <span className="text-xs display text-green-400">🚚 SHIPPED</span>
+                            <span className="text-xs display text-green-400 whitespace-nowrap">🚚 SHIPPED</span>
                             {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
                           </>
                         ) : paid ? (
                           o.trackingNumber ? (
                             <>
-                              <span className="text-xs display text-amber-400" title="Label/tracking ready - customer not emailed yet">READY TO SHIP</span>
+                              <span className="text-xs display text-amber-400 whitespace-nowrap" title="Label/tracking ready - customer not emailed yet">READY TO SHIP</span>
                               <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
                               <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email" />
                             </>
                           ) : (
                             <>
-                              <span className="text-xs display text-green-400">PAID</span>
+                              <span className="text-xs display text-green-400 whitespace-nowrap">PAID</span>
                               <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />
                               <AdminShipButton kind="team_order" id={o.id} who={o.teamName} label="➕ Add tracking" />
                             </>
                           )
                         ) : o.depositPaidAt && estimate ? (
                           <>
-                            <span className="text-xs display text-sky-400" title="50% deposit received">DEPOSIT ✓</span>
+                            <span className="text-xs display text-sky-400 whitespace-nowrap">DEPOSIT ✓</span>
                             <AdminInvoiceButton
                               teamOrderId={o.id}
                               teamName={o.teamName}
@@ -552,8 +552,8 @@ export default async function AdminPage() {
                   <span className="ml-2 text-muted">{o.customerName ?? "-"}</span>
                   <span className="ml-2 text-xs text-muted">({o.type})</span>
                 </div>
-                <span className="flex items-center gap-2 shrink-0">
-                  <span className="text-foreground">
+                <span className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
+                  <span className="text-foreground whitespace-nowrap">
                     {money(o.totalCents)} <span className="text-muted text-xs">{fmtDate(o.createdAt)}</span>
                   </span>
                   {o.shippedAt ? (

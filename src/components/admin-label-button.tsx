@@ -101,7 +101,7 @@ export function AdminLabelButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-xs display text-foreground border border-brand/50 px-2.5 py-1 hover:bg-brand/10"
+        className="text-xs display text-foreground border border-brand/50 px-2.5 py-1 hover:bg-brand/10 whitespace-nowrap"
       >
         🏷 Buy label
       </button>

@@ -45,7 +45,7 @@ export function AdminArchiveButton({
       type="button"
       onClick={toggle}
       disabled={busy}
-      className="text-xs display text-muted border border-line px-2.5 py-1 hover:border-brand/50 hover:text-foreground disabled:opacity-50"
+      className="text-xs display text-muted border border-line px-2.5 py-1 hover:border-brand/50 hover:text-foreground disabled:opacity-50 whitespace-nowrap"
     >
       {busy ? "..." : archived ? "Restore" : "Archive"}
     </button>

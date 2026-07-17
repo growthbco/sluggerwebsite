@@ -30,7 +30,7 @@ export function AdminAddonDetails({ addons, teamName }: { addons: Addon[]; teamN
         type="button"
         onClick={() => setOpen(true)}
         title="View add-on items"
-        className="text-xs display text-emerald-400 border border-emerald-500/40 px-2 py-0.5 hover:bg-emerald-500/10"
+        className="text-xs display text-emerald-400 border border-emerald-500/40 px-2 py-0.5 hover:bg-emerald-500/10 whitespace-nowrap"
       >
         ＋{itemCount} add-on{itemCount === 1 ? "" : "s"}
       </button>

@@ -63,7 +63,7 @@ export function AdminInvoiceButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-xs display text-foreground border border-brand/50 px-2.5 py-1 hover:bg-brand/10 disabled:opacity-50"
+        className="text-xs display text-foreground border border-brand/50 px-2.5 py-1 hover:bg-brand/10 disabled:opacity-50 whitespace-nowrap"
       >
         {`${resend ? "Re-send" : "Send"} ${label}`}
       </button>

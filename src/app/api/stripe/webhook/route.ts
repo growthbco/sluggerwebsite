@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { eq } from "drizzle-orm";
-import { postOrderToDiscord, postDesignRequestToDiscord, postTeamOrderPaidToDiscord } from "@/lib/discord";
+import { postOrderToDiscord, postDesignRequestToDiscord, postTeamOrderPaidToDiscord, postAddonToDesignerDiscord } from "@/lib/discord";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
 import { getById, markDesignFeePaid, setDiscordThreadId, formatProducts } from "@/lib/design-requests";
@@ -124,6 +124,14 @@ export async function POST(req: Request) {
             stage: "balance",
             designThreadId: design?.discordThreadId,
             details,
+          });
+          // Tell the designer to add these pieces to the print file (posts in
+          // the project's design thread when there is one).
+          await postAddonToDesignerDiscord({
+            reference: result.order.reference,
+            teamName: result.order.teamName,
+            rows: result.addon.rows,
+            designThreadId: design?.discordThreadId,
           });
           const buyerEmail = session.customer_details?.email ?? result.order.contactEmail;
           if (buyerEmail) {

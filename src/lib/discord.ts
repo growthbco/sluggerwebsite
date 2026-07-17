@@ -139,6 +139,49 @@ export async function postTeamOrderPaidToDiscord(args: {
   });
 }
 
+/** Tell the designer to add paid add-on pieces to the print file. Posts into
+ *  the project's existing design thread when there is one (keeps the story in
+ *  one place); otherwise the #design-requests channel. Production-facing:
+ *  names / numbers / sizes, no pricing. */
+export async function postAddonToDesignerDiscord(args: {
+  reference: string;
+  teamName: string;
+  rows: Array<{ label: string; size: string; name?: string; number?: string; quantity: number }>;
+  designThreadId?: string | null;
+}): Promise<boolean> {
+  const designUrl = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
+  // Prefer the project's thread; fall back to the design channel, then the
+  // team-orders channel so the ping isn't lost if design Discord isn't set.
+  const url =
+    args.designThreadId && designUrl
+      ? `${designUrl}?thread_id=${args.designThreadId}`
+      : designUrl || process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
+  if (!url) {
+    console.warn("No Discord webhook set - skipping add-on designer ping");
+    return false;
+  }
+  const lines = args.rows
+    .map((r) => {
+      const who = [r.name?.trim(), r.number ? `#${r.number}` : null].filter(Boolean).join(" ") || "(no name)";
+      const qty = Math.max(1, r.quantity ?? 1);
+      return `• ${who} — ${r.label} (${r.size})${qty > 1 ? ` ×${qty}` : ""}`;
+    })
+    .join("\n");
+  return send(url, {
+    username: "Slugger Team Orders",
+    content: "@here ➕ Add-on to add to the print file",
+    allowed_mentions: { parse: ["everyone"] },
+    embeds: [
+      {
+        title: `➕ ADD TO PRINT FILE — ${args.teamName} (${args.reference})`,
+        description: `A paid add-on came in for an existing order. Please add these pieces to the print file:\n\n${lines}`,
+        color: GOLD,
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  });
+}
+
 /** Post a team order's roster (no pricing). Linked orders land INSIDE the
  *  design's existing thread so a project's whole story lives in one place;
  *  standalone orders go to the #team-orders channel. */

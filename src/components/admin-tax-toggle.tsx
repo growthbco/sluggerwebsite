@@ -31,7 +31,7 @@ export function AdminTaxToggle({ teamOrderId, exempt }: { teamOrderId: string; e
       onClick={toggle}
       disabled={busy}
       title="Tax-exempt companies/orgs pay no sales tax"
-      className={`text-xs display px-2 py-0.5 border disabled:opacity-50 ${
+      className={`text-xs display px-2 py-0.5 border disabled:opacity-50 whitespace-nowrap ${
         exempt ? "border-brand/60 text-brand bg-brand/10" : "border-line text-muted hover:border-brand/40"
       }`}
     >
