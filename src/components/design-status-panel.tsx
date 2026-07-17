@@ -146,6 +146,14 @@ export function DesignStatusPanel({
         </section>
       )}
 
+      {hasProof && !isApproved && (
+        <p className="text-sm text-foreground bg-brand/10 border border-brand/40 px-4 py-3">
+          ⚠ <strong>What you see is what you get.</strong> Everything on this proof — every name, number,
+          size, logo, and detail — prints on your jerseys exactly as shown. Please review it carefully
+          before approving.
+        </p>
+      )}
+
       {message && <p className="text-sm text-brand">{message}</p>}
 
       {isApproved ? (
