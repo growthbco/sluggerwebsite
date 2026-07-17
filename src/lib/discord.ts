@@ -106,6 +106,8 @@ export async function postTeamOrderPaidToDiscord(args: {
   totalCents: number;
   stage?: "deposit" | "balance";
   designThreadId?: string | null;
+  /** Extra lines appended under the amount (itemized add-on breakdown, etc.). */
+  details?: string;
 }): Promise<boolean> {
   const designUrl = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
   const url =
@@ -125,9 +127,11 @@ export async function postTeamOrderPaidToDiscord(args: {
         title: isDeposit
           ? `💰 50% DEPOSIT PAID — ${args.teamName} (${args.reference})`
           : `💰 PAID IN FULL — ${args.teamName} (${args.reference})`,
-        description: isDeposit
-          ? `Deposit received: **${amt}**. Clear to START production.`
-          : `Balance received: **${amt}**. Clear to ship when ready.`,
+        description:
+          (isDeposit
+            ? `Deposit received: **${amt}**. Clear to START production.`
+            : `Balance received: **${amt}**. Clear to ship when ready.`) +
+          (args.details ? `\n\n${args.details}` : ""),
         color: GOLD,
         timestamp: new Date().toISOString(),
       },

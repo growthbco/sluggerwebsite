@@ -79,8 +79,9 @@ export async function setAddonSession(addonId: string, sessionId: string) {
   await db.update(teamOrderAddons).set({ stripeCheckoutSessionId: sessionId }).where(eq(teamOrderAddons.id, addonId));
 }
 
-/** Webhook: mark paid (idempotent) and append the pieces to the roster. */
-export async function markAddonPaid(addonId: string, sessionId: string) {
+/** Webhook: mark paid (idempotent) and append the pieces to the roster.
+ *  paidTotalCents is Stripe's amount_total (goods + tax + shipping). */
+export async function markAddonPaid(addonId: string, sessionId: string, paidTotalCents?: number) {
   const db = getDb();
   const [addon] = await db.select().from(teamOrderAddons).where(eq(teamOrderAddons.id, addonId)).limit(1);
   if (!addon || addon.status === "paid") return null; // retry or unknown: skip
@@ -89,7 +90,7 @@ export async function markAddonPaid(addonId: string, sessionId: string) {
 
   await db
     .update(teamOrderAddons)
-    .set({ status: "paid", paidAt: new Date(), stripeCheckoutSessionId: sessionId })
+    .set({ status: "paid", paidAt: new Date(), stripeCheckoutSessionId: sessionId, paidTotalCents: paidTotalCents ?? null })
     .where(eq(teamOrderAddons.id, addonId));
 
   for (const r of addon.rows) {

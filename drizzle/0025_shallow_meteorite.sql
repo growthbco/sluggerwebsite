@@ -1,0 +1,1 @@
+ALTER TABLE "team_order_addons" ADD COLUMN "paid_total_cents" integer;

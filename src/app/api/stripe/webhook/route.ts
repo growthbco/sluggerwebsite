@@ -97,16 +97,33 @@ export async function POST(req: Request) {
     if (session.metadata?.kind === "team_order_addon" && session.metadata?.addonId && dbEnabled()) {
       try {
         const { markAddonPaid } = await import("@/lib/team-order-addons");
-        const result = await markAddonPaid(session.metadata.addonId, session.id);
+        const paidTotal = session.amount_total ?? 0;
+        const result = await markAddonPaid(session.metadata.addonId, session.id, paidTotal);
         if (result) {
           const { getById } = await import("@/lib/design-requests");
+          const { taxCents } = await import("@/lib/pricing");
           const design = result.order.designRequestId ? await getById(result.order.designRequestId) : null;
+          // Itemized breakdown so the ping is self-explanatory: who was added,
+          // and exactly why the total is what it is (goods + tax + shipping).
+          const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+          const goods = result.addon.rows.reduce((s, r) => s + r.unitPriceCents * r.quantity, 0);
+          const tax = taxCents(goods);
+          const shipping = Math.max(0, paidTotal - goods - tax);
+          const playerLines = result.addon.rows
+            .map((r) => `• ${[r.name?.trim(), r.number ? `#${r.number}` : null].filter(Boolean).join(" ") || "(no name)"} — ${r.label} (${r.size}) — ${money(r.unitPriceCents)}`)
+            .join("\n");
+          const details =
+            `**Added pieces:**\n${playerLines}\n\n` +
+            `Goods ${money(goods)} + tax ${money(tax)}` +
+            (shipping > 0 ? ` + shipping ${money(shipping)} (ships separately — main order already shipped)` : "") +
+            ` = **${money(paidTotal)}**`;
           await postTeamOrderPaidToDiscord({
             reference: `${result.order.reference} ADD-ON`,
-            teamName: `➕ ${result.order.teamName} — ${result.summary}`,
-            totalCents: session.amount_total ?? 0,
+            teamName: `➕ ${result.order.teamName}`,
+            totalCents: paidTotal,
             stage: "balance",
             designThreadId: design?.discordThreadId,
+            details,
           });
           const buyerEmail = session.customer_details?.email ?? result.order.contactEmail;
           if (buyerEmail) {

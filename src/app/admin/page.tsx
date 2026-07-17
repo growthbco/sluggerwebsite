@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { desc, sql } from "drizzle-orm";
+import { desc, sql, eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
-import { designRequests, teamOrders, teams, orders } from "@/db/schema";
+import { designRequests, teamOrders, teams, orders, teamOrderAddons } from "@/db/schema";
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
 import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
@@ -12,6 +12,7 @@ import { AdminInvoiceButton } from "@/components/admin-invoice-button";
 import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
 import { TrackingInfo } from "@/components/tracking-info";
+import { AdminAddonDetails } from "@/components/admin-addon-details";
 import { AdminArchiveButton } from "@/components/admin-archive-button";
 import { AdminLocalToggle } from "@/components/admin-local-toggle";
 import { AdminTaxToggle } from "@/components/admin-tax-toggle";
@@ -66,7 +67,7 @@ export default async function AdminPage() {
   }
 
   const db = getDb();
-  const [designs, torders, stores, recentOrders] = await Promise.all([
+  const [designs, torders, stores, recentOrders, paidAddons] = await Promise.all([
     db
       .select({
         id: designRequests.id,
@@ -141,7 +142,28 @@ export default async function AdminPage() {
       .from(orders)
       .orderBy(desc(orders.createdAt))
       .limit(15),
+    db
+      .select({
+        teamOrderId: teamOrderAddons.teamOrderId,
+        rows: teamOrderAddons.rows,
+        totalCents: teamOrderAddons.totalCents,
+        paidTotalCents: teamOrderAddons.paidTotalCents,
+        paidAt: teamOrderAddons.paidAt,
+      })
+      .from(teamOrderAddons)
+      .where(eq(teamOrderAddons.status, "paid"))
+      .orderBy(desc(teamOrderAddons.paidAt)),
   ]);
+
+  // Paid add-ons grouped by their parent team order, so each order can show
+  // the extra players (name / # / size) that were added after the fact.
+  type AddonView = { rows: typeof paidAddons[number]["rows"]; totalCents: number; paidTotalCents: number | null };
+  const addonsByOrder = new Map<string, AddonView[]>();
+  for (const a of paidAddons) {
+    const list = addonsByOrder.get(a.teamOrderId) ?? [];
+    list.push({ rows: a.rows, totalCents: a.totalCents, paidTotalCents: a.paidTotalCents });
+    addonsByOrder.set(a.teamOrderId, list);
+  }
 
   const activeDesigns = designs.filter((d) => !d.archivedAt);
   const archivedDesigns = designs.filter((d) => d.archivedAt);
@@ -364,7 +386,14 @@ export default async function AdminPage() {
                         {o.reference}
                       </Link>
                     </td>
-                    <td className="px-3 py-2 text-foreground">{o.teamName}</td>
+                    <td className="px-3 py-2 text-foreground">
+                      <span className="flex flex-wrap items-center gap-2">
+                        {o.teamName}
+                        {addonsByOrder.has(o.id) && (
+                          <AdminAddonDetails addons={addonsByOrder.get(o.id)!} teamName={o.teamName} />
+                        )}
+                      </span>
+                    </td>
                     <td className="px-3 py-2"><Badge label={o.status} /></td>
                     <td className="px-3 py-2 text-muted">{o.contactEmail}</td>
                     <td className="px-3 py-2 text-foreground">

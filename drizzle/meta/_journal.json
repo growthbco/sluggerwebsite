@@ -176,6 +176,13 @@
       "when": 1784247221475,
       "tag": "0024_orange_karnak",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1784297430478,
+      "tag": "0025_shallow_meteorite",
+      "breakpoints": true
     }
   ]
 }

@@ -459,7 +459,10 @@ export const teamOrderAddons = pgTable(
     rows: jsonb("rows")
       .$type<Array<{ key: string; label: string; size: string; name?: string; number?: string; quantity: number; unitPriceCents: number }>>()
       .notNull(),
-    totalCents: integer("total_cents").notNull(),
+    totalCents: integer("total_cents").notNull(), // goods only (pre-tax/shipping)
+    // What the customer actually paid at checkout (goods + 7% tax + shipping),
+    // so the admin can show why the total is what it is.
+    paidTotalCents: integer("paid_total_cents"),
     status: text("status").notNull().default("pending"), // pending | paid
     stripeCheckoutSessionId: text("stripe_checkout_session_id"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
