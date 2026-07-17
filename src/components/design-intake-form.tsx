@@ -195,6 +195,11 @@ export function DesignIntakeForm() {
       <div>
         <label className="display text-sm text-foreground">What do you want us to mock up? *</label>
         <p className="text-sm text-muted mt-1">Pick everything you&apos;d like designed. You can choose more than one.</p>
+        <p className="mt-2 text-sm bg-brand/10 border border-brand/40 text-foreground p-3">
+          Please only select the pieces you actually plan to buy. Each mockup takes real design
+          time to create, so we&apos;d rather focus on the gear you intend to order than design things
+          that won&apos;t get made.
+        </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {PRODUCT_OPTIONS.map((p) => {
             const on = productTypes.includes(p);
