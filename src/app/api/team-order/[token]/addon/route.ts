@@ -39,10 +39,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const stripe = getStripe();
 
-    // Before the main order ships, add-ons ride with the batch (no shipping).
-    // After it ships, they need their own delivery: weight-based rate or free
-    // local pickup, with an address collected.
-    const shipsSeparately = order.status === "shipped";
+    // Shipping rules for add-ons:
+    //  - A small add-on (under 10 pieces) on an order that HASN'T shipped yet
+    //    rides with the main batch for free.
+    //  - A large add-on (10+ pieces) is its own production run, so it ships
+    //    separately even if the main order hasn't gone out.
+    //  - Once the main order has shipped, ANY add-on needs its own delivery.
+    const ADDON_SEPARATE_SHIP_MIN = 10;
+    const pieceCount = rows.reduce((s, r) => s + r.quantity, 0);
+    const shipsSeparately = order.status === "shipped" || pieceCount >= ADDON_SEPARATE_SHIP_MIN;
     const goodsLineItems = rows.map((r) => ({
       quantity: r.quantity,
       price_data: {

@@ -115,7 +115,7 @@ export async function POST(req: Request) {
           const details =
             `**Added pieces:**\n${playerLines}\n\n` +
             `Goods ${money(goods)} + tax ${money(tax)}` +
-            (shipping > 0 ? ` + shipping ${money(shipping)} (ships separately — main order already shipped)` : "") +
+            (shipping > 0 ? ` + shipping ${money(shipping)} (ships separately)` : "") +
             ` = **${money(paidTotal)}**`;
           await postTeamOrderPaidToDiscord({
             reference: `${result.order.reference} ADD-ON`,
