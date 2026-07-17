@@ -368,43 +368,92 @@ export async function postContactToDiscord(msg: ContactPayload): Promise<boolean
   return send(url, body);
 }
 
-async function send(url: string, body: unknown): Promise<boolean> {
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      console.error("Discord webhook failed:", res.status, await res.text());
-      return false;
+const DISCORD_MAX_ATTEMPTS = 3;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** POST to a Discord webhook with retries on the transient failures that made
+ *  proof notifications vanish before: 429 rate limits (honoring Retry-After)
+ *  and 5xx / network errors (exponential backoff). Returns the parsed response
+ *  (for ?wait=true posts) on success, or null after exhausting retries. A hard
+ *  4xx (bad request) isn't retried - it won't succeed on a repeat. */
+async function postWebhook(url: string, body: unknown): Promise<{ ok: boolean; data?: { id?: string; channel_id?: string } }> {
+  for (let attempt = 1; attempt <= DISCORD_MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        // Only ?wait=true responses have a JSON body worth parsing.
+        let data: { id?: string; channel_id?: string } | undefined;
+        try {
+          data = url.includes("wait=true") ? ((await res.json()) as typeof data) : undefined;
+        } catch {}
+        return { ok: true, data };
+      }
+      const retriable = res.status === 429 || res.status >= 500;
+      const text = await res.text().catch(() => "");
+      if (retriable && attempt < DISCORD_MAX_ATTEMPTS) {
+        const retryAfter = Number(res.headers.get("retry-after"));
+        const waitMs = retryAfter > 0 ? retryAfter * 1000 : attempt * 600;
+        console.warn(`Discord webhook ${res.status} (attempt ${attempt}) - retrying in ${waitMs}ms`);
+        await sleep(waitMs);
+        continue;
+      }
+      console.error("Discord webhook failed:", res.status, text.slice(0, 300));
+      return { ok: false };
+    } catch (e) {
+      console.error(`Discord webhook error (attempt ${attempt}):`, e);
+      if (attempt < DISCORD_MAX_ATTEMPTS) {
+        await sleep(attempt * 600);
+        continue;
+      }
+      return { ok: false };
     }
-    return true;
-  } catch (e) {
-    console.error("Discord webhook error:", e);
-    return false;
   }
+  return { ok: false };
+}
+
+/** Email a fallback alert to staff when a Discord notification can't be posted
+ *  after retries, so nothing goes silently missing. Best-effort; email is an
+ *  independent channel from Discord. */
+async function alertDiscordFailure(body: unknown): Promise<void> {
+  try {
+    const embed = (body as { embeds?: Array<{ title?: string; description?: string }> })?.embeds?.[0] ?? {};
+    const esc = (s: string) => s.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!));
+    const { sendEmail, CONTACT_INBOX } = await import("@/lib/email");
+    await sendEmail({
+      to: process.env.ALERT_EMAIL || CONTACT_INBOX,
+      subject: "⚠️ A Discord notification failed to post",
+      html: `
+        <p>A Discord notification could not be posted after ${DISCORD_MAX_ATTEMPTS} attempts, so it may be missing from the channel.</p>
+        <p><strong>${esc(embed.title ?? "Notification")}</strong></p>
+        ${embed.description ? `<p>${esc(embed.description)}</p>` : ""}
+        <p style="color:#666;font-size:13px;">Please post it manually in Discord or check the webhook configuration.</p>
+      `,
+    });
+  } catch (e) {
+    console.error("Discord failure alert email also failed:", e);
+  }
+}
+
+async function send(url: string, body: unknown): Promise<boolean> {
+  const { ok } = await postWebhook(url, body);
+  if (!ok) await alertDiscordFailure(body);
+  return ok;
 }
 
 /** Same as send() but uses ?wait=true so Discord returns the created Message,
  *  which lets us capture channel_id (= thread_id for forum posts). */
 async function sendAndReturn(url: string, body: unknown): Promise<{ id?: string; channel_id?: string } | null> {
-  try {
-    const sep = url.includes("?") ? "&" : "?";
-    const res = await fetch(`${url}${sep}wait=true`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      console.error("Discord webhook failed:", res.status, await res.text());
-      return null;
-    }
-    return (await res.json()) as { id?: string; channel_id?: string };
-  } catch (e) {
-    console.error("Discord webhook error:", e);
+  const sep = url.includes("?") ? "&" : "?";
+  const { ok, data } = await postWebhook(`${url}${sep}wait=true`, body);
+  if (!ok) {
+    await alertDiscordFailure(body);
     return null;
   }
+  return data ?? {};
 }
 
 /** Post a follow-up update INTO the existing thread for a design request
