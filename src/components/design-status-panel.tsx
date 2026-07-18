@@ -156,9 +156,9 @@ export function DesignStatusPanel({
 
       {hasProof && !isApproved && (
         <p className="text-sm text-foreground bg-brand/10 border border-brand/40 px-4 py-3">
-          ⚠ <strong>What you see is what you get.</strong> Everything on this proof - every name, number,
-          size, logo, and detail - prints on your jerseys exactly as shown. Please review it carefully
-          before approving.
+          ⚠ <strong>Your approved design is what we produce.</strong> Every name, number, size, logo,
+          and detail on the proof you approve prints exactly as shown. Not right yet? Request changes -
+          revisions are included. Once you approve, it goes straight to production as-is.
         </p>
       )}
 
