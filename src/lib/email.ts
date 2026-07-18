@@ -288,6 +288,13 @@ export async function emailInvoiceReminder(args: {
 }
 
 /** Shipping notification with the tracking number. */
+// Direct "write a review" link for the Slugger Athletics Google Business
+// Profile (place ID from Google Maps). Review text mentioning specific
+// products (hats, jerseys) is a local-SEO ranking signal, so the ask below
+// nudges customers to say what they ordered.
+const GOOGLE_REVIEW_URL =
+  "https://search.google.com/local/writereview?placeid=ChIJh0imFOTa7EgRpcOO8DdGe9E";
+
 export async function emailOrderShipped(args: {
   to: string;
   name?: string | null;
@@ -305,7 +312,10 @@ export async function emailOrderShipped(args: {
       bodyHtml: `
         <p style="margin:0 0 12px;">Your custom gear just shipped. Track it here:</p>
         <p style="margin:0 0 12px;background:#f6f4ee;padding:12px 14px;border-left:3px solid #b8a36c;font-family:monospace;">${esc(args.trackingNumber)}</p>
-        <p style="margin:0;">Once it lands, we'd love to see it on the field - tag us @sluggerathletics!</p>
+        <p style="margin:0 0 16px;">Once it lands, we'd love to see it on the field - tag us @sluggerathletics!</p>
+        <p style="margin:0 0 6px;"><strong>Happy with your gear?</strong> A quick Google review helps our small shop more than you'd think.</p>
+        <p style="margin:0 0 12px;font-size:13px;color:#555;">One sentence about what we made for you (jerseys, embroidered hats, the whole kit) helps other teams find us.</p>
+        <p style="margin:0;"><a href="${GOOGLE_REVIEW_URL}" style="color:#b8a36c;font-weight:bold;">Leave a Google review →</a></p>
       `,
       ctaText: "Track your package",
       ctaUrl: args.trackingUrl,
