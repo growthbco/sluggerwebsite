@@ -6,7 +6,7 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.sluggerathletics.c
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticPaths = [
     "", "/shop", "/shop/uniforms", "/shop/hats", "/shop/chains", "/shop/accessories",
-    "/drops", "/team-uniforms", "/embroidery", "/hype-chains", "/gallery",
+    "/drops", "/team-uniforms", "/embroidery", "/custom-hats", "/hype-chains", "/gallery",
     "/team-order", "/pricing", "/track", "/size-guide", "/faq", "/contact", "/shipping", "/returns",
     "/privacy", "/terms",
   ];

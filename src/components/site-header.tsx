@@ -14,7 +14,7 @@ const nav = [
   { href: "/shop", label: "Shop" },
   { href: "/team-uniforms", label: "Uniforms" },
   { href: "/drops", label: "Buy-Ins" },
-  { href: "/embroidery", label: "Embroidery" },
+  { href: "/custom-hats", label: "Custom Hats" },
   { href: "/pricing", label: "Pricing" },
   { href: "/gallery", label: "Gallery" },
 ];

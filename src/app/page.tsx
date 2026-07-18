@@ -49,8 +49,11 @@ export default function Home() {
               <span className="text-brand">Gear</span> That Hits
             </h1>
             <p className="mt-6 text-lg text-muted max-w-xl">
-              Uniforms for every sport, expertly embroidered hats, and 3D hype
-              chains. <span className="text-foreground font-semibold">Free designs, no obligation</span> -
+              Uniforms for every sport,{" "}
+              <Link href="/custom-hats" className="text-foreground underline underline-offset-4 decoration-brand hover:text-brand transition-colors">
+                custom embroidered hats
+              </Link>
+              , and 3D hype chains. <span className="text-foreground font-semibold">Free designs, no obligation</span> -
               ready in 2-3 weeks, or as fast as one week with rush.
             </p>
             {/* Two clearly distinct entry points - most customers fit one of

@@ -61,8 +61,11 @@ export default function EmbroideryPage() {
           Custom Embroidery in Ocala
         </h1>
         <p className="mt-5 text-lg text-muted max-w-2xl mx-auto">
-          Slugger Athletics is your local source for <strong className="text-foreground">custom embroidered team hats</strong>,
-          caps, polos, and apparel in Ocala and across Central Florida. We embroider
+          Slugger Athletics is your local source for{" "}
+          <Link href="/custom-hats" className="text-foreground font-semibold underline underline-offset-4 decoration-brand hover:text-brand transition-colors">
+            custom embroidered team hats
+          </Link>
+          , caps, polos, and apparel in Ocala and across Central Florida. We embroider
           your logo with crisp, durable stitching - designed in-house, free of charge,
           and shipped fast.
         </p>
@@ -133,7 +136,8 @@ export default function EmbroideryPage() {
           Based in Ocala, we serve teams, leagues, schools, and businesses throughout
           Marion County and Central Florida - including The Villages, Gainesville, and
           surrounding areas. Looking for <strong className="text-foreground">embroidery in Ocala</strong>?
-          We make custom embroidered hats and apparel easy.
+          We make custom embroidered hats and apparel easy - and if you&apos;re outside Florida,
+          we ship <Link href="/custom-hats" className="text-brand hover:underline">custom embroidered hats with no minimum</Link> nationwide.
         </p>
         <p className="mt-6 text-muted">
           Call <a href="tel:+13526601232" className="text-brand hover:underline">352-660-1232</a> or

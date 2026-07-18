@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CategoryTabs } from "@/components/category-tabs";
 import { ShopGrid } from "@/components/shop-grid";
@@ -6,7 +7,7 @@ import { byCategory, type Category } from "@/lib/catalog";
 
 const CATEGORIES: Record<Category, { title: string; blurb: string }> = {
   uniforms: { title: "Team Uniforms & Jerseys", blurb: "Custom jerseys and uniforms for every sport - designed in-house, free of charge." },
-  hats: { title: "Embroidered Hats", blurb: "Expertly embroidered caps and snapbacks to round out your look." },
+  hats: { title: "Embroidered Hats", blurb: "Expertly embroidered fitted caps, snapbacks, and trucker hats to round out your look." },
   chains: { title: "Hype Chains", blurb: "3D hype chains and accessories to bring the energy." },
   accessories: { title: "Accessories", blurb: "Hoodies, shorts, and gear that go with your kit." },
 };
@@ -48,6 +49,18 @@ export default async function CategoryPage({
         <CategoryTabs active={category} />
       </div>
       <ShopGrid products={items} />
+      {/* Hats is a money category: route shoppers who want their OWN logo to
+          the custom page instead of bouncing off the ready-made grid. */}
+      {category === "hats" && (
+        <div className="mt-12 bg-steel border border-line p-6 text-center">
+          <h2 className="display text-xl text-foreground">Want your own logo on a hat?</h2>
+          <p className="mt-2 text-muted text-sm max-w-xl mx-auto">
+            We make <Link href="/custom-hats" className="text-brand hover:underline">custom embroidered hats with no minimum order</Link> -
+            fitted Flexfit, snapback, and trucker styles from $25 with free logo digitizing.
+            In Central Florida? See our <Link href="/embroidery" className="text-brand hover:underline">embroidery services in Ocala</Link>.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

@@ -19,6 +19,8 @@ const FAQS = [
       : "Yes - with one small step. We charge $35 upfront to start the design, then credit 100% of it back to your final team order, so the design is free with purchase. The $35 just keeps us from designing for people who shop our artwork elsewhere. Returning Slugger customers get it waived automatically." },
   { q: "Can I customize name and number?", a: "Absolutely. Jerseys and apparel let you add a player name and number right on the product page, and team orders capture them per player." },
   { q: "What's a Buy-In?", a: "A Buy-In is a limited, themed drop (like our horror or seasonal collections). You buy your size during the open window - once it closes, that drop is done." },
+  { q: "Do you make custom embroidered hats?", a: "Yes - fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo. Snapbacks and truckers are $25, fitted hats are $30, and an embroidered number on the back adds $5. Logo digitizing and your proof are free.", link: { href: "/custom-hats", label: "See custom embroidered hats" } },
+  { q: "Is there a minimum for custom hats?", a: "No - custom embroidered hats have no minimum order. Buy a single hat or cover the whole team at the same flat price.", link: { href: "/custom-hats", label: "Custom hats with no minimum" } },
   { q: "How do I set up a team store?", a: "Reach out and we'll set up a branded store for your team so players and fans can order gear directly. Great for fundraisers and ongoing orders." },
 ];
 
@@ -50,6 +52,13 @@ export default function FaqPage() {
               <span className="text-brand text-xl transition-transform group-open:rotate-45">+</span>
             </summary>
             <p className="mt-3 text-muted">{f.a}</p>
+            {"link" in f && f.link && (
+              <p className="mt-2">
+                <Link href={f.link.href} className="text-brand hover:underline text-sm">
+                  {f.link.label} →
+                </Link>
+              </p>
+            )}
           </details>
         ))}
       </div>

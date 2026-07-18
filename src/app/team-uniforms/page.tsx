@@ -47,7 +47,9 @@ export default function TeamUniformsPage() {
           Based in Ocala, we outfit teams, leagues, and schools throughout Marion
           County and Central Florida - including The Villages, Gainesville, and beyond.
           Searching for <strong className="text-foreground">custom team uniforms in Ocala</strong>? We make
-          full team ordering simple with player self-entry rosters.
+          full team ordering simple with player self-entry rosters. Top off the look with{" "}
+          <a href="/custom-hats" className="text-brand hover:underline">custom embroidered hats</a> -
+          no minimum, with matching player numbers.
         </>
       }
       jsonLd={{

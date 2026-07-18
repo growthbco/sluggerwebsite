@@ -7,7 +7,8 @@ const cols = [
     links: [
       { href: "/shop", label: "All Products" },
       { href: "/team-uniforms", label: "Team Uniforms" },
-      { href: "/embroidery", label: "Embroidered Hats" },
+      { href: "/custom-hats", label: "Custom Embroidered Hats" },
+      { href: "/embroidery", label: "Embroidery - Ocala, FL" },
       { href: "/hype-chains", label: "Hype Chains" },
       { href: "/drops", label: "Buy-Ins" },
     ],
