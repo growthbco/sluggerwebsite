@@ -24,6 +24,7 @@ const cols = [
   {
     title: "Support",
     links: [
+      { href: "/services", label: "All Services & Pricing" },
       { href: "/pricing", label: "Pricing" },
       { href: "/track", label: "Track Order" },
       { href: "/faq", label: "FAQs" },

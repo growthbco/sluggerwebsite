@@ -7,7 +7,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const staticPaths = [
     "", "/shop", "/shop/uniforms", "/shop/hats", "/shop/chains", "/shop/accessories",
     "/drops", "/team-uniforms", "/embroidery", "/custom-hats", "/hype-chains", "/gallery",
-    "/team-order", "/pricing", "/track", "/size-guide", "/faq", "/contact", "/shipping", "/returns",
+    "/team-order", "/services", "/pricing", "/track", "/size-guide", "/faq", "/contact", "/shipping", "/returns",
     "/privacy", "/terms",
   ];
 
