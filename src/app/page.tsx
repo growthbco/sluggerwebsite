@@ -3,7 +3,7 @@ import Image from "next/image";
 import { categories } from "@/lib/sample-data";
 import { dropProducts, primaryImage, formatPrice } from "@/lib/catalog";
 import { heroPhoto } from "@/lib/gallery";
-import { ElevateSection, Reviews, SocialGrid, AboutBand, FaqTeaser } from "@/components/home-extras";
+import { ElevateSection, SystemSection, Reviews, SocialGrid, AboutBand, FaqTeaser } from "@/components/home-extras";
 import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
 
 export default function Home() {
@@ -111,6 +111,9 @@ export default function Home() {
 
       {/* Elevate Your Game - feature section */}
       <ElevateSection />
+
+      {/* The automated ordering system - the "why us" pitch for new customers */}
+      <SystemSection />
 
       {/* ---------------------------------------------------------------- */}
       {/* Categories                                                       */}

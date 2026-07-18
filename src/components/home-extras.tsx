@@ -49,6 +49,72 @@ export function ElevateSection() {
   );
 }
 
+/* The ordering system is a real differentiator: most competitors still run on
+ * email chains and spreadsheets. Spell out what's automated so new customers
+ * see the benefit before they ever place an order. */
+const SYSTEM_FEATURES = [
+  {
+    t: "Free Design Proofs, Online",
+    d: "Watch your design come together on a live status page. Request changes, message your designer with photos, and approve the final proof right from your phone.",
+  },
+  {
+    t: "Player Self-Entry Rosters",
+    d: "Share one link and every player enters their own name, number, and size. Have a roster already? Snap a photo or upload a spreadsheet and our AI fills it in for you to confirm.",
+  },
+  {
+    t: "AI-Checked Print Files",
+    d: "Before anything prints, our AI cross-checks every name, number, and size on the print file against your roster. Typos get caught before they reach the field - what you approve is what you get.",
+  },
+  {
+    t: "Pay Online, Your Way",
+    d: "Secure online checkout with a 50% deposit to start production and the balance when your order is ready. No checks, no chasing.",
+  },
+  {
+    t: "Add Players Anytime",
+    d: "Late addition to the roster? Pay online for extra pieces and they join your existing order - and go through the same proof and AI check so they come out right.",
+  },
+  {
+    t: "Track It All Season",
+    d: "Live order tracking from production to your door, plus private team stores so players and fans can grab gear whenever they want.",
+  },
+];
+
+export function SystemSection() {
+  return (
+    <section className="bg-steel border-y border-line">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-16 sm:py-20">
+        <div className="max-w-2xl">
+          <span className="display text-brand text-sm">Why Ordering With Us Is Easy</span>
+          <h2 className="display text-3xl sm:text-4xl text-foreground mt-1">
+            A Smarter Way to Order Team Gear
+          </h2>
+          <p className="mt-3 text-muted">
+            We built our own ordering system so you never deal with email chains,
+            spreadsheets, or surprise misprints. Here&apos;s what&apos;s working for you
+            behind the scenes:
+          </p>
+        </div>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {SYSTEM_FEATURES.map((f) => (
+            <div key={f.t} className="bg-ink border border-line p-6">
+              <h3 className="display text-lg text-foreground">{f.t}</h3>
+              <p className="mt-2 text-sm text-muted">{f.d}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-8 flex flex-wrap gap-4">
+          <Link href="/design" className="clip-slant bg-brand text-on-brand display px-6 py-3 hover:bg-brand-dark transition-colors">
+            Get a Free Design
+          </Link>
+          <Link href="/team-order" className="clip-slant border border-line text-foreground display px-6 py-3 hover:bg-foreground/5 transition-colors">
+            Start a Team Order
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function Reviews() {
   return (
     <section className="bg-steel border-y border-line">
