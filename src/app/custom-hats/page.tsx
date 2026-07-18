@@ -4,9 +4,24 @@ import Image from "next/image";
 import { byCategory, primaryImage } from "@/lib/catalog";
 
 export const metadata: Metadata = {
-  title: "Custom Embroidered Hats - No Minimum Order | Fitted, Snapback & Trucker",
+  // Keep the pre-template title under ~45 chars: the layout appends
+  // "| Slugger Athletics" and Google truncates around 60.
+  title: "Custom Embroidered Hats - No Minimum Order",
   description:
-    "Custom embroidered hats with no minimum order. Fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo - free digitizing, free proof, flat $25-30 pricing, shipped in 2-3 weeks.",
+    "Custom embroidered hats with no minimum order. Fitted Flexfit caps, snapbacks, and trucker hats with your logo - free digitizing, free proof, from $25.",
+  openGraph: {
+    title: "Custom Embroidered Hats - No Minimum Order",
+    description:
+      "Fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo. Free digitizing, free proof, from $25 - no minimums.",
+    type: "website",
+    url: "/custom-hats",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Custom Embroidered Hats - No Minimum Order",
+    description:
+      "Fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo. Free digitizing, free proof, from $25 - no minimums.",
+  },
   keywords: [
     "custom embroidered hats",
     "custom embroidered hats no minimum",
