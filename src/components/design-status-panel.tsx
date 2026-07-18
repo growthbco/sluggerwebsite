@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ProofAnnotator, type Annotation } from "@/components/proof-annotator";
+import { ProofLightbox } from "@/components/proof-lightbox";
 
 type Props = {
   token: string;
@@ -46,6 +47,7 @@ export function DesignStatusPanel({
   const [generalNote, setGeneralNote] = useState("");
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [used, setUsed] = useState(revisionsUsed);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const copy = STATUS_COPY[currentStatus] ?? { label: currentStatus, blurb: "" };
   const isApproved = currentStatus === "approved" || currentStatus === "ordered";
@@ -124,22 +126,28 @@ export function DesignStatusPanel({
         <section>
           <h2 className="display text-xl text-foreground">Your proof{proofImages.length > 1 ? "s" : ""}</h2>
           {proofImages.length > 1 && !isApproved && (
-            <p className="text-sm text-muted mt-1">Click a proof to select it, then approve or request changes.</p>
+            <p className="text-sm text-muted mt-1">Click a proof to select and enlarge it, then approve or request changes.</p>
           )}
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {proofImages.map((u) => (
               <button
                 key={u}
                 type="button"
-                onClick={() => !isApproved && setChosen(u)}
-                className={`relative aspect-[4/3] bg-white border-2 overflow-hidden ${
+                onClick={() => {
+                  if (!isApproved) setChosen(u);
+                  setExpanded(u);
+                }}
+                className={`group relative aspect-[4/3] bg-white border-2 overflow-hidden cursor-zoom-in ${
                   chosen === u ? "border-brand" : "border-line hover:border-brand/50"
-                } ${isApproved ? "cursor-default" : "cursor-pointer"}`}
+                }`}
               >
                 <Image src={u} alt="Proof" fill sizes="(max-width: 640px) 100vw, 50vw" className="object-contain p-2" unoptimized />
                 {chosen === u && !isApproved && (
                   <span className="absolute top-2 right-2 grid place-items-center h-7 w-7 bg-brand text-on-brand display text-xs">✓</span>
                 )}
+                <span className="absolute bottom-2 left-2 bg-black/70 text-white text-[11px] px-2 py-1 pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
+                  Click to enlarge
+                </span>
               </button>
             ))}
           </div>
@@ -229,6 +237,8 @@ export function DesignStatusPanel({
           </button>
         </section>
       )}
+
+      {expanded && <ProofLightbox src={expanded} onClose={() => setExpanded(null)} />}
     </div>
   );
 }
