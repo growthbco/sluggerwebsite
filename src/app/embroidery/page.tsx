@@ -28,7 +28,7 @@ const WHAT_WE_EMBROIDER = [
 const PROCESS = [
   { n: 1, t: "Send your logo", d: "Share your logo or idea - our in-house team digitizes it for embroidery at no charge." },
   { n: 2, t: "Approve a proof", d: "We send a free proof so you can see exactly how the stitch-out will look before we run it." },
-  { n: 3, t: "We stitch & ship", d: "Your embroidered hats and gear are produced and shipped fast - typically in 2-3 weeks." },
+  { n: 3, t: "We stitch & ship", d: "Embroidery is done in-house, so turnaround is quick - small orders in days, larger runs in a week or two." },
 ];
 
 export default function EmbroideryPage() {

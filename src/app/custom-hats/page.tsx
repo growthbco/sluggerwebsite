@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   // "| Slugger Athletics" and Google truncates around 60.
   title: "Custom Embroidered Hats - No Minimum Order",
   description:
-    "Custom embroidered hats with no minimum order. Fitted Flexfit caps, snapbacks, and trucker hats with your logo - free digitizing, free proof, from $25.",
+    "Custom embroidered hats with no minimum order. Flexfit caps, snapbacks, and truckers stitched in-house in Ocala for quick turnaround - free proof, from $25.",
   openGraph: {
     title: "Custom Embroidered Hats - No Minimum Order",
     description:
@@ -79,7 +79,7 @@ const FAQS = [
   },
   {
     q: "How long do custom hats take?",
-    a: "Most hat orders ship in 2-3 weeks after you approve your proof. Need them sooner? Rush production gets hats to you in about a week.",
+    a: "Hats are embroidered right here in our Ocala shop, so turnaround is quick - smaller orders are often ready in just days, larger runs about a week or two. Rush options are available if you're on a deadline.",
   },
   {
     q: "What logo file do I need?",
@@ -133,6 +133,8 @@ export default function CustomHatsPage() {
           <strong className="text-foreground">no minimum order</strong>. Flat pricing at{" "}
           <strong className="text-foreground">$25-30 per hat</strong>, free logo digitizing, and a
           free proof before we stitch. Order one hat or a hundred - same price, same quality.
+          Every hat is embroidered right here in our Ocala shop, so smaller orders are often
+          ready in just days.
         </p>
         <div className="mt-8 flex flex-wrap gap-4 justify-center">
           <Link href="/team-order" className="clip-slant bg-brand text-on-brand display text-lg px-8 py-4 hover:bg-brand-dark transition-colors">
@@ -223,7 +225,7 @@ export default function CustomHatsPage() {
           {[
             { n: 1, t: "Send your logo", d: "Share your logo or idea - our in-house team digitizes it for embroidery at no charge." },
             { n: 2, t: "Approve a proof", d: "We send a free proof so you see exactly how the stitch-out will look before we run it." },
-            { n: 3, t: "We stitch & ship", d: "Your hats are embroidered and shipped fast - typically in 2-3 weeks, or about a week with rush." },
+            { n: 3, t: "We stitch & ship", d: "Hats are stitched in-house, so most orders are ready fast - days for small runs, about a week or two for big ones." },
           ].map((s) => (
             <div key={s.n} className="text-center">
               <div className="mx-auto h-12 w-12 grid place-items-center clip-slant bg-brand text-on-brand display text-xl">{s.n}</div>
