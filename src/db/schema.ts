@@ -428,6 +428,13 @@ export const teamOrders = pgTable(
     labelUrl: text("label_url"),
     shippedAt: timestamp("shipped_at", { withTimezone: true }),
 
+    // Inbound production shipment (factory -> Slugger in Florida). Entered by
+    // the designer on /design/manage. Internal only - never shown to the
+    // customer; their tracking is the outbound trackingNumber above.
+    inboundCarrier: text("inbound_carrier"),
+    inboundTrackingNumber: text("inbound_tracking_number"),
+    inboundTrackingAddedAt: timestamp("inbound_tracking_added_at", { withTimezone: true }),
+
     // Admin archive: hides the order from the active list without deleting it,
     // with a note ("lost - went with competitor") for later follow-up.
     archivedAt: timestamp("archived_at", { withTimezone: true }),

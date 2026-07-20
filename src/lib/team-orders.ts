@@ -157,6 +157,24 @@ export async function savePrintFileVerification(
     .where(eq(teamOrders.id, teamOrderId));
 }
 
+/** Designer logs the factory -> Slugger shipment. Internal only. */
+export async function saveInboundTracking(
+  teamOrderId: string,
+  trackingNumber: string,
+  carrier: string,
+) {
+  const db = getDb();
+  await db
+    .update(teamOrders)
+    .set({
+      inboundTrackingNumber: trackingNumber,
+      inboundCarrier: carrier,
+      inboundTrackingAddedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(teamOrders.id, teamOrderId));
+}
+
 /** Coach submits the order; locks self-entry and marks it submitted. */
 export async function submitTeamOrder(teamOrderId: string) {
   const db = getDb();

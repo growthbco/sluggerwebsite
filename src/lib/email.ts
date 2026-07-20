@@ -324,6 +324,34 @@ export async function emailOrderShipped(args: {
   });
 }
 
+/** Internal heads-up: the designer logged the factory -> Slugger tracking
+ *  number, so the order is on its way to the Florida shop. Never sent to the
+ *  customer. */
+export async function emailInboundShipment(args: {
+  reference: string;
+  teamName: string;
+  carrier: string;
+  trackingNumber: string;
+  trackingUrl: string;
+}): Promise<boolean> {
+  return sendEmail({
+    to: CONTACT_INBOX,
+    subject: `📦 Inbound shipment: ${args.teamName} (${args.reference})`,
+    html: brandedEmail({
+      preheader: `${args.carrier} ${args.trackingNumber}`,
+      heading: "Order is on the way to us",
+      intro: `Team order <strong>${esc(args.reference)}</strong> · ${esc(args.teamName)}`,
+      bodyHtml: `
+        <p style="margin:0 0 12px;">The designer added tracking for the production shipment headed to the shop.</p>
+        <p style="margin:0 0 12px;background:#f6f4ee;padding:12px 14px;border-left:3px solid #b8a36c;font-family:monospace;">${esc(args.carrier)} · ${esc(args.trackingNumber)}</p>
+        <p style="margin:0;font-size:13px;color:#555;">Internal only - the customer does not see this. When it lands, use the admin page to create the outbound label and email their tracking.</p>
+      `,
+      ctaText: "Check shipment status",
+      ctaUrl: args.trackingUrl,
+    }),
+  });
+}
+
 /** Friendly reminder that a proof is waiting on the client's review. */
 export async function emailProofFollowUp(args: {
   to: string;

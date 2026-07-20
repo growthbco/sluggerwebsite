@@ -12,6 +12,7 @@ import { AdminInvoiceButton } from "@/components/admin-invoice-button";
 import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
 import { TrackingInfo } from "@/components/tracking-info";
+import { inboundTrackingUrlFor } from "@/lib/tracking";
 import { AdminAddonDetails } from "@/components/admin-addon-details";
 import { AdminArchiveButton } from "@/components/admin-archive-button";
 import { AdminLocalToggle } from "@/components/admin-local-toggle";
@@ -109,6 +110,8 @@ export default async function AdminPage() {
         trackingNumber: teamOrders.trackingNumber,
         labelUrl: teamOrders.labelUrl,
         shippedAt: teamOrders.shippedAt,
+        inboundCarrier: teamOrders.inboundCarrier,
+        inboundTrackingNumber: teamOrders.inboundTrackingNumber,
         archivedAt: teamOrders.archivedAt,
         archivedNote: teamOrders.archivedNote,
         updatedAt: teamOrders.updatedAt,
@@ -418,6 +421,19 @@ export default async function AdminPage() {
                     </td>
                     <td className="px-3 py-2 min-w-[16rem]">
                       <span className="flex flex-wrap items-center gap-1.5">
+                        {/* Inbound leg (factory -> shop): shown until we ship
+                            out to the customer. Internal only. */}
+                        {o.inboundTrackingNumber && !o.shippedAt && (
+                          <a
+                            href={inboundTrackingUrlFor(o.inboundTrackingNumber, o.inboundCarrier)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`Inbound from production - ${o.inboundCarrier ?? "carrier"} ${o.inboundTrackingNumber}`}
+                            className="text-xs display text-violet-400 underline decoration-dotted underline-offset-2 hover:text-violet-300 whitespace-nowrap"
+                          >
+                            ✈ INBOUND · {o.inboundCarrier ?? "?"}
+                          </a>
+                        )}
                         {o.shippedAt ? (
                           <>
                             <span className="text-xs display text-green-400 whitespace-nowrap">🚚 SHIPPED</span>

@@ -9,6 +9,7 @@ import { DesignMessages } from "@/components/design-messages";
 import { DesignProgress } from "@/components/design-progress";
 import { TeamStoreTeaser } from "@/components/team-store-teaser";
 import { PrintFileQA } from "@/components/print-file-qa";
+import { InboundTracking } from "@/components/inbound-tracking";
 
 export const metadata: Metadata = { title: "Manage Design Request", robots: { index: false } };
 
@@ -82,6 +83,23 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
             linkedOrder.printFileUrls ?? (linkedOrder.printFileUrl ? [linkedOrder.printFileUrl] : [])
           }
           initialResult={linkedOrder.printFileVerification ?? null}
+        />
+      )}
+
+      {/* Designer-only inbound tracking (factory -> Slugger). Same auth story
+          as print-file QA: the team-order manage token, reached via the
+          staff-only Discord thread. Customers never see this section. */}
+      {linkedOrder && linkedOrder.manageToken && (
+        <InboundTracking
+          token={linkedOrder.manageToken}
+          initial={
+            linkedOrder.inboundTrackingNumber
+              ? {
+                  trackingNumber: linkedOrder.inboundTrackingNumber,
+                  carrier: linkedOrder.inboundCarrier ?? "Other",
+                }
+              : null
+          }
         />
       )}
 
