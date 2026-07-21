@@ -18,6 +18,8 @@ export const ITEM_WEIGHT_OZ: Record<string, number> = {
   shorts: 10,
   hoodie: 24,
   socks: 3,
+  fitted_hat: 5,
+  snapback_hat: 5,
 };
 
 export function addonWeightOz(rows: { key: string; quantity: number }[]): number {

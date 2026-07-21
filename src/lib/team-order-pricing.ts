@@ -11,6 +11,8 @@ const ITEM_PRICES: Record<string, number> = {
   shorts: 2500,
   hoodie: 4000,
   socks: 1500,
+  fitted_hat: 3000,
+  snapback_hat: 2500,
 };
 
 export const RUSH_FEE_CENTS = 500; // per piece, when rushShipping is set
@@ -27,6 +29,8 @@ export const ITEM_WEIGHT_OZ: Record<string, number> = {
   shorts: 10,
   hoodie: 24,
   socks: 3,
+  fitted_hat: 5,
+  snapback_hat: 5,
 };
 
 /** Total estimated package weight (oz) for an order's roster. Each player's

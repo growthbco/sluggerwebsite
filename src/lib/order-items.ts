@@ -9,6 +9,10 @@ export const APPAREL_SIZES = [
 
 export const SOCK_SIZES = ["Youth S/M", "Youth L/XL", "Adult S/M", "Adult L/XL"];
 
+// Flexfit i8503 size range; snapbacks are one size fits most.
+export const FITTED_HAT_SIZES = ["XS", "S/M", "L/XL", "XXL"];
+export const SNAPBACK_HAT_SIZES = ["One Size"];
+
 export type ItemType = { key: string; label: string; sizes: string[] };
 
 export const ITEM_TYPES: ItemType[] = [
@@ -18,6 +22,8 @@ export const ITEM_TYPES: ItemType[] = [
   { key: "shorts", label: "Shorts", sizes: APPAREL_SIZES },
   { key: "hoodie", label: "Hoodie", sizes: APPAREL_SIZES },
   { key: "socks", label: "Socks", sizes: SOCK_SIZES },
+  { key: "fitted_hat", label: "Fitted Hat", sizes: FITTED_HAT_SIZES },
+  { key: "snapback_hat", label: "Snapback Hat", sizes: SNAPBACK_HAT_SIZES },
 ];
 
 // Jersey fabric options with plain-language descriptions for shoppers.
