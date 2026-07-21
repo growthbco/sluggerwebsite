@@ -227,6 +227,32 @@ export async function approveDesign(id: string, approvedUrl?: string) {
     .where(eq(designRequests.id, id));
 }
 
+/** Staff/designer manually sets (or corrects) WHICH proof is the approved
+ *  design - for when the client approves one file, then changes their mind,
+ *  or the auto-picked "latest proof" wasn't the one they meant. Also syncs
+ *  any linked team orders, which carry a copy of the approved URL. */
+export async function setApprovedDesign(id: string, url: string) {
+  const db = getDb();
+  const now = new Date();
+  const [existing] = await db.select().from(designRequests).where(eq(designRequests.id, id)).limit(1);
+  if (!existing) return null;
+  await db
+    .update(designRequests)
+    .set({
+      approvedDesignUrl: url,
+      approvedAt: existing.approvedAt ?? now,
+      // Don't walk an "ordered" design backwards.
+      ...(existing.status !== "ordered" ? { status: "approved" as const } : {}),
+      updatedAt: now,
+    })
+    .where(eq(designRequests.id, id));
+  await db
+    .update(teamOrders)
+    .set({ approvedDesignUrl: url, updatedAt: now })
+    .where(eq(teamOrders.designRequestId, id));
+  return existing;
+}
+
 /** Max free revision rounds a client gets before the Request Changes
  *  button locks. Cap exists to keep designs from spiraling. */
 export const MAX_REVISIONS = 5;

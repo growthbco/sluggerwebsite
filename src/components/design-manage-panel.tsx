@@ -24,6 +24,7 @@ type Props = {
   contact: { name: string; email: string; phone: string | null };
   inspirationImages: string[];
   proofImages: string[];
+  approvedUrl: string | null;
   statusUrl: string;
   revisionsUsed: number;
   maxRevisions: number;
@@ -44,6 +45,7 @@ export function DesignManagePanel({
   contact,
   inspirationImages,
   proofImages,
+  approvedUrl,
   statusUrl,
   revisionsUsed,
   maxRevisions,
@@ -52,6 +54,9 @@ export function DesignManagePanel({
   neededBy,
 }: Props) {
   const [proofs, setProofs] = useState<string[]>(proofImages);
+  const [approved, setApproved] = useState<string | null>(approvedUrl);
+  const [settingApproved, setSettingApproved] = useState<string | null>(null);
+  const [approvedMessage, setApprovedMessage] = useState("");
   const [uploading, setUploading] = useState(false);
   const [posting, setPosting] = useState(false);
   const [pending, setPending] = useState<string[]>([]);
@@ -99,6 +104,26 @@ export function DesignManagePanel({
       setMessage((e as Error).message);
     } finally {
       setPosting(false);
+    }
+  }
+
+  async function markApproved(url: string) {
+    setSettingApproved(url);
+    setApprovedMessage("");
+    try {
+      const res = await fetch(`/api/design-request/${token}/set-approved`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not set the approved design.");
+      setApproved(url);
+      setApprovedMessage("Saved. The Discord thread was pinged with this exact image.");
+    } catch (e) {
+      setApprovedMessage((e as Error).message);
+    } finally {
+      setSettingApproved(null);
     }
   }
 
@@ -252,13 +277,43 @@ export function DesignManagePanel({
       {proofs.length > 0 && (
         <section>
           <h2 className="display text-xl text-foreground">Sent proofs</h2>
-          <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2">
-            {proofs.map((u, i) => (
-              <a key={i} href={u} target="_blank" rel="noopener noreferrer" className="relative aspect-square bg-white border border-line overflow-hidden block">
-                <Image src={u} alt={`Proof ${i + 1}`} fill sizes="20vw" className="object-contain p-1" unoptimized />
-              </a>
-            ))}
+          <p className="text-sm text-muted mt-1">
+            {approved
+              ? "The green-marked proof is THE approved design - build the print file from that exact version."
+              : "If the client approves outside the site (or changes their mind), use \"This one's approved\" to lock in the right version and ping the Discord thread."}
+          </p>
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {proofs.map((u, i) => {
+              const isApproved = approved === u;
+              return (
+                <div key={i} className={`border ${isApproved ? "border-green-500" : "border-line"}`}>
+                  <a href={u} target="_blank" rel="noopener noreferrer" className="relative aspect-square bg-white overflow-hidden block">
+                    <Image src={u} alt={`Proof ${i + 1}`} fill sizes="25vw" className="object-contain p-1" unoptimized />
+                    {isApproved && (
+                      <span className="absolute top-1 left-1 bg-green-600 text-white display text-[10px] px-1.5 py-0.5">
+                        ✓ APPROVED
+                      </span>
+                    )}
+                  </a>
+                  {!isApproved && (
+                    <button
+                      type="button"
+                      onClick={() => markApproved(u)}
+                      disabled={settingApproved !== null}
+                      className="w-full text-[11px] display text-muted border-t border-line px-1 py-1.5 hover:text-foreground hover:bg-steel disabled:opacity-50"
+                    >
+                      {settingApproved === u
+                        ? "Saving..."
+                        : approved
+                          ? "Approve this instead"
+                          : "This one's approved"}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
+          {approvedMessage && <p className="mt-2 text-sm text-brand">{approvedMessage}</p>}
         </section>
       )}
 
