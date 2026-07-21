@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { postTeamOrderToDiscord } from "@/lib/discord";
 import { dbEnabled } from "@/db";
-import { getByStatusToken, markOrdered } from "@/lib/design-requests";
+import { getByStatusToken, findActiveDesignByEmail, markOrdered } from "@/lib/design-requests";
 import { createTeamOrder, addRosterRow, submitTeamOrder } from "@/lib/team-orders";
 
 export const runtime = "nodejs";
@@ -42,14 +42,23 @@ export async function POST(req: Request) {
   let design: Awaited<ReturnType<typeof getByStatusToken>> | null = null;
   if (body.designToken && dbEnabled()) {
     design = await getByStatusToken(body.designToken);
+    if (design?.status === "cancelled") design = null;
+    // Identity-lock only once the proof is approved; before that the design's
+    // own details may still be in flux, but the LINK stays either way so the
+    // roster lands in the design's Discord thread.
     if (design && (design.status === "approved" || design.status === "ordered")) {
       teamName = design.teamName;
       contactName = design.contactName;
       contactEmail = design.contactEmail;
       contactPhone = design.contactPhone ?? undefined;
-    } else {
-      design = null;
     }
+  }
+  // Safety net: coaches routinely skip their design link and fill this form by
+  // hand. If their email has exactly one active design request, attach the
+  // order to it so the roster posts into that design's existing thread instead
+  // of spawning a disconnected one. Identity is NOT overridden here.
+  if (!design && !body.designToken && body.contactEmail && dbEnabled()) {
+    design = await findActiveDesignByEmail(body.contactEmail);
   }
 
   if (!teamName || !contactName || !contactEmail) {

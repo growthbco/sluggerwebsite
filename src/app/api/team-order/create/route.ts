@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { createTeamOrder } from "@/lib/team-orders";
-import { getByStatusToken } from "@/lib/design-requests";
+import { getByStatusToken, findActiveDesignByEmail } from "@/lib/design-requests";
 
 export const runtime = "nodejs";
 
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   let designRequestId: string | undefined;
   if (body.designToken) {
     const design = await getByStatusToken(body.designToken);
-    if (design) {
+    if (design && design.status !== "cancelled") {
       designRequestId = design.id;
       if (design.status === "approved" || design.status === "ordered") {
         teamName = design.teamName;
@@ -38,6 +38,13 @@ export async function POST(req: Request) {
         contactPhone = design.contactPhone ?? undefined;
       }
     }
+  }
+  // Safety net: no design link, but this email has exactly one active design
+  // request - attach the order to it so roster notifications land in that
+  // design's Discord thread instead of spawning a disconnected one.
+  if (!designRequestId && !body.designToken && body.contactEmail) {
+    const design = await findActiveDesignByEmail(body.contactEmail);
+    if (design) designRequestId = design.id;
   }
 
   if (!teamName || !contactName || !contactEmail) {

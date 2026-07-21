@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq, and, or, sql } from "drizzle-orm";
+import { eq, ne, and, or, desc, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { designRequests, teamOrders } from "@/db/schema";
 
@@ -86,6 +86,24 @@ export async function findReturningCustomerRef(email: string): Promise<string | 
   if (priorOrder) return priorOrder.reference;
 
   return null;
+}
+
+/** Find this email's active design request. Safety net for coaches who skip
+ *  their design link and fill the plain /team-order form by hand - we still
+ *  want their roster attached to the design's Discord thread. Returns null
+ *  unless exactly ONE non-cancelled design matches: guessing between two
+ *  active designs would post a roster into the wrong team's thread. */
+export async function findActiveDesignByEmail(email: string) {
+  if (!email) return null;
+  const db = getDb();
+  const e = email.trim().toLowerCase();
+  const rows = await db
+    .select()
+    .from(designRequests)
+    .where(and(sql`lower(${designRequests.contactEmail}) = ${e}`, ne(designRequests.status, "cancelled")))
+    .orderBy(desc(designRequests.createdAt))
+    .limit(2);
+  return rows.length === 1 ? rows[0] : null;
 }
 
 /** Mark the design fee as paid (via Stripe webhook) and flip status to
