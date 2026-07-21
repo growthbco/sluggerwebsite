@@ -7,7 +7,7 @@ import { getDb } from "@/db";
 import { teamOrderAddons, teamOrders } from "@/db/schema";
 import { addRosterRow } from "@/lib/team-orders";
 import { itemPriceCents } from "@/lib/team-order-pricing";
-import { itemLabel, sizesFor } from "@/lib/order-items";
+import { itemLabel, sizesFor, isInHouseItem } from "@/lib/order-items";
 
 // Approx shipping weight per piece in ounces - used when an add-on comes in
 // AFTER the main order shipped (it can't ride with the batch anymore).
@@ -110,16 +110,20 @@ export async function markAddonPaid(addonId: string, sessionId: string, paidTota
     }
   }
 
-  // Any add-on invalidates the current print-file QA: the file on record
-  // doesn't include the new pieces, so the designer must upload an updated
-  // print file and pass the AI check (or staff override) again before
+  // A printed-piece add-on invalidates the current print-file QA: the file on
+  // record doesn't include the new pieces, so the designer must upload an
+  // updated print file and pass the AI check (or staff override) again before
   // printing - even if the original order was already verified and approved.
   // The old sheet URLs are kept so re-verifying against them flags the new
-  // pieces as missing instead of silently passing.
-  await db
-    .update(teamOrders)
-    .set({ printFileVerifiedAt: null, printFileVerification: null, updatedAt: new Date() })
-    .where(eq(teamOrders.id, addon.teamOrderId));
+  // pieces as missing instead of silently passing. In-house pieces (hats) are
+  // embroidered at the shop and never touch the print file, so a hat-only
+  // add-on leaves the QA alone.
+  if (addon.rows.some((r) => !isInHouseItem(r.key))) {
+    await db
+      .update(teamOrders)
+      .set({ printFileVerifiedAt: null, printFileVerification: null, updatedAt: new Date() })
+      .where(eq(teamOrders.id, addon.teamOrderId));
+  }
 
   const summary = addon.rows.map((r) => `${r.quantity}× ${r.label}`).join(", ");
   return { addon, order, summary };

@@ -7,6 +7,7 @@ import { designRequests, teamOrders, teams, orders, teamOrderAddons } from "@/db
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
 import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
+import { itemLabel, isInHouseItem } from "@/lib/order-items";
 import { AdminLogout } from "@/components/admin-logout";
 import { AdminInvoiceButton } from "@/components/admin-invoice-button";
 import { AdminShipButton } from "@/components/admin-ship-button";
@@ -174,13 +175,33 @@ export default async function AdminPage() {
   const archivedOrders = torders.filter((o) => o.archivedAt);
 
   // Price each unpaid team order from its roster so "Send invoice" can show
-  // the number upfront. Roster fetches are per-order but the list is small.
+  // the number upfront, and count in-house pieces (hats we embroider in
+  // Ocala) so they stay visible until shipped - the factory shipment won't
+  // contain them. Roster fetches are per-order but the list is small.
   const orderEstimates = new Map<string, number>();
+  const inHouseWork = new Map<string, string>(); // order id -> "11× Snapback Hat"
   for (const o of activeOrders) {
-    if (o.status === "paid" || o.invoicePaidAt) continue;
     try {
       const roster = await getRoster(o.id);
-      if (roster.length) orderEstimates.set(o.id, computeTeamOrderQuote(o, roster).totalCents);
+      if (!roster.length) continue;
+      if (!(o.status === "paid" || o.invoicePaidAt)) {
+        orderEstimates.set(o.id, computeTeamOrderQuote(o, roster).totalCents);
+      }
+      if (!o.shippedAt) {
+        const counts = new Map<string, number>();
+        for (const r of roster) {
+          const qty = Math.max(1, r.quantity ?? 1);
+          for (const [k, v] of Object.entries(r.sizes ?? {})) {
+            if (isInHouseItem(k) && (v ?? "").trim()) counts.set(k, (counts.get(k) ?? 0) + qty);
+          }
+        }
+        if (counts.size) {
+          inHouseWork.set(
+            o.id,
+            Array.from(counts.entries()).map(([k, n]) => `${n}× ${itemLabel(k)}`).join(", "),
+          );
+        }
+      }
     } catch {}
   }
 
@@ -421,6 +442,17 @@ export default async function AdminPage() {
                     </td>
                     <td className="px-3 py-2 min-w-[16rem]">
                       <span className="flex flex-wrap items-center gap-1.5">
+                        {/* Pieces we embroider in-house (hats): the factory
+                            shipment won't contain these, so keep them in view
+                            until the order ships. */}
+                        {inHouseWork.has(o.id) && (
+                          <span
+                            title="Embroidered in-house in Ocala - not part of the factory shipment"
+                            className="text-xs display text-amber-300 border border-amber-300/40 px-1.5 py-0.5 whitespace-nowrap"
+                          >
+                            🧢 IN-HOUSE: {inHouseWork.get(o.id)}
+                          </span>
+                        )}
                         {/* Inbound leg (factory -> shop): shown until we ship
                             out to the customer. Internal only. */}
                         {o.inboundTrackingNumber && !o.shippedAt && (

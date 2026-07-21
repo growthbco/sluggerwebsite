@@ -13,7 +13,10 @@ export const SOCK_SIZES = ["Youth S/M", "Youth L/XL", "Adult S/M", "Adult L/XL"]
 export const FITTED_HAT_SIZES = ["XS", "S/M", "L/XL", "XXL"];
 export const SNAPBACK_HAT_SIZES = ["One Size"];
 
-export type ItemType = { key: string; label: string; sizes: string[] };
+// inHouse: embroidered in the Ocala shop, NOT produced by the overseas
+// designer/factory. In-house items are kept out of everything designer-facing
+// (Discord roster posts, print-file QA) and surfaced on the admin page instead.
+export type ItemType = { key: string; label: string; sizes: string[]; inHouse?: boolean };
 
 export const ITEM_TYPES: ItemType[] = [
   { key: "jersey", label: "Jersey", sizes: APPAREL_SIZES },
@@ -22,9 +25,13 @@ export const ITEM_TYPES: ItemType[] = [
   { key: "shorts", label: "Shorts", sizes: APPAREL_SIZES },
   { key: "hoodie", label: "Hoodie", sizes: APPAREL_SIZES },
   { key: "socks", label: "Socks", sizes: SOCK_SIZES },
-  { key: "fitted_hat", label: "Fitted Hat", sizes: FITTED_HAT_SIZES },
-  { key: "snapback_hat", label: "Snapback Hat", sizes: SNAPBACK_HAT_SIZES },
+  { key: "fitted_hat", label: "Fitted Hat", sizes: FITTED_HAT_SIZES, inHouse: true },
+  { key: "snapback_hat", label: "Snapback Hat", sizes: SNAPBACK_HAT_SIZES, inHouse: true },
 ];
+
+export function isInHouseItem(key: string): boolean {
+  return Boolean(ITEM_TYPES.find((t) => t.key === key)?.inHouse);
+}
 
 // Jersey fabric options with plain-language descriptions for shoppers.
 export type JerseyMaterial = { key: string; label: string; description: string };

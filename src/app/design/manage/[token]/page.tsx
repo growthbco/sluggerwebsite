@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
 import { getByManageToken, MAX_REVISIONS, formatProducts } from "@/lib/design-requests";
 import { getByDesignRequestId, getRoster } from "@/lib/team-orders";
-import { JERSEY_MATERIALS, itemLabel } from "@/lib/order-items";
+import { JERSEY_MATERIALS, itemLabel, isInHouseItem } from "@/lib/order-items";
 import { getStoreByDesignRequestId, STORE_ITEM_PRESETS } from "@/lib/team-stores";
 import { DesignManagePanel } from "@/components/design-manage-panel";
 import { DesignMessages } from "@/components/design-messages";
@@ -38,6 +38,14 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
   // - we don't want to put the print-file check in front of the customer.
   const linkedOrder = await getByDesignRequestId(request.id);
   const linkedRoster = linkedOrder ? await getRoster(linkedOrder.id) : [];
+  // This page is designer-facing, and in-house items (hats, embroidered at
+  // the shop) aren't the designer's work: they're dropped from the spec line
+  // and print-file QA. Rows that exist only for in-house pieces are excluded.
+  const printRoster = linkedRoster.filter(
+    (r) =>
+      (r.size ?? "").trim() ||
+      Object.entries(r.sizes ?? {}).some(([k, v]) => !isInHouseItem(k) && (v ?? "").trim()),
+  );
 
   // Per-person team store (only offered once the design is approved).
   const storeEligible = request.status === "approved" || request.status === "ordered";
@@ -58,7 +66,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
                 linkedOrder.jerseyMaterial
                   ? JERSEY_MATERIALS.find((m) => m.key === linkedOrder.jerseyMaterial)?.label ?? linkedOrder.jerseyMaterial
                   : null,
-                (linkedOrder.items ?? []).map(itemLabel).join(" + "),
+                (linkedOrder.items ?? []).filter((k) => !isInHouseItem(k)).map(itemLabel).join(" + "),
               ]
                 .filter(Boolean)
                 .join(" · ")
@@ -67,14 +75,14 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         printFileVerified={Boolean(linkedOrder?.printFileVerifiedAt)}
       />
 
-      {linkedOrder && linkedRoster.length > 0 && (
+      {linkedOrder && printRoster.length > 0 && (
         <PrintFileQA
           // Auth: the verify endpoint accepts the team-order's manage token.
           // The designer reaches this page from the Discord thread (which only
           // staff can see), so it's safe to surface the team-order token here.
           token={linkedOrder.manageToken!}
-          rosterCount={linkedRoster.length}
-          roster={linkedRoster.map((r) => ({
+          rosterCount={printRoster.length}
+          roster={printRoster.map((r) => ({
             name: r.playerName ?? "",
             number: r.playerNumber ?? "",
             size: r.sizes?.jersey ?? r.size ?? "",

@@ -1,6 +1,6 @@
 // Posts new orders to Discord via an incoming webhook (no bot to host).
 // Used for paid Shop/Buy-In orders (#orders) and team orders (#team-orders).
-import { itemLabel } from "@/lib/order-items";
+import { itemLabel, isInHouseItem } from "@/lib/order-items";
 
 const GOLD = 0xb8a36c;
 
@@ -146,9 +146,13 @@ export async function postTeamOrderPaidToDiscord(args: {
 export async function postAddonToDesignerDiscord(args: {
   reference: string;
   teamName: string;
-  rows: Array<{ label: string; size: string; name?: string; number?: string; quantity: number }>;
+  rows: Array<{ key?: string; label: string; size: string; name?: string; number?: string; quantity: number }>;
   designThreadId?: string | null;
 }): Promise<boolean> {
+  // In-house pieces (hats) are the shop's work, not the designer's - drop
+  // them, and skip the ping entirely if that's all the add-on contained.
+  const printRows = args.rows.filter((r) => !r.key || !isInHouseItem(r.key));
+  if (printRows.length === 0) return true;
   const designUrl = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
   // Prefer the project's thread; fall back to the design channel, then the
   // team-orders channel so the ping isn't lost if design Discord isn't set.
@@ -160,7 +164,7 @@ export async function postAddonToDesignerDiscord(args: {
     console.warn("No Discord webhook set - skipping add-on designer ping");
     return false;
   }
-  const lines = args.rows
+  const lines = printRows
     .map((r) => {
       const who = [r.name?.trim(), r.number ? `#${r.number}` : null].filter(Boolean).join(" ") || "(no name)";
       const qty = Math.max(1, r.quantity ?? 1);
@@ -199,7 +203,10 @@ export async function postTeamOrderToDiscord(
     return false;
   }
 
-  const itemKeys = order.items?.length ? order.items : ["jersey"];
+  // In-house items (hats) are embroidered at the shop, not by the factory -
+  // the designer never needs to see them, so they're filtered out of this
+  // production-facing post entirely.
+  const itemKeys = (order.items?.length ? order.items : ["jersey"]).filter((k) => !isInHouseItem(k));
 
   // Production only needs: name / number / sizes per item (+ optional note). No prices.
   const rows = order.roster
@@ -224,7 +231,7 @@ export async function postTeamOrderToDiscord(
     { name: "Order", value: `\`${order.reference}\``, inline: true },
     { name: "Style", value: order.jerseyStyle || "-", inline: true },
     { name: "Material", value: order.jerseyMaterial || "-", inline: true },
-    { name: "Items", value: itemKeys.map(itemLabel).join(", "), inline: true },
+    { name: "Items", value: itemKeys.map(itemLabel).join(", ") || "-", inline: true },
     { name: "Players", value: String(order.roster.filter((r) => r.name || r.number || r.size || (r.sizes && Object.keys(r.sizes).length)).length), inline: true },
     { name: "Roster", value: rows.slice(0, 1024) || "-", inline: false },
   ];
