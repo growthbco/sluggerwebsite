@@ -218,7 +218,9 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
           ${
             args.shipCents && args.shipCents > 0
               ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;">${money(args.shipCents)}</td></tr>`
-              : ""
+              : isDeposit
+                ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;color:#8a8570;">on final invoice · free Ocala pickup</td></tr>`
+                : ""
           }
           <tr>
             <td style="padding:10px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;"><strong>Due now</strong></td>
@@ -242,7 +244,7 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
         }
         ${
           isDeposit
-            ? `<p style="margin:0;">Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} plus tax is due before your order ships. You'll enter your <strong>shipping address</strong> on the payment page so we know exactly where your gear is headed. Questions or roster changes first? Just reply to this email.</p>`
+            ? `<p style="margin:0;">Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} plus tax and shipping is due before your order ships. Shipping is calculated to your address on the final invoice, and local pickup in Ocala is always free. You'll enter your <strong>shipping address</strong> on the payment page so we know exactly where your gear is headed. Questions or roster changes first? Just reply to this email.</p>`
             : `<p style="margin:0;">Your gear is in production! Settling the balance now means we ship the moment it's ready - no waiting. Questions? Just reply to this email.</p>`
         }
         ${
