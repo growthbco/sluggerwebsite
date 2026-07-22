@@ -1,6 +1,6 @@
 // Public retail price list (owner-confirmed, Jul 2026). Per piece, plus tax.
 // Flat pricing - no minimums, no quantity tiers. The custom design is included.
-// Anything not listed here (hype chains, specialty items) is quoted custom.
+// Anything not listed here (specialty items) is quoted custom.
 
 export type PriceRow = { item: string; priceCents: number; note?: string };
 export type PriceGroup = { group: string; rows: PriceRow[] };
@@ -36,6 +36,7 @@ export const PRICE_LIST: PriceGroup[] = [
     rows: [
       { item: "Hoodie", priceCents: 4000 },
       { item: "Custom Socks", priceCents: 1500 },
+      { item: "Custom 3D Hype Chain", priceCents: 4000, note: "Starting price - final depends on design detail and colors. Free mockup; one-time $50 3D design file fee per design, then each chain from $40" },
     ],
   },
 ];

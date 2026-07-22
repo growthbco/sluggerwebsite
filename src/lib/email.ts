@@ -252,8 +252,8 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
             ? `<p style="margin:0;">Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} plus tax and shipping is due before your order ships. You'll enter your <strong>shipping address</strong> on the payment page so we know exactly where your gear is headed. Questions or roster changes first? Just reply to this email.</p>
         <table style="width:100%;border-collapse:collapse;margin:18px 0 0;"><tr><td style="padding:14px 16px;background:#f6f4ee;border:1px solid #e6e0cf;border-left:3px solid #b8a36c;">
           <p style="margin:0 0 6px;font-weight:bold;color:#13160b;">🏆 Make it official: add a Custom Team Hype Chain</p>
-          <p style="margin:0 0 8px;font-size:14px;color:#444;">The chain your players fight for after every big play - custom built in 3D to match your team's logo and colors. Add one now and it ships right alongside your uniforms.</p>
-          <p style="margin:0;font-size:14px;"><a href="https://sluggerathletics.com/hype-chains" style="color:#9c884f;font-weight:bold;">See custom hype chains →</a> <span style="color:#8a8570;">or just reply to this email and we'll mock one up for your team.</span></p>
+          <p style="margin:0 0 8px;font-size:14px;color:#444;">The chain your players fight for after every big play - custom built in 3D to match your team's logo and colors. Chains start at $40 each (one-time $50 design file charge per design), and the mockup is free. Add one now and it ships right alongside your uniforms.</p>
+          <p style="margin:0;font-size:14px;"><a href="https://sluggerathletics.com/hype-chains" style="color:#9c884f;font-weight:bold;">See custom hype chains →</a> <span style="color:#8a8570;">or just reply to this email and we'll mock one up free.</span></p>
         </td></tr></table>`
             : `<p style="margin:0;">Your gear is in production! Settling the balance now means we ship the moment it's ready - no waiting. Questions? Just reply to this email.</p>`
         }

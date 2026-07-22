@@ -34,7 +34,7 @@ export default function HypeChainsPage() {
         { t: "3D Hype Chains", d: "Bold, lightweight 3D-printed chains in your team colors - the ultimate celebration prop." },
         { t: "Custom Pendants", d: "Personalized pendants - mascots, logos, numbers, or whatever fires your team up." },
         { t: "Team Sets", d: "Order in bulk so the whole roster reps the chain after a clutch hit." },
-        { t: "Accessories", d: "Round out the look with matching team accessories and gear." },
+        { t: "Simple Pricing", d: "Free mockup so you see it first. One-time $50 charge for the production 3D file, then each chain starts at $40 depending on detail and colors." },
       ]}
       exampleCategory="chains"
       exampleTitle="Hype Chains & Accessories"

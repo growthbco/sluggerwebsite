@@ -181,9 +181,9 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
       },
       {
         name: "3D Hype Chains",
-        price: null,
+        price: "From $40",
         description:
-          "Custom 3D hype chains for dugout celebrations - built to match your team's logo and colors.",
+          "Custom 3D hype chains for dugout celebrations - built to match your team's logo and colors. Free mockup; one-time $50 3D design file fee, then each chain starts at $40 depending on detail and colors.",
         href: "/hype-chains",
       },
       {
