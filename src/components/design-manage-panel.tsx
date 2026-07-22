@@ -18,6 +18,7 @@ type Props = {
   teamName: string;
   status: string;
   products: string | null;
+  estimatedPieces: string | null;
   vision: string | null;
   colors: string | null;
   colorHexes: string[];
@@ -39,6 +40,7 @@ export function DesignManagePanel({
   teamName,
   status,
   products,
+  estimatedPieces,
   vision,
   colors,
   colorHexes,
@@ -170,6 +172,12 @@ export function DesignManagePanel({
           <div className="sm:col-span-2">
             <div className="display text-foreground text-xs">🎨 Mock up</div>
             <div className="text-foreground">{products}</div>
+          </div>
+        )}
+        {estimatedPieces && (
+          <div>
+            <div className="display text-foreground text-xs">Approx. pieces</div>
+            <div className="text-foreground">{estimatedPieces}</div>
           </div>
         )}
         {(colors || colorHexes.length > 0) && (

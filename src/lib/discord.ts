@@ -270,6 +270,8 @@ type DesignRequestPayload = {
   manageUrl?: string;
   neededBy?: string | Date | null;
   rush?: boolean;
+  /** Approximate piece count from the intake ("3-9", "25+", ...). */
+  estimatedPieces?: string | null;
 };
 
 function fmtNeededBy(v: string | Date | null | undefined): string | null {
@@ -298,6 +300,12 @@ export async function postDesignRequestToDiscord(req: DesignRequestPayload): Pro
     { name: "Request", value: `\`${req.reference}\``, inline: true },
     { name: "Sport", value: req.sport || "-", inline: true },
   ];
+  if (req.estimatedPieces) {
+    // Tiny requests get a warning glyph - a full custom design for 1-2 pieces
+    // usually isn't worth the work, so staff should weigh in before designing.
+    const tiny = /^1\b|^1-2/.test(req.estimatedPieces);
+    fields.push({ name: "Approx. pieces", value: `${tiny ? "⚠️ " : ""}${req.estimatedPieces}`, inline: true });
+  }
   const needed = fmtNeededBy(req.neededBy ?? null);
   if (needed) {
     fields.push({

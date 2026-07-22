@@ -58,6 +58,7 @@ export async function POST(req: Request) {
             manageUrl,
             neededBy: request.neededBy ?? undefined,
             rush: request.rush,
+            estimatedPieces: request.estimatedPieces,
           });
           if (discordResult.threadId) {
             try { await setDiscordThreadId(designRequestId, discordResult.threadId); } catch (e) { console.error("setDiscordThreadId failed:", e); }

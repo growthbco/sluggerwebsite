@@ -117,6 +117,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         teamName={request.teamName}
         status={request.status}
         products={formatProducts(request.productTypes, request.jerseyStyle) || null}
+        estimatedPieces={request.estimatedPieces ?? null}
         vision={request.vision}
         colors={request.colors}
         colorHexes={request.colorHexes ?? []}

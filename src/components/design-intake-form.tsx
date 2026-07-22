@@ -15,6 +15,7 @@ export function DesignIntakeForm() {
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [productTypes, setProductTypes] = useState<string[]>([]);
+  const [estimatedPieces, setEstimatedPieces] = useState("");
   const [jerseyStyle, setJerseyStyle] = useState("");
   const [otherProduct, setOtherProduct] = useState("");
   const [vision, setVision] = useState("");
@@ -47,6 +48,7 @@ export function DesignIntakeForm() {
   // What the customer wants us to mock up. "Jersey" reveals a cut dropdown;
   // "Other" reveals a free-text box.
   const PRODUCT_OPTIONS = ["Jersey / Shirt", "Shorts", "Pants", "Hoodie", "Hat", "Socks", "Bag", "Other"];
+  const PIECE_RANGES = ["1-2", "3-9", "10-14", "15-24", "25+"];
   const JERSEY_STYLES = ["Full-button", "Two-button", "Crew neck", "V-neck", "Sleeveless / Tank"];
   const wantsJersey = productTypes.includes("Jersey / Shirt");
   const wantsOther = productTypes.includes("Other");
@@ -115,6 +117,7 @@ export function DesignIntakeForm() {
           colorHexes,
           inspirationImages: images.map((i) => i.url),
           neededBy: neededBy || undefined,
+          estimatedPieces: estimatedPieces || undefined,
         }),
       });
       const data = await res.json();
@@ -168,6 +171,7 @@ export function DesignIntakeForm() {
     contactName &&
     contactEmail &&
     productTypes.length > 0 &&
+    estimatedPieces &&
     (vision.trim() || images.length > 0) &&
     !uploading;
 
@@ -261,6 +265,43 @@ export function DesignIntakeForm() {
               placeholder="e.g. bags, beanies, warmup jackets..."
             />
           </div>
+        )}
+      </div>
+
+      {/* Approximate order size - qualifies the request before design work
+          starts. A full custom design isn't practical for a single piece. */}
+      <div>
+        <label className="display text-sm text-foreground">About how many pieces total? *</label>
+        <p className="text-sm text-muted mt-1">A rough count is fine - players plus coaches, all items combined.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {PIECE_RANGES.map((r) => {
+            const on = estimatedPieces === r;
+            return (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setEstimatedPieces(r)}
+                aria-pressed={on}
+                className={`display text-sm px-3.5 py-2 border transition-colors ${
+                  on
+                    ? "bg-brand text-on-brand border-brand"
+                    : "bg-steel text-foreground border-line hover:border-brand/50"
+                }`}
+              >
+                {on ? "✓ " : ""}
+                {r} pieces
+              </button>
+            );
+          })}
+        </div>
+        {estimatedPieces === "1-2" && (
+          <p className="mt-3 text-sm bg-brand/10 border border-brand/40 text-foreground p-3">
+            Heads up: full custom team designs are built for groups, so we may not be able to
+            take on a design for just one or two pieces. If you only need one custom item,{" "}
+            <a href="/custom-hats" className="text-brand underline">custom embroidered hats</a> have
+            truly no minimum, and our <a href="/shop" className="text-brand underline">shop</a> and
+            drops are single-piece friendly. Growing roster? Pick the range you expect to end up at.
+          </p>
         )}
       </div>
 

@@ -1,0 +1,1 @@
+ALTER TABLE "design_requests" ADD COLUMN "estimated_pieces" text;

@@ -32,6 +32,8 @@ export type NewDesignRequest = {
   colorHexes?: string[];
   /** When the customer needs the uniforms in hand. ISO date string. */
   neededBy?: string;
+  /** Approximate total piece count the client expects ("3-9", "25+", ...). */
+  estimatedPieces?: string;
   /** Fee state - set by the create-request route based on returning-customer
    *  detection. Defaults to "pending_payment" if not provided. */
   feeWaivedReason?: string | null;
@@ -157,6 +159,7 @@ export async function createDesignRequest(input: NewDesignRequest) {
       colorHexes: input.colorHexes ?? [],
       inspirationImages: input.inspirationImages ?? [],
       neededBy: neededByDate && !isNaN(neededByDate.getTime()) ? neededByDate : null,
+      estimatedPieces: input.estimatedPieces ?? null,
       rush,
       statusToken,
       manageToken,

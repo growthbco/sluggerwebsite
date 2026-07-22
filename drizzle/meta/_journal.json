@@ -204,6 +204,13 @@
       "when": 1784735325346,
       "tag": "0028_brave_morg",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1784749882670,
+      "tag": "0029_lethal_doctor_faustus",
+      "breakpoints": true
     }
   ]
 }

@@ -36,6 +36,7 @@ export async function POST(req: Request) {
     jerseyStyle?: string;
     inspirationImages?: string[];
     neededBy?: string;
+    estimatedPieces?: string;
   };
   try {
     body = await req.json();
@@ -95,6 +96,7 @@ export async function POST(req: Request) {
       colorHexes,
       inspirationImages: body.inspirationImages ?? [],
       neededBy: body.neededBy,
+      estimatedPieces: (body.estimatedPieces ?? "").trim().slice(0, 20) || undefined,
       feeWaivedReason,
       feeWaivedRef,
     });
@@ -116,6 +118,7 @@ export async function POST(req: Request) {
         manageUrl,
         neededBy,
         rush,
+        estimatedPieces: body.estimatedPieces,
       });
       if (discordResult.threadId) {
         try { await setDiscordThreadId(requestId, discordResult.threadId); } catch (e) { console.error("setDiscordThreadId failed:", e); }

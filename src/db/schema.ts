@@ -530,6 +530,10 @@ export const designRequests = pgTable(
     // jersey cut when a jersey is requested (Two-button, Crew neck, V-neck...).
     productTypes: jsonb("product_types").$type<string[]>().default([]),
     jerseyStyle: text("jersey_style"),
+    // Approximate piece count the client expects ("3-9", "25+", ...). Asked at
+    // intake to qualify the request - full custom designs aren't worth doing
+    // for a single piece, so staff sees this before design work starts.
+    estimatedPieces: text("estimated_pieces"),
     // Exact colors the customer picked from the hex wheel (e.g. ["#EC4899",
     // "#000000"]). The free-form `colors` text still holds names/notes.
     colorHexes: jsonb("color_hexes").$type<string[]>().default([]),
