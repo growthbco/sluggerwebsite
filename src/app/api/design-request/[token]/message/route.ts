@@ -125,11 +125,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
             const updated = await addDesignMessage(request.id, "designer", result.reply, "AI Assistant");
             if (updated) messages = updated;
             // Log the exchange to Discord so staff can correct a bad answer.
+            // flagStaff (discount asks): the AI sent the holding reply per
+            // policy, but the real number needs a human - ping for follow-up.
             await postDesignThreadUpdate({
               threadId: request.discordThreadId ?? undefined,
-              title: `🤖 AI Assistant answered - ${request.teamName} (${request.reference})`,
+              title: result.flagStaff
+                ? `🤖💰 AI answered a discount ask - follow up personally - ${request.teamName} (${request.reference})`
+                : `🤖 AI Assistant answered - ${request.teamName} (${request.reference})`,
               description: `**Q:** ${text.slice(0, 600)}\n**A:** ${result.reply.slice(0, 1200)}`,
               username: "Slugger Design Requests",
+              mention: Boolean(result.flagStaff),
             });
           } else if (result?.action === "escalate") {
             await postDesignThreadUpdate({

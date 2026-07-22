@@ -20,6 +20,8 @@ export type AssistantResult = {
   action: "answer" | "escalate" | "none";
   reply?: string;
   reason?: string;
+  /** Answer was sent but staff should personally follow up (discount asks). */
+  flagStaff?: boolean;
 };
 
 export type DesignContext = {
@@ -108,6 +110,7 @@ function buildGrounding(design: DesignContext, order: OrderContext | null, messa
     "- Slugger Athletics makes custom team uniforms and embroidered hats in Ocala, Florida.",
     "- Contact: text (352) 660-1232, email apparel@sluggerathletics.com.",
     "- EVERYTHING is fully custom and made to order. Features like quarter-zips, collar styles, sleeve length, fonts, a cursive name instead of a number, and color tweaks are all possible - when a client asks IF something can be done, the honest answer is usually yes, it is their call, so ask which way they want it instead of assuming. If a custom feature is not on the price list, say the team will confirm any price difference.",
+    "- Discounts: possible, and they depend on the TOTAL number of pieces in the order - more pieces means more room to work. NEVER name a specific discount, percentage, or lower price. The right response: say we can work with them since it depends on piece count, ask what total or per-player number they were hoping to be at, and offer a quick phone call to land on a number - text (352) 660-1232.",
     "- Payment flow: Slugger emails an invoice; a 50% deposit starts production and the balance (plus shipping) is due before the order ships. 7% Florida sales tax applies to goods.",
     "- Production: most orders ship 2-3 weeks after design approval and deposit; rush is about a week. Hats are embroidered in-house and small hat orders are often ready in days.",
     `- Revisions: ${MAX_REVISIONS} revision rounds are included with a design.`,
@@ -166,12 +169,13 @@ export async function assistDesignThread(input: {
     "",
     "Choose exactly one action:",
     '- "answer": ONLY if the client asked something you can answer completely and confidently from the facts above (order status, what happens next, pricing from the list, turnaround, sizing, revisions, how approval works, whether a custom feature is possible). Write a short, warm, plain-text reply (2-5 sentences, no markdown, no em dashes - use hyphens). Do not promise anything beyond the stated facts. Do not sign a name.',
-    '- "escalate": if the message involves a discount, price negotiation, refund, cancellation, complaint, changing an already-approved design, payment trouble, a callback request, or anything the facts do not fully cover. Also escalate if you are unsure. Do NOT write a client reply; give a one-line reason instead.',
+    '- A FIRST-TIME discount ask also gets "answer": use the discount policy above (depends on piece count, ask their target number, offer a call) and set flagStaff true so the team follows up personally. Never name a number.',
+    '- "escalate": if the message involves a refund, cancellation, complaint, changing an already-approved design, payment trouble, a callback request, an ongoing back-and-forth negotiation staff is already handling, or anything the facts do not fully cover. Also escalate if you are unsure. Do NOT write a client reply; give a one-line reason instead.',
     '- "none": if no reply is needed (a thank-you, an acknowledgment, or the client is clearly mid-conversation with a specific staff member - e.g. staff asked them a question and this is their answer). Never interrupt an ongoing negotiation.',
     "",
     "Reply in the language the client wrote in - if they wrote in Spanish, answer in natural Spanish (keep product names and dollar amounts as-is). Same for any other language.",
     "Never contradict anything a staff member said earlier in the conversation.",
-    'Return ONLY JSON: { "action": "answer" | "escalate" | "none", "reply": string, "reason": string }',
+    'Return ONLY JSON: { "action": "answer" | "escalate" | "none", "reply": string, "reason": string, "flagStaff": boolean }',
   ].join("\n");
 
   const out = (await callGemini(prompt, {
@@ -180,6 +184,7 @@ export async function assistDesignThread(input: {
       action: { type: "STRING", enum: ["answer", "escalate", "none"] },
       reply: { type: "STRING" },
       reason: { type: "STRING" },
+      flagStaff: { type: "BOOLEAN" },
     },
     required: ["action"],
   })) as AssistantResult | null;
@@ -210,7 +215,8 @@ export async function suggestStaffReply(input: {
     "Draft the most helpful next message from staff to the client:",
     "- Usually that means answering the client's most recent unanswered question(s); if everything is answered, a short, useful next-step nudge.",
     "- Everything Slugger makes is custom: when the client asks whether something can be done (a quarter-zip, cursive name instead of a number, etc.), the answer is that it is their choice - confirm it is doable and ask which way they want it.",
-    "- You may address sensitive topics (discount asks, complaints) since a human reviews this, but NEVER invent a specific discount, price, or date that is not in the facts. Where a business decision is needed, insert a placeholder like [YOUR CALL: discount amount] so the staff member fills it in.",
+    "- Discount asks: follow the discount policy in the facts - we can work with them, it depends on the total piece count, ask what number they were hoping for, and offer a quick phone call. Never name a specific discount or price.",
+    "- You may address other sensitive topics (complaints, exceptions) since a human reviews this, but NEVER invent a specific price, amount, or date that is not in the facts. Where a business decision is needed, insert a placeholder like [YOUR CALL: amount] so the staff member fills it in.",
     "- Match the tone of earlier staff messages: friendly, brief, plain text. 2-6 sentences. No markdown, no em dashes - use hyphens. Do not sign a name.",
     "- Write in the language the client writes in.",
     'Return ONLY JSON: { "draft": string }',
