@@ -222,35 +222,49 @@ export async function approveDesign(id: string, approvedUrl?: string) {
       status: "approved",
       approvedAt: now,
       approvedDesignUrl: approvedUrl ?? null,
+      approvedDesignUrls: approvedUrl ? [approvedUrl] : null,
       updatedAt: now,
     })
     .where(eq(designRequests.id, id));
 }
 
-/** Staff/designer manually sets (or corrects) WHICH proof is the approved
- *  design - for when the client approves one file, then changes their mind,
- *  or the auto-picked "latest proof" wasn't the one they meant. Also syncs
- *  any linked team orders, which carry a copy of the approved URL. */
-export async function setApprovedDesign(id: string, url: string) {
+/** Staff/designer marks a proof as approved (or removes the mark). A project
+ *  can have SEVERAL approved designs - jersey, hat, hoodie, pants each get
+ *  their own final mockup - so this toggles membership in the approved set
+ *  rather than replacing a single value. The set keeps proofImages order;
+ *  the first one stays in approvedDesignUrl for older single-URL surfaces
+ *  (and is synced onto any linked team orders). */
+export async function toggleApprovedDesign(id: string, url: string, approved: boolean) {
   const db = getDb();
   const now = new Date();
   const [existing] = await db.select().from(designRequests).where(eq(designRequests.id, id)).limit(1);
   if (!existing) return null;
+
+  const current = existing.approvedDesignUrls ?? (existing.approvedDesignUrl ? [existing.approvedDesignUrl] : []);
+  const set = new Set(current);
+  if (approved) set.add(url);
+  else set.delete(url);
+  // Stable order: follow the sent-proofs order, with any strays appended.
+  const proofOrder = existing.proofImages ?? [];
+  const urls = [...proofOrder.filter((u) => set.has(u)), ...[...set].filter((u) => !proofOrder.includes(u))];
+  const primary = urls[0] ?? null;
+
   await db
     .update(designRequests)
     .set({
-      approvedDesignUrl: url,
-      approvedAt: existing.approvedAt ?? now,
-      // Don't walk an "ordered" design backwards.
-      ...(existing.status !== "ordered" ? { status: "approved" as const } : {}),
+      approvedDesignUrls: urls,
+      approvedDesignUrl: primary,
+      ...(approved ? { approvedAt: existing.approvedAt ?? now } : {}),
+      // Approving moves the design forward; never walk "ordered" backwards.
+      ...(approved && existing.status !== "ordered" ? { status: "approved" as const } : {}),
       updatedAt: now,
     })
     .where(eq(designRequests.id, id));
   await db
     .update(teamOrders)
-    .set({ approvedDesignUrl: url, updatedAt: now })
+    .set({ approvedDesignUrl: primary, updatedAt: now })
     .where(eq(teamOrders.designRequestId, id));
-  return existing;
+  return { request: existing, urls };
 }
 
 /** Max free revision rounds a client gets before the Request Changes

@@ -24,7 +24,7 @@ type Props = {
   contact: { name: string; email: string; phone: string | null };
   inspirationImages: string[];
   proofImages: string[];
-  approvedUrl: string | null;
+  approvedUrls: string[];
   statusUrl: string;
   revisionsUsed: number;
   maxRevisions: number;
@@ -45,7 +45,7 @@ export function DesignManagePanel({
   contact,
   inspirationImages,
   proofImages,
-  approvedUrl,
+  approvedUrls,
   statusUrl,
   revisionsUsed,
   maxRevisions,
@@ -54,7 +54,7 @@ export function DesignManagePanel({
   neededBy,
 }: Props) {
   const [proofs, setProofs] = useState<string[]>(proofImages);
-  const [approved, setApproved] = useState<string | null>(approvedUrl);
+  const [approved, setApproved] = useState<string[]>(approvedUrls);
   const [settingApproved, setSettingApproved] = useState<string | null>(null);
   const [approvedMessage, setApprovedMessage] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -107,19 +107,23 @@ export function DesignManagePanel({
     }
   }
 
-  async function markApproved(url: string) {
+  async function toggleApproved(url: string, next: boolean) {
     setSettingApproved(url);
     setApprovedMessage("");
     try {
       const res = await fetch(`/api/design-request/${token}/set-approved`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, approved: next }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not set the approved design.");
-      setApproved(url);
-      setApprovedMessage("Saved. The Discord thread was pinged with this exact image.");
+      if (!res.ok) throw new Error(data.error || "Could not update the approved designs.");
+      setApproved(data.urls ?? []);
+      setApprovedMessage(
+        next
+          ? "Added to approved designs. The Discord thread was pinged with this exact image."
+          : "Removed from approved designs. The Discord thread was updated.",
+      );
     } catch (e) {
       setApprovedMessage((e as Error).message);
     } finally {
@@ -274,45 +278,63 @@ export function DesignManagePanel({
         </section>
       )}
 
+      {approved.length > 0 && (
+        <section>
+          <h2 className="display text-xl text-green-400">✓ Approved designs ({approved.length})</h2>
+          <p className="text-sm text-muted mt-1">
+            Build the print files from these exact versions only. A project can have several -
+            jersey, hat, hoodie, pants each get their own approved mockup.
+          </p>
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {approved.map((u, i) => (
+              <div key={u} className="border border-green-500">
+                <a href={u} target="_blank" rel="noopener noreferrer" className="relative aspect-square bg-white overflow-hidden block">
+                  <Image src={u} alt={`Approved design ${i + 1}`} fill sizes="25vw" className="object-contain p-1" unoptimized />
+                  <span className="absolute top-1 left-1 bg-green-600 text-white display text-[10px] px-1.5 py-0.5">
+                    ✓ APPROVED
+                  </span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => toggleApproved(u, false)}
+                  disabled={settingApproved !== null}
+                  className="w-full text-[11px] display text-muted border-t border-green-500/50 px-1 py-1.5 hover:text-red-400 hover:bg-steel disabled:opacity-50"
+                >
+                  {settingApproved === u ? "Saving..." : "Remove"}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {proofs.length > 0 && (
         <section>
           <h2 className="display text-xl text-foreground">Sent proofs</h2>
           <p className="text-sm text-muted mt-1">
-            {approved
-              ? "The green-marked proof is THE approved design - build the print file from that exact version."
-              : "If the client approves outside the site (or changes their mind), use \"This one's approved\" to lock in the right version and ping the Discord thread."}
+            Mark each final mockup the client approved - it moves up into the Approved designs
+            section and pings the Discord thread with that exact image.
           </p>
           <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {proofs.map((u, i) => {
-              const isApproved = approved === u;
-              return (
-                <div key={i} className={`border ${isApproved ? "border-green-500" : "border-line"}`}>
-                  <a href={u} target="_blank" rel="noopener noreferrer" className="relative aspect-square bg-white overflow-hidden block">
-                    <Image src={u} alt={`Proof ${i + 1}`} fill sizes="25vw" className="object-contain p-1" unoptimized />
-                    {isApproved && (
-                      <span className="absolute top-1 left-1 bg-green-600 text-white display text-[10px] px-1.5 py-0.5">
-                        ✓ APPROVED
-                      </span>
-                    )}
-                  </a>
-                  {!isApproved && (
-                    <button
-                      type="button"
-                      onClick={() => markApproved(u)}
-                      disabled={settingApproved !== null}
-                      className="w-full text-[11px] display text-muted border-t border-line px-1 py-1.5 hover:text-foreground hover:bg-steel disabled:opacity-50"
-                    >
-                      {settingApproved === u
-                        ? "Saving..."
-                        : approved
-                          ? "Approve this instead"
-                          : "This one's approved"}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+            {proofs.filter((u) => !approved.includes(u)).map((u, i) => (
+              <div key={u} className="border border-line">
+                <a href={u} target="_blank" rel="noopener noreferrer" className="relative aspect-square bg-white overflow-hidden block">
+                  <Image src={u} alt={`Proof ${i + 1}`} fill sizes="25vw" className="object-contain p-1" unoptimized />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => toggleApproved(u, true)}
+                  disabled={settingApproved !== null}
+                  className="w-full text-[11px] display text-muted border-t border-line px-1 py-1.5 hover:text-foreground hover:bg-steel disabled:opacity-50"
+                >
+                  {settingApproved === u ? "Saving..." : "Mark approved"}
+                </button>
+              </div>
+            ))}
           </div>
+          {proofs.length > 0 && proofs.every((u) => approved.includes(u)) && (
+            <p className="mt-2 text-sm text-muted">All sent proofs are marked approved.</p>
+          )}
           {approvedMessage && <p className="mt-2 text-sm text-brand">{approvedMessage}</p>}
         </section>
       )}

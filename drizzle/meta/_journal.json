@@ -190,6 +190,13 @@
       "when": 1784516977046,
       "tag": "0026_lyrical_epoch",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1784687111070,
+      "tag": "0027_omniscient_naoko",
+      "breakpoints": true
     }
   ]
 }

@@ -567,6 +567,10 @@ export const designRequests = pgTable(
     proofImages: jsonb("proof_images").$type<string[]>().default([]),
     // The single approved proof URL (selected on approval) - attached to the team order.
     approvedDesignUrl: text("approved_design_url"),
+    // ALL approved proofs. A project can have several final mockups (jersey,
+    // hat, hoodie, pants), each approved individually from /design/manage.
+    // approvedDesignUrl above stays the primary (first) for older surfaces.
+    approvedDesignUrls: jsonb("approved_design_urls").$type<string[]>(),
 
     // Tokens powering the public client + private staff links.
     statusToken: text("status_token"),
