@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { desc, sql, eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
-import { designRequests, teamOrders, teams, orders, teamOrderAddons } from "@/db/schema";
+import { designRequests, teamOrders, teams, orders, teamOrderAddons, assistantFacts } from "@/db/schema";
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
 import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote, estimateOrderWeightOz } from "@/lib/team-order-pricing";
@@ -21,6 +21,7 @@ import { AdminLocalToggle } from "@/components/admin-local-toggle";
 import { AdminTaxToggle } from "@/components/admin-tax-toggle";
 import { AdminSearch } from "@/components/admin-search";
 import { AdminNewStore } from "@/components/admin-new-store";
+import { AdminAssistantFacts } from "@/components/admin-assistant-facts";
 import { STORE_ITEM_PRESETS } from "@/lib/team-stores";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
@@ -160,6 +161,9 @@ export default async function AdminPage() {
       .where(eq(teamOrderAddons.status, "paid"))
       .orderBy(desc(teamOrderAddons.paidAt)),
   ]);
+
+  // Facts staff taught the AI assistant (rendered in the training panel).
+  const aiFacts = await db.select().from(assistantFacts).orderBy(assistantFacts.createdAt);
 
   // Paid add-ons grouped by their parent team order, so each order can show
   // the extra players (name / # / size) that were added after the fact.
@@ -652,6 +656,18 @@ export default async function AdminPage() {
           </div>
         </section>
       </div>
+
+      <section className="mt-10">
+        <h2 className="display text-xl text-foreground">🤖 Train the AI assistant</h2>
+        <p className="text-sm text-muted mt-1">
+          Teach the bot shop facts it should use when answering clients and drafting replies -
+          pricing nuances, policies, product details. It treats these as official and they win
+          over its built-in knowledge. Remove one and it forgets immediately.
+        </p>
+        <div className="mt-3">
+          <AdminAssistantFacts initial={aiFacts.map((f) => ({ id: f.id, fact: f.fact }))} />
+        </div>
+      </section>
     </div>
   );
 }

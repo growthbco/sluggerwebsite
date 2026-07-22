@@ -623,6 +623,21 @@ export const designRequests = pgTable(
 /* Relations                                                           */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* AI assistant knowledge                                              */
+/* ------------------------------------------------------------------ */
+
+// Facts staff teach the AI assistant from the admin page ("train the bot").
+// Every row is injected into the assistant's grounded knowledge - both the
+// auto-replies on client threads and the staff "Suggest reply" drafts - as
+// authoritative shop policy.
+export const assistantFacts = pgTable("assistant_facts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  fact: text("fact").notNull(),
+  addedBy: text("added_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const productsRelations = relations(products, ({ many }) => ({
   images: many(productImages),
   variants: many(productVariants),

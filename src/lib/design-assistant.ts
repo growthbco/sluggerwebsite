@@ -62,9 +62,24 @@ function statusMeaning(status: string): string {
   return map[status] ?? status;
 }
 
+/** Facts staff have taught the assistant from the admin page. Fail-open:
+ *  a DB hiccup means the bot just runs without the extra notes. */
+async function loadTaughtFacts(): Promise<string[]> {
+  try {
+    const { dbEnabled, getDb } = await import("@/db");
+    if (!dbEnabled()) return [];
+    const { assistantFacts } = await import("@/db/schema");
+    const rows = await getDb().select().from(assistantFacts).orderBy(assistantFacts.createdAt);
+    return rows.map((r) => r.fact);
+  } catch (e) {
+    console.error("loadTaughtFacts failed:", e);
+    return [];
+  }
+}
+
 /** The grounded knowledge both modes share: business facts, price list,
  *  FAQs, this project's live state, and the recent conversation. */
-function buildGrounding(design: DesignContext, order: OrderContext | null, messages: DesignMessage[]): string {
+function buildGrounding(design: DesignContext, order: OrderContext | null, messages: DesignMessage[], taughtFacts: string[] = []): string {
   const projectLines = [
     `Reference: ${design.reference}`,
     `Team: ${design.teamName}`,
@@ -115,6 +130,14 @@ function buildGrounding(design: DesignContext, order: OrderContext | null, messa
     "- Production: most orders ship 2-3 weeks after design approval and deposit; rush is about a week. Hats are embroidered in-house and small hat orders are often ready in days.",
     `- Revisions: ${MAX_REVISIONS} revision rounds are included with a design.`,
     "",
+    ...(taughtFacts.length
+      ? [
+          "",
+          "SHOP-TAUGHT NOTES (added by Slugger staff - authoritative, and they OVERRIDE the general facts above if they conflict):",
+          taughtFacts.map((f) => `- ${f}`).join("\n"),
+        ]
+      : []),
+    "",
     "PRICE LIST (per piece, plus tax, no minimums, design included):",
     priceList,
     "",
@@ -162,10 +185,11 @@ export async function assistDesignThread(input: {
   order: OrderContext | null;
   messages: DesignMessage[];
 }): Promise<AssistantResult | null> {
+  const taughtFacts = await loadTaughtFacts();
   const prompt = [
     "You are the AI assistant on Slugger Athletics' private design-request message thread. The CLIENT just sent the last message below; decide how to respond.",
     "",
-    buildGrounding(input.design, input.order, input.messages),
+    buildGrounding(input.design, input.order, input.messages, taughtFacts),
     "",
     "Choose exactly one action:",
     '- "answer": ONLY if the client asked something you can answer completely and confidently from the facts above (order status, what happens next, pricing from the list, turnaround, sizing, revisions, how approval works, whether a custom feature is possible). Write a short, warm, plain-text reply (2-5 sentences, no markdown, no em dashes - use hyphens). Do not promise anything beyond the stated facts. Do not sign a name.',
@@ -207,10 +231,11 @@ export async function suggestStaffReply(input: {
   messages: DesignMessage[];
   staffName?: string;
 }): Promise<string | null> {
+  const taughtFacts = await loadTaughtFacts();
   const prompt = [
     `You are drafting a message for ${input.staffName || "a staff member"} at Slugger Athletics to send to the client on their design-request thread. The draft goes into the staff member's message box for them to edit before sending - it is a suggestion, not an auto-reply.`,
     "",
-    buildGrounding(input.design, input.order, input.messages),
+    buildGrounding(input.design, input.order, input.messages, taughtFacts),
     "",
     "Draft the most helpful next message from staff to the client:",
     "- Usually that means answering the client's most recent unanswered question(s); if everything is answered, a short, useful next-step nudge.",
