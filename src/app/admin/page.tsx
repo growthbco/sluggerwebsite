@@ -22,6 +22,7 @@ import { AdminTaxToggle } from "@/components/admin-tax-toggle";
 import { AdminSearch } from "@/components/admin-search";
 import { AdminNewStore } from "@/components/admin-new-store";
 import { AdminAssistantFacts } from "@/components/admin-assistant-facts";
+import { MarkStaffDevice } from "@/components/mark-staff-device";
 import { STORE_ITEM_PRESETS } from "@/lib/team-stores";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
@@ -250,6 +251,7 @@ export default async function AdminPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-14">
+      <MarkStaffDevice />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <span className="display text-brand text-sm">Staff Dashboard</span>

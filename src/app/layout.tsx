@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { StaffShortcut } from "@/components/staff-shortcut";
 import { CartProvider } from "@/lib/cart";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -55,6 +56,7 @@ export default function RootLayout({
           <SiteHeader />
           <main className="flex-1">{children}</main>
           <SiteFooter />
+          <StaffShortcut />
         </CartProvider>
         {/* LeadConnector chat widget - loaded after page is interactive so
             it doesn't block first paint. */}
