@@ -25,7 +25,8 @@ export function StaffShortcut() {
   return (
     <Link
       href="/admin"
-      className="fixed bottom-4 right-4 z-50 clip-slant bg-brand text-on-brand display text-sm px-4 py-2.5 shadow-lg hover:bg-brand-dark transition-colors"
+      // Bottom-LEFT on purpose: the chat widget owns the bottom-right corner.
+      className="fixed bottom-4 left-4 z-50 clip-slant bg-brand text-on-brand display text-sm px-4 py-2.5 shadow-lg hover:bg-brand-dark transition-colors"
       title="Slugger staff dashboard"
     >
       ⚡ Staff
