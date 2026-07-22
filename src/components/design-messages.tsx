@@ -71,7 +71,7 @@ export function DesignMessages({
   const [senderName, setSenderName] = useState("");
   const [pending, setPending] = useState<{ url: string; name: string }[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [busy, setBusy] = useState<"" | "sending" | "refreshing">("");
+  const [busy, setBusy] = useState<"" | "sending" | "refreshing" | "suggesting">("");
   const [error, setError] = useState("");
 
   // Remember who's replying across visits so they pick once.
@@ -138,6 +138,25 @@ export function DesignMessages({
       setMessages(data.messages);
       setDraft("");
       setPending([]);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function suggestReply() {
+    setBusy("suggesting");
+    setError("");
+    try {
+      const res = await fetch(`/api/design-request/${token}/suggest-reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: senderName.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not draft a suggestion.");
+      setDraft(data.draft);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -236,6 +255,17 @@ export function DesignMessages({
 
       {role === "designer" && (
         <div className="mt-4 flex flex-wrap gap-2">
+          {/* AI draft: reads the thread + order facts and fills the composer.
+              Always edited/sent by a human under their own name. */}
+          <button
+            type="button"
+            onClick={suggestReply}
+            disabled={busy !== ""}
+            className="text-xs display text-brand border border-brand/50 px-3 py-1.5 hover:bg-brand/10 disabled:opacity-50"
+            title="AI drafts a reply from the conversation and order details - edit before sending"
+          >
+            {busy === "suggesting" ? "✨ Drafting..." : "✨ Suggest reply"}
+          </button>
           {[...(QUICK_REPLIES[status ?? ""] ?? []), ...QUICK_REPLIES.default].map((q) => (
             <button
               key={q.label}
