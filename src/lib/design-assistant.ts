@@ -136,6 +136,7 @@ export async function assistDesignThread(input: {
     '- "escalate": if the message involves a discount, price negotiation, refund, cancellation, complaint, changing an already-approved design, payment trouble, a callback request, or anything the facts do not fully cover. Also escalate if you are unsure. Do NOT write a client reply; give a one-line reason instead.',
     '- "none": if no reply is needed (a thank-you, an acknowledgment, or the client is clearly mid-conversation with a specific staff member - e.g. staff asked them a question and this is their answer). Never interrupt an ongoing negotiation.',
     "",
+    "Reply in the language the client wrote in - if they wrote in Spanish, answer in natural Spanish (keep product names and dollar amounts as-is). Same for any other language.",
     "Never contradict anything a staff member said earlier in the conversation.",
     'Return ONLY JSON: { "action": "answer" | "escalate" | "none", "reply": string, "reason": string }',
   ].join("\n");
