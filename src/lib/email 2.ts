@@ -219,7 +219,7 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
             args.shipCents && args.shipCents > 0
               ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;">${money(args.shipCents)}</td></tr>`
               : isDeposit
-                ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;color:#8a8570;">added to your final invoice</td></tr>`
+                ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;color:#8a8570;">on final invoice · free Ocala pickup</td></tr>`
                 : ""
           }
           <tr>
@@ -227,11 +227,6 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
             <td style="padding:10px 14px;background:#f6f4ee;text-align:right;"><strong>${money(args.dueCents + args.taxDueCents + (args.shipCents ?? 0))}</strong></td>
           </tr>
         </table>
-        ${
-          isDeposit
-            ? `<p style="margin:0 0 14px;font-size:13px;color:#666;">Why is shipping on the final invoice? Teams often add pieces while we're in production - extra jerseys, hats, a team hype chain. Charging shipping at the end means everything ships together and you pay the exact real rate, never an estimate. And if you pick up at our Ocala shop, shipping is simply $0.</p>`
-            : ""
-        }
         ${
           args.roster && args.roster.length
             ? `<p style="margin:18px 0 6px;font-size:13px;color:#666;"><strong>Your roster (${args.roster.length}):</strong></p>
@@ -249,12 +244,7 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
         }
         ${
           isDeposit
-            ? `<p style="margin:0;">Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} plus tax and shipping is due before your order ships. You'll enter your <strong>shipping address</strong> on the payment page so we know exactly where your gear is headed. Questions or roster changes first? Just reply to this email.</p>
-        <table style="width:100%;border-collapse:collapse;margin:18px 0 0;"><tr><td style="padding:14px 16px;background:#f6f4ee;border:1px solid #e6e0cf;border-left:3px solid #b8a36c;">
-          <p style="margin:0 0 6px;font-weight:bold;color:#13160b;">🏆 Make it official: add a Custom Team Hype Chain</p>
-          <p style="margin:0 0 8px;font-size:14px;color:#444;">The chain your players fight for after every big play - custom built in 3D to match your team's logo and colors. Add one now and it ships right alongside your uniforms.</p>
-          <p style="margin:0;font-size:14px;"><a href="https://sluggerathletics.com/hype-chains" style="color:#9c884f;font-weight:bold;">See custom hype chains →</a> <span style="color:#8a8570;">or just reply to this email and we'll mock one up for your team.</span></p>
-        </td></tr></table>`
+            ? `<p style="margin:0;">Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} plus tax is due before your order ships. You'll enter your <strong>shipping address</strong> on the payment page so we know exactly where your gear is headed. Questions or roster changes first? Just reply to this email.</p>`
             : `<p style="margin:0;">Your gear is in production! Settling the balance now means we ship the moment it's ready - no waiting. Questions? Just reply to this email.</p>`
         }
         ${
