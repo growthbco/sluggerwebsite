@@ -548,6 +548,17 @@ export default async function AdminPage() {
                         ) : (
                           <span className="text-xs text-muted">no roster</span>
                         )}
+                        {(o.invoiceUrl || estimate) && (
+                          <a
+                            href={`/api/admin/team-order/invoice-view?id=${o.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={o.invoiceUrl ? "See a copy of the invoice the customer received" : "Preview the deposit invoice before sending it"}
+                            className="text-xs display text-muted underline decoration-dotted underline-offset-2 hover:text-foreground whitespace-nowrap"
+                          >
+                            👁 INVOICE
+                          </a>
+                        )}
                         <AdminArchiveButton kind="team_order" id={o.id} archived={false} />
                       </span>
                     </td>

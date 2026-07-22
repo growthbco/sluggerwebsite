@@ -162,8 +162,7 @@ export async function emailProofReady(args: {
 }
 
 /** Team-order invoice (50% deposit or final balance) + a Stripe payment link. */
-export async function emailTeamOrderInvoice(args: {
-  to: string;
+export type TeamOrderInvoiceContent = {
   teamName: string;
   reference: string;
   stage: "deposit" | "balance";
@@ -176,7 +175,12 @@ export async function emailTeamOrderInvoice(args: {
   roster?: { name: string; number: string; size: string }[];
   payUrl: string;
   payFullUrl?: string;
-}): Promise<boolean> {
+};
+
+/** The invoice email as { subject, html } - shared by the actual send and the
+ *  admin "view invoice" preview so the preview is EXACTLY what the customer
+ *  received. */
+export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject: string; html: string } {
   const money = (c: number) => `$${(c / 100).toFixed(2)}`;
   const rows = args.lines
     .map(
@@ -188,8 +192,7 @@ export async function emailTeamOrderInvoice(args: {
     )
     .join("");
   const isDeposit = args.stage === "deposit";
-  return sendEmail({
-    to: args.to,
+  return {
     subject: isDeposit
       ? `Your ${args.teamName} order: ${money(args.dueCents)} deposit starts production (${args.reference})`
       : `Final balance for your ${args.teamName} order: ${money(args.dueCents)} (${args.reference})`,
@@ -252,8 +255,12 @@ export async function emailTeamOrderInvoice(args: {
       ctaUrl: args.payUrl,
       footerNote: "Standard 2-3 week turnaround · Free local pickup in Ocala",
     }),
-    replyTo: CONTACT_INBOX,
-  });
+  };
+}
+
+export async function emailTeamOrderInvoice(args: TeamOrderInvoiceContent & { to: string }): Promise<boolean> {
+  const { subject, html } = renderTeamOrderInvoice(args);
+  return sendEmail({ to: args.to, subject, html, replyTo: CONTACT_INBOX });
 }
 
 /** Reminder for an unpaid deposit or balance invoice. */
