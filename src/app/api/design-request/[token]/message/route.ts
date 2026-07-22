@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { getByManageToken, getByStatusToken, addDesignMessage } from "@/lib/design-requests";
+import { getByDesignRequestId, getRoster } from "@/lib/team-orders";
+import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
+import { assistDesignThread } from "@/lib/design-assistant";
 import { emailDesignerMessage } from "@/lib/email";
 import { postDesignThreadUpdate } from "@/lib/discord";
 
@@ -49,7 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const name = from === "designer" ? (body.name ?? "").trim().slice(0, 40) || undefined : undefined;
 
   try {
-    const messages = await addDesignMessage(request.id, from, text, name, attachments);
+    let messages = await addDesignMessage(request.id, from, text, name, attachments);
     if (!messages) return NextResponse.json({ error: "Could not save" }, { status: 500 });
 
     // Notifications describe attachments even when there's no text.
@@ -85,6 +88,62 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         imageUrl: firstImage,
         username: "Slugger Design Requests",
       });
+
+      // AI assistant: answer routine questions instantly; escalate anything
+      // sensitive (discounts, refunds, complaints) to staff instead of
+      // replying. Best-effort - a failure here never fails the client's send.
+      if (text) {
+        try {
+          const order = await getByDesignRequestId(request.id);
+          const roster = order ? await getRoster(order.id) : [];
+          const result = await assistDesignThread({
+            design: {
+              reference: request.reference,
+              teamName: request.teamName,
+              status: request.status,
+              revisionsUsed: request.revisionsUsed,
+              proofCount: request.proofImages?.length ?? 0,
+              rush: request.rush,
+              neededBy: request.neededBy,
+            },
+            order: order
+              ? {
+                  reference: order.reference,
+                  status: order.status,
+                  items: order.items ?? ["jersey"],
+                  rosterCount: roster.length,
+                  estimateCents: roster.length ? computeTeamOrderQuote(order, roster).totalCents : null,
+                  quotedTotalCents: order.quotedTotalCents,
+                  depositPaidAt: order.depositPaidAt,
+                  invoicePaidAt: order.invoicePaidAt,
+                  shippedAt: order.shippedAt,
+                }
+              : null,
+            messages,
+          });
+          if (result?.action === "answer" && result.reply) {
+            const updated = await addDesignMessage(request.id, "designer", result.reply, "AI Assistant");
+            if (updated) messages = updated;
+            // Log the exchange to Discord so staff can correct a bad answer.
+            await postDesignThreadUpdate({
+              threadId: request.discordThreadId ?? undefined,
+              title: `🤖 AI Assistant answered - ${request.teamName} (${request.reference})`,
+              description: `**Q:** ${text.slice(0, 600)}\n**A:** ${result.reply.slice(0, 1200)}`,
+              username: "Slugger Design Requests",
+            });
+          } else if (result?.action === "escalate") {
+            await postDesignThreadUpdate({
+              threadId: request.discordThreadId ?? undefined,
+              title: `🙋 Needs a human reply - ${request.teamName} (${request.reference})`,
+              description: `${result.reason ? `${result.reason}\n` : ""}**Client:** ${text.slice(0, 1000)}`,
+              username: "Slugger Design Requests",
+              mention: true,
+            });
+          }
+        } catch (e) {
+          console.error("design assistant hook failed:", e);
+        }
+      }
     }
 
     return NextResponse.json({ ok: true, messages });
