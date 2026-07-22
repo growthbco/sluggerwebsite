@@ -6,8 +6,9 @@ import { dbEnabled, getDb } from "@/db";
 import { designRequests, teamOrders, teams, orders, teamOrderAddons } from "@/db/schema";
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
 import { getRoster } from "@/lib/team-orders";
-import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
+import { computeTeamOrderQuote, estimateOrderWeightOz } from "@/lib/team-order-pricing";
 import { itemLabel, isInHouseItem } from "@/lib/order-items";
+import { shippingCentsFor } from "@/lib/team-stores";
 import { AdminLogout } from "@/components/admin-logout";
 import { AdminInvoiceButton } from "@/components/admin-invoice-button";
 import { AdminShipButton } from "@/components/admin-ship-button";
@@ -111,6 +112,7 @@ export default async function AdminPage() {
         trackingNumber: teamOrders.trackingNumber,
         labelUrl: teamOrders.labelUrl,
         shippedAt: teamOrders.shippedAt,
+        shippingChargedCents: teamOrders.shippingChargedCents,
         inboundCarrier: teamOrders.inboundCarrier,
         inboundTrackingNumber: teamOrders.inboundTrackingNumber,
         archivedAt: teamOrders.archivedAt,
@@ -179,6 +181,10 @@ export default async function AdminPage() {
   // Ocala) so they stay visible until shipped - the factory shipment won't
   // contain them. Roster fetches are per-order but the list is small.
   const orderEstimates = new Map<string, number>();
+  // Shipping estimate (formula: carrier cost from roster weight + margin).
+  // The real number comes from a live rate when the balance invoice is sent;
+  // this keeps the expected charge visible up front. Pickup = $0.
+  const shipEstimates = new Map<string, number>();
   const inHouseWork = new Map<string, string>(); // order id -> "11× Snapback Hat"
   for (const o of activeOrders) {
     try {
@@ -186,6 +192,8 @@ export default async function AdminPage() {
       if (!roster.length) continue;
       if (!(o.status === "paid" || o.invoicePaidAt)) {
         orderEstimates.set(o.id, computeTeamOrderQuote(o, roster).totalCents);
+        const weightOz = estimateOrderWeightOz(roster);
+        if (weightOz > 0) shipEstimates.set(o.id, shippingCentsFor(weightOz));
       }
       if (!o.shippedAt) {
         const counts = new Map<string, number>();
@@ -426,6 +434,21 @@ export default async function AdminPage() {
                           {estimate ? money(estimate) : "-"}
                           {estimate && !o.quotedTotalCents ? <span className="text-xs text-muted"> est.</span> : null}
                         </span>
+                        {/* Shipping rides on the FINAL invoice: show the
+                            charged amount once known, else the weight-based
+                            estimate so the full number is visible up front. */}
+                        {o.shippingChargedCents != null ? (
+                          <span className="text-xs text-muted whitespace-nowrap" title="Shipping charged on the final invoice">
+                            + {o.shippingChargedCents === 0 ? "pickup" : `${money(o.shippingChargedCents)} ship`}
+                          </span>
+                        ) : estimate && shipEstimates.has(o.id) ? (
+                          <span
+                            className="text-xs text-muted whitespace-nowrap"
+                            title="Estimated shipping, charged on the final balance invoice (live rate at that point; $0 if local pickup)"
+                          >
+                            + ~{money(shipEstimates.get(o.id)!)} ship
+                          </span>
+                        ) : null}
                         {!o.invoiceUrl && !paid && (
                           <>
                             <AdminLocalToggle teamOrderId={o.id} local={o.localPricing} />
