@@ -122,7 +122,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
             messages,
           });
           if (result?.action === "answer" && result.reply) {
-            const updated = await addDesignMessage(request.id, "designer", result.reply, "AI Assistant");
+            // Clients see "Support · Slugger Athletics" - never an AI label. Staff
+            // can tell it was the bot from the Discord log.
+            const updated = await addDesignMessage(request.id, "designer", result.reply, "Support");
             if (updated) messages = updated;
             // Log the exchange to Discord so staff can correct a bad answer.
             // flagStaff (discount asks): the AI sent the holding reply per
@@ -130,8 +132,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
             await postDesignThreadUpdate({
               threadId: request.discordThreadId ?? undefined,
               title: result.flagStaff
-                ? `🤖💰 AI answered a discount ask - follow up personally - ${request.teamName} (${request.reference})`
-                : `🤖 AI Assistant answered - ${request.teamName} (${request.reference})`,
+                ? `🤖🙋 AI sent a holding reply - follow up personally - ${request.teamName} (${request.reference})`
+                : `🤖 AI answered - ${request.teamName} (${request.reference})`,
               description: `**Q:** ${text.slice(0, 600)}\n**A:** ${result.reply.slice(0, 1200)}`,
               username: "Slugger Design Requests",
               mention: Boolean(result.flagStaff),
