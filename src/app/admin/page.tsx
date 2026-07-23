@@ -193,10 +193,16 @@ export default async function AdminPage() {
   // this keeps the expected charge visible up front. Pickup = $0.
   const shipEstimates = new Map<string, number>();
   const inHouseWork = new Map<string, string>(); // order id -> "11× Snapback Hat"
+  // Orders with any name/number on the roster need print-file QA before
+  // production; plain-gear orders skip that gate entirely.
+  const personalizedOrders = new Set<string>();
   for (const o of activeOrders) {
     try {
       const roster = await getRoster(o.id);
       if (!roster.length) continue;
+      if (roster.some((r) => (r.playerName ?? "").trim() || (r.playerNumber ?? "").trim())) {
+        personalizedOrders.add(o.id);
+      }
       if (!(o.status === "paid" || o.invoicePaidAt)) {
         orderEstimates.set(o.id, computeTeamOrderQuote(o, roster).totalCents);
         const weightOz = estimateOrderWeightOz(roster);
@@ -545,7 +551,7 @@ export default async function AdminPage() {
                             dueCents={deposit}
                             stage="deposit"
                             resend={Boolean(o.invoiceUrl)}
-                            warnPrintFile={Boolean(o.designRequestId) && !o.printFileVerifiedAt}
+                            warnPrintFile={Boolean(o.designRequestId) && !o.printFileVerifiedAt && personalizedOrders.has(o.id)}
                           />
                         ) : (
                           <span className="text-xs text-muted">no roster</span>

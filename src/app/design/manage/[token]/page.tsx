@@ -46,6 +46,11 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
       (r.size ?? "").trim() ||
       Object.entries(r.sizes ?? {}).some(([k, v]) => !isInHouseItem(k) && (v ?? "").trim()),
   );
+  // Plain gear (no names or numbers on any row) has nothing to cross-check
+  // against a print file, so the whole QA step is skipped per shop policy.
+  const personalized = printRoster.some(
+    (r) => (r.playerName ?? "").trim() || (r.playerNumber ?? "").trim(),
+  );
 
   // Per-person team store (only offered once the design is approved).
   const storeEligible = request.status === "approved" || request.status === "ordered";
@@ -72,10 +77,10 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
                 .join(" · ")
             : null
         }
-        printFileVerified={Boolean(linkedOrder?.printFileVerifiedAt)}
+        printFileVerified={Boolean(linkedOrder?.printFileVerifiedAt) || (Boolean(linkedOrder) && printRoster.length > 0 && !personalized)}
       />
 
-      {linkedOrder && printRoster.length > 0 && (
+      {linkedOrder && printRoster.length > 0 && personalized && (
         <PrintFileQA
           // Auth: the verify endpoint accepts the team-order's manage token.
           // The designer reaches this page from the Discord thread (which only
