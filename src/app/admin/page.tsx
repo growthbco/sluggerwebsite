@@ -24,6 +24,8 @@ import { AdminNewStore } from "@/components/admin-new-store";
 import { AdminAssistantFacts } from "@/components/admin-assistant-facts";
 import { AdminRecordPayment } from "@/components/admin-record-payment";
 import { AdminPickupToggle } from "@/components/admin-pickup-toggle";
+import { AdminRowMenu } from "@/components/admin-row-menu";
+import { AdminCustomPrice } from "@/components/admin-custom-price";
 import { MarkStaffDevice } from "@/components/mark-staff-device";
 import { STORE_ITEM_PRESETS } from "@/lib/team-stores";
 
@@ -119,6 +121,7 @@ export default async function AdminPage() {
         shippingChargedCents: teamOrders.shippingChargedCents,
         paymentNote: teamOrders.paymentNote,
         localPickup: teamOrders.localPickup,
+        customJerseyCents: teamOrders.customJerseyCents,
         inboundCarrier: teamOrders.inboundCarrier,
         inboundTrackingNumber: teamOrders.inboundTrackingNumber,
         archivedAt: teamOrders.archivedAt,
@@ -508,7 +511,13 @@ export default async function AdminPage() {
                             + ~{money(shipEstimates.get(o.id)!)} ship
                           </span>
                         ) : null}
-                        {o.localPricing && <span className="text-xs display text-brand">OCALA</span>}
+                        {o.customJerseyCents ? (
+                          <span className="text-xs display text-brand" title="Negotiated per-jersey price for this order">
+                            ${(o.customJerseyCents / 100).toFixed(0)}/JERSEY
+                          </span>
+                        ) : (
+                          o.localPricing && <span className="text-xs display text-brand">OCALA</span>
+                        )}
                         {o.taxExempt && <span className="text-xs display text-brand">TAX-EXEMPT</span>}
                       </span>
                     </td>
@@ -586,12 +595,8 @@ export default async function AdminPage() {
                         ) : (
                           <span className="text-xs text-muted">no roster</span>
                         )}
-                        {/* Secondary actions, collapsed. */}
-                        <details>
-                          <summary className="list-none inline-block cursor-pointer text-xs display text-muted border border-line px-2.5 py-1 hover:border-brand/50 hover:text-foreground select-none" title="More actions">
-                            ⋯
-                          </summary>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        {/* Secondary actions in a floating dropdown. */}
+                        <AdminRowMenu>
                             {!paid && (
                               <AdminRecordPayment
                                 teamOrderId={o.id}
@@ -616,6 +621,7 @@ export default async function AdminPage() {
                             )}
                             {!o.invoiceUrl && !paid && (
                               <>
+                                <AdminCustomPrice teamOrderId={o.id} currentCents={o.customJerseyCents} />
                                 <AdminLocalToggle teamOrderId={o.id} local={o.localPricing} />
                                 <AdminTaxToggle teamOrderId={o.id} exempt={o.taxExempt} />
                               </>
@@ -640,8 +646,7 @@ export default async function AdminPage() {
                               <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
                             )}
                             <AdminArchiveButton kind="team_order" id={o.id} archived={false} />
-                          </div>
-                        </details>
+                        </AdminRowMenu>
                       </span>
                     </td>
                     <td className="px-3 py-2 text-muted">{fmtDate(o.updatedAt)}</td>

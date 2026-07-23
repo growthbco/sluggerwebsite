@@ -1,0 +1,1 @@
+ALTER TABLE "team_orders" ADD COLUMN "custom_jersey_cents" integer;

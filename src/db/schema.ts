@@ -422,6 +422,9 @@ export const teamOrders = pgTable(
     // Local order: customer picks up in Ocala - no shipping anywhere (admin
     // estimates, invoices, balance default all show pickup instead).
     localPickup: boolean("local_pickup").notNull().default(false),
+    // Owner-negotiated per-jersey price for THIS order (e.g. $23 for a
+    // long-time customer). Wins over the standard and Ocala prices.
+    customJerseyCents: integer("custom_jersey_cents"),
     // Offline payments (Zelle, CashApp, cash...) recorded by staff from the
     // admin page, e.g. "deposit via Zelle - $330 (Jul 22, 2026)".
     paymentNote: text("payment_note"),

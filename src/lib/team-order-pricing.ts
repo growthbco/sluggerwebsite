@@ -84,7 +84,14 @@ type RosterRow = {
 /** Count what each player actually ordered (their per-item sizes) and price
  *  it. A row with only the legacy `size` field counts as one jersey. */
 export function computeTeamOrderQuote(
-  order: { jerseyStyle?: string | null; items?: string[] | null; rushShipping?: boolean | null; localPricing?: boolean | null },
+  order: {
+    jerseyStyle?: string | null;
+    items?: string[] | null;
+    rushShipping?: boolean | null;
+    localPricing?: boolean | null;
+    /** Owner-negotiated per-jersey price for this order - wins over all defaults. */
+    customJerseyCents?: number | null;
+  },
   roster: RosterRow[],
 ): TeamOrderQuote {
   const counts = new Map<string, number>();
@@ -104,7 +111,10 @@ export function computeTeamOrderQuote(
   const keys = Array.from(counts.keys()).sort((a, b) => (a === "jersey" ? -1 : b === "jersey" ? 1 : a.localeCompare(b)));
   for (const key of keys) {
     const quantity = counts.get(key)!;
-    const unit = key === "jersey" ? jerseyPriceCents(order.jerseyStyle, order.localPricing) : ITEM_PRICES[key];
+    const unit =
+      key === "jersey"
+        ? order.customJerseyCents || jerseyPriceCents(order.jerseyStyle, order.localPricing)
+        : ITEM_PRICES[key];
     if (!unit) continue; // unknown item type: leave for a manual quote
     const label =
       key === "jersey" && order.jerseyStyle ? `${order.jerseyStyle} Jersey` : itemLabel(key);
