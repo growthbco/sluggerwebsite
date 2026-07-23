@@ -163,7 +163,13 @@ export function AdminCustomInvoiceForm() {
                     {busy === `ai-${i}` ? "Drafting..." : "✨ AI write it"}
                   </button>
                 </div>
-                <input className={`mt-1 ${inputCls}`} value={l.description} onChange={(e) => update(i, "description", e.target.value)} placeholder="What the customer is getting" />
+                <textarea
+                  className={`mt-1 ${inputCls} min-h-20 resize-y`}
+                  rows={3}
+                  value={l.description}
+                  onChange={(e) => update(i, "description", e.target.value)}
+                  placeholder="What the customer is getting"
+                />
               </div>
             </div>
           ))}
