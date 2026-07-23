@@ -43,7 +43,7 @@ export function AdminRowMenu({ children }: { children: React.ReactNode }) {
           {/* Click-away backdrop */}
           <div className="fixed inset-0 z-40" onClick={() => setPos(null)} />
           <div
-            className="fixed z-50 min-w-[15rem] max-w-[90vw] bg-ink border border-line shadow-2xl p-2.5 flex flex-col items-start gap-2"
+            className="admin-row-menu fixed z-50 min-w-[13rem] max-w-[90vw] bg-ink border border-line shadow-2xl py-1.5 flex flex-col items-stretch"
             style={pos}
           >
             {children}

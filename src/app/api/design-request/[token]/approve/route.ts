@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { getByStatusToken, approveDesign } from "@/lib/design-requests";
 import { postDesignThreadUpdate } from "@/lib/discord";
+import { setThreadStageTag } from "@/lib/discord-bot";
 
 export const runtime = "nodejs";
 
@@ -36,6 +37,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       imageUrl: approvedUrl,
       username: "Slugger Design Requests",
     });
+    await setThreadStageTag(request.discordThreadId, "✅ Approved");
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("approveDesign failed:", e);

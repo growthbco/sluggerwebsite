@@ -2,6 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 
+// One-tap pipeline filters for team orders, in funnel order. Values match
+// the team_orders status enum carried on each row's data-status.
+const STAGE_CHIPS: { label: string; value: string }[] = [
+  { label: "📋 New roster", value: "submitted" },
+  { label: "🧾 Invoiced", value: "quoted" },
+  { label: "💰 Deposit paid", value: "in_production" },
+  { label: "💸 Paid in full", value: "paid" },
+  { label: "🚚 Shipped", value: "shipped" },
+];
+
 // Filters the dashboard's project rows in place. Rows opt in with a
 // data-search attribute (searchable text) and data-status attribute.
 export function AdminSearch({ statuses }: { statuses: string[] }) {
@@ -36,7 +46,26 @@ export function AdminSearch({ statuses }: { statuses: string[] }) {
   }, [q, status]);
 
   return (
-    <div ref={ref} className="mt-6 flex flex-wrap items-center gap-2">
+    <div ref={ref} className="mt-6 space-y-2">
+      {/* Order pipeline chips - one tap to see everyone at that stage. */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {STAGE_CHIPS.map((c) => {
+          const on = status === c.value;
+          return (
+            <button
+              key={c.value}
+              type="button"
+              onClick={() => setStatus(on ? "" : c.value)}
+              className={`text-xs display px-2.5 py-1 border whitespace-nowrap ${
+                on ? "bg-brand text-on-brand border-brand" : "border-line text-muted hover:border-brand/50 hover:text-foreground"
+              }`}
+            >
+              {c.label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
@@ -67,6 +96,7 @@ export function AdminSearch({ statuses }: { statuses: string[] }) {
           Clear
         </button>
       )}
+      </div>
     </div>
   );
 }

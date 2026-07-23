@@ -35,7 +35,7 @@ export function AdminPickupToggle({ teamOrderId, pickup }: { teamOrderId: string
         pickup ? "border-brand/60 text-brand bg-brand/10" : "border-line text-muted hover:border-brand/40"
       }`}
     >
-      {busy ? "..." : pickup ? "🏬 PICKUP ✓" : "+ pickup"}
+      {busy ? "..." : pickup ? "Local pickup ✓" : "Local pickup"}
     </button>
   );
 }

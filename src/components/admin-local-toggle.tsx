@@ -35,7 +35,7 @@ export function AdminLocalToggle({ teamOrderId, local }: { teamOrderId: string; 
         local ? "border-brand/60 text-brand bg-brand/10" : "border-line text-muted hover:border-brand/40"
       }`}
     >
-      {busy ? "..." : local ? "OCALA $25 ✓" : "+ set Ocala $25"}
+      {busy ? "..." : local ? "Ocala $25 ✓" : "Ocala $25 pricing"}
     </button>
   );
 }

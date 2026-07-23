@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { postTeamOrderToDiscord } from "@/lib/discord";
+import { setThreadStageTag } from "@/lib/discord-bot";
 import { dbEnabled } from "@/db";
 import { getByStatusToken, findActiveDesignByEmail, markOrdered } from "@/lib/design-requests";
 import { createTeamOrder, addRosterRow, submitTeamOrder } from "@/lib/team-orders";
@@ -129,6 +130,8 @@ export async function POST(req: Request) {
       },
       { designThreadId: design?.discordThreadId },
     );
+
+    await setThreadStageTag(design?.discordThreadId, "📋 Roster In");
 
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     return NextResponse.json({

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { getByManageToken, toggleApprovedDesign } from "@/lib/design-requests";
 import { postDesignThreadUpdate } from "@/lib/discord";
+import { setThreadStageTag } from "@/lib/discord-bot";
 
 export const runtime = "nodejs";
 
@@ -43,6 +44,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       username: "Slugger Design Requests",
       mention: approved,
     });
+    await setThreadStageTag(request.discordThreadId, "✅ Approved");
     return NextResponse.json({ ok: true, urls: result.urls });
   } catch (e) {
     console.error("toggleApprovedDesign failed:", e);

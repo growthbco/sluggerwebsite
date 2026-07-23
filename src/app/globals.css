@@ -101,3 +101,32 @@ body {
     transparent 1px 14px
   );
 }
+
+/* ---------------------------------------------------------------------------
+   Admin row-action dropdown (.admin-row-menu): render every closed action as
+   a uniform, quiet menu item regardless of the button's native styling.
+   Opened inline editors (spans with inputs) keep their own look.
+--------------------------------------------------------------------------- */
+.admin-row-menu > button,
+.admin-row-menu > a {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 0.55rem 1rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  color: var(--foreground);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.admin-row-menu > button:hover,
+.admin-row-menu > a:hover {
+  background: rgba(184, 163, 108, 0.14);
+  color: var(--foreground);
+}
+.admin-row-menu > span,
+.admin-row-menu > div {
+  padding: 0.45rem 1rem;
+}

@@ -6,6 +6,7 @@ import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
 import { postTeamOrderPaidToDiscord } from "@/lib/discord";
 import { getById as getDesignById } from "@/lib/design-requests";
+import { setThreadStageTag } from "@/lib/discord-bot";
 import { isAdmin } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
@@ -63,7 +64,9 @@ export async function POST(req: Request) {
             status: "in_production",
             depositPaidAt: now,
             quotedTotalCents: quotedTotalCents || null,
-            depositCents: depositCents || null,
+            // The ACTUAL amount received - a custom partial payment must
+            // reduce the balance by what was really paid, not by half.
+            depositCents: paidCents || depositCents || null,
             paymentNote,
             invoiceRemindersSent: 0,
             updatedAt: now,
@@ -95,6 +98,8 @@ export async function POST(req: Request) {
         : ""
     }`,
   });
+
+  await setThreadStageTag(design?.discordThreadId, stage === "deposit" ? "💰 Deposit Paid" : "💸 Paid in Full");
 
   return NextResponse.json({ ok: true, stage, method, paidCents, paymentNote });
 }

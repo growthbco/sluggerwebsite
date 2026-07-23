@@ -3,6 +3,7 @@ import { dbEnabled } from "@/db";
 import { getByManageToken, addProofImages } from "@/lib/design-requests";
 import { emailProofReady } from "@/lib/email";
 import { postDesignThreadUpdate } from "@/lib/discord";
+import { setThreadStageTag } from "@/lib/discord-bot";
 
 export const runtime = "nodejs";
 
@@ -44,6 +45,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       imageUrl: urls[urls.length - 1],
       username: "Slugger Design Requests",
     });
+    await setThreadStageTag(request.discordThreadId, "🎨 Designing");
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("addProofImages failed:", e);

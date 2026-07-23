@@ -214,6 +214,8 @@ export async function POST(req: Request) {
             stage: isDeposit ? "deposit" : "balance",
             designThreadId: design?.discordThreadId,
           });
+          const { setThreadStageTag } = await import("@/lib/discord-bot");
+          await setThreadStageTag(design?.discordThreadId, isDeposit ? "💰 Deposit Paid" : "💸 Paid in Full");
         }
         // The deposit and pay-in-full links are siblings: paying one kills the
         // other so nobody can double-pay.

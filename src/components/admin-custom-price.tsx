@@ -42,7 +42,7 @@ export function AdminCustomPrice({ teamOrderId, currentCents }: { teamOrderId: s
           currentCents ? "border-brand/60 text-brand bg-brand/10" : "border-line text-muted hover:border-brand/40"
         }`}
       >
-        {currentCents ? `CUSTOM $${(currentCents / 100).toFixed(0)}/jersey ✓` : "+ custom jersey $"}
+        {currentCents ? `Custom jersey $${(currentCents / 100).toFixed(0)} ✓` : "Custom jersey price"}
       </button>
     );
   }

@@ -60,7 +60,7 @@ export function AdminRecordPayment({
         className="text-xs display text-muted border border-line px-2 py-1 hover:border-brand/50 hover:text-foreground whitespace-nowrap"
         title={`Record a Zelle / CashApp / cash payment for ${teamName}`}
       >
-        💵 Record payment
+        Record payment
       </button>
     );
   }

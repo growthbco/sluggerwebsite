@@ -3,6 +3,7 @@ import { dbEnabled } from "@/db";
 import { getByManageToken, getRoster, submitTeamOrder } from "@/lib/team-orders";
 import { postTeamOrderToDiscord } from "@/lib/discord";
 import { markOrdered, getById } from "@/lib/design-requests";
+import { setThreadStageTag } from "@/lib/discord-bot";
 
 export const runtime = "nodejs";
 
@@ -56,6 +57,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ token:
       try { await markOrdered(order.designRequestId); } catch (e) { console.error("markOrdered failed:", e); }
     }
 
+    await setThreadStageTag(design?.discordThreadId, "📋 Roster In");
     return NextResponse.json({ ok: true, reference: order.reference });
   } catch (e) {
     console.error("submitTeamOrder failed:", e);

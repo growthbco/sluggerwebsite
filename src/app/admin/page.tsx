@@ -611,9 +611,9 @@ export default async function AdminPage() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title={o.invoiceUrl ? "See a copy of the invoice the customer received" : "Preview the deposit invoice before sending it"}
-                                className="text-xs display text-muted underline decoration-dotted underline-offset-2 hover:text-foreground whitespace-nowrap"
+                                className="text-xs display text-muted whitespace-nowrap"
                               >
-                                👁 INVOICE
+                                View invoice
                               </a>
                             )}
                             {!o.balanceInvoiceUrl && !paid && (
@@ -630,17 +630,17 @@ export default async function AdminPage() {
                               o.trackingNumber ? (
                                 <>
                                   <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
-                                  <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email" />
+                                  <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="Mark shipped + email" />
                                 </>
                               ) : (
                                 <>
                                   <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />
-                                  <AdminShipButton kind="team_order" id={o.id} who={o.teamName} label="➕ Add tracking" />
+                                  <AdminShipButton kind="team_order" id={o.id} who={o.teamName} label="Add tracking" />
                                 </>
                               )
                             )}
                             {paid && !o.shippedAt && (
-                              <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber ?? undefined} label="➕ Add tracking" />
+                              <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber ?? undefined} label="Add tracking" />
                             )}
                             {paid && !o.shippedAt && o.trackingNumber && (
                               <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
