@@ -71,6 +71,7 @@ export async function GET(req: Request) {
     })),
     payUrl: sentUrl ?? "#",
     payFullUrl: stage === "deposit" ? order.fullInvoiceUrl ?? undefined : undefined,
+    localPickup: order.localPickup,
   });
 
   const banner = sentUrl

@@ -16,6 +16,7 @@ export function AdminInvoiceButton({
   stage,
   resend,
   warnPrintFile,
+  localPickup,
 }: {
   teamOrderId: string;
   teamName: string;
@@ -24,12 +25,14 @@ export function AdminInvoiceButton({
   resend?: boolean;
   /** True when this order's print file hasn't passed QA yet. */
   warnPrintFile?: boolean;
+  /** Order marked local pickup - the balance defaults to no shipping. */
+  localPickup?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [ship, setShip] = useState<"auto" | "pickup">("auto");
+  const [ship, setShip] = useState<"auto" | "pickup">(localPickup ? "pickup" : "auto");
 
   const label = stage === "deposit" ? "50% deposit" : "final invoice";
   const withTax = Math.round(dueCents * 1.07);

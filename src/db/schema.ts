@@ -419,6 +419,9 @@ export const teamOrders = pgTable(
     balanceInvoiceUrl: text("balance_invoice_url"),
     // Shipping charged to the customer on the final invoice (0 = local pickup).
     shippingChargedCents: integer("shipping_charged_cents"),
+    // Local order: customer picks up in Ocala - no shipping anywhere (admin
+    // estimates, invoices, balance default all show pickup instead).
+    localPickup: boolean("local_pickup").notNull().default(false),
     // Offline payments (Zelle, CashApp, cash...) recorded by staff from the
     // admin page, e.g. "deposit via Zelle - $330 (Jul 22, 2026)".
     paymentNote: text("payment_note"),

@@ -175,6 +175,8 @@ export type TeamOrderInvoiceContent = {
   roster?: { name: string; number: string; size: string }[];
   payUrl: string;
   payFullUrl?: string;
+  /** Order is local pickup in Ocala - no shipping is ever charged. */
+  localPickup?: boolean;
 };
 
 /** The invoice email as { subject, html } - shared by the actual send and the
@@ -218,9 +220,11 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
           ${
             args.shipCents && args.shipCents > 0
               ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;">${money(args.shipCents)}</td></tr>`
-              : isDeposit
-                ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;color:#8a8570;">added to your final invoice</td></tr>`
-                : ""
+              : args.localPickup
+                ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;color:#8a8570;">free local pickup in Ocala</td></tr>`
+                : isDeposit
+                  ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;color:#8a8570;">added to your final invoice</td></tr>`
+                  : ""
           }
           <tr>
             <td style="padding:10px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;"><strong>Due now</strong></td>
@@ -229,7 +233,9 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
         </table>
         ${
           isDeposit
-            ? `<p style="margin:0 0 14px;font-size:13px;color:#666;">Why is shipping on the final invoice? Teams often add pieces while we're in production - extra jerseys, hats, a team hype chain. Charging shipping at the end means everything ships together and you pay the exact real rate, never an estimate. And if you pick up at our Ocala shop, shipping is simply $0.</p>`
+            ? args.localPickup
+              ? `<p style="margin:0 0 14px;font-size:13px;color:#666;">This order is set for free local pickup at our Ocala shop - no shipping charges, ever. We'll let you know the moment it's ready to grab.</p>`
+              : `<p style="margin:0 0 14px;font-size:13px;color:#666;">Why is shipping on the final invoice? Teams often add pieces while we're in production - extra jerseys, hats, a team hype chain. Charging shipping at the end means everything ships together and you pay the exact real rate, never an estimate. And if you pick up at our Ocala shop, shipping is simply $0.</p>`
             : ""
         }
         ${

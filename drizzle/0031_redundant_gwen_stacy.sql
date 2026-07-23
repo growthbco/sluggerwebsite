@@ -1,0 +1,1 @@
+ALTER TABLE "team_orders" ADD COLUMN "local_pickup" boolean DEFAULT false NOT NULL;

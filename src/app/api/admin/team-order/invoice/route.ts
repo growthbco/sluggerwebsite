@@ -68,7 +68,9 @@ export async function POST(req: Request) {
   // so shipping is deterministic - no manual entry. "pickup" = $0. A manual
   // shipWeightOz still overrides if ever needed.
   let shipCents = 0;
-  const wantShip = stage === "balance" && body.ship !== "pickup";
+  // Explicit choice from the modal wins; otherwise a local-pickup order
+  // defaults to no shipping.
+  const wantShip = stage === "balance" && (body.ship ? body.ship !== "pickup" : !order.localPickup);
   if (wantShip) {
     const weightOz = body.shipWeightOz && body.shipWeightOz > 0 ? Math.round(body.shipWeightOz) : estimateOrderWeightOz(roster);
     if (weightOz > 0) {
@@ -167,6 +169,7 @@ export async function POST(req: Request) {
       taxDueCents: order.taxExempt ? 0 : taxCents(dueCents),
       taxExempt: order.taxExempt,
       shipCents,
+      localPickup: order.localPickup,
       roster: roster.map((r) => ({
         name: (r.playerName ?? "").trim(),
         number: (r.playerNumber ?? "").trim(),

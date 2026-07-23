@@ -23,6 +23,7 @@ import { AdminSearch } from "@/components/admin-search";
 import { AdminNewStore } from "@/components/admin-new-store";
 import { AdminAssistantFacts } from "@/components/admin-assistant-facts";
 import { AdminRecordPayment } from "@/components/admin-record-payment";
+import { AdminPickupToggle } from "@/components/admin-pickup-toggle";
 import { MarkStaffDevice } from "@/components/mark-staff-device";
 import { STORE_ITEM_PRESETS } from "@/lib/team-stores";
 
@@ -117,6 +118,7 @@ export default async function AdminPage() {
         shippedAt: teamOrders.shippedAt,
         shippingChargedCents: teamOrders.shippingChargedCents,
         paymentNote: teamOrders.paymentNote,
+        localPickup: teamOrders.localPickup,
         inboundCarrier: teamOrders.inboundCarrier,
         inboundTrackingNumber: teamOrders.inboundTrackingNumber,
         archivedAt: teamOrders.archivedAt,
@@ -225,6 +227,45 @@ export default async function AdminPage() {
       }
     } catch {}
   }
+
+  // Unified recent-payments feed: team-order deposits/balances (Stripe or
+  // recorded offline) and paid add-ons. The old "Recent paid orders" list
+  // only read the shop-orders table, so it said "no orders yet" while team
+  // invoices were getting paid.
+  type PaymentEvent = { at: Date; label: string; sub: string; amountCents: number };
+  const paymentEvents: PaymentEvent[] = [];
+  const orderById = new Map(torders.map((t) => [t.id, t]));
+  for (const t of torders) {
+    const offline = t.paymentNote ? " · 💵 offline" : "";
+    const total = t.quotedTotalCents ?? 0;
+    const dep = t.depositCents ?? Math.round(total / 2);
+    const paidInFull = Boolean(
+      t.invoicePaidAt && t.depositPaidAt && Math.abs(+t.invoicePaidAt - +t.depositPaidAt) < 60000,
+    );
+    if (t.depositPaidAt && !paidInFull) {
+      paymentEvents.push({ at: t.depositPaidAt, label: t.teamName, sub: `50% deposit · ${t.reference}${offline}`, amountCents: dep });
+    }
+    if (t.invoicePaidAt) {
+      paymentEvents.push({
+        at: t.invoicePaidAt,
+        label: t.teamName,
+        sub: `${paidInFull ? "paid in full" : "final balance"} · ${t.reference}${offline}`,
+        amountCents: paidInFull ? total : Math.max(0, total - dep),
+      });
+    }
+  }
+  for (const a of paidAddons) {
+    if (!a.paidAt) continue;
+    const t = orderById.get(a.teamOrderId);
+    paymentEvents.push({
+      at: a.paidAt,
+      label: t?.teamName ?? "Add-on",
+      sub: `paid add-on${t ? ` · ${t.reference}` : ""}`,
+      amountCents: a.paidTotalCents ?? a.totalCents,
+    });
+  }
+  paymentEvents.sort((a, b) => +b.at - +a.at);
+  const recentPayments = paymentEvents.slice(0, 12);
 
   // "Waiting on us" = the design work still needs Slugger. Once a design is
   // approved / ordered / cancelled the work is done, so a trailing client
@@ -451,7 +492,11 @@ export default async function AdminPage() {
                         {/* Shipping rides on the FINAL invoice: show the
                             charged amount once known, else the weight-based
                             estimate so the full number is visible up front. */}
-                        {o.shippingChargedCents != null ? (
+                        {o.localPickup ? (
+                          <span className="text-xs text-muted whitespace-nowrap" title="Local order - customer picks up in Ocala, no shipping">
+                            + pickup
+                          </span>
+                        ) : o.shippingChargedCents != null ? (
                           <span className="text-xs text-muted whitespace-nowrap" title="Shipping charged on the final invoice">
                             + {o.shippingChargedCents === 0 ? "pickup" : `${money(o.shippingChargedCents)} ship`}
                           </span>
@@ -463,18 +508,8 @@ export default async function AdminPage() {
                             + ~{money(shipEstimates.get(o.id)!)} ship
                           </span>
                         ) : null}
-                        {!o.invoiceUrl && !paid && (
-                          <>
-                            <AdminLocalToggle teamOrderId={o.id} local={o.localPricing} />
-                            <AdminTaxToggle teamOrderId={o.id} exempt={o.taxExempt} />
-                          </>
-                        )}
-                        {o.localPricing && (o.invoiceUrl || paid) && (
-                          <span className="text-xs display text-brand">OCALA</span>
-                        )}
-                        {o.taxExempt && (o.invoiceUrl || paid) && (
-                          <span className="text-xs display text-brand">TAX-EXEMPT</span>
-                        )}
+                        {o.localPricing && <span className="text-xs display text-brand">OCALA</span>}
+                        {o.taxExempt && <span className="text-xs display text-brand">TAX-EXEMPT</span>}
                       </span>
                     </td>
                     <td className="px-3 py-2 min-w-[16rem]">
@@ -503,6 +538,13 @@ export default async function AdminPage() {
                             ✈ INBOUND · {o.inboundCarrier ?? "?"}
                           </a>
                         )}
+                        {o.paymentNote && (
+                          <span className="text-xs text-emerald-300/90 whitespace-nowrap" title={o.paymentNote}>
+                            💵 {o.paymentNote.split(";").pop()?.trim()}
+                          </span>
+                        )}
+                        {/* ONE primary action per state - everything else
+                            lives in the ⋯ menu so rows stay scannable. */}
                         {o.shippedAt ? (
                           <>
                             <span className="text-xs display text-green-400 whitespace-nowrap">🚚 SHIPPED</span>
@@ -512,14 +554,12 @@ export default async function AdminPage() {
                           o.trackingNumber ? (
                             <>
                               <span className="text-xs display text-amber-400 whitespace-nowrap" title="Label/tracking ready - customer not emailed yet">READY TO SHIP</span>
-                              <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
                               <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email" />
                             </>
                           ) : (
                             <>
                               <span className="text-xs display text-green-400 whitespace-nowrap">PAID</span>
                               <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />
-                              <AdminShipButton kind="team_order" id={o.id} who={o.teamName} label="➕ Add tracking" />
                             </>
                           )
                         ) : o.depositPaidAt && estimate ? (
@@ -531,18 +571,8 @@ export default async function AdminPage() {
                               dueCents={estimate - deposit}
                               stage="balance"
                               resend={Boolean(o.balanceInvoiceUrl)}
+                              localPickup={o.localPickup}
                             />
-                            {o.trackingNumber ? (
-                              <>
-                                <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
-                                <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email" />
-                              </>
-                            ) : (
-                              <>
-                                <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />
-                                <AdminShipButton kind="team_order" id={o.id} who={o.teamName} label="➕ Add tracking" />
-                              </>
-                            )}
                           </>
                         ) : estimate ? (
                           <AdminInvoiceButton
@@ -556,31 +586,62 @@ export default async function AdminPage() {
                         ) : (
                           <span className="text-xs text-muted">no roster</span>
                         )}
-                        {!paid && (
-                          <AdminRecordPayment
-                            teamOrderId={o.id}
-                            teamName={o.teamName}
-                            depositPaid={Boolean(o.depositPaidAt)}
-                            suggestedDepositCents={estimate ? deposit : null}
-                          />
-                        )}
-                        {o.paymentNote && (
-                          <span className="text-xs text-emerald-300/90 whitespace-nowrap" title={o.paymentNote}>
-                            💵 {o.paymentNote.split(";").pop()?.trim()}
-                          </span>
-                        )}
-                        {(o.invoiceUrl || estimate) && (
-                          <a
-                            href={`/api/admin/team-order/invoice-view?id=${o.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={o.invoiceUrl ? "See a copy of the invoice the customer received" : "Preview the deposit invoice before sending it"}
-                            className="text-xs display text-muted underline decoration-dotted underline-offset-2 hover:text-foreground whitespace-nowrap"
-                          >
-                            👁 INVOICE
-                          </a>
-                        )}
-                        <AdminArchiveButton kind="team_order" id={o.id} archived={false} />
+                        {/* Secondary actions, collapsed. */}
+                        <details>
+                          <summary className="list-none inline-block cursor-pointer text-xs display text-muted border border-line px-2.5 py-1 hover:border-brand/50 hover:text-foreground select-none" title="More actions">
+                            ⋯
+                          </summary>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            {!paid && (
+                              <AdminRecordPayment
+                                teamOrderId={o.id}
+                                teamName={o.teamName}
+                                depositPaid={Boolean(o.depositPaidAt)}
+                                suggestedDepositCents={estimate ? deposit : null}
+                              />
+                            )}
+                            {(o.invoiceUrl || estimate) && (
+                              <a
+                                href={`/api/admin/team-order/invoice-view?id=${o.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={o.invoiceUrl ? "See a copy of the invoice the customer received" : "Preview the deposit invoice before sending it"}
+                                className="text-xs display text-muted underline decoration-dotted underline-offset-2 hover:text-foreground whitespace-nowrap"
+                              >
+                                👁 INVOICE
+                              </a>
+                            )}
+                            {!o.balanceInvoiceUrl && !paid && (
+                              <AdminPickupToggle teamOrderId={o.id} pickup={o.localPickup} />
+                            )}
+                            {!o.invoiceUrl && !paid && (
+                              <>
+                                <AdminLocalToggle teamOrderId={o.id} local={o.localPricing} />
+                                <AdminTaxToggle teamOrderId={o.id} exempt={o.taxExempt} />
+                              </>
+                            )}
+                            {o.depositPaidAt && !o.shippedAt && !paid && (
+                              o.trackingNumber ? (
+                                <>
+                                  <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
+                                  <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email" />
+                                </>
+                              ) : (
+                                <>
+                                  <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />
+                                  <AdminShipButton kind="team_order" id={o.id} who={o.teamName} label="➕ Add tracking" />
+                                </>
+                              )
+                            )}
+                            {paid && !o.shippedAt && (
+                              <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber ?? undefined} label="➕ Add tracking" />
+                            )}
+                            {paid && !o.shippedAt && o.trackingNumber && (
+                              <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
+                            )}
+                            <AdminArchiveButton kind="team_order" id={o.id} archived={false} />
+                          </div>
+                        </details>
                       </span>
                     </td>
                     <td className="px-3 py-2 text-muted">{fmtDate(o.updatedAt)}</td>
@@ -651,9 +712,29 @@ export default async function AdminPage() {
         </section>
 
         <section>
-          <h2 className="display text-xl text-foreground">Recent paid orders</h2>
+          <h2 className="display text-xl text-foreground">Recent payments</h2>
           <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
-            {recentOrders.length === 0 && <p className="px-3 py-3 text-sm text-muted">No orders yet.</p>}
+            {recentPayments.length === 0 && <p className="px-3 py-3 text-sm text-muted">No payments yet.</p>}
+            {recentPayments.map((p, i) => (
+              <div key={i} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
+                <div>
+                  <span className="text-foreground">{p.label}</span>
+                  <span className="ml-2 text-xs text-muted">{p.sub}</span>
+                </div>
+                <span className="text-foreground whitespace-nowrap">
+                  {money(p.amountCents)} <span className="text-muted text-xs">{fmtDate(p.at)}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <h2 className="display text-xl text-foreground mt-8">Shop &amp; store orders</h2>
+          <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
+            {recentOrders.length === 0 && (
+              <p className="px-3 py-3 text-sm text-muted">
+                No shop or team-store purchases yet. Team order payments show above.
+              </p>
+            )}
             {recentOrders.map((o) => (
               <div key={o.reference} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
                 <div>
