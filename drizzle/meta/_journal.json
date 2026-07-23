@@ -232,6 +232,13 @@
       "when": 1784774161250,
       "tag": "0032_bored_starbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1784775777563,
+      "tag": "0033_faulty_tyger_tiger",
+      "breakpoints": true
     }
   ]
 }

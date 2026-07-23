@@ -281,6 +281,55 @@ export async function emailTeamOrderInvoice(args: TeamOrderInvoiceContent & { to
   return sendEmail({ to: args.to, subject, html, replyTo: CONTACT_INBOX });
 }
 
+/** Free-form custom invoice (built from scratch on /admin/invoice/new). */
+export async function emailCustomInvoice(args: {
+  to: string;
+  customerName: string;
+  reference: string;
+  lines: { name: string; description?: string; quantity: number; unitPriceCents: number }[];
+  subtotalCents: number;
+  taxCents: number;
+  totalCents: number;
+  notes?: string | null;
+  payUrl: string;
+}): Promise<boolean> {
+  const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+  const rows = args.lines
+    .map(
+      (l) => `
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #e6e2d6;">
+            ${esc(l.name)} × ${l.quantity} <span style="color:#8a8570;">(${money(l.unitPriceCents)} each)</span>
+            ${l.description ? `<div style="font-size:13px;color:#8a8570;margin-top:2px;">${esc(l.description)}</div>` : ""}
+          </td>
+          <td style="padding:8px 0;border-bottom:1px solid #e6e2d6;text-align:right;vertical-align:top;">${money(l.unitPriceCents * l.quantity)}</td>
+        </tr>`,
+    )
+    .join("");
+  return sendEmail({
+    to: args.to,
+    subject: `Invoice from Slugger Athletics: ${money(args.totalCents)} (${args.reference})`,
+    html: brandedEmail({
+      preheader: `Your Slugger Athletics invoice for ${money(args.totalCents)} is ready to pay online.`,
+      heading: `Invoice for ${esc(args.customerName)}`,
+      intro: `Invoice reference: <strong>${esc(args.reference)}</strong>`,
+      bodyHtml: `
+        <table style="width:100%;border-collapse:collapse;margin:0 0 14px;">${rows}
+          <tr><td style="padding:10px 0;">Subtotal</td><td style="padding:10px 0;text-align:right;">${money(args.subtotalCents)}</td></tr>
+          ${args.taxCents > 0 ? `<tr><td style="padding:4px 0;">FL sales tax (7%)</td><td style="padding:4px 0;text-align:right;">${money(args.taxCents)}</td></tr>` : ""}
+          <tr><td style="padding:10px 0;border-top:1px solid #e6e2d6;"><strong>Total due</strong></td><td style="padding:10px 0;border-top:1px solid #e6e2d6;text-align:right;"><strong>${money(args.totalCents)}</strong></td></tr>
+        </table>
+        ${args.notes ? `<div style="margin:0 0 14px;padding:12px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;font-size:13px;color:#555;white-space:pre-line;">${esc(args.notes)}</div>` : ""}
+        <p style="margin:0;">Pay securely online with the button below. Questions? Just reply to this email or text us at (352) 660-1232.</p>
+      `,
+      ctaText: "Pay this invoice",
+      ctaUrl: args.payUrl,
+      footerNote: "Slugger Athletics · Custom team gear · Ocala, FL",
+    }),
+    replyTo: CONTACT_INBOX,
+  });
+}
+
 /** Reminder for an unpaid deposit or balance invoice. */
 export async function emailInvoiceReminder(args: {
   to: string;

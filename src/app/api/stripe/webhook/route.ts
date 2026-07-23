@@ -32,6 +32,32 @@ export async function POST(req: Request) {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
 
+    // Free-form custom invoice paid: flip status + tell the orders channel.
+    if (session.metadata?.kind === "custom_invoice" && session.metadata?.customInvoiceId && dbEnabled()) {
+      try {
+        const { customInvoices } = await import("@/db/schema");
+        const db = getDb();
+        const [inv] = await db
+          .update(customInvoices)
+          .set({ status: "paid", paidAt: new Date() })
+          .where(eq(customInvoices.id, session.metadata.customInvoiceId))
+          .returning();
+        if (inv) {
+          await postOrderToDiscord({
+            reference: inv.reference,
+            orderType: "Custom Invoice",
+            customerName: inv.customerName,
+            customerEmail: inv.customerEmail,
+            lines: inv.lines.map((l) => ({ name: l.name, quantity: l.quantity, amountCents: l.unitPriceCents * l.quantity })),
+            totalCents: session.amount_total ?? inv.totalCents,
+          });
+        }
+      } catch (e) {
+        console.error("custom invoice webhook failed:", e);
+      }
+      return NextResponse.json({ received: true });
+    }
+
     // Design fee checkout: payment confirms the intake. Mark paid + fire the
     // designer notifications now (we held them until payment so the designer
     // queue doesn't fill with unpaid leads).

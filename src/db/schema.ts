@@ -637,6 +637,33 @@ export const designRequests = pgTable(
 /* ------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------ */
+/* Custom invoices                                                     */
+/* ------------------------------------------------------------------ */
+
+// Free-form invoices built from scratch on /admin/invoice/new - name the
+// items, price them, send. Not tied to a team order or design request.
+export const customInvoices = pgTable("custom_invoices", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  reference: text("reference").notNull(), // INV-XXXXXX
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email").notNull(),
+  lines: jsonb("lines")
+    .$type<Array<{ name: string; description?: string; quantity: number; unitPriceCents: number }>>()
+    .notNull(),
+  // Notes / terms & conditions block shown at the bottom of the invoice.
+  notes: text("notes"),
+  taxExempt: boolean("tax_exempt").notNull().default(false),
+  subtotalCents: integer("subtotal_cents").notNull(),
+  taxCents: integer("tax_cents").notNull().default(0),
+  totalCents: integer("total_cents").notNull(),
+  payUrl: text("pay_url"),
+  status: text("status").notNull().default("sent"), // sent | paid
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  paymentNote: text("payment_note"), // offline payment record
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ------------------------------------------------------------------ */
 /* AI assistant knowledge                                              */
 /* ------------------------------------------------------------------ */
 

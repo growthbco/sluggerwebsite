@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { desc, sql, eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
-import { designRequests, teamOrders, teams, orders, teamOrderAddons, assistantFacts } from "@/db/schema";
+import { designRequests, teamOrders, teams, orders, teamOrderAddons, assistantFacts, customInvoices } from "@/db/schema";
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
 import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote, estimateOrderWeightOz } from "@/lib/team-order-pricing";
@@ -173,6 +173,9 @@ export default async function AdminPage() {
   // Facts staff taught the AI assistant (rendered in the training panel).
   const aiFacts = await db.select().from(assistantFacts).orderBy(assistantFacts.createdAt);
 
+  // Free-form custom invoices (newest first).
+  const invoices = await db.select().from(customInvoices).orderBy(desc(customInvoices.createdAt)).limit(15);
+
   // Paid add-ons grouped by their parent team order, so each order can show
   // the extra players (name / # / size) that were added after the fact.
   type AddonView = { rows: typeof paidAddons[number]["rows"]; totalCents: number; paidTotalCents: number | null };
@@ -267,6 +270,11 @@ export default async function AdminPage() {
       amountCents: a.paidTotalCents ?? a.totalCents,
     });
   }
+  for (const inv of invoices) {
+    if (inv.status === "paid" && inv.paidAt) {
+      paymentEvents.push({ at: inv.paidAt, label: inv.customerName, sub: `custom invoice · ${inv.reference}`, amountCents: inv.totalCents });
+    }
+  }
   paymentEvents.sort((a, b) => +b.at - +a.at);
   const recentPayments = paymentEvents.slice(0, 12);
 
@@ -310,6 +318,9 @@ export default async function AdminPage() {
           <h1 className="display text-4xl text-foreground mt-1">All Projects</h1>
         </div>
         <div className="flex items-center gap-3">
+          <Link href="/admin/invoice/new" className="text-xs display text-on-brand bg-brand clip-slant px-3 py-1.5 hover:bg-brand-dark">
+            + New invoice
+          </Link>
           <Link href="/admin/customers" className="text-xs display text-foreground border border-line px-3 py-1.5 hover:border-brand/50">
             Customers →
           </Link>
@@ -732,6 +743,37 @@ export default async function AdminPage() {
               </div>
             ))}
           </div>
+
+          {invoices.length > 0 && (
+            <>
+              <div className="flex items-center justify-between mt-8">
+                <h2 className="display text-xl text-foreground">Custom invoices</h2>
+                <Link href="/admin/invoice/new" className="text-xs display text-brand hover:underline">+ New invoice</Link>
+              </div>
+              <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
+                {invoices.map((inv) => (
+                  <div key={inv.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
+                    <div>
+                      <span className="font-mono text-xs text-foreground">{inv.reference}</span>
+                      <span className="ml-2 text-foreground">{inv.customerName}</span>
+                      <span className={`ml-2 text-xs display ${inv.status === "paid" ? "text-green-400" : "text-amber-400"}`}>
+                        {inv.status === "paid" ? "PAID" : "SENT"}
+                      </span>
+                    </div>
+                    <span className="flex items-center gap-2 whitespace-nowrap">
+                      <span className="text-foreground">{money(inv.totalCents)}</span>
+                      {inv.status !== "paid" && inv.payUrl && (
+                        <a href={inv.payUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-muted hover:text-foreground">
+                          payment link
+                        </a>
+                      )}
+                      <span className="text-muted text-xs">{fmtDate(inv.createdAt)}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           <h2 className="display text-xl text-foreground mt-8">Shop &amp; store orders</h2>
           <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">

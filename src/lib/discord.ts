@@ -13,7 +13,7 @@ type OrderLine = {
 
 type OrderPayload = {
   reference: string;
-  orderType: "Shop" | "Buy-In" | "Team Store";
+  orderType: "Shop" | "Buy-In" | "Team Store" | "Custom Invoice";
   customerName?: string;
   customerEmail?: string;
   shipping?: string;
