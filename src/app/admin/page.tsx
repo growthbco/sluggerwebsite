@@ -26,6 +26,7 @@ import { AdminRecordPayment } from "@/components/admin-record-payment";
 import { AdminPickupToggle } from "@/components/admin-pickup-toggle";
 import { AdminRowMenu } from "@/components/admin-row-menu";
 import { AdminCustomPrice } from "@/components/admin-custom-price";
+import { AdminInboundTracking } from "@/components/admin-inbound-tracking";
 import { MarkStaffDevice } from "@/components/mark-staff-device";
 import { STORE_ITEM_PRESETS } from "@/lib/team-stores";
 
@@ -655,6 +656,13 @@ export default async function AdminPage() {
                             )}
                             {paid && !o.shippedAt && o.trackingNumber && (
                               <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
+                            )}
+                            {!o.shippedAt && o.manageToken && (
+                              <AdminInboundTracking
+                                manageToken={o.manageToken}
+                                initialCarrier={o.inboundCarrier}
+                                initialNumber={o.inboundTrackingNumber}
+                              />
                             )}
                             <AdminArchiveButton kind="team_order" id={o.id} archived={false} />
                         </AdminRowMenu>
