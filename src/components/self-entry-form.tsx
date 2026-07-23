@@ -58,8 +58,8 @@ export function SelfEntryForm({ token, items }: { token: string; items: string[]
   return (
     <div className="space-y-4">
       <div>
-        <label className="display text-sm text-foreground">Your Name * <span className="text-muted normal-case">(prints in CAPS)</span></label>
-        <input className={`mt-2 ${inputCls}`} value={name} onChange={(e) => setName(e.target.value)} placeholder="Last name" />
+        <label className="display text-sm text-foreground">Your Name <span className="text-muted normal-case">(optional - prints in CAPS if given)</span></label>
+        <input className={`mt-2 ${inputCls}`} value={name} onChange={(e) => setName(e.target.value)} placeholder="Last name, or leave blank for no name" />
       </div>
       <div>
         <label className="display text-sm text-foreground">Number</label>
@@ -87,7 +87,7 @@ export function SelfEntryForm({ token, items }: { token: string; items: string[]
 
       <button
         onClick={submit}
-        disabled={status === "sending" || !name || !hasSize}
+        disabled={status === "sending" || !hasSize}
         className="w-full clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg py-3.5 transition-colors disabled:opacity-60"
       >
         {status === "sending" ? "Adding…" : "Add Me to the Roster"}

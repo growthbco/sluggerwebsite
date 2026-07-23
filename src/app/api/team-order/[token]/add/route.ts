@@ -23,9 +23,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
+  // Name is optional - plenty of orders are plain gear with no
+  // personalization. A size is the only hard requirement.
   const hasSize = body.sizes && Object.values(body.sizes).some(Boolean);
-  if (!body.playerName || !hasSize) {
-    return NextResponse.json({ error: "Name and at least one size are required." }, { status: 400 });
+  if (!hasSize) {
+    return NextResponse.json({ error: "Pick at least one size." }, { status: 400 });
   }
 
   try {

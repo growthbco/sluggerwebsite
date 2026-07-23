@@ -211,6 +211,13 @@
       "when": 1784749882670,
       "tag": "0029_lethal_doctor_faustus",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1784772951828,
+      "tag": "0030_fresh_elektra",
+      "breakpoints": true
     }
   ]
 }

@@ -419,6 +419,9 @@ export const teamOrders = pgTable(
     balanceInvoiceUrl: text("balance_invoice_url"),
     // Shipping charged to the customer on the final invoice (0 = local pickup).
     shippingChargedCents: integer("shipping_charged_cents"),
+    // Offline payments (Zelle, CashApp, cash...) recorded by staff from the
+    // admin page, e.g. "deposit via Zelle - $330 (Jul 22, 2026)".
+    paymentNote: text("payment_note"),
     invoicePaidAt: timestamp("invoice_paid_at", { withTimezone: true }), // fully paid
     // Unpaid-invoice reminders (deposit or balance); reset on each new invoice.
     invoiceRemindersSent: integer("invoice_reminders_sent").notNull().default(0),

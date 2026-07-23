@@ -18,7 +18,20 @@ type Prefill = {
   contactEmail: string;
   contactPhone: string;
   approvedDesignUrl: string | null;
+  items?: string[];
+  designJerseyStyle?: string | null;
 };
+
+/** Best-effort match of the design's jersey cut onto this form's style list. */
+function styleFromDesign(designStyle?: string | null): string | undefined {
+  const s = (designStyle ?? "").toLowerCase();
+  if (!s) return undefined;
+  if (s.includes("two")) return "Two Button";
+  if (s.includes("full")) return "Full Button";
+  if (s.includes("v-neck") || s.includes("v neck")) return "V-Neck";
+  if (s.includes("crew") || s.includes("round")) return "Standard Crew Neck";
+  return JERSEY_STYLES.find((j) => j.toLowerCase() === s);
+}
 
 export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [mode, setMode] = useState<"manual" | "link">("manual");
@@ -26,9 +39,11 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [contactName, setContactName] = useState(prefill?.contactName ?? "");
   const [contactEmail, setContactEmail] = useState(prefill?.contactEmail ?? "");
   const [contactPhone, setContactPhone] = useState(prefill?.contactPhone ?? "");
-  const [jerseyStyle, setJerseyStyle] = useState(JERSEY_STYLES[0]);
+  const [jerseyStyle, setJerseyStyle] = useState(styleFromDesign(prefill?.designJerseyStyle) ?? JERSEY_STYLES[0]);
   const [material, setMaterial] = useState(JERSEY_MATERIALS[0].key);
-  const [items, setItems] = useState<string[]>(["jersey"]);
+  // Orders from an approved design start with the items the design actually
+  // covers (a hoodie design pre-selects hoodie, not the jersey default).
+  const [items, setItems] = useState<string[]>(prefill?.items?.length ? prefill.items : ["jersey"]);
   const [rows, setRows] = useState<Row[]>([emptyRow(), emptyRow(), emptyRow()]);
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -67,6 +82,9 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const filledRows = rows.filter((r) => r.name || r.number || Object.keys(r.sizes).length);
   // Selected item types in canonical order, jersey first.
   const selected = ITEM_TYPES.filter((t) => items.includes(t.key));
+  // Jersey style/material only apply when a jersey is actually being ordered
+  // - a hoodie-only order must not carry a phantom jersey style.
+  const hasJersey = items.includes("jersey");
 
   async function submit() {
     setStatus("sending"); setMessage("");
@@ -74,7 +92,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle, jerseyMaterial: material, items, roster: rows, designToken: prefill?.designToken }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, roster: rows, designToken: prefill?.designToken }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
@@ -91,7 +109,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle, jerseyMaterial: material, items, designToken: prefill?.designToken }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, designToken: prefill?.designToken }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create link");
@@ -186,15 +204,18 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
         </div>
       )}
 
-      {/* Jersey style - editable in both flows */}
+      {/* Jersey style - editable in both flows; only relevant with a jersey */}
+      {hasJersey && (
       <div>
         <label className="display text-sm text-foreground">Jersey Style *</label>
         <select className={`mt-2 ${inputCls}`} value={jerseyStyle} onChange={(e) => setJerseyStyle(e.target.value)}>
           {JERSEY_STYLES.map((s) => <option key={s}>{s}</option>)}
         </select>
       </div>
+      )}
 
       {/* Jersey material */}
+      {hasJersey && (
       <div>
         <label className="display text-sm text-foreground">Jersey Material</label>
         <div className="mt-3 grid sm:grid-cols-2 gap-3">
@@ -213,6 +234,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
           })}
         </div>
       </div>
+      )}
 
       {/* Item types */}
       <div>
@@ -242,7 +264,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
               <h2 className="display text-xl text-foreground">Roster</h2>
               <span className="text-sm text-muted">{filledRows.length} players</span>
             </div>
-            <p className="text-sm text-muted mt-1">Name, number, and a size for each item. Names print in CAPS.</p>
+            <p className="text-sm text-muted mt-1">A size for each item is all we need - name and number are optional (leave them blank for plain gear with no personalization). Names print in CAPS.</p>
 
             <div className="mt-4">
               <RosterImport

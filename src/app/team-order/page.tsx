@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { TeamOrderForm } from "@/components/team-order-form";
 import { dbEnabled } from "@/db";
 import { getByStatusToken } from "@/lib/design-requests";
+import { itemKeysFromDesignProducts } from "@/lib/order-items";
 
 export const metadata: Metadata = {
   title: "Team Order - Outfit Your Whole Team",
@@ -16,6 +17,11 @@ type Prefill = {
   contactEmail: string;
   contactPhone: string;
   approvedDesignUrl: string | null;
+  /** Item keys derived from what the design actually covers - pre-selected on
+   *  the form so the order can't drift from the design (e.g. a hoodie design
+   *  accidentally ordered as crew-neck jerseys). */
+  items: string[];
+  designJerseyStyle: string | null;
 };
 
 export default async function TeamOrderPage({
@@ -38,6 +44,8 @@ export default async function TeamOrderPage({
         contactEmail: req.contactEmail,
         contactPhone: req.contactPhone ?? "",
         approvedDesignUrl: req.approvedDesignUrl,
+        items: itemKeysFromDesignProducts(req.productTypes),
+        designJerseyStyle: req.jerseyStyle,
       };
     }
   }

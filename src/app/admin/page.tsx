@@ -22,6 +22,7 @@ import { AdminTaxToggle } from "@/components/admin-tax-toggle";
 import { AdminSearch } from "@/components/admin-search";
 import { AdminNewStore } from "@/components/admin-new-store";
 import { AdminAssistantFacts } from "@/components/admin-assistant-facts";
+import { AdminRecordPayment } from "@/components/admin-record-payment";
 import { MarkStaffDevice } from "@/components/mark-staff-device";
 import { STORE_ITEM_PRESETS } from "@/lib/team-stores";
 
@@ -115,6 +116,7 @@ export default async function AdminPage() {
         labelUrl: teamOrders.labelUrl,
         shippedAt: teamOrders.shippedAt,
         shippingChargedCents: teamOrders.shippingChargedCents,
+        paymentNote: teamOrders.paymentNote,
         inboundCarrier: teamOrders.inboundCarrier,
         inboundTrackingNumber: teamOrders.inboundTrackingNumber,
         archivedAt: teamOrders.archivedAt,
@@ -547,6 +549,19 @@ export default async function AdminPage() {
                           />
                         ) : (
                           <span className="text-xs text-muted">no roster</span>
+                        )}
+                        {!paid && (
+                          <AdminRecordPayment
+                            teamOrderId={o.id}
+                            teamName={o.teamName}
+                            depositPaid={Boolean(o.depositPaidAt)}
+                            suggestedDepositCents={estimate ? deposit : null}
+                          />
+                        )}
+                        {o.paymentNote && (
+                          <span className="text-xs text-emerald-300/90 whitespace-nowrap" title={o.paymentNote}>
+                            💵 {o.paymentNote.split(";").pop()?.trim()}
+                          </span>
                         )}
                         {(o.invoiceUrl || estimate) && (
                           <a

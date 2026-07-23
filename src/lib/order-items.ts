@@ -33,6 +33,28 @@ export function isInHouseItem(key: string): boolean {
   return Boolean(ITEM_TYPES.find((t) => t.key === key)?.inHouse);
 }
 
+/** Map design-request product labels ("Hoodie", "Jersey / Shirt", free-typed
+ *  "Other" text...) onto team-order item keys, so the order form pre-selects
+ *  what was actually designed instead of defaulting to a jersey. Labels with
+ *  no matching item type (bags, custom pieces) are skipped - those get quoted
+ *  manually. */
+export function itemKeysFromDesignProducts(productTypes?: string[] | null): string[] {
+  const keys: string[] = [];
+  const push = (k: string) => { if (!keys.includes(k)) keys.push(k); };
+  for (const raw of productTypes ?? []) {
+    const p = raw.toLowerCase();
+    if (/jersey|shirt/.test(p)) push("jersey");
+    else if (/hoodie|sweat/.test(p)) push("hoodie");
+    else if (/knicker/.test(p)) push("knickers");
+    else if (/pant/.test(p)) push("long_pants");
+    else if (/short/.test(p)) push("shorts");
+    else if (/sock/.test(p)) push("socks");
+    else if (/fitted/.test(p)) push("fitted_hat");
+    else if (/snap|trucker|hat|cap/.test(p)) push("snapback_hat");
+  }
+  return keys;
+}
+
 // Jersey fabric options with plain-language descriptions for shoppers.
 export type JerseyMaterial = { key: string; label: string; description: string };
 export const JERSEY_MATERIALS: JerseyMaterial[] = [
