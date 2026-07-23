@@ -128,7 +128,7 @@ function buildGrounding(design: DesignContext, order: OrderContext | null, messa
     "- Discounts: possible, and they depend on the TOTAL number of pieces in the order - more pieces means more room to work. NEVER name a specific discount, percentage, or lower price. The right response: say we can work with them since it depends on piece count, ask what total or per-player number they were hoping to be at, and offer a quick phone call to land on a number - text (352) 660-1232.",
     "- Payment flow: Slugger emails an invoice; a 50% deposit starts production and the balance (plus shipping) is due before the order ships. 7% Florida sales tax applies to goods.",
     "- Production: most orders ship 2-3 weeks after design approval and deposit; rush is about a week. Hats are embroidered in-house and small hat orders are often ready in days.",
-    `- Revisions: ${MAX_REVISIONS} revision rounds are included with a design.`,
+    `- Revisions: ${MAX_REVISIONS} revision rounds are included with a design - but ONLY BEFORE the client approves it. Once the design is approved (status approved/ordered), and especially once any payment has been made, production starts immediately and the design is LOCKED: no design changes are possible. Never promise a design change or mention revision rounds after approval.`,
     "",
     ...(taughtFacts.length
       ? [
@@ -194,7 +194,8 @@ export async function assistDesignThread(input: {
     "Choose exactly one action:",
     '- "answer": ONLY if the client asked something you can answer completely and confidently from the facts above (order status, what happens next, pricing from the list, turnaround, sizing, revisions, how approval works, whether a custom feature is possible). Write a short, warm, plain-text reply (2-5 sentences, no markdown, no em dashes - use hyphens). Do not promise anything beyond the stated facts. Do not sign a name.',
     '- A FIRST-TIME discount ask also gets "answer": use the discount policy above (depends on piece count, ask their target number, offer a call) and set flagStaff true so the team follows up personally. Never name a number.',
-    '- "escalate": if the message involves a refund, cancellation, complaint, changing an already-approved design, payment trouble, a callback request, an ongoing back-and-forth negotiation staff is already handling, or anything the facts do not fully cover. Also escalate if you are unsure. Do NOT write a client reply; give a one-line reason instead.',
+    '- "escalate": if the message involves a refund, cancellation, complaint, payment trouble, a callback request, an ongoing back-and-forth negotiation staff is already handling, or anything the facts do not fully cover. Also escalate if you are unsure. Do NOT write a client reply; give a one-line reason instead.',
+    '- HARD RULE: when THIS PROJECT\'s design status is approved or ordered, or a deposit/payment has been made, ANY request to change the design (colors, elements, silhouettes, fonts, layout - anything visual) is "escalate". The design is locked and may already be in production; only staff can check. Do not promise the change, do not mention revision rounds.',
     '- "none": if no reply is needed (a thank-you, an acknowledgment, or the client is clearly mid-conversation with a specific staff member - e.g. staff asked them a question and this is their answer). Never interrupt an ongoing negotiation.',
     "",
     "Reply in the language the client wrote in - if they wrote in Spanish, answer in natural Spanish (keep product names and dollar amounts as-is). Same for any other language.",
@@ -241,6 +242,7 @@ export async function suggestStaffReply(input: {
     "- Usually that means answering the client's most recent unanswered question(s); if everything is answered, a short, useful next-step nudge.",
     "- Everything Slugger makes is custom: when the client asks whether something can be done (a quarter-zip, cursive name instead of a number, etc.), the answer is that it is their choice - confirm it is doable and ask which way they want it.",
     "- Discount asks: follow the discount policy in the facts - we can work with them, it depends on the total piece count, ask what number they were hoping for, and offer a quick phone call. Never name a specific discount or price.",
+    "- Design changes after approval/payment: the design is locked once approved and production starts on payment. Draft a reply that says the team will check whether production has already started before anything can be considered - never promise the change.",
     "- You may address other sensitive topics (complaints, exceptions) since a human reviews this, but NEVER invent a specific price, amount, or date that is not in the facts. Where a business decision is needed, insert a placeholder like [YOUR CALL: amount] so the staff member fills it in.",
     "- Match the tone of earlier staff messages: friendly, brief, plain text. 2-6 sentences. No markdown, no em dashes - use hyphens. Do not sign a name.",
     "- Write in the language the client writes in.",
