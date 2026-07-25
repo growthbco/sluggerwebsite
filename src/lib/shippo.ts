@@ -174,3 +174,83 @@ export async function buyLabel(rateId: string): Promise<{ trackingNumber: string
     costCents: Math.round(parseFloat(t.rate?.amount ?? "0") * 100),
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* Live tracking status                                                */
+/* ------------------------------------------------------------------ */
+
+const TRACK_CARRIERS: Record<string, string> = {
+  FedEx: "fedex",
+  UPS: "ups",
+  USPS: "usps",
+  DHL: "dhl_express",
+};
+
+export type LiveTracking = {
+  status: string; // e.g. "In transit", "Delivered"
+  detail?: string;
+  location?: string; // "Memphis, TN"
+  at?: string; // ISO date of the latest scan
+};
+
+// Dashboard loads shouldn't hammer Shippo: cache per tracking number for a
+// few minutes (best-effort - serverless instances each keep their own).
+const trackCache = new Map<string, { at: number; value: LiveTracking | null }>();
+const TRACK_TTL_MS = 5 * 60 * 1000;
+
+/** Latest scan status for a tracking number (works for shipments not bought
+ *  through Shippo). Returns null when the carrier is unsupported, the number
+ *  isn't in the carrier's system yet, or anything fails - callers just skip
+ *  the status line. */
+export async function getLiveTracking(carrier: string | null | undefined, trackingNumber: string): Promise<LiveTracking | null> {
+  if (!shippoEnabled()) return null;
+  const slug = TRACK_CARRIERS[carrier ?? ""];
+  if (!slug || !trackingNumber) return null;
+
+  const key = `${slug}:${trackingNumber}`;
+  const hit = trackCache.get(key);
+  if (hit && Date.now() - hit.at < TRACK_TTL_MS) return hit.value;
+
+  try {
+    const res = await fetch(`${API}/tracks/${slug}/${encodeURIComponent(trackingNumber)}`, {
+      headers: headers(),
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) {
+      trackCache.set(key, { at: Date.now(), value: null });
+      return null;
+    }
+    const data = (await res.json()) as {
+      tracking_status?: {
+        status?: string;
+        status_details?: string;
+        status_date?: string;
+        location?: { city?: string; state?: string };
+      } | null;
+    };
+    const ts = data.tracking_status;
+    if (!ts?.status) {
+      trackCache.set(key, { at: Date.now(), value: null });
+      return null;
+    }
+    const STATUS_LABELS: Record<string, string> = {
+      PRE_TRANSIT: "Label created",
+      TRANSIT: "In transit",
+      DELIVERED: "Delivered",
+      RETURNED: "Returned",
+      FAILURE: "Delivery problem",
+      UNKNOWN: "Status unknown",
+    };
+    const value: LiveTracking = {
+      status: STATUS_LABELS[ts.status] ?? ts.status,
+      detail: ts.status_details || undefined,
+      location: [ts.location?.city, ts.location?.state].filter(Boolean).join(", ") || undefined,
+      at: ts.status_date || undefined,
+    };
+    trackCache.set(key, { at: Date.now(), value });
+    return value;
+  } catch (e) {
+    console.error("Shippo tracking lookup failed:", e);
+    return null;
+  }
+}

@@ -9,6 +9,7 @@ import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote, estimateOrderWeightOz } from "@/lib/team-order-pricing";
 import { itemLabel, isInHouseItem } from "@/lib/order-items";
 import { shippingCentsFor } from "@/lib/team-stores";
+import { getLiveTracking, type LiveTracking } from "@/lib/shippo";
 import { AdminLogout } from "@/components/admin-logout";
 import { AdminInvoiceButton } from "@/components/admin-invoice-button";
 import { AdminShipButton } from "@/components/admin-ship-button";
@@ -279,6 +280,19 @@ export default async function AdminPage() {
   }
   paymentEvents.sort((a, b) => +b.at - +a.at);
   const recentPayments = paymentEvents.slice(0, 12);
+
+  // Live carrier status for inbound (factory -> shop) shipments, fetched
+  // in parallel and cached a few minutes in the Shippo lib. Best-effort:
+  // a miss just means the row shows the link without a status line.
+  const inboundLive = new Map<string, LiveTracking>();
+  await Promise.all(
+    activeOrders
+      .filter((o) => o.inboundTrackingNumber)
+      .map(async (o) => {
+        const t = await getLiveTracking(o.inboundCarrier, o.inboundTrackingNumber!);
+        if (t) inboundLive.set(o.id, t);
+      }),
+  );
 
   // "Waiting on us" = the design work still needs Slugger. Once a design is
   // approved / ordered / cancelled the work is done, so a trailing client
@@ -559,8 +573,17 @@ export default async function AdminPage() {
                             className="text-xs display text-violet-400 underline decoration-dotted underline-offset-2 hover:text-violet-300 whitespace-nowrap"
                           >
                             ✈ INBOUND · {o.inboundCarrier ?? "?"} {o.inboundTrackingNumber}
-                            {o.inboundTrackingAddedAt ? ` · ${fmtDate(o.inboundTrackingAddedAt)}` : ""}
                           </a>
+                        )}
+                        {inboundLive.has(o.id) && (
+                          <span
+                            className="text-xs text-violet-300/90 whitespace-nowrap"
+                            title={inboundLive.get(o.id)!.detail ?? "Latest carrier scan"}
+                          >
+                            {inboundLive.get(o.id)!.status}
+                            {inboundLive.get(o.id)!.location ? ` - ${inboundLive.get(o.id)!.location}` : ""}
+                            {inboundLive.get(o.id)!.at ? ` (${fmtDate(inboundLive.get(o.id)!.at!)})` : ""}
+                          </span>
                         )}
                         {o.paymentNote && (
                           <span className="text-xs text-emerald-300/90 whitespace-nowrap" title={o.paymentNote}>
