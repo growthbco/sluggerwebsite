@@ -231,6 +231,9 @@ export async function suggestStaffReply(input: {
   order: OrderContext | null;
   messages: DesignMessage[];
   staffName?: string;
+  /** Text the staff member already typed - THE answer/direction to finish,
+   *  not a topic suggestion. Their intent wins over everything else. */
+  direction?: string;
 }): Promise<string | null> {
   const taughtFacts = await loadTaughtFacts();
   const prompt = [
@@ -238,8 +241,17 @@ export async function suggestStaffReply(input: {
     "",
     buildGrounding(input.design, input.order, input.messages, taughtFacts),
     "",
-    "Draft the most helpful next message from staff to the client:",
-    "- Usually that means answering the client's most recent unanswered question(s); if everything is answered, a short, useful next-step nudge.",
+    ...(input.direction
+      ? [
+          "THE STAFF MEMBER STARTED THE REPLY THEMSELVES. This is their answer and their intent - finish it, do not replace it:",
+          `"""${input.direction}"""`,
+          "",
+          "Turn that into one complete, polished, client-ready message: keep their meaning, decisions, and any facts or numbers they state (their words are AUTHORITATIVE and override the general facts above if they conflict), fix grammar and flow, keep their tone, and complete any unfinished thought in the direction they were clearly going. Do not add new promises, prices, or topics they did not raise.",
+        ]
+      : [
+          "Draft the most helpful next message from staff to the client:",
+          "- Usually that means answering the client's most recent unanswered question(s); if everything is answered, a short, useful next-step nudge.",
+        ]),
     "- Everything Slugger makes is custom: when the client asks whether something can be done (a quarter-zip, cursive name instead of a number, etc.), the answer is that it is their choice - confirm it is doable and ask which way they want it.",
     "- Discount asks: follow the discount policy in the facts - we can work with them, it depends on the total piece count, ask what number they were hoping for, and offer a quick phone call. Never name a specific discount or price.",
     "- Design changes after approval/payment: the design is locked once approved and production starts on payment. Draft a reply that says the team will check whether production has already started before anything can be considered - never promise the change.",

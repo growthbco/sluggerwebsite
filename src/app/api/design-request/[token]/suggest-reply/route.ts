@@ -18,7 +18,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const request = await getByManageToken(token);
   if (!request) return NextResponse.json({ error: "Link not found" }, { status: 404 });
 
-  let body: { name?: string } = {};
+  let body: { name?: string; direction?: string } = {};
   try { body = await req.json(); } catch {}
 
   try {
@@ -49,6 +49,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         : null,
       messages: request.messages ?? [],
       staffName: (body.name ?? "").trim().slice(0, 40) || undefined,
+      direction: (body.direction ?? "").trim().slice(0, 1500) || undefined,
     });
     if (!draft) return NextResponse.json({ error: "No suggestion available right now - try again." }, { status: 503 });
     return NextResponse.json({ ok: true, draft });

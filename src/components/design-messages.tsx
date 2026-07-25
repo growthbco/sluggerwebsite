@@ -152,7 +152,7 @@ export function DesignMessages({
       const res = await fetch(`/api/design-request/${token}/suggest-reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: senderName.trim() || undefined }),
+        body: JSON.stringify({ name: senderName.trim() || undefined, direction: draft.trim() || undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not draft a suggestion.");
@@ -262,9 +262,11 @@ export function DesignMessages({
             onClick={suggestReply}
             disabled={busy !== ""}
             className="text-xs display text-brand border border-brand/50 px-3 py-1.5 hover:bg-brand/10 disabled:opacity-50"
-            title="AI drafts a reply from the conversation and order details - edit before sending"
+            title={draft.trim()
+              ? "AI finishes and polishes what you started - your words set the direction"
+              : "AI drafts a reply from the conversation and order details - edit before sending"}
           >
-            {busy === "suggesting" ? "✨ Drafting..." : "✨ Suggest reply"}
+            {busy === "suggesting" ? "✨ Drafting..." : draft.trim() ? "✨ Finish my reply" : "✨ Suggest reply"}
           </button>
           {[...(QUICK_REPLIES[status ?? ""] ?? []), ...QUICK_REPLIES.default].map((q) => (
             <button
