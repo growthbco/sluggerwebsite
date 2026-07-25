@@ -443,6 +443,8 @@ export const teamOrders = pgTable(
     inboundCarrier: text("inbound_carrier"),
     inboundTrackingNumber: text("inbound_tracking_number"),
     inboundTrackingAddedAt: timestamp("inbound_tracking_added_at", { withTimezone: true }),
+    // Last stalled-shipment nudge posted to the designer (cron dedupe).
+    inboundNudgedAt: timestamp("inbound_nudged_at", { withTimezone: true }),
 
     // Admin archive: hides the order from the active list without deleting it,
     // with a note ("lost - went with competitor") for later follow-up.

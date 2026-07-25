@@ -12,6 +12,11 @@ import {
 } from "@/lib/follow-ups";
 import { emailProofFollowUp, emailInvoiceReminder } from "@/lib/email";
 import { postDesignThreadUpdate } from "@/lib/discord";
+import { getDb } from "@/db";
+import { teamOrders } from "@/db/schema";
+import { and, eq, isNull, isNotNull, or, lt } from "drizzle-orm";
+import { getLiveTracking } from "@/lib/shippo";
+import { getById as getDesignById } from "@/lib/design-requests";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,11 +125,64 @@ export async function GET(req: Request) {
     staleResults.push({ reference: d.reference, team: d.teamName, hours: d.waitingHours, pinged });
   }
 
+  // Stalled inbound shipments (factory -> shop): the designer created a
+  // label that the carrier never received (48h+), or the package hasn't
+  // scanned in 4+ days. Nudges the design thread, at most every 48h.
+  const NUDGE_COOLDOWN_MS = 48 * 60 * 60 * 1000;
+  const LABEL_STALL_MS = 48 * 60 * 60 * 1000;
+  const TRANSIT_STALL_MS = 4 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const db = getDb();
+  const tracked = await db
+    .select()
+    .from(teamOrders)
+    .where(
+      and(
+        isNotNull(teamOrders.inboundTrackingNumber),
+        isNull(teamOrders.archivedAt),
+        or(isNull(teamOrders.inboundNudgedAt), lt(teamOrders.inboundNudgedAt, new Date(now - NUDGE_COOLDOWN_MS))),
+      ),
+    );
+  const inboundResults: { reference: string; team: string; status: string; nudged?: boolean }[] = [];
+  for (const o of tracked) {
+    try {
+      const live = await getLiveTracking(o.inboundCarrier, o.inboundTrackingNumber!);
+      if (!live || live.status === "Delivered") continue;
+      const addedAge = o.inboundTrackingAddedAt ? now - +o.inboundTrackingAddedAt : 0;
+      const scanAge = live.at ? now - +new Date(live.at) : null;
+      const labelStalled = live.status === "Label created" && addedAge > LABEL_STALL_MS;
+      const transitStalled = live.status === "In transit" && scanAge !== null && scanAge > TRANSIT_STALL_MS;
+      if (!labelStalled && !transitStalled) continue;
+      if (dryRun) {
+        inboundResults.push({ reference: o.reference, team: o.teamName, status: live.status });
+        continue;
+      }
+      const design = o.designRequestId ? await getDesignById(o.designRequestId) : null;
+      const days = Math.floor((labelStalled ? addedAge : scanAge!) / 86400000);
+      const nudged = await postDesignThreadUpdate({
+        threadId: design?.discordThreadId,
+        title: `🚨 Inbound shipment not moving - ${o.teamName} (${o.reference})`,
+        description: labelStalled
+          ? `The ${o.inboundCarrier ?? ""} label for this order was created **${days} day${days === 1 ? "" : "s"} ago** but the carrier still has NOT received the package. Please drop it off or reply here with what's holding it up.`
+          : `This ${o.inboundCarrier ?? ""} shipment has had **no new scan in ${days} days**. Please check with the carrier and reply here with an update.`,
+        mention: true,
+        username: "Slugger Shipping Watch",
+      });
+      if (nudged) {
+        await db.update(teamOrders).set({ inboundNudgedAt: new Date() }).where(eq(teamOrders.id, o.id));
+      }
+      inboundResults.push({ reference: o.reference, team: o.teamName, status: live.status, nudged });
+    } catch (e) {
+      console.error(`Inbound stall check failed for ${o.reference}:`, e);
+    }
+  }
+
   return NextResponse.json({
     dryRun,
-    count: results.length + invoiceResults.length + staleResults.length,
+    count: results.length + invoiceResults.length + staleResults.length + inboundResults.length,
     results,
     invoiceReminders: invoiceResults,
     designerReminders: staleResults,
+    inboundStalls: inboundResults,
   });
 }

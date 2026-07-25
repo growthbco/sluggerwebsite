@@ -1,0 +1,1 @@
+ALTER TABLE "team_orders" ADD COLUMN "inbound_nudged_at" timestamp with time zone;
