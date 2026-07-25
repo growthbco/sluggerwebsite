@@ -125,6 +125,7 @@ export default async function AdminPage() {
         customJerseyCents: teamOrders.customJerseyCents,
         inboundCarrier: teamOrders.inboundCarrier,
         inboundTrackingNumber: teamOrders.inboundTrackingNumber,
+        inboundTrackingAddedAt: teamOrders.inboundTrackingAddedAt,
         archivedAt: teamOrders.archivedAt,
         archivedNote: teamOrders.archivedNote,
         updatedAt: teamOrders.updatedAt,
@@ -546,17 +547,19 @@ export default async function AdminPage() {
                             🧢 IN-HOUSE: {inHouseWork.get(o.id)}
                           </span>
                         )}
-                        {/* Inbound leg (factory -> shop): shown until we ship
-                            out to the customer. Internal only. */}
-                        {o.inboundTrackingNumber && !o.shippedAt && (
+                        {/* Inbound leg (factory -> shop). Always shown while
+                            tracking exists - redo shipments can arrive after
+                            the original order shipped. Internal only. */}
+                        {o.inboundTrackingNumber && (
                           <a
                             href={inboundTrackingUrlFor(o.inboundTrackingNumber, o.inboundCarrier)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            title={`Inbound from production - ${o.inboundCarrier ?? "carrier"} ${o.inboundTrackingNumber}`}
+                            title={`Inbound from production${o.inboundTrackingAddedAt ? ` - entered ${fmtDate(o.inboundTrackingAddedAt)}` : ""} - click for live carrier tracking`}
                             className="text-xs display text-violet-400 underline decoration-dotted underline-offset-2 hover:text-violet-300 whitespace-nowrap"
                           >
-                            ✈ INBOUND · {o.inboundCarrier ?? "?"}
+                            ✈ INBOUND · {o.inboundCarrier ?? "?"} {o.inboundTrackingNumber}
+                            {o.inboundTrackingAddedAt ? ` · ${fmtDate(o.inboundTrackingAddedAt)}` : ""}
                           </a>
                         )}
                         {o.paymentNote && (
