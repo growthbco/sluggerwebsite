@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import type { SportPage } from "@/lib/sport-pages";
+import { SPORT_PAGES, type SportPage } from "@/lib/sport-pages";
+import { SERVICE_AREAS } from "@/lib/service-areas";
 import { galleryPhotos } from "@/lib/gallery";
 import { BUNDLES, formatDollars } from "@/lib/pricing";
 
@@ -67,7 +68,7 @@ export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; 
           </div>
           {photos.map((ph) => (
             <div key={ph.id} className="relative aspect-square bg-steel border border-line overflow-hidden">
-              <Image src={`/media/${ph.file}`} alt={`${ph.alt} - custom ${page.sport.toLowerCase()} gear by Slugger Athletics`} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover" unoptimized />
+              <Image src={ph.file} alt={`${ph.alt} - custom ${page.sport.toLowerCase()} gear by Slugger Athletics`} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover" unoptimized />
             </div>
           ))}
         </div>
@@ -131,6 +132,35 @@ export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; 
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Keyword-anchor interlinks: every sport page links its siblings,
+          the city pages, and the core product pages. */}
+      <section className="mt-14">
+        <h2 className="display text-2xl text-foreground">More Custom Gear</h2>
+        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+          {SPORT_PAGES.filter((p) => p.slug !== page.slug).map((p) => (
+            <Link key={p.slug} href={`/${p.slug}`} className="text-brand hover:underline">
+              {p.h1}
+            </Link>
+          ))}
+          <Link href="/custom-sublimated-jerseys" className="text-brand hover:underline">Custom Sublimated Jerseys</Link>
+          <Link href="/custom-practice-jerseys" className="text-brand hover:underline">Custom Practice Jerseys ($20)</Link>
+          <Link href="/custom-hats" className="text-brand hover:underline">Custom Embroidered Hats</Link>
+          <Link href="/hype-chains" className="text-brand hover:underline">Custom Hype Chains</Link>
+        </div>
+        <p className="mt-4 text-sm text-muted">
+          Serving{" "}
+          {SERVICE_AREAS.map((a, i) => (
+            <span key={a.slug}>
+              <Link href={`/custom-uniforms/${a.slug}`} className="text-brand hover:underline">
+                custom uniforms in {a.city}
+              </Link>
+              {i < SERVICE_AREAS.length - 1 ? ", " : ""}
+            </span>
+          ))}{" "}
+          - and teams nationwide.
+        </p>
       </section>
 
       {/* Local + CTA */}

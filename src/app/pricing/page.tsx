@@ -55,9 +55,11 @@ export default function PricingPage() {
 
       {/* Bundles first - the simplest way to buy. */}
       <section className="mt-10">
-        <h2 className="display text-2xl text-foreground">2026 Team Bundles</h2>
+        <h2 className="display text-2xl text-foreground">2026 Team Bundles (Baseball &amp; Softball)</h2>
         <p className="mt-2 text-sm text-muted">
           The easiest way to outfit a player - one price for the whole set, per player.
+          Playing basketball, soccer, flag, or anything else? We build the same per-player
+          bundle pricing for every sport - just ask when you order.
         </p>
         <div className="mt-4 grid gap-5 sm:grid-cols-3">
           {BUNDLES.map((b) => (

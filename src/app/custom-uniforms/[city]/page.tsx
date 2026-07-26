@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { InfoPage } from "@/components/info-page";
 import { SERVICE_AREAS, getServiceArea } from "@/lib/service-areas";
+import { SPORT_PAGES } from "@/lib/sport-pages";
+import Link from "next/link";
 
 // Local service-area landing pages: /custom-uniforms/the-villages etc.
 // Each city gets distinct copy from src/lib/service-areas.ts.
@@ -27,6 +29,7 @@ export default async function ServiceAreaPage({ params }: { params: Promise<{ ci
   if (!area) notFound();
 
   return (
+    <>
     <InfoPage
       eyebrow={`Serving ${area.city}, Florida`}
       h1={`Custom Team Uniforms for ${area.city}`}
@@ -66,5 +69,19 @@ export default async function ServiceAreaPage({ params }: { params: Promise<{ ci
         description: `Custom team uniforms, jerseys, and embroidered hats for ${area.city}, Florida teams.`,
       }}
     />
+    {/* Sport interlinks with keyword anchors */}
+    <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-16">
+      <h2 className="display text-2xl text-foreground">Every Sport for {area.city} Teams</h2>
+      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+        {SPORT_PAGES.map((p) => (
+          <Link key={p.slug} href={`/${p.slug}`} className="text-brand hover:underline">
+            {p.h1}
+          </Link>
+        ))}
+        <Link href="/custom-hats" className="text-brand hover:underline">Custom Embroidered Hats</Link>
+        <Link href="/pricing" className="text-brand hover:underline">2026 Pricing &amp; Bundles</Link>
+      </div>
+    </section>
+    </>
   );
 }
