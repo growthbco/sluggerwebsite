@@ -6,8 +6,11 @@
 //    from /design/manage. Drafts may touch any topic (a human reviews), but
 //    never invent discounts, prices, or promises not in the facts.
 //
-// Same Gemini setup as the roster importer and print-file check.
+// Text generation runs on Claude (the owner prefers its wording) with the
+// original Gemini setup kept as an automatic fallback; image work stays on
+// Gemini elsewhere in the codebase.
 
+import Anthropic from "@anthropic-ai/sdk";
 import { PRICE_LIST, BUNDLES, BUNDLE_UPGRADE_NOTE } from "@/lib/pricing";
 import { FAQS } from "@/lib/faqs";
 import { MAX_REVISIONS, type DesignMessage } from "@/lib/design-requests";
@@ -156,6 +159,48 @@ function buildGrounding(design: DesignContext, order: OrderContext | null, messa
   ].join("\n");
 }
 
+// Gemini responseSchema uses uppercase type names; Claude structured outputs
+// take standard JSON Schema. Convert so both providers share one schema.
+function toJsonSchema(s: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...s };
+  if (typeof out.type === "string") out.type = (out.type as string).toLowerCase();
+  if (out.properties && typeof out.properties === "object") {
+    out.properties = Object.fromEntries(
+      Object.entries(out.properties as Record<string, Record<string, unknown>>).map(([k, v]) => [k, toJsonSchema(v)]),
+    );
+    out.additionalProperties = false;
+  }
+  if (out.items && typeof out.items === "object") out.items = toJsonSchema(out.items as Record<string, unknown>);
+  return out;
+}
+
+let anthropic: Anthropic | null = null;
+
+async function callClaude(prompt: string, schema: object): Promise<Record<string, string> | null> {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  try {
+    anthropic ??= new Anthropic({ timeout: 25000, maxRetries: 1 });
+    const response = await anthropic.messages.create({
+      model: "claude-opus-4-8",
+      max_tokens: 2048,
+      output_config: { format: { type: "json_schema", schema: toJsonSchema(schema as Record<string, unknown>) } },
+      messages: [{ role: "user", content: prompt }],
+    });
+    if (response.stop_reason === "refusal") return null;
+    const text = response.content.find((b) => b.type === "text")?.text ?? "";
+    return text ? JSON.parse(text) : null;
+  } catch (e) {
+    console.error("claude assistant error (falling back to gemini):", e);
+    return null;
+  }
+}
+
+/** Grounded JSON generation: Claude first, Gemini as fallback. Shared by the
+ *  design-thread assistant, staff reply drafts, public chat, and invoice AI. */
+export async function generateJson(prompt: string, schema: object): Promise<Record<string, string> | null> {
+  return (await callClaude(prompt, schema)) ?? (await callGemini(prompt, schema));
+}
+
 async function callGemini(prompt: string, schema: object): Promise<Record<string, string> | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
@@ -207,7 +252,7 @@ export async function assistDesignThread(input: {
     'Return ONLY JSON: { "action": "answer" | "escalate" | "none", "reply": string, "reason": string, "flagStaff": boolean }',
   ].join("\n");
 
-  const out = (await callGemini(prompt, {
+  const out = (await generateJson(prompt, {
     type: "OBJECT",
     properties: {
       action: { type: "STRING", enum: ["answer", "escalate", "none"] },
@@ -265,7 +310,7 @@ export async function suggestStaffReply(input: {
     'Return ONLY JSON: { "draft": string }',
   ].join("\n");
 
-  const out = await callGemini(prompt, {
+  const out = await generateJson(prompt, {
     type: "OBJECT",
     properties: { draft: { type: "STRING" } },
     required: ["draft"],
@@ -323,7 +368,7 @@ export async function answerPublicChat(history: ChatTurn[], extraContext?: strin
     'Return ONLY JSON: { "reply": string }',
   ].join("\n");
 
-  const out = await callGemini(prompt, {
+  const out = await generateJson(prompt, {
     type: "OBJECT",
     properties: { reply: { type: "STRING" } },
     required: ["reply"],

@@ -15,6 +15,7 @@
     "mockups": "tsx scripts/generate-mockups.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@google/genai": "^2.6.0",
     "@neondatabase/serverless": "^1.1.0",
     "@vercel/analytics": "^2.0.1",

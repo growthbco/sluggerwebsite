@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/admin-auth";
+import { generateJson } from "@/lib/design-assistant";
 
 export const runtime = "nodejs";
-
-const MODEL = process.env.GEMINI_ASSISTANT_MODEL || "gemini-flash-latest";
-const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 // Admin-only AI writing help for the custom invoice builder: item
 // descriptions and notes/terms blocks, drafted from whatever context the
@@ -12,8 +10,9 @@ const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 // nothing is sent anywhere automatically.
 export async function POST(req: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return NextResponse.json({ error: "AI not configured" }, { status: 503 });
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY) {
+    return NextResponse.json({ error: "AI not configured" }, { status: 503 });
+  }
 
   let body: {
     kind?: "description" | "terms";
@@ -49,26 +48,12 @@ export async function POST(req: Request) {
         ].join("\n\n");
 
   try {
-    const res = await fetch(`${API_BASE}/${MODEL}:generateContent?key=${key}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.4,
-          responseMimeType: "application/json",
-          responseSchema: { type: "OBJECT", properties: { text: { type: "STRING" } }, required: ["text"] },
-        },
-      }),
-      signal: AbortSignal.timeout(20000),
-    });
-    if (!res.ok) {
-      console.error("ai-draft failed:", res.status, await res.text().catch(() => ""));
-      return NextResponse.json({ error: "AI draft failed - try again" }, { status: 502 });
-    }
-    const data = await res.json();
-    const out = JSON.parse(data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}") as { text?: string };
-    const text = (out.text ?? "").trim().slice(0, 2000);
+    const out = (await generateJson(prompt, {
+      type: "OBJECT",
+      properties: { text: { type: "STRING" } },
+      required: ["text"],
+    })) as { text?: string } | null;
+    const text = (out?.text ?? "").trim().slice(0, 2000);
     if (!text) return NextResponse.json({ error: "AI draft came back empty - try again" }, { status: 502 });
     return NextResponse.json({ ok: true, text });
   } catch (e) {
