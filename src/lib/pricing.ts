@@ -14,8 +14,9 @@ export const PRICE_LIST: PriceGroup[] = [
       { item: "Round-Neck Jersey (any sport)", priceCents: 2800, note: "Baseball, softball, soccer, pickleball & more - dry-fit included" },
       { item: "Dry-Fit Practice Jersey", priceCents: 2000, note: "Quality performance dry-fit with your team print - practice sets, coaches, parents & fans" },
       { item: "Long-Sleeve Shirt", priceCents: 3200 },
-      { item: "Two-Button Jersey", priceCents: 3500 },
-      { item: "Full-Button Jersey", priceCents: 3800 },
+      { item: "Two-Button Jersey", priceCents: 3200 },
+      { item: "Full-Button Jersey", priceCents: 3500 },
+      { item: "Quarter-Zip Jersey", priceCents: 3800, note: "Premium quarter-zip pullover in full custom sublimation" },
       { item: "Reversible Basketball Uniform", priceCents: 8500, note: "Two looks in one - home & away" },
     ],
   },
@@ -85,7 +86,7 @@ export const BUNDLES: Bundle[] = [
 ];
 
 export const BUNDLE_UPGRADE_NOTE =
-  "Bundle prices are estimated for crew-style (over-the-head) jerseys with a snapback hat. Button styles add the usual difference per jersey - two-button add $7, full-button add $10 - and a fitted hat instead of a snapback adds $5.";
+  "Bundle prices are estimated for crew-style (over-the-head) jerseys with a snapback hat. Button styles add the usual difference per jersey - two-button add $4, full-button add $7, quarter-zip add $10 - and a fitted hat instead of a snapback adds $5.";
 
 export function formatDollars(cents: number) {
   return `$${(cents / 100).toFixed(0)}`;

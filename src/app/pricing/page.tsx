@@ -6,7 +6,7 @@ import { PRICE_LIST, BUNDLES, BUNDLE_UPGRADE_NOTE, formatDollars } from "@/lib/p
 export const metadata: Metadata = {
   title: "2026 Pricing - Custom Jerseys, Uniforms & Team Gear",
   description:
-    "Straightforward 2026 pricing for custom team gear: round-neck jerseys $28, button jerseys $35-38, pants $40, embroidered hats $25-30. Custom design included, 6-piece minimum per design.",
+    "Straightforward 2026 pricing for custom team gear: round-neck jerseys $28, button jerseys $32-35, quarter-zips $38, pants $40, embroidered hats $25-30. Custom design included, 6-piece minimum per design.",
   alternates: { canonical: "/pricing" },
 };
 
@@ -26,6 +26,32 @@ export default function PricingPage() {
           rates, and duties change - the price on your invoice is always the one that counts.
         </p>
       </header>
+
+      {/* Jersey styles - branded mockups so buyers can SEE the difference. */}
+      <section className="mt-10">
+        <h2 className="display text-2xl text-foreground">Jersey Styles</h2>
+        <p className="mt-2 text-sm text-muted">
+          Every style is fully custom sublimated - your colors, logos, names, and numbers, design included.
+        </p>
+        <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { name: "Crew Neck", price: 2800, img: "/styles/crew.jpg" },
+            { name: "Two-Button", price: 3200, img: "/styles/two-button.jpg" },
+            { name: "Full-Button", price: 3500, img: "/styles/full-button.jpg" },
+            { name: "Quarter-Zip", price: 3800, img: "/styles/quarter-zip.jpg" },
+          ].map((s) => (
+            <div key={s.name} className="bg-steel border border-line">
+              <div className="relative aspect-square bg-white">
+                <Image src={s.img} alt={`Custom ${s.name} jersey by Slugger Athletics`} fill sizes="(max-width: 1024px) 50vw, 25vw" className="object-cover" />
+              </div>
+              <div className="px-3 py-2.5 flex items-baseline justify-between">
+                <span className="display text-sm text-foreground">{s.name}</span>
+                <span className="display text-brand">{formatDollars(s.price)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Bundles first - the simplest way to buy. */}
       <section className="mt-10">

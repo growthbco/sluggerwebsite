@@ -56,8 +56,9 @@ export function estimateOrderWeightOz(
 
 export function jerseyPriceCents(jerseyStyle?: string | null, localPricing?: boolean | null): number {
   const s = (jerseyStyle ?? "").toLowerCase();
-  if (s.includes("full")) return 3800;
-  if (s.includes("two")) return 3500;
+  if (s.includes("zip")) return 3800;
+  if (s.includes("full")) return 3500;
+  if (s.includes("two")) return 3200;
   return localPricing ? LOCAL_JERSEY_CENTS : 2800; // crew / v-neck / unspecified
 }
 

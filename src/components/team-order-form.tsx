@@ -5,7 +5,7 @@ import { ITEM_TYPES, JERSEY_MATERIALS } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
 
-const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button"];
+const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button", "Quarter-Zip"];
 
 type Row = { name: string; number: string; sizes: Record<string, string>; notes: string };
 
