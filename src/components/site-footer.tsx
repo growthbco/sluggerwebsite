@@ -5,7 +5,7 @@ const cols = [
   {
     title: "Shop",
     links: [
-      { href: "/shop", label: "All Products" },
+      { href: "/custom-sublimated-jerseys", label: "Custom Jerseys" },
       { href: "/team-uniforms", label: "Team Uniforms" },
       { href: "/custom-hats", label: "Custom Embroidered Hats" },
       { href: "/embroidery", label: "Embroidery - Ocala, FL" },

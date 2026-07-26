@@ -82,7 +82,7 @@ export default function Home() {
               </Link>
             </div>
             <p className="mt-4 text-sm">
-              <Link href="/shop" className="text-muted hover:text-foreground underline underline-offset-4">
+              <Link href="/drops" className="text-muted hover:text-foreground underline underline-offset-4">
                 Or shop our latest drops →
               </Link>
             </p>
