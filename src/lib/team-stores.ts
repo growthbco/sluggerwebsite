@@ -29,6 +29,7 @@ export const STORE_ITEM_PRESETS: StoreItem[] = [
   { key: "two_button_jersey", label: "Two-Button Jersey", priceCents: 3500, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 11 },
   { key: "full_button_jersey", label: "Full-Button Jersey", priceCents: 3800, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 12 },
   { key: "reversible_basketball", label: "Reversible Basketball Uniform", priceCents: 8500, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 16 },
+  { key: "practice_jersey", label: "Dry-Fit Practice Jersey", priceCents: 2000, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 10 },
   { key: "hoodie", label: "Hoodie", priceCents: 4000, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 24 },
   { key: "baseball_pants", label: "Baseball / Softball Pants", priceCents: 4000, sizes: APPAREL_SIZES, weightOz: 16 },
   { key: "microfiber_pants", label: "Lightweight Microfiber Pants", priceCents: 4000, sizes: APPAREL_SIZES, weightOz: 12 },

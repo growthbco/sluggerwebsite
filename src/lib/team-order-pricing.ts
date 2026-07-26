@@ -6,6 +6,7 @@ import { itemLabel } from "@/lib/order-items";
 // Per-item retail prices in cents (mirrors src/lib/pricing.ts).
 const ITEM_PRICES: Record<string, number> = {
   jersey: 2800, // crew / v-neck default; overridden by style below
+  practice_jersey: 2000,
   knickers: 4000,
   long_pants: 4000,
   shorts: 2500,
@@ -24,6 +25,7 @@ export const LOCAL_JERSEY_CENTS = 2500;
 // package weight - and thus shipping - is deterministic from the roster.
 export const ITEM_WEIGHT_OZ: Record<string, number> = {
   jersey: 11,
+  practice_jersey: 10,
   knickers: 14,
   long_pants: 16,
   shorts: 10,

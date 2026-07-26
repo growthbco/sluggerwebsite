@@ -1,4 +1,5 @@
-// Public retail price list (owner-confirmed, Jul 2026). Per piece, plus tax.
+// Public 2026 retail price list (owner-confirmed, Jul 2026). Per piece, plus
+// tax. Prices are reviewed as market costs / rates / duties change.
 // Flat pricing - no minimums, no quantity tiers. The custom design is included.
 // Anything not listed here (specialty items) is quoted custom.
 
@@ -10,6 +11,7 @@ export const PRICE_LIST: PriceGroup[] = [
     group: "Jerseys & Shirts",
     rows: [
       { item: "Round-Neck Jersey (any sport)", priceCents: 2800, note: "Baseball, softball, soccer, pickleball & more - dry-fit included" },
+      { item: "Dry-Fit Practice Jersey", priceCents: 2000, note: "Quality performance dry-fit with your team print - practice sets, coaches, parents & fans" },
       { item: "Long-Sleeve Shirt", priceCents: 3200 },
       { item: "Two-Button Jersey", priceCents: 3500 },
       { item: "Full-Button Jersey", priceCents: 3800 },

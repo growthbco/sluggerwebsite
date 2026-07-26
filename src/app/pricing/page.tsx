@@ -3,7 +3,7 @@ import Link from "next/link";
 import { PRICE_LIST, formatDollars } from "@/lib/pricing";
 
 export const metadata: Metadata = {
-  title: "Pricing - Custom Jerseys, Uniforms & Team Gear",
+  title: "2026 Pricing - Custom Jerseys, Uniforms & Team Gear",
   description:
     "Straightforward pricing for custom team gear: round-neck jerseys $28, button jerseys $35-38, pants $40, embroidered hats $25-30. Custom design included, no minimums.",
   alternates: { canonical: "/pricing" },
@@ -13,11 +13,15 @@ export default function PricingPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14">
       <header className="max-w-2xl">
-        <span className="display text-brand text-sm">Pricing</span>
-        <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">Simple, Flat Pricing</h1>
+        <span className="display text-brand text-sm">2026 Pricing</span>
+        <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">Simple, Flat 2026 Pricing</h1>
         <p className="mt-3 text-muted">
           The price you see is the price per piece - custom design included, no minimums,
           no surprises. Order 5 or 50, it&apos;s the same rate.
+        </p>
+        <p className="mt-2 text-xs text-muted">
+          Prices shown are our 2026 rates. We review pricing as material costs, shipping
+          rates, and duties change - the price on your invoice is always the one that counts.
         </p>
       </header>
 

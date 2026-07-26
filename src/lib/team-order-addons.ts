@@ -13,6 +13,7 @@ import { itemLabel, sizesFor, isInHouseItem } from "@/lib/order-items";
 // AFTER the main order shipped (it can't ride with the batch anymore).
 export const ITEM_WEIGHT_OZ: Record<string, number> = {
   jersey: 11,
+  practice_jersey: 10,
   knickers: 14,
   long_pants: 16,
   shorts: 10,

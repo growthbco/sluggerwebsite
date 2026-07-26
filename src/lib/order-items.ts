@@ -20,6 +20,7 @@ export type ItemType = { key: string; label: string; sizes: string[]; inHouse?: 
 
 export const ITEM_TYPES: ItemType[] = [
   { key: "jersey", label: "Jersey", sizes: APPAREL_SIZES },
+  { key: "practice_jersey", label: "Practice Jersey", sizes: APPAREL_SIZES },
   { key: "knickers", label: "Knickers", sizes: APPAREL_SIZES },
   { key: "long_pants", label: "Long Pants", sizes: APPAREL_SIZES },
   { key: "shorts", label: "Shorts", sizes: APPAREL_SIZES },
