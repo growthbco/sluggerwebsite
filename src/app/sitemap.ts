@@ -11,6 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/drops", "/team-uniforms", "/embroidery", "/custom-hats", "/hype-chains", "/gallery",
     "/team-order", "/services", "/pricing", "/track", "/size-guide", "/faq", "/contact", "/shipping", "/returns",
     "/privacy", "/terms",
+    "/custom-sublimated-jerseys", "/custom-practice-jerseys",
     ...SPORT_PAGES.map((p) => `/${p.slug}`),
     ...SERVICE_AREAS.map((a) => `/custom-uniforms/${a.slug}`),
   ];
