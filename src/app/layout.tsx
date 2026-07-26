@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Oswald } from "next/font/google";
-import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { StaffShortcut } from "@/components/staff-shortcut";
+import { SiteChat } from "@/components/site-chat";
 
 // Sitewide LocalBusiness schema: ties every page to the Ocala shop and its
 // Central Florida service area for local search.
@@ -82,15 +82,8 @@ export default function RootLayout({
           <main className="flex-1">{children}</main>
           <SiteFooter />
           <StaffShortcut />
+          <SiteChat />
         </CartProvider>
-        {/* LeadConnector chat widget - loaded after page is interactive so
-            it doesn't block first paint. */}
-        <Script
-          src="https://beta.leadconnectorhq.com/loader.js"
-          data-resources-url="https://beta.leadconnectorhq.com/chat-widget/loader.js"
-          data-widget-id="6a1a594796c166bea6d701a5"
-          strategy="afterInteractive"
-        />
         <Analytics />
       </body>
     </html>

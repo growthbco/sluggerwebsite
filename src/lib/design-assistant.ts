@@ -273,3 +273,58 @@ export async function suggestStaffReply(input: {
   const draft = (out?.draft ?? "").trim();
   return draft ? draft.slice(0, 1500) : null;
 }
+
+/* ------------------------------------------------------------------ */
+/* Public site chat                                                    */
+/* ------------------------------------------------------------------ */
+
+export type ChatTurn = { role: "user" | "bot"; text: string };
+
+/** Answer a visitor's question in the public site chat widget. Grounded in
+ *  the same shop knowledge as the design-thread assistant, but with no
+ *  project context - order-specific questions get pointed at the customer's
+ *  own status link or a text to the shop. Returns null on any failure. */
+export async function answerPublicChat(history: ChatTurn[]): Promise<string | null> {
+  const taughtFacts = await loadTaughtFacts();
+  // Reuse the shared grounding with a neutral "no project" context.
+  const grounding = buildGrounding(
+    { reference: "-", teamName: "-", status: "-", revisionsUsed: null, proofCount: 0, rush: null, neededBy: null },
+    null,
+    [],
+    taughtFacts,
+  )
+    // Strip the project-specific tail (meaningless in public chat).
+    .split("THIS PROJECT RIGHT NOW:")[0];
+
+  const convo = history
+    .slice(-10)
+    .map((t) => `${t.role === "user" ? "VISITOR" : "YOU"}: ${t.text.slice(0, 500)}`)
+    .join("\n");
+
+  const prompt = [
+    "You are the website chat assistant for Slugger Athletics (sluggerathletics.com), a custom team gear shop in Ocala, Florida. A site visitor is chatting with you.",
+    "",
+    grounding,
+    "USEFUL LINKS you may share (plain URLs): /design (start a free design), /team-order (start a team order), /pricing (2026 pricing and bundles), /custom-hats, /team-uniforms, /faq, /track.",
+    "",
+    "CONVERSATION:",
+    convo,
+    "",
+    "Reply to the visitor's last message:",
+    "- Answer ONLY from the facts above. Short, warm, plain text - 1-4 sentences. No markdown, no em dashes (use hyphens).",
+    "- Never invent prices, dates, or policies. If you do not know, say so and offer the text line: (352) 660-1232.",
+    "- Questions about a SPECIFIC existing order or design: you cannot see orders - point them to the status link in their email, or to text (352) 660-1232.",
+    "- Discount asks: we can work with them, it depends on total piece count - ask their target number and offer a call. Never name a discount.",
+    "- When it fits naturally, point them to starting a free design at /design - that is the goal.",
+    "- Reply in the visitor's language.",
+    'Return ONLY JSON: { "reply": string }',
+  ].join("\n");
+
+  const out = await callGemini(prompt, {
+    type: "OBJECT",
+    properties: { reply: { type: "STRING" } },
+    required: ["reply"],
+  });
+  const reply = (out?.reply ?? "").trim();
+  return reply ? reply.slice(0, 1200) : null;
+}
