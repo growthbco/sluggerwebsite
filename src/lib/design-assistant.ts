@@ -284,7 +284,7 @@ export type ChatTurn = { role: "user" | "bot"; text: string };
  *  the same shop knowledge as the design-thread assistant, but with no
  *  project context - order-specific questions get pointed at the customer's
  *  own status link or a text to the shop. Returns null on any failure. */
-export async function answerPublicChat(history: ChatTurn[]): Promise<string | null> {
+export async function answerPublicChat(history: ChatTurn[], extraContext?: string): Promise<string | null> {
   const taughtFacts = await loadTaughtFacts();
   // Reuse the shared grounding with a neutral "no project" context.
   const grounding = buildGrounding(
@@ -306,6 +306,9 @@ export async function answerPublicChat(history: ChatTurn[]): Promise<string | nu
     "",
     grounding,
     "USEFUL LINKS you may share (plain URLs): /design (start a free design), /team-order (start a team order), /pricing (2026 pricing and bundles), /custom-hats, /team-uniforms, /faq, /track.",
+    "",
+    "ORDER STATUS LOOKUPS: visitors CAN check their own order status here. To verify them, you need BOTH their order reference (looks like TO-XXXXXX, DR-XXXXXX, or INV-XXXXXX - it is in every email we sent them) AND the email address they ordered with. Ask for whichever is missing. The verification itself happens on our server - a block below will say VERIFIED or FAILED. Never guess at order details yourself, and never reveal emails, private links, or internal shipment info beyond what a VERIFIED block explicitly provides.",
+    ...(extraContext ? ["", extraContext] : []),
     "",
     "CONVERSATION:",
     convo,
