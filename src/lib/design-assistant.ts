@@ -8,7 +8,7 @@
 //
 // Same Gemini setup as the roster importer and print-file check.
 
-import { PRICE_LIST } from "@/lib/pricing";
+import { PRICE_LIST, BUNDLES, BUNDLE_UPGRADE_NOTE } from "@/lib/pricing";
 import { FAQS } from "@/lib/faqs";
 import { MAX_REVISIONS, type DesignMessage } from "@/lib/design-requests";
 import { itemLabel } from "@/lib/order-items";
@@ -140,6 +140,10 @@ function buildGrounding(design: DesignContext, order: OrderContext | null, messa
     "",
     "PRICE LIST (per piece, plus tax, no minimums, design included):",
     priceList,
+    "",
+    "2026 BUNDLES (per player, plus tax - suggest the matching bundle when someone is pricing multiple pieces, especially Home & Away when they only mention jerseys):",
+    BUNDLES.map((b) => `${b.name}: ${b.includes.join(" + ")} = $${(b.priceCents / 100).toFixed(0)} (vs $${(b.compareAtCents / 100).toFixed(0)} separately)`).join("\n"),
+    BUNDLE_UPGRADE_NOTE,
     "",
     "FAQS:",
     FAQS.map((f) => `Q: ${f.q}\nA: ${f.a}`).join("\n"),

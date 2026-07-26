@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PRICE_LIST, formatDollars } from "@/lib/pricing";
+import Image from "next/image";
+import { PRICE_LIST, BUNDLES, BUNDLE_UPGRADE_NOTE, formatDollars } from "@/lib/pricing";
 
 export const metadata: Metadata = {
   title: "2026 Pricing - Custom Jerseys, Uniforms & Team Gear",
@@ -24,6 +25,42 @@ export default function PricingPage() {
           rates, and duties change - the price on your invoice is always the one that counts.
         </p>
       </header>
+
+      {/* Bundles first - the simplest way to buy. */}
+      <section className="mt-10">
+        <h2 className="display text-2xl text-foreground">2026 Team Bundles</h2>
+        <p className="mt-2 text-sm text-muted">
+          The easiest way to outfit a player - one price for the whole set, per player.
+        </p>
+        <div className="mt-4 grid gap-5 sm:grid-cols-3">
+          {BUNDLES.map((b) => (
+            <div key={b.name} className="bg-steel border border-line flex flex-col">
+              <div className="relative aspect-square bg-white">
+                <Image src={b.image} alt={`${b.name} - custom team gear bundle`} fill sizes="(max-width: 640px) 100vw, 33vw" className="object-cover" />
+              </div>
+              <div className="p-4 flex-1 flex flex-col">
+                <div className="flex items-baseline justify-between gap-2">
+                  <h3 className="display text-lg text-foreground">{b.name}</h3>
+                  <p className="shrink-0">
+                    <span className="display text-xl text-brand">{formatDollars(b.priceCents)}</span>{" "}
+                    <span className="text-xs text-muted line-through">{formatDollars(b.compareAtCents)}</span>
+                  </p>
+                </div>
+                <p className="mt-1.5 text-sm text-muted">{b.blurb}</p>
+                <ul className="mt-3 space-y-1 text-sm text-foreground/90">
+                  {b.includes.map((i) => (
+                    <li key={i}>✓ {i}</li>
+                  ))}
+                </ul>
+                <p className="mt-auto pt-3 text-xs text-brand display">
+                  Save {formatDollars(b.compareAtCents - b.priceCents)} per player
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-muted">{BUNDLE_UPGRADE_NOTE}</p>
+      </section>
 
       <div className="mt-10 space-y-8">
         {PRICE_LIST.map((g) => (

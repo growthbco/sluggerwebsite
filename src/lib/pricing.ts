@@ -43,6 +43,49 @@ export const PRICE_LIST: PriceGroup[] = [
   },
 ];
 
+// 2026 bundles (owner-approved Jul 2026). Priced with round-neck jerseys and
+// snapback hats; button jerseys upgrade at the usual difference. The discount
+// is deliberately small - bundles exist to simplify the decision, not to be
+// cheap (margins stay above the 2x floor).
+export type Bundle = {
+  name: string;
+  priceCents: number;
+  compareAtCents: number; // a-la-carte total
+  includes: string[];
+  image: string;
+  blurb: string;
+};
+
+export const BUNDLES: Bundle[] = [
+  {
+    name: "Game Day Bundle",
+    priceCents: 8500,
+    compareAtCents: 9300,
+    includes: ["Custom Jersey", "Baseball / Softball Pants", "Snapback Hat"],
+    image: "/bundles/game-day.jpg",
+    blurb: "Everything one player needs to take the field - jersey, pants, and the hat to match.",
+  },
+  {
+    name: "Home & Away Bundle",
+    priceCents: 9000,
+    compareAtCents: 9600,
+    includes: ["2 Custom Jerseys (home + away)", "Baseball / Softball Pants"],
+    image: "/bundles/home-away.jpg",
+    blurb: "Two looks, one price - a home and an away jersey with pants to run all season.",
+  },
+  {
+    name: "The Total Package",
+    priceCents: 12000,
+    compareAtCents: 13600,
+    includes: ["2 Custom Jerseys (home + away)", "Baseball / Softball Pants", "Snapback Hat", "Custom Socks"],
+    image: "/bundles/total-package.jpg",
+    blurb: "The full kit, head to toe - our best per-player value.",
+  },
+];
+
+export const BUNDLE_UPGRADE_NOTE =
+  "Bundle prices use round-neck jerseys and snapback hats. Upgrades per jersey: two-button add $7, full-button add $10. Fitted hat instead of snapback: add $5.";
+
 export function formatDollars(cents: number) {
   return `$${(cents / 100).toFixed(0)}`;
 }
