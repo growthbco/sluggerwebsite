@@ -1,6 +1,7 @@
 // Public 2026 retail price list (owner-confirmed, Jul 2026). Per piece, plus
 // tax. Prices are reviewed as market costs / rates / duties change.
-// Flat pricing - no minimums, no quantity tiers. The custom design is included.
+// Flat pricing, no quantity tiers; 6-piece minimum per custom design (hats
+// excluded - embroidered in-house with no minimum). Custom design included.
 // Anything not listed here (specialty items) is quoted custom.
 
 export type PriceRow = { item: string; priceCents: number; note?: string };
@@ -61,7 +62,7 @@ export const BUNDLES: Bundle[] = [
     name: "Game Day Bundle",
     priceCents: 8500,
     compareAtCents: 9300,
-    includes: ["Custom Jersey", "Baseball / Softball Pants", "Snapback Hat"],
+    includes: ["Crew-Style Custom Jersey", "Baseball / Softball Pants", "Snapback Hat"],
     image: "/bundles/game-day.jpg",
     blurb: "Everything one player needs to take the field - jersey, pants, and the hat to match.",
   },
@@ -69,7 +70,7 @@ export const BUNDLES: Bundle[] = [
     name: "Home & Away Bundle",
     priceCents: 9000,
     compareAtCents: 9600,
-    includes: ["2 Custom Jerseys (home + away)", "Baseball / Softball Pants"],
+    includes: ["2 Crew-Style Custom Jerseys (home + away)", "Baseball / Softball Pants"],
     image: "/bundles/home-away.jpg",
     blurb: "Two looks, one price - a home and an away jersey with pants to run all season.",
   },
@@ -77,14 +78,14 @@ export const BUNDLES: Bundle[] = [
     name: "The Total Package",
     priceCents: 12000,
     compareAtCents: 13600,
-    includes: ["2 Custom Jerseys (home + away)", "Baseball / Softball Pants", "Snapback Hat", "Custom Socks"],
+    includes: ["2 Crew-Style Custom Jerseys (home + away)", "Baseball / Softball Pants", "Snapback Hat", "Custom Socks"],
     image: "/bundles/total-package.jpg",
     blurb: "The full kit, head to toe - our best per-player value.",
   },
 ];
 
 export const BUNDLE_UPGRADE_NOTE =
-  "Bundle prices use round-neck jerseys and snapback hats. Upgrades per jersey: two-button add $7, full-button add $10. Fitted hat instead of snapback: add $5.";
+  "Bundle prices are estimated for crew-style (over-the-head) jerseys with a snapback hat. Button styles add the usual difference per jersey - two-button add $7, full-button add $10 - and a fitted hat instead of a snapback adds $5.";
 
 export function formatDollars(cents: number) {
   return `$${(cents / 100).toFixed(0)}`;

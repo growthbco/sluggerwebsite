@@ -138,7 +138,7 @@ function buildGrounding(design: DesignContext, order: OrderContext | null, messa
         ]
       : []),
     "",
-    "PRICE LIST (per piece, plus tax, no minimums, design included):",
+    "PRICE LIST (per piece, plus tax, design included; custom orders have a 6-piece minimum per design - embroidered hats, shop items, and drops have NO minimum):",
     priceList,
     "",
     "2026 BUNDLES (per player, plus tax - suggest the matching bundle when someone is pricing multiple pieces, especially Home & Away when they only mention jerseys):",

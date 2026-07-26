@@ -6,7 +6,7 @@ import { PRICE_LIST, BUNDLES, BUNDLE_UPGRADE_NOTE, formatDollars } from "@/lib/p
 export const metadata: Metadata = {
   title: "2026 Pricing - Custom Jerseys, Uniforms & Team Gear",
   description:
-    "Straightforward pricing for custom team gear: round-neck jerseys $28, button jerseys $35-38, pants $40, embroidered hats $25-30. Custom design included, no minimums.",
+    "Straightforward 2026 pricing for custom team gear: round-neck jerseys $28, button jerseys $35-38, pants $40, embroidered hats $25-30. Custom design included, 6-piece minimum per design.",
   alternates: { canonical: "/pricing" },
 };
 
@@ -17,8 +17,9 @@ export default function PricingPage() {
         <span className="display text-brand text-sm">2026 Pricing</span>
         <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">Simple, Flat 2026 Pricing</h1>
         <p className="mt-3 text-muted">
-          The price you see is the price per piece - custom design included, no minimums,
-          no surprises. Order 5 or 50, it&apos;s the same rate.
+          The price you see is the price per piece - custom design included, no
+          surprises. Custom orders start at 6 pieces per design; order 6 or 60, it&apos;s
+          the same per-piece rate. Embroidered hats have no minimum.
         </p>
         <p className="mt-2 text-xs text-muted">
           Prices shown are our 2026 rates. We review pricing as material costs, shipping
@@ -42,7 +43,7 @@ export default function PricingPage() {
                 <div className="flex items-baseline justify-between gap-2">
                   <h3 className="display text-lg text-foreground">{b.name}</h3>
                   <p className="shrink-0">
-                    <span className="display text-xl text-brand">{formatDollars(b.priceCents)}</span>{" "}
+                    <span className="text-xs text-muted">from</span> <span className="display text-xl text-brand">{formatDollars(b.priceCents)}</span>{" "}
                     <span className="text-xs text-muted line-through">{formatDollars(b.compareAtCents)}</span>
                   </p>
                 </div>

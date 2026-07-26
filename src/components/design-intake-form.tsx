@@ -48,7 +48,7 @@ export function DesignIntakeForm() {
   // What the customer wants us to mock up. "Jersey" reveals a cut dropdown;
   // "Other" reveals a free-text box.
   const PRODUCT_OPTIONS = ["Jersey / Shirt", "Shorts", "Pants", "Hoodie", "Hat", "Socks", "Bag", "Other"];
-  const PIECE_RANGES = ["1-2", "3-9", "10-14", "15-24", "25+"];
+  const PIECE_RANGES = ["1-5", "6-9", "10-14", "15-24", "25+"];
   const JERSEY_STYLES = ["Full-button", "Two-button", "Crew neck", "V-neck", "Sleeveless / Tank"];
   const wantsJersey = productTypes.includes("Jersey / Shirt");
   const wantsOther = productTypes.includes("Other");
@@ -294,10 +294,10 @@ export function DesignIntakeForm() {
             );
           })}
         </div>
-        {estimatedPieces === "1-2" && (
+        {estimatedPieces === "1-5" && (
           <p className="mt-3 text-sm bg-brand/10 border border-brand/40 text-foreground p-3">
-            Heads up: full custom team designs are built for groups, so we may not be able to
-            take on a design for just one or two pieces. If you only need one custom item,{" "}
+            Heads up: custom orders start at 6 pieces per design, so we may not be able to
+            take this on below that. If you only need a piece or two,{" "}
             <a href="/custom-hats" className="text-brand underline">custom embroidered hats</a> have
             truly no minimum, and our <a href="/shop" className="text-brand underline">shop</a> and
             drops are single-piece friendly. Growing roster? Pick the range you expect to end up at.

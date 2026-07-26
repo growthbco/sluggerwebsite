@@ -303,7 +303,7 @@ export async function postDesignRequestToDiscord(req: DesignRequestPayload): Pro
   if (req.estimatedPieces) {
     // Tiny requests get a warning glyph - a full custom design for 1-2 pieces
     // usually isn't worth the work, so staff should weigh in before designing.
-    const tiny = /^1\b|^1-2/.test(req.estimatedPieces);
+    const tiny = /^1-5/.test(req.estimatedPieces);
     fields.push({ name: "Approx. pieces", value: `${tiny ? "⚠️ " : ""}${req.estimatedPieces}`, inline: true });
   }
   const needed = fmtNeededBy(req.neededBy ?? null);
