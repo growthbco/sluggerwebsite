@@ -80,12 +80,12 @@ body {
 }
 
 /* Angular "cut corner" used on CTAs and chips, echoing the example site. */
-.clip-slant {
-  clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
-}
-
+/* Formerly an angled clip-path; the owner found the cut-off look odd, so
+   these are now clean slightly-rounded shapes. Class names kept so all ~50
+   call sites restyle from this one spot. */
+.clip-slant,
 .clip-slant-both {
-  clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+  border-radius: 4px;
 }
 
 /* Pause the trust-strip marquee on hover (animation registered in @theme above). */

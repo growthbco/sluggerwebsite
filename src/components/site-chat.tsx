@@ -4,6 +4,28 @@ import { useEffect, useRef, useState } from "react";
 
 type Turn = { role: "user" | "bot"; text: string };
 
+// Bot replies mention site paths (/design, /pricing) and URLs - render them
+// as real links so visitors can tap straight through.
+const LINK_RE = /(https?:\/\/[^\s]+|(?<![\w/])\/(?:design|team-order|team-stores|team-uniforms|pricing|custom-[a-z-]+|hype-chains|embroidery|faq|track|gallery|services|size-guide)(?:\/[\w-]+)*)/g;
+
+function withLinks(text: string) {
+  const parts = text.split(LINK_RE);
+  return parts.map((part, i) => {
+    if (!part) return null;
+    if (i % 2 === 1) {
+      const href = part.startsWith("http") ? part.replace(/[.,!?)]+$/, "") : part;
+      const trailing = part.slice(href.length);
+      return (
+        <span key={i}>
+          <a href={href} className="text-brand underline underline-offset-2 break-all">{href}</a>
+          {trailing}
+        </span>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
 const WELCOME: Turn = {
   role: "bot",
   text: "Hey! I'm the Slugger assistant. Ask me about pricing, custom uniforms, hats, turnaround - anything. How can I help?",
@@ -53,7 +75,7 @@ export function SiteChat() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Close chat" : "Chat with us"}
-        className="fixed bottom-4 right-4 z-50 h-14 w-14 clip-slant bg-brand text-on-brand shadow-xl grid place-items-center hover:bg-brand-dark transition-colors"
+        className="fixed bottom-4 right-4 z-50 h-14 w-14 rounded-full bg-brand text-on-brand shadow-xl grid place-items-center hover:bg-brand-dark transition-colors"
       >
         {open ? (
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" /></svg>
@@ -64,7 +86,7 @@ export function SiteChat() {
 
       {/* Panel */}
       {open && (
-        <div className="fixed bottom-20 right-4 z-50 w-[92vw] max-w-sm bg-ink border border-line shadow-2xl flex flex-col" style={{ height: "min(560px, 75vh)" }}>
+        <div className="fixed bottom-20 left-3 right-3 sm:left-auto sm:right-4 z-50 sm:w-96 bg-ink border border-line rounded-lg overflow-hidden shadow-2xl flex flex-col" style={{ height: "min(560px, 70dvh)" }}>
           <div className="px-4 py-3 border-b border-line bg-steel">
             <p className="display text-foreground">Slugger Athletics</p>
             <p className="text-xs text-muted">Usually replies instantly · or text (352) 660-1232</p>
@@ -73,8 +95,8 @@ export function SiteChat() {
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2.5">
             {turns.map((t, i) => (
               <div key={i} className={`flex ${t.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] px-3 py-2 text-sm whitespace-pre-line border ${t.role === "user" ? "bg-brand/15 border-brand/40 text-foreground" : "bg-steel border-line text-foreground/90"}`}>
-                  {t.text}
+                <div className={`max-w-[85%] px-3 py-2 text-sm whitespace-pre-line border rounded-md ${t.role === "user" ? "bg-brand/15 border-brand/40 text-foreground" : "bg-steel border-line text-foreground/90"}`}>
+                  {t.role === "bot" ? withLinks(t.text) : t.text}
                 </div>
               </div>
             ))}
@@ -96,7 +118,7 @@ export function SiteChat() {
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") send(draft); }}
               placeholder="Ask about pricing, turnaround…"
-              className="flex-1 bg-steel border border-line px-3 py-2.5 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+              className="flex-1 min-w-0 bg-steel border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
             />
             <button type="button" onClick={() => send(draft)} disabled={busy || !draft.trim()} className="clip-slant bg-brand text-on-brand display text-sm px-4 disabled:opacity-50">
               Send
