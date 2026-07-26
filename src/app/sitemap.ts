@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
 import { products } from "@/lib/catalog";
+import { SPORT_PAGES } from "@/lib/sport-pages";
+import { SERVICE_AREAS } from "@/lib/service-areas";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.sluggerathletics.com";
 
@@ -9,6 +11,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/drops", "/team-uniforms", "/embroidery", "/custom-hats", "/hype-chains", "/gallery",
     "/team-order", "/services", "/pricing", "/track", "/size-guide", "/faq", "/contact", "/shipping", "/returns",
     "/privacy", "/terms",
+    ...SPORT_PAGES.map((p) => `/${p.slug}`),
+    ...SERVICE_AREAS.map((a) => `/custom-uniforms/${a.slug}`),
   ];
 
   const now = new Date();
