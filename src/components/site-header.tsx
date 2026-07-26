@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { CartButton } from "@/components/cart-button";
+import { SPORT_PAGES } from "@/lib/sport-pages";
 
 // Text nav is intentionally focused on browsing categories. The two funnel
 // entry points (Free Design + Team Order) live as buttons on the right so
@@ -12,10 +13,15 @@ import { CartButton } from "@/components/cart-button";
 const nav = [
   { href: "/", label: "Home" },
   { href: "/team-uniforms", label: "Uniforms" },
-  { href: "/drops", label: "Buy-Ins" },
   { href: "/custom-hats", label: "Custom Hats" },
   { href: "/pricing", label: "Pricing" },
   { href: "/gallery", label: "Gallery" },
+];
+
+// "Uniforms" expands into every sport page (plus the hub itself).
+const UNIFORM_LINKS = [
+  { href: "/team-uniforms", label: "All Team Uniforms" },
+  ...SPORT_PAGES.map((s) => ({ href: `/${s.slug}`, label: s.sport })),
 ];
 
 export function SiteHeader() {
@@ -58,15 +64,43 @@ export function SiteHeader() {
 
             {/* Browse nav (desktop only) */}
             <nav className="hidden lg:flex items-center gap-6">
-              {nav.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="display text-sm tracking-wide text-foreground/75 hover:text-foreground transition-colors"
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {nav.map((item) =>
+                item.label === "Uniforms" ? (
+                  <div key={item.href} className="relative group">
+                    <Link
+                      href={item.href}
+                      className="display text-sm tracking-wide text-foreground/75 hover:text-foreground transition-colors inline-flex items-center gap-1"
+                    >
+                      {item.label}
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="mt-0.5 opacity-60">
+                        <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </Link>
+                    {/* Hover dropdown; pt-3 bridges the gap so it doesn't flicker. */}
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full pt-3 hidden group-hover:block group-focus-within:block">
+                      <div className="bg-ink border border-line shadow-2xl py-2 min-w-[13rem]">
+                        {UNIFORM_LINKS.map((l) => (
+                          <Link
+                            key={l.href}
+                            href={l.href}
+                            className="block px-4 py-2 display text-sm text-foreground/80 hover:text-foreground hover:bg-brand/10 whitespace-nowrap"
+                          >
+                            {l.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="display text-sm tracking-wide text-foreground/75 hover:text-foreground transition-colors"
+                  >
+                    {item.label}
+                  </Link>
+                ),
+              )}
             </nav>
 
             {/* Funnel CTAs + cart + hamburger */}
@@ -164,6 +198,20 @@ export function SiteHeader() {
                   >
                     {item.label}
                   </Link>
+                  {item.label === "Uniforms" && (
+                    <ul className="bg-foreground/[0.03] border-b border-line/50">
+                      {UNIFORM_LINKS.slice(1).map((l) => (
+                        <li key={l.href}>
+                          <Link
+                            href={l.href}
+                            className="block pl-9 pr-5 py-2.5 display text-sm text-foreground/70 hover:text-foreground hover:bg-foreground/5"
+                          >
+                            {l.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>

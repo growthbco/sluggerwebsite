@@ -1,0 +1,151 @@
+import Link from "next/link";
+import Image from "next/image";
+import type { SportPage } from "@/lib/sport-pages";
+import { galleryPhotos } from "@/lib/gallery";
+import { BUNDLES, formatDollars } from "@/lib/pricing";
+
+// Rich sport landing page: branded mockup + REAL uniform photos, deep
+// sport-specific copy, pricing, bundles, FAQs (with FAQPage schema), and the
+// two funnel CTAs. Shared by all /custom-<sport>-* pages.
+export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; photoOffset?: number }) {
+  // Rotate through the real-photo pool so each sport page shows different
+  // shots instead of all ten pages repeating the same five images.
+  const photos = [...galleryPhotos.slice(photoOffset), ...galleryPhotos.slice(0, photoOffset)].slice(0, 5);
+
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Service",
+      serviceType: page.h1,
+      provider: {
+        "@type": "LocalBusiness",
+        name: "Slugger Athletics",
+        email: "apparel@sluggerathletics.com",
+        telephone: "+1-352-660-1232",
+        address: { "@type": "PostalAddress", addressLocality: "Ocala", addressRegion: "FL", addressCountry: "US" },
+      },
+      areaServed: [{ "@type": "City", name: "Ocala, Florida" }, { "@type": "Country", name: "United States" }],
+      description: page.metaDescription,
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: page.faqs.map((f) => ({
+        "@type": "Question",
+        name: f.q,
+        acceptedAnswer: { "@type": "Answer", text: f.a },
+      })),
+    },
+  ];
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-14">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+
+      <header className="max-w-3xl">
+        <span className="display text-brand text-sm">Custom {page.sport} · Ocala, FL · Ships Nationwide</span>
+        <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">{page.h1}</h1>
+        <p className="mt-4 text-muted text-lg">{page.intro}</p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/design" className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-6 py-3 transition-colors">
+            Start a Free Design
+          </Link>
+          <Link href="/pricing" className="border border-brand/70 text-foreground hover:bg-brand/10 display px-6 py-3 transition-colors">
+            See 2026 Pricing
+          </Link>
+        </div>
+      </header>
+
+      {/* Mockup + real uniforms: proof beats promises. */}
+      <section className="mt-14">
+        <h2 className="display text-3xl text-foreground">Real Uniforms, Real Teams</h2>
+        <p className="mt-2 text-muted">Our Slugger-styled {page.sport.toLowerCase()} mockup - and real gear we have produced.</p>
+        <div className="mt-5 grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="relative aspect-square bg-white border border-brand/60">
+            <Image src={page.mockup} alt={`${page.h1} - Slugger Athletics mockup`} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover" />
+            <span className="absolute top-2 left-2 bg-brand text-on-brand display text-[10px] px-2 py-0.5">SLUGGER STYLE</span>
+          </div>
+          {photos.map((ph) => (
+            <div key={ph.id} className="relative aspect-square bg-steel border border-line overflow-hidden">
+              <Image src={`/media/${ph.file}`} alt={`${ph.alt} - custom ${page.sport.toLowerCase()} gear by Slugger Athletics`} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover" unoptimized />
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-sm">
+          <Link href="/gallery" className="text-brand hover:underline">See the full gallery →</Link>
+        </p>
+      </section>
+
+      {/* Deep dive */}
+      <section className="mt-14 max-w-3xl space-y-4">
+        {page.deepDive.map((para, i) => (
+          <p key={i} className="text-foreground/85 leading-relaxed">{para}</p>
+        ))}
+      </section>
+
+      {/* Offerings */}
+      <section className="mt-14">
+        <h2 className="display text-3xl text-foreground">{page.sport} Gear We Make</h2>
+        <div className="mt-5 grid sm:grid-cols-2 gap-4">
+          {page.offerings.map((o) => (
+            <div key={o.t} className="bg-steel border border-line p-5">
+              <h3 className="display text-lg text-foreground">{o.t}</h3>
+              <p className="mt-1.5 text-sm text-muted">{o.d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Pricing strip */}
+      <section className="mt-14 bg-steel border border-line p-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <h2 className="display text-2xl text-foreground">Straightforward 2026 Pricing</h2>
+          <Link href="/pricing" className="text-sm text-brand hover:underline">Full price list →</Link>
+        </div>
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+          {[
+            { label: "Jerseys from", price: 2800 },
+            { label: "Practice shirts", price: 2000 },
+            { label: "Hats from", price: 2500 },
+            { label: "Bundles from", price: BUNDLES[0].priceCents },
+          ].map((x) => (
+            <div key={x.label} className="bg-ink border border-line px-3 py-4">
+              <p className="display text-2xl text-brand">{formatDollars(x.price)}</p>
+              <p className="text-xs text-muted mt-1">{x.label}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-muted">
+          Design included · names & numbers included · same price youth to 5XL · 6-piece minimum per design (hats have no minimum)
+        </p>
+      </section>
+
+      {/* FAQs */}
+      <section className="mt-14 max-w-3xl">
+        <h2 className="display text-3xl text-foreground">{page.sport} Uniform FAQs</h2>
+        <div className="mt-5 space-y-5">
+          {page.faqs.map((f) => (
+            <div key={f.q}>
+              <h3 className="display text-lg text-foreground">{f.q}</h3>
+              <p className="mt-1 text-muted">{f.a}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Local + CTA */}
+      <section className="mt-14 max-w-3xl">
+        <h2 className="display text-3xl text-foreground">{page.sport} Teams, Local and Nationwide</h2>
+        <p className="mt-3 text-muted">{page.localBody}</p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/design" className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-6 py-3 transition-colors">
+            Get Your Free {page.sport} Design
+          </Link>
+          <a href="sms:+13526601232" className="border border-line text-foreground hover:border-brand/50 display px-6 py-3 transition-colors">
+            💬 Text (352) 660-1232
+          </a>
+        </div>
+      </section>
+    </div>
+  );
+}

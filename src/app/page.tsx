@@ -1,13 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { categories } from "@/lib/sample-data";
-import { dropProducts, primaryImage, formatPrice } from "@/lib/catalog";
+import { SPORT_PAGES } from "@/lib/sport-pages";
 import { heroPhoto } from "@/lib/gallery";
 import { ElevateSection, SystemSection, Reviews, SocialGrid, AboutBand, FaqTeaser } from "@/components/home-extras";
 import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
 
 export default function Home() {
-  const drops = dropProducts(3);
   return (
     <>
       {/* ---------------------------------------------------------------- */}
@@ -82,8 +81,8 @@ export default function Home() {
               </Link>
             </div>
             <p className="mt-4 text-sm">
-              <Link href="/drops" className="text-muted hover:text-foreground underline underline-offset-4">
-                Or shop our latest drops →
+              <Link href="/gallery" className="text-muted hover:text-foreground underline underline-offset-4">
+                Or see our recent work →
               </Link>
             </p>
           </div>
@@ -146,49 +145,26 @@ export default function Home() {
       </section>
 
       {/* ---------------------------------------------------------------- */}
-      {/* Active Buy-Ins / Drops                                           */}
+      {/* Every sport                                                      */}
       {/* ---------------------------------------------------------------- */}
       <section className="bg-steel border-y border-line">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 py-16 sm:py-20">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <span className="display text-brand text-sm">Limited Releases</span>
-              <h2 className="display text-3xl sm:text-4xl text-foreground">Active Buy-Ins</h2>
+              <span className="display text-brand text-sm">Multi-Sport</span>
+              <h2 className="display text-3xl sm:text-4xl text-foreground">Every Sport, One Shop</h2>
             </div>
-            <Link href="/drops" className="display text-sm text-muted hover:text-foreground">
-              View all →
+            <Link href="/team-uniforms" className="display text-sm text-muted hover:text-foreground">
+              All uniforms →
             </Link>
           </div>
-          <div className="mt-8 grid gap-5 md:grid-cols-3">
-            {drops.map((d) => (
-              <Link
-                key={d.slug}
-                href={`/product/${d.slug}`}
-                className="group relative overflow-hidden bg-ink border border-line hover:border-brand/60 transition-colors"
-              >
-                <div className="relative aspect-[16/10] overflow-hidden">
-                  <Image
-                    src={primaryImage(d)}
-                    alt={d.name}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                    className="object-cover transition-transform duration-300 group-hover:scale-105"
-                    unoptimized
-                  />
-                  <span
-                    className={`absolute top-3 left-0 clip-slant display text-xs px-3 py-1 ${
-                      d.inStock ? "bg-brand text-on-brand" : "bg-black/60 text-white"
-                    }`}
-                  >
-                    {d.inStock ? "Open Now" : "Sold Out"}
-                  </span>
+          <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {SPORT_PAGES.map((p) => (
+              <Link key={p.slug} href={`/${p.slug}`} className="group bg-ink border border-line hover:border-brand/60 transition-colors">
+                <div className="relative aspect-square bg-white overflow-hidden">
+                  <Image src={p.mockup} alt={p.h1} fill sizes="(max-width: 1024px) 50vw, 20vw" className="object-cover transition-transform duration-300 group-hover:scale-105" />
                 </div>
-                <div className="p-5">
-                  <span className="display text-xs text-brand">{d.categoriesRaw[0] ?? "Limited Drop"}</span>
-                  <h3 className="display text-xl text-foreground mt-1">{d.name}</h3>
-                  <p className="text-sm text-muted mt-2 line-clamp-2">{d.description}</p>
-                  <p className="text-sm text-foreground/80 mt-3 display">{formatPrice(d.priceCents)}</p>
-                </div>
+                <p className="px-3 py-2.5 display text-sm text-foreground group-hover:text-brand">{p.sport} →</p>
               </Link>
             ))}
           </div>

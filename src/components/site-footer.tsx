@@ -10,7 +10,6 @@ const cols = [
       { href: "/custom-hats", label: "Custom Embroidered Hats" },
       { href: "/embroidery", label: "Embroidery - Ocala, FL" },
       { href: "/hype-chains", label: "Hype Chains" },
-      { href: "/drops", label: "Buy-Ins" },
     ],
   },
   {

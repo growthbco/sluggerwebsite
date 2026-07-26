@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
     return [
       { source: "/shop", destination: "/team-uniforms", permanent: true },
       { source: "/shop/:category", destination: "/team-uniforms", permanent: true },
+      { source: "/drops", destination: "/team-uniforms", permanent: true },
     ];
   },
   images: {
