@@ -41,6 +41,10 @@ function themeVars(hex: string | null | undefined): React.CSSProperties | undefi
   } as React.CSSProperties;
 }
 
+// Store contents (items, designs, gallery) change from the admin/DB side -
+// always render fresh so updates appear immediately, never a cached page.
+export const dynamic = "force-dynamic";
+
 export default async function TeamStorePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   if (!dbEnabled()) return <Centered title="Not available yet">Team stores aren&apos;t turned on yet.</Centered>;
