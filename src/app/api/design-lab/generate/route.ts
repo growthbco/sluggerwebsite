@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/admin-auth";
+import { generateJson } from "@/lib/design-assistant";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -59,7 +60,24 @@ export async function POST(req: Request) {
   if (body.previousImage && refinement) {
     const prev = parseDataUrl(body.previousImage);
     if (!prev) return NextResponse.json({ error: "Bad previous image" }, { status: 400 });
-    parts.push({ text: `Edit this custom ${sport} jersey mockup. Keep it a professional floating ghost-mannequin product shot on a pure white background, front view. Apply this change: ${refinement}` });
+    // Guardrail 1: have Claude turn the customer's loose wording into a precise
+    // edit instruction scoped to design elements ("make it lighter" once faded
+    // the entire product photo instead of the background pattern).
+    let instruction = refinement;
+    const interpreted = (await generateJson(
+      [
+        `A customer is refining an AI mockup of a custom ${sport} jersey (a product photo of the garment on a white background). Their request: "${refinement}"`,
+        "Rewrite this as ONE precise image-edit instruction for an image model. Rules:",
+        "- The request refers to the JERSEY'S DESIGN (patterns, lettering, graphics, trim, colors) unless it explicitly mentions the photo, lighting, or background.",
+        "- Words like lighter/darker/softer/transparent mean the intensity of specific design elements, NOT the exposure of the photo or the whole garment.",
+        "- Name the specific element(s) to change and state that everything else stays identical.",
+        'Return ONLY JSON: { "instruction": string }',
+      ].join("\n"),
+      { type: "OBJECT", properties: { instruction: { type: "STRING" } }, required: ["instruction"] },
+    )) as { instruction?: string } | null;
+    if (interpreted?.instruction) instruction = interpreted.instruction.slice(0, 600);
+    // Guardrail 2: hard rules appended to every refinement.
+    parts.push({ text: `Edit this custom ${sport} jersey product mockup. ${instruction} STRICT RULES: the output must remain a crisp, full-contrast, professional product photo - floating ghost-mannequin, front view, pure white background, normal exposure and saturation. NEVER fade, wash out, blur, or change the brightness of the whole photo or the whole garment. Change ONLY the specific design elements mentioned; keep the fabric base color, lettering, fit, framing, and photo quality exactly as they are unless explicitly asked.` });
     parts.push({ inline_data: prev });
   } else {
     const reference = parseDataUrl(body.reference);
