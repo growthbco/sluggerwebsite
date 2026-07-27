@@ -15,6 +15,8 @@ export type SportPage = {
   deepDive: string[];
   /** Sport-specific FAQs (rendered + FAQPage JSON-LD). */
   faqs: { q: string; a: string }[];
+  /** Real product photos of gear we actually made (shown before gallery). */
+  realPhotos?: { src: string; alt: string }[];
 };
 
 export const SPORT_PAGES: SportPage[] = [
@@ -80,6 +82,7 @@ export const SPORT_PAGES: SportPage[] = [
       "Ocala and Central Florida basketball programs get free design proofs, honest per-piece pricing, and local pickup - AAU clubs nationwide get the same design work with shipping to your gym.",
     deepDive: ["Basketball programs love one thing above all: the reversible. Ours is $85 for a fully sublimated uniform with home colors on one side and away on the other - one purchase, two looks, no second order halfway through the season. AAU clubs run them all year.", "Standard jersey-and-shorts sets are fully custom too, from youth rec leagues to men's league teams that want to look like they mean it. Free design mockup first, per-player sizing through the roster link, and matching practice jerseys at $20 for scrimmage nights."],
     faqs: [{"q": "How much are custom basketball uniforms?", "a": "Reversible uniforms are $85 (two looks in one). Standard sublimated jerseys start at $28, with matching shorts and $20 practice jerseys available in the same design."}, {"q": "Do you outfit AAU teams outside Florida?", "a": "Yes - design and approval happen online, and we ship nationwide. Central Florida teams can pick up at our Ocala shop."}, {"q": "Can we get names and numbers on both sides of a reversible?", "a": "Numbers yes - both sides are fully sublimated, so numbers on each side are included in the price. We will lay it out in your free mockup."}],
+    realPhotos: [{ src: "/styles/basketball-reversible.jpg", alt: "Reversible custom basketball jersey - black side and royal blue MAVS side, made by Slugger Athletics" }],
   },
   {
     slug: "custom-soccer-uniforms",
@@ -101,6 +104,7 @@ export const SPORT_PAGES: SportPage[] = [
       "We outfit soccer clubs across Marion County and Central Florida with free design work, per-player roster entry, and local pickup - and ship kits to clubs nationwide.",
     deepDive: ["Soccer kits live and die on the details: the crest has to be crisp, the sponsor logos have to be right, and the keeper needs to stand out without looking like a different team. Because our kits are fully sublimated, crests, sponsors, and pattern work cost nothing extra - the whole design is dyed into the fabric in one pass.", "We build kits for clubs, schools, and adult leagues: jerseys from $28, shorts and custom socks to match, and keeper kits in contrast colors within the same design language. Free mockup first, sizes youth through 5X at one price."],
     faqs: [{"q": "How much does a custom soccer kit cost?", "a": "Jerseys start at $28 with crests, sponsors, names, and numbers included. Add shorts ($25) and custom socks ($15) for a full kit - bundle pricing available per player."}, {"q": "Are sponsor logos extra?", "a": "No - sublimation prints the whole design at once, so sponsor logos, crests, and patterns are included no matter how many you add."}, {"q": "Can you do goalkeeper kits?", "a": "Yes - keeper kits come in contrast colors within your team's design so the ref is happy and the kit still looks like yours."}],
+    realPhotos: [{ src: "/styles/soccer-kit-black.jpg", alt: "Custom sublimated soccer kit - black and white striped jersey and shorts made by Slugger Athletics" }, { src: "/styles/soccer-kit-blue.jpg", alt: "Custom sublimated soccer kit - royal blue and white youth jersey and shorts made by Slugger Athletics" }],
   },
   {
     slug: "custom-flag-football-uniforms",

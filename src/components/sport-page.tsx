@@ -9,9 +9,10 @@ import { BUNDLES, formatDollars } from "@/lib/pricing";
 // sport-specific copy, pricing, bundles, FAQs (with FAQPage schema), and the
 // two funnel CTAs. Shared by all /custom-<sport>-* pages.
 export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; photoOffset?: number }) {
-  // Rotate through the real-photo pool so each sport page shows different
-  // shots instead of all ten pages repeating the same five images.
-  const photos = [...galleryPhotos.slice(photoOffset), ...galleryPhotos.slice(0, photoOffset)].slice(0, 5);
+  // Real product shots of this sport's gear come first; the rotating gallery
+  // pool fills the remaining cells so each page still shows different shots.
+  const real = page.realPhotos ?? [];
+  const photos = [...galleryPhotos.slice(photoOffset), ...galleryPhotos.slice(0, photoOffset)].slice(0, Math.max(0, 5 - real.length));
 
   const jsonLd = [
     {
@@ -66,6 +67,12 @@ export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; 
             <Image src={page.mockup} alt={`${page.h1} - Slugger Athletics mockup`} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover" />
             <span className="absolute top-2 left-2 bg-brand text-on-brand display text-[10px] px-2 py-0.5">SLUGGER STYLE</span>
           </div>
+          {real.map((rp) => (
+            <div key={rp.src} className="relative aspect-square bg-white border border-brand/60 overflow-hidden">
+              <Image src={rp.src} alt={rp.alt} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover" />
+              <span className="absolute top-2 left-2 bg-brand text-on-brand display text-[10px] px-2 py-0.5">MADE BY US</span>
+            </div>
+          ))}
           {photos.map((ph) => (
             <div key={ph.id} className="relative aspect-square bg-steel border border-line overflow-hidden">
               <Image src={ph.file} alt={`${ph.alt} - custom ${page.sport.toLowerCase()} gear by Slugger Athletics`} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover" unoptimized />
