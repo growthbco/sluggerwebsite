@@ -30,6 +30,7 @@ export async function POST(req: Request) {
     teamName?: string;
     idea?: string;
     logo?: string; // data URL
+    reference?: string; // data URL of a jersey the customer likes
     previousImage?: string; // data URL, for refinements
     refinement?: string;
   } = {};
@@ -61,17 +62,28 @@ export async function POST(req: Request) {
     parts.push({ text: `Edit this custom ${sport} jersey mockup. Keep it a professional floating ghost-mannequin product shot on a pure white background, front view. Apply this change: ${refinement}` });
     parts.push({ inline_data: prev });
   } else {
+    const reference = parseDataUrl(body.reference);
+    const logo = parseDataUrl(body.logo);
     const prompt = [
       `Professional e-commerce product mockup of a fully custom sublimated ${sport} jersey, ${style} cut, floating ghost-mannequin style, front view, pure white background, studio lighting.`,
+      reference
+        ? `A REFERENCE JERSEY image is provided: recreate its overall design language - layout, paneling, stripe/graphic placement, and general vibe - as a NEW original design (do not copy logos or team names from the reference).`
+        : "",
       `Primary color ${clean(body.primaryColor, 30) || "black"}, accent color ${clean(body.secondaryColor, 30) || "gold"}.`,
       teamName ? `The team name "${teamName}" appears across the chest in bold athletic lettering, spelled exactly: ${teamName}.` : "",
       idea ? `Design direction from the customer: ${idea}.` : "",
-      body.logo ? "Incorporate the provided team logo naturally into the design (chest or sleeve)." : "",
+      logo ? "A TEAM LOGO image is also provided: incorporate that logo naturally into the design (chest or sleeve), keeping it recognizable." : "",
       "Make it look like a premium, print-ready team uniform design - tasteful, modern, athletic. No mannequin, no human, no watermark, no extra text besides the jersey design itself.",
     ].filter(Boolean).join(" ");
     parts.push({ text: prompt });
-    const logo = parseDataUrl(body.logo);
-    if (logo) parts.push({ inline_data: logo });
+    if (reference) {
+      parts.push({ text: "REFERENCE JERSEY (style inspiration):" });
+      parts.push({ inline_data: reference });
+    }
+    if (logo) {
+      parts.push({ text: "TEAM LOGO (incorporate this):" });
+      parts.push({ inline_data: logo });
+    }
   }
 
   try {
