@@ -79,7 +79,7 @@ const FAQS = [
   },
   {
     q: "How long do custom hats take?",
-    a: "Hats are embroidered right here in our Ocala shop, so turnaround is quick - smaller orders are often ready in just days, larger runs about a week or two. Rush options are available if you're on a deadline.",
+    a: "Hats are embroidered right here in our Ocala shop. When we have your hat style and colors in stock, orders are usually ready in a couple of days; if we need to order the blank hats in, plan on about a week or so. Rush options are available if you're on a deadline.",
   },
   {
     q: "What logo file do I need?",
@@ -134,7 +134,8 @@ export default function CustomHatsPage() {
           <strong className="text-foreground">6-hat minimum per design</strong>. Your mockup is
           free. If we create the stitch-ready embroidery file from your logo there is a one-time
           digitizing fee - or bring your own embroidery file and skip it. Every hat is embroidered
-          right here in our Ocala shop, so orders are often ready in just days.
+          right here in our Ocala shop - in-stock styles are usually ready in a couple of days
+          (about a week if we need to order your blanks in).
         </p>
         <div className="mt-8 flex flex-wrap gap-4 justify-center">
           <Link href="/team-order" className="clip-slant bg-brand text-on-brand display text-lg px-8 py-4 hover:bg-brand-dark transition-colors">

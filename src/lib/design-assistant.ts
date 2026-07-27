@@ -141,7 +141,7 @@ function buildGrounding(design: DesignContext, order: OrderContext | null, messa
         ]
       : []),
     "",
-    "PRICE LIST (per piece, plus tax, design included; ALL custom orders - INCLUDING embroidered hats - have a 6-piece minimum per design. HAT FEES: the mockup is FREE; creating the stitch-ready embroidery file from a logo carries a one-time digitizing fee - customers who bring their own embroidery file (DST/EMB) skip that fee entirely. Hats are embroidered in-house so they turn around fast, but the 6-hat minimum always applies):",
+    "PRICE LIST (per piece, plus tax, design included; ALL custom orders - INCLUDING embroidered hats - have a 6-piece minimum per design. HAT FEES: the mockup is FREE; creating the stitch-ready embroidery file from a logo carries a one-time digitizing fee - customers who bring their own embroidery file (DST/EMB) skip that fee entirely. Hats are embroidered in-house: when the blank hats are in stock they are usually ready in a COUPLE OF DAYS; if the blanks must be ordered in, about a WEEK or so. The 6-hat minimum always applies):",
     priceList,
     "",
     "2026 BUNDLES (per player, plus tax - suggest the matching bundle when someone is pricing multiple pieces, especially Home & Away when they only mention jerseys):",

@@ -24,7 +24,7 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
         name: "Custom Embroidered Hats",
         price: "From $25",
         description:
-          "Fitted, snapback, and trucker hats embroidered with your logo - 6-hat minimum per design. Free mockup; a one-time digitizing fee applies if we create the embroidery file, or bring your own stitch file and skip it. Embroidered in-house in our Ocala shop - smaller orders are often ready in just days.",
+          "Fitted, snapback, and trucker hats embroidered with your logo - 6-hat minimum per design. Free mockup; a one-time digitizing fee applies if we create the embroidery file, or bring your own stitch file and skip it. Embroidered in-house in our Ocala shop - in-stock styles are usually ready in a couple of days, about a week if we order your blanks in.",
         href: "/custom-hats",
       },
       {
