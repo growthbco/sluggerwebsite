@@ -11,6 +11,8 @@ type StoreItem = {
   nameNumber?: boolean;
   numberAddOnCents?: number;
   weightOz: number;
+  /** Optional product photo for the card. */
+  image?: string;
   /** Approved colorways the buyer chooses between (teams with multiple designs). */
   designs?: { label: string; image: string }[];
 };
@@ -55,6 +57,8 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
   // Flash "✓ Added" on the tapped button - on phones the order summary is
   // below the fold, so the button itself must confirm the add.
   const [justAdded, setJustAdded] = useState("");
+  // Product-card grid: tapping a card opens the customize modal for that item.
+  const [activeKey, setActiveKey] = useState<string | null>(null);
   // Optional ZIP -> live carrier rate shown before checkout.
   const [zip, setZip] = useState("");
   const [shipQuote, setShipQuote] = useState<{ amountCents: number; live: boolean; place?: string } | null>(null);
@@ -120,6 +124,7 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
     setError("");
     setJustAdded(item.key);
     setTimeout(() => setJustAdded((k) => (k === item.key ? "" : k)), 1500);
+    setActiveKey(null);
   }
 
   const [rush, setRush] = useState(false);
@@ -187,113 +192,38 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
             />
           </div>
         </details>
-        <div className="grid sm:grid-cols-2 gap-4 content-start">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 content-start">
         {items.map((item) => {
           const d = draft(item.key, item.sizes);
+          const cardImg = item.designs?.find((dz) => dz.label === d.design)?.image ?? item.designs?.[0]?.image ?? item.image;
           return (
-            <div key={item.key} className="bg-steel border border-line p-4 flex flex-col hover:border-brand/40 transition-colors">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="grid place-items-center h-10 w-10 bg-ink border border-line text-xl shrink-0" aria-hidden>
-                    {ITEM_ICONS[item.key] ?? "👕"}
-                  </span>
-                  <h3 className="display text-foreground leading-tight">{item.label}</h3>
-                </div>
-                <p className="display text-xl text-brand shrink-0">{money(item.priceCents)}</p>
-              </div>
-
-              <div className="mt-3 space-y-2 flex-1">
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setActiveKey(item.key)}
+              className="group bg-steel border border-line hover:border-brand/60 transition-colors text-left flex flex-col"
+            >
+              <div className="relative aspect-square bg-white overflow-hidden grid place-items-center">
+                {cardImg ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={cardImg} alt={item.label} className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105" />
+                ) : (
+                  <span className="text-6xl" aria-hidden>{ITEM_ICONS[item.key] ?? "👕"}</span>
+                )}
                 {(item.designs?.length ?? 0) > 1 && (
-                  <div className="mb-3">
-                    <p className="display text-xs text-muted tracking-wide mb-1.5">PICK YOUR DESIGN</p>
-                    <div className="flex gap-2 overflow-x-auto pb-1">
-                      {item.designs!.map((dz) => {
-                        const active = (d.design ?? item.designs![0].label) === dz.label;
-                        return (
-                          <button
-                            key={dz.label}
-                            type="button"
-                            onClick={() => setDraft(item.key, { design: dz.label })}
-                            className={`shrink-0 w-24 text-left border-2 rounded overflow-hidden ${active ? "border-brand" : "border-line opacity-75 hover:opacity-100"}`}
-                            aria-pressed={active}
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={dz.image} alt={dz.label} className="h-16 w-full object-contain bg-white" />
-                            <span className={`block px-1.5 py-1 text-[11px] leading-tight ${active ? "text-brand" : "text-muted"}`}>{dz.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <span className="absolute top-2 left-2 bg-brand text-on-brand display text-[10px] px-2 py-0.5">{item.designs!.length} DESIGNS</span>
                 )}
-                <select
-                  value={d.size}
-                  onChange={(e) => setDraft(item.key, { size: e.target.value })}
-                  className="w-full bg-ink border border-line px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
-                  aria-label={`${item.label} size`}
-                >
-                  {item.sizes.map((s) => (
-                    <option key={s} value={s}>
-                      Size: {s}
-                    </option>
-                  ))}
-                </select>
-                {item.nameNumber && (
-                  <div className="flex gap-2">
-                    <input
-                      value={d.playerName}
-                      onChange={(e) => setDraft(item.key, { playerName: e.target.value })}
-                      placeholder="Name (optional)"
-                      maxLength={30}
-                      className="flex-1 min-w-0 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-                    />
-                    <input
-                      value={d.playerNumber}
-                      onChange={(e) => setDraft(item.key, { playerNumber: e.target.value })}
-                      placeholder="#"
-                      maxLength={4}
-                      className="w-14 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-                    />
-                  </div>
-                )}
-                {!item.nameNumber ? (
-                  <>
-                    <div className="flex gap-2">
-                      <input
-                        value={d.playerName}
-                        onChange={(e) => setDraft(item.key, { playerName: e.target.value })}
-                        placeholder="Optional: who's this for?"
-                        maxLength={30}
-                        className="flex-1 min-w-0 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-                      />
-                      {item.numberAddOnCents ? (
-                        <input
-                          value={d.playerNumber}
-                          onChange={(e) => setDraft(item.key, { playerNumber: e.target.value.replace(/[^0-9]/g, "").slice(0, 4) })}
-                          placeholder="#"
-                          maxLength={4}
-                          className="w-16 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-                        />
-                      ) : null}
-                    </div>
-                    <p className="text-xs text-muted">
-                      Name is just so you know whose it is - it won&apos;t be printed.
-                      {item.numberAddOnCents
-                        ? ` Want a number embroidered on the back? Enter it in the # box (+${money(item.numberAddOnCents)}). Leave blank for none.`
-                        : ""}
-                    </p>
-                  </>
-                ) : null}
               </div>
-
-              <button
-                type="button"
-                onClick={() => add(item)}
-                className="mt-3 w-full clip-slant bg-brand text-on-brand display text-sm px-5 py-2.5 hover:bg-brand-dark"
-              >
-                {justAdded === item.key ? "✓ Added to order" : "Add to order"}
-              </button>
-            </div>
+              <div className="p-3 flex-1 flex flex-col">
+                <h3 className="display text-sm sm:text-base text-foreground leading-tight">{item.label}</h3>
+                <div className="mt-auto pt-2 flex items-center justify-between gap-2">
+                  <p className="display text-lg text-brand">{money(item.priceCents)}</p>
+                  <span className="display text-[11px] tracking-wide text-muted group-hover:text-brand transition-colors">
+                    {justAdded === item.key ? "✓ ADDED" : "CUSTOMIZE →"}
+                  </span>
+                </div>
+              </div>
+            </button>
           );
         })}
         </div>
@@ -401,6 +331,123 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
           Made to order in your team&apos;s design · 2-3 week turnaround after the batch closes
         </p>
       </aside>
+
+      {/* Customize modal: options only appear for the product being added. */}
+      {(() => {
+        const item = items.find((i) => i.key === activeKey);
+        if (!item) return null;
+        const d = draft(item.key, item.sizes);
+        const previewImg = item.designs?.find((dz) => dz.label === (d.design ?? item.designs?.[0]?.label))?.image ?? item.designs?.[0]?.image ?? item.image;
+        return (
+          <div className="fixed inset-0 z-[70] bg-black/75 grid place-items-center p-3 sm:p-6" onClick={() => setActiveKey(null)}>
+            <div
+              className="w-full max-w-lg max-h-[92vh] overflow-y-auto bg-ink border border-brand/60 rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-line bg-steel sticky top-0">
+                <h3 className="display text-lg text-foreground">{item.label}</h3>
+                <div className="flex items-center gap-3">
+                  <p className="display text-xl text-brand">{money(item.priceCents)}</p>
+                  <button type="button" onClick={() => setActiveKey(null)} aria-label="Close" className="h-8 w-8 grid place-items-center border border-line text-foreground hover:bg-foreground/10 rounded">✕</button>
+                </div>
+              </div>
+              {previewImg && (
+                <div className="bg-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={previewImg} alt={item.label} className="w-full max-h-56 object-contain" />
+                </div>
+              )}
+              <div className="p-4 space-y-3">
+                {(item.designs?.length ?? 0) > 1 && (
+                  <div>
+                    <p className="display text-xs text-muted tracking-wide mb-1.5">PICK YOUR DESIGN</p>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {item.designs!.map((dz) => {
+                        const active = (d.design ?? item.designs![0].label) === dz.label;
+                        return (
+                          <button
+                            key={dz.label}
+                            type="button"
+                            onClick={() => setDraft(item.key, { design: dz.label })}
+                            className={`shrink-0 w-24 text-left border-2 rounded overflow-hidden ${active ? "border-brand" : "border-line opacity-75 hover:opacity-100"}`}
+                            aria-pressed={active}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={dz.image} alt={dz.label} className="h-16 w-full object-contain bg-white" />
+                            <span className={`block px-1.5 py-1 text-[11px] leading-tight ${active ? "text-brand" : "text-muted"}`}>{dz.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <select
+                  value={d.size}
+                  onChange={(e) => setDraft(item.key, { size: e.target.value })}
+                  className="w-full bg-steel border border-line px-3 py-2.5 text-base sm:text-sm text-foreground focus:border-brand focus:outline-none"
+                  aria-label={`${item.label} size`}
+                >
+                  {item.sizes.map((sz) => (
+                    <option key={sz} value={sz}>Size: {sz}</option>
+                  ))}
+                </select>
+                {item.nameNumber ? (
+                  <div className="flex gap-2">
+                    <input
+                      value={d.playerName}
+                      onChange={(e) => setDraft(item.key, { playerName: e.target.value })}
+                      placeholder="Name on back (optional)"
+                      maxLength={30}
+                      className="flex-1 min-w-0 bg-steel border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                    />
+                    <input
+                      value={d.playerNumber}
+                      onChange={(e) => setDraft(item.key, { playerNumber: e.target.value })}
+                      placeholder="#"
+                      maxLength={4}
+                      className="w-16 bg-steel border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex gap-2">
+                      <input
+                        value={d.playerName}
+                        onChange={(e) => setDraft(item.key, { playerName: e.target.value })}
+                        placeholder="Optional: who's this for?"
+                        maxLength={30}
+                        className="flex-1 min-w-0 bg-steel border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                      />
+                      {item.numberAddOnCents ? (
+                        <input
+                          value={d.playerNumber}
+                          onChange={(e) => setDraft(item.key, { playerNumber: e.target.value.replace(/[^0-9]/g, "").slice(0, 4) })}
+                          placeholder="#"
+                          maxLength={4}
+                          className="w-16 bg-steel border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                        />
+                      ) : null}
+                    </div>
+                    <p className="text-xs text-muted">
+                      Name is just so you know whose it is - it won&apos;t be printed.
+                      {item.numberAddOnCents
+                        ? ` Number embroidered on the back adds ${money(item.numberAddOnCents)} - leave blank for none.`
+                        : ""}
+                    </p>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => add(item)}
+                  className="w-full clip-slant bg-brand text-on-brand display text-lg px-5 py-3 hover:bg-brand-dark"
+                >
+                  Add to order - {money(item.priceCents)}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

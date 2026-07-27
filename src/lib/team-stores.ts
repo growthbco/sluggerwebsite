@@ -19,6 +19,8 @@ export type StoreItem = {
   numberAddOnCents?: number;
   /** Approx shipping weight in ounces; drives the weight-based ship fee. */
   weightOz: number;
+  /** Optional product photo for the card. */
+  image?: string;
   /** Optional approved colorways buyers pick between. */
   designs?: { label: string; image: string }[];
 };

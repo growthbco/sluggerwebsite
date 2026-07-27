@@ -230,6 +230,7 @@ export const teams = pgTable(
         numberAddOnCents?: number;
         weightOz: number;
         designs?: { label: string; image: string }[];
+        image?: string;
       }>
     >(),
 

@@ -100,15 +100,6 @@ export default async function TeamStorePage({ params }: { params: Promise<{ toke
         ))}
       </div>
 
-      {galleryImages.length > 0 && (
-        <section className="mt-10">
-          <h2 className="display text-xl text-foreground text-center">Your team&apos;s design</h2>
-          <p className="text-sm text-muted text-center mt-1">Everything you order comes in this look. Tap the thumbnails for more views.</p>
-          <div className="mt-4">
-            <ProofGallery images={galleryImages} teamName={store.name} />
-          </div>
-        </section>
-      )}
 
       <section className="mt-10">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -119,6 +110,16 @@ export default async function TeamStorePage({ params }: { params: Promise<{ toke
           <TeamStoreShop token={token} items={store.storeItems ?? []} />
         </div>
       </section>
+
+      {galleryImages.length > 0 && (
+        <section className="mt-10">
+          <h2 className="display text-xl text-foreground text-center">The full design collection</h2>
+          <p className="text-sm text-muted text-center mt-1">Every piece is made in your team&apos;s custom designs. Tap to view up close.</p>
+          <div className="mt-4">
+            <ProofGallery images={galleryImages} teamName={store.name} />
+          </div>
+        </section>
+      )}
 
       <details id="size-charts" className="mt-12 border border-line bg-steel group">
         <summary className="flex cursor-pointer items-center justify-between px-5 py-4 list-none">
