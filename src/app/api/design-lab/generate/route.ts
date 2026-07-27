@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/admin-auth";
 import { generateJson } from "@/lib/design-assistant";
 import { put } from "@vercel/blob";
+import sharp from "sharp";
 import { eq, sql } from "drizzle-orm";
 import { getDb, dbEnabled } from "@/db";
 import { designLabVisitors } from "@/db/schema";
@@ -172,7 +173,31 @@ export async function POST(req: Request) {
     );
     const payload = img?.inlineData ?? img?.inline_data;
     if (!payload?.data) return NextResponse.json({ error: "No image came back - try rewording" }, { status: 502 });
-    const mime = payload.mimeType ?? payload.mime_type ?? "image/png";
+    // Bake a diagonal SLUGGER ATHLETICS watermark into every concept so the
+    // artwork can't be shopped to another printer; the clean version only
+    // ever exists as the designer's real proof.
+    let outB64 = payload.data as string;
+    let mime = payload.mimeType ?? payload.mime_type ?? "image/png";
+    try {
+      const src = sharp(Buffer.from(outB64, "base64"));
+      const { width = 1024, height = 768 } = await src.metadata();
+      const wm = Buffer.from(
+        `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="p" width="420" height="180" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
+              <text x="0" y="90" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" fill="#555555" fill-opacity="0.16">SLUGGER ATHLETICS · CONCEPT</text>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#p)"/>
+        </svg>`,
+      );
+      const stamped = await src.composite([{ input: wm }]).png().toBuffer();
+      outB64 = stamped.toString("base64");
+      mime = "image/png";
+    } catch (e) {
+      console.error("watermark failed (returning unstamped):", e);
+    }
+    payload.data = outB64;
     console.log(`design-lab generation #${used} today (~$${(used * 0.134).toFixed(2)} spent)`);
     // Persist every render (fire-and-forget) so there's a reviewable history.
     try {

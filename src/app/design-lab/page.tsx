@@ -16,7 +16,7 @@ export default async function DesignLabPage({ searchParams }: { searchParams: Pr
       <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">AI Jersey Design Lab</h1>
       <p className="mt-3 text-muted max-w-2xl">
         Describe the uniform, drop in a logo or even a hand-drawn sketch, and see a concept in
-        seconds. Each generation costs about 13 cents; the daily cap is 60.
+        seconds - front and back, in your exact colors.
       </p>
       <div className="mt-10">
         <DesignLab testKey={key} ladder={ladder === "1"} paidJustNow={paid === "1"} />

@@ -250,7 +250,6 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
             </button>
           </div>
         )}
-        {usage && <p className="text-xs text-muted">{usage.used}/{usage.cap} generations today (~${(usage.used * 0.134).toFixed(2)} spent)</p>}
       </div>
 
       {/* Result */}
