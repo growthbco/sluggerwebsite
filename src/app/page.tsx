@@ -87,7 +87,7 @@ export default function Home() {
               </Link>
             </div>
             <p className="mt-4 text-sm">
-              <Link href="/jersey-maker" className="text-brand hover:underline underline-offset-4 display">
+              <Link href="/custom-jersey-maker" className="text-brand hover:underline underline-offset-4 display">
                 ⚡ NEW: Design your jersey with AI - see it in seconds →
               </Link>
               <span className="mx-2 text-muted">·</span>

@@ -55,7 +55,7 @@ export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; 
           <Link href="/pricing" className="border border-brand/70 text-foreground hover:bg-brand/10 display px-6 py-3 transition-colors">
             See 2026 Pricing
           </Link>
-          <Link href="/jersey-maker" className="border border-brand/70 text-brand hover:bg-brand/10 display px-6 py-3 transition-colors">
+          <Link href="/custom-jersey-maker" className="border border-brand/70 text-brand hover:bg-brand/10 display px-6 py-3 transition-colors">
             ⚡ Try the AI Design Lab
           </Link>
         </div>

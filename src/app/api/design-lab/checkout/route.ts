@@ -15,7 +15,7 @@ export async function POST(req: Request) {
 
   let body: { returnTo?: string } = {};
   try { body = await req.json(); } catch {}
-  const returnTo = typeof body.returnTo === "string" && body.returnTo.startsWith("/") ? body.returnTo : "/jersey-maker";
+  const returnTo = typeof body.returnTo === "string" && body.returnTo.startsWith("/") ? body.returnTo : "/custom-jersey-maker";
 
   const stripe = getStripe();
   const session = await stripe.checkout.sessions.create({

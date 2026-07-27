@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: "Custom Jersey Maker - Design Your Own Jersey Free",
   description:
     "Free custom jersey maker: pick your sport and colors, describe your idea, upload a logo or sketch, and see your custom jersey - front and back - in seconds. Our real designer then makes it production-ready.",
-  alternates: { canonical: "/jersey-maker" },
+  alternates: { canonical: "/custom-jersey-maker" },
 };
 
 export default async function DesignLabPage({ searchParams }: { searchParams: Promise<{ key?: string; ladder?: string; paid?: string }> }) {

@@ -10,7 +10,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "", "/team-uniforms", "/embroidery", "/custom-hats", "/hype-chains", "/gallery",
     "/team-order", "/services", "/pricing", "/track", "/size-guide", "/faq", "/contact", "/shipping", "/returns",
     "/privacy", "/terms",
-    "/custom-sublimated-jerseys", "/custom-practice-jerseys", "/design", "/jersey-maker", "/team-stores",
+    "/custom-sublimated-jerseys", "/custom-practice-jerseys", "/design", "/custom-jersey-maker", "/team-stores",
     ...SPORT_PAGES.map((p) => `/${p.slug}`),
     ...SERVICE_AREAS.map((a) => `/custom-uniforms/${a.slug}`),
   ];

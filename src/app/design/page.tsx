@@ -17,7 +17,7 @@ export default function DesignPage() {
         <span className="display text-brand text-sm">Free with Order</span>
         <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">Start Your Design</h1>
         <div className="mt-6 max-w-2xl">
-          <Link href="/jersey-maker" className="block bg-brand/10 border border-brand/60 hover:bg-brand/20 p-5 transition-colors">
+          <Link href="/custom-jersey-maker" className="block bg-brand/10 border border-brand/60 hover:bg-brand/20 p-5 transition-colors">
             <span className="display text-[11px] tracking-wider text-brand">⚡ NEW - IMPATIENT? TRY THIS</span>
             <p className="display text-xl sm:text-2xl mt-1 text-foreground">Design It Yourself With AI →</p>
             <p className="text-sm text-muted mt-1">Pick colors, describe your idea, see a front-and-back concept in seconds - then our designer makes it real. Free to try.</p>
