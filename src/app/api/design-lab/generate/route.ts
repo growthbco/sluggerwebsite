@@ -19,22 +19,42 @@ const DAILY_CAP = 150;
 let dayStamp = "";
 let used = 0;
 
-// Dark version of the Slugger logo for tiling over white mockups; fetched
-// once per instance from the site's own public asset.
-let darkLogoB64: string | null = null;
-async function getDarkLogo(): Promise<string | null> {
-  if (darkLogoB64) return darkLogoB64;
+// Full-color Slugger logo for the background watermark; fetched once per
+// instance from the site's own public asset.
+let logoB64: string | null = null;
+async function getLogo(): Promise<string | null> {
+  if (logoB64) return logoB64;
   try {
     const site = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
     const res = await fetch(`${site}/slugger-logo.png`);
     if (!res.ok) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    const dark = await sharp(buf).negate({ alpha: false }).png().toBuffer();
-    darkLogoB64 = dark.toString("base64");
-    return darkLogoB64;
+    logoB64 = Buffer.from(await res.arrayBuffer()).toString("base64");
+    return logoB64;
   } catch {
     return null;
   }
+}
+
+// Background mask via flood fill from the image borders: marks near-white
+// pixels connected to the edge, so the watermark lands BEHIND the jersey
+// (background only) and never covers the garment or its soft shadow.
+function backgroundMask(rgba: Buffer, width: number, height: number): Uint8Array {
+  const mask = new Uint8Array(width * height);
+  const nearWhite = (i: number) => rgba[i * 4] >= 240 && rgba[i * 4 + 1] >= 240 && rgba[i * 4 + 2] >= 240;
+  const stack: number[] = [];
+  for (let x = 0; x < width; x++) { stack.push(x, (height - 1) * width + x); }
+  for (let y = 0; y < height; y++) { stack.push(y * width, y * width + width - 1); }
+  while (stack.length) {
+    const i = stack.pop()!;
+    if (mask[i] || !nearWhite(i)) continue;
+    mask[i] = 1;
+    const x = i % width;
+    if (x > 0) stack.push(i - 1);
+    if (x < width - 1) stack.push(i + 1);
+    if (i >= width) stack.push(i - width);
+    if (i < width * (height - 1)) stack.push(i + width);
+  }
+  return mask;
 }
 
 function checkCap(): boolean {
@@ -210,23 +230,44 @@ export async function POST(req: Request) {
     let outB64 = payload.data as string;
     let mime = payload.mimeType ?? payload.mime_type ?? "image/png";
     try {
-      const src = sharp(Buffer.from(outB64, "base64"));
-      const { width = 1024, height = 768 } = await src.metadata();
-      const logo = await getDarkLogo();
-      const tile = logo
-        ? `<image href="data:image/png;base64,${logo}" x="20" y="30" width="240" opacity="0.09"/>`
-        : `<text x="0" y="90" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" fill="#555555" fill-opacity="0.14">SLUGGER ATHLETICS · CONCEPT</text>`;
-      const wm = Buffer.from(
-        `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="p" width="380" height="300" patternUnits="userSpaceOnUse" patternTransform="rotate(-22)">
-              ${tile}
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#p)"/>
-        </svg>`,
-      );
-      const stamped = await src.composite([{ input: wm }]).png().toBuffer();
+      const srcBuf = Buffer.from(outB64, "base64");
+      const srcSharp = sharp(srcBuf);
+      const { width = 1200, height = 900 } = await srcSharp.metadata();
+      const logo = await getLogo();
+      let overlay: Buffer;
+      if (logo) {
+        // Colored logo tiled across the whole frame...
+        const wmSvg = Buffer.from(
+          `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="p" width="400" height="320" patternUnits="userSpaceOnUse" patternTransform="rotate(-18)">
+                <image href="data:image/png;base64,${logo}" x="20" y="40" width="280" opacity="0.5"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#p)"/>
+          </svg>`,
+        );
+        const wmRaw = Buffer.from(await sharp(wmSvg).ensureAlpha().raw().toBuffer());
+        // ...then masked to the background only, so it sits BEHIND the jersey.
+        const srcRaw = await sharp(srcBuf).ensureAlpha().raw().toBuffer();
+        const mask = backgroundMask(srcRaw, width, height);
+        for (let i = 0; i < mask.length; i++) {
+          if (!mask[i]) wmRaw[i * 4 + 3] = 0;
+        }
+        overlay = await sharp(wmRaw, { raw: { width, height, channels: 4 } }).png().toBuffer();
+      } else {
+        overlay = Buffer.from(
+          `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="p" width="420" height="180" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
+                <text x="0" y="90" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" fill="#555555" fill-opacity="0.14">SLUGGER ATHLETICS · CONCEPT</text>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#p)"/>
+          </svg>`,
+        );
+      }
+      const stamped = await sharp(srcBuf).composite([{ input: overlay }]).png().toBuffer();
       outB64 = stamped.toString("base64");
       mime = "image/png";
     } catch (e) {
