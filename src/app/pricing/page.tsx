@@ -19,7 +19,7 @@ export default function PricingPage() {
         <p className="mt-3 text-muted">
           The price you see is the price per piece - custom design included, no
           surprises. Custom orders start at 6 pieces per design; order 6 or 60, it&apos;s
-          the same per-piece rate. Embroidered hats have no minimum.
+          the same per-piece rate. The 6-piece minimum includes embroidered hats.
         </p>
         <p className="mt-2 text-xs text-muted">
           Prices shown are our 2026 rates. We review pricing as material costs, shipping

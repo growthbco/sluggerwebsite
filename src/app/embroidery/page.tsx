@@ -137,7 +137,7 @@ export default function EmbroideryPage() {
           Marion County and Central Florida - including The Villages, Gainesville, and
           surrounding areas. Looking for <strong className="text-foreground">embroidery in Ocala</strong>?
           We make custom embroidered hats and apparel easy - and if you&apos;re outside Florida,
-          we ship <Link href="/custom-hats" className="text-brand hover:underline">custom embroidered hats with no minimum</Link> nationwide.
+          we ship <Link href="/custom-hats" className="text-brand hover:underline">custom embroidered hats</Link> nationwide.
         </p>
         <p className="mt-6 text-muted">
           Call <a href="tel:+13526601232" className="text-brand hover:underline">352-660-1232</a> or

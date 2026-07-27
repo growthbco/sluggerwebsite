@@ -79,7 +79,7 @@ export default function TeamUniformsPage() {
             . Searching for <strong className="text-foreground">custom team uniforms in Ocala</strong>? We make
             full team ordering simple with player self-entry rosters. Top off the look with{" "}
             <a href="/custom-hats" className="text-brand hover:underline">custom embroidered hats</a> -
-            no minimum on hats, with matching player numbers.
+            hats starting at just 6 per design, with matching player numbers.
           </>
         }
         jsonLd={{

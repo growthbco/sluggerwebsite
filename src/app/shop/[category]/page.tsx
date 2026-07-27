@@ -55,7 +55,7 @@ export default async function CategoryPage({
         <div className="mt-12 bg-steel border border-line p-6 text-center">
           <h2 className="display text-xl text-foreground">Want your own logo on a hat?</h2>
           <p className="mt-2 text-muted text-sm max-w-xl mx-auto">
-            We make <Link href="/custom-hats" className="text-brand hover:underline">custom embroidered hats with no minimum order</Link> -
+            We make <Link href="/custom-hats" className="text-brand hover:underline">custom embroidered hats stitched in-house in Ocala</Link> -
             fitted Flexfit, snapback, and trucker styles from $25 with free logo digitizing.
             In Central Florida? See our <Link href="/embroidery" className="text-brand hover:underline">embroidery services in Ocala</Link>.
           </p>

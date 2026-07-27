@@ -24,7 +24,7 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
         name: "Custom Embroidered Hats",
         price: "From $25",
         description:
-          "Fitted, snapback, and trucker hats embroidered with your logo - no minimum order. Free logo digitizing and a free proof before we stitch. Embroidered in-house in our Ocala shop - smaller orders are often ready in just days.",
+          "Fitted, snapback, and trucker hats embroidered with your logo - 6-hat minimum per design. The design fee covers logo digitizing and a stitched proof before we run anything. Embroidered in-house in our Ocala shop - smaller orders are often ready in just days.",
         href: "/custom-hats",
       },
       {
@@ -45,7 +45,7 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
         name: "Custom Trucker Hats",
         price: "$25",
         description:
-          "Classic mesh-back trucker caps embroidered with your design. Great for leagues, tournaments, businesses, and giveaways - no minimum order.",
+          "Classic mesh-back trucker caps embroidered with your design. Great for leagues, tournaments, businesses, and giveaways - 6-hat minimum per design.",
         href: "/custom-hats",
       },
       {
@@ -73,7 +73,7 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
         name: "Logo Digitizing",
         price: "Free",
         description:
-          "We convert your logo into stitch-ready embroidery files in-house at no charge. Send a PNG, JPG, PDF, or even a photo - you approve a free proof before we stitch anything.",
+          "We convert your logo into stitch-ready embroidery files in-house - covered by the design fee. Send a PNG, JPG, PDF, or even a photo - you approve a proof before we stitch anything.",
         href: "/embroidery",
       },
       {

@@ -296,11 +296,9 @@ export function DesignIntakeForm() {
         </div>
         {estimatedPieces === "1-5" && (
           <p className="mt-3 text-sm bg-brand/10 border border-brand/40 text-foreground p-3">
-            Heads up: custom orders start at 6 pieces per design, so we may not be able to
-            take this on below that. If you only need a piece or two,{" "}
-            <a href="/custom-hats" className="text-brand underline">custom embroidered hats</a> have
-            truly no minimum, and our <a href="/shop" className="text-brand underline">shop</a> and
-            drops are single-piece friendly. Growing roster? Pick the range you expect to end up at.
+            Heads up: custom orders - including embroidered hats - start at 6 pieces per
+            design, so we may not be able to take this on below that. Growing roster? Pick the
+            range you expect to end up at.
           </p>
         )}
       </div>

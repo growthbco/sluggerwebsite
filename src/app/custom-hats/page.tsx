@@ -6,26 +6,26 @@ import { byCategory, primaryImage } from "@/lib/catalog";
 export const metadata: Metadata = {
   // Keep the pre-template title under ~45 chars: the layout appends
   // "| Slugger Athletics" and Google truncates around 60.
-  title: "Custom Embroidered Hats - No Minimum Order",
+  title: "Custom Embroidered Hats - In-House in Ocala",
   description:
-    "Custom embroidered hats with no minimum order. Flexfit caps, snapbacks, and truckers stitched in-house in Ocala for quick turnaround - free proof, from $25.",
+    "Custom embroidered hats from $25 - Flexfit caps, snapbacks, and truckers stitched in-house in Ocala for quick turnaround. 6-hat minimum per design.",
   openGraph: {
-    title: "Custom Embroidered Hats - No Minimum Order",
+    title: "Custom Embroidered Hats - In-House in Ocala",
     description:
-      "Fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo. Free digitizing, free proof, from $25 - no minimums.",
+      "Fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo - from $25, stitched in-house for fast turnaround.",
     type: "website",
     url: "/custom-hats",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Custom Embroidered Hats - No Minimum Order",
+    title: "Custom Embroidered Hats - In-House in Ocala",
     description:
-      "Fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo. Free digitizing, free proof, from $25 - no minimums.",
+      "Fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo - from $25, stitched in-house for fast turnaround.",
   },
   keywords: [
     "custom embroidered hats",
-    "custom embroidered hats no minimum",
-    "custom hats no minimum",
+    "custom embroidered hats Ocala",
+    "custom team hats",
     "custom fitted hats",
     "custom snapback hats",
     "custom embroidered trucker hats",
@@ -63,15 +63,15 @@ const STYLES = [
 const FAQS = [
   {
     q: "Is there a minimum order for custom embroidered hats?",
-    a: "No. We embroider custom hats with no minimum order - buy one hat or outfit a whole roster. The price stays the same flat $25-30 per hat either way.",
+    a: "Custom embroidered hats start at 6 hats per design - same as the rest of our custom gear, since every design takes real digitizing and setup. The price stays a flat $25-30 per hat whether you order 6 or 60.",
   },
   {
     q: "How much do custom embroidered hats cost?",
-    a: "Snapback and trucker hats are $25, fitted Flexfit hats are $30, and an embroidered number on the back adds $5. Logo digitizing, the design work, and your proof are all free - no setup fees.",
+    a: "Snapback and trucker hats are $25, fitted Flexfit hats are $30, and an embroidered number on the back adds $5. Our one-time design fee covers the logo digitizing, design work, and your proof.",
   },
   {
     q: "Do you charge a digitizing or setup fee?",
-    a: "No. Our in-house team digitizes your logo for embroidery at no charge, and you approve a free proof before we stitch anything.",
+    a: "There is a one-time design fee per design - it covers digitizing your logo for embroidery and the proof you approve before we stitch anything. No other setup fees.",
   },
   {
     q: "Can you do 3D puff embroidery?",
@@ -83,7 +83,7 @@ const FAQS = [
   },
   {
     q: "What logo file do I need?",
-    a: "Anything works - a PNG, JPG, PDF, or even a photo of your old gear. We redraw and digitize it for stitching, free of charge, and you approve the result before production.",
+    a: "Anything works - a PNG, JPG, PDF, or even a photo of your old gear. We redraw and digitize it for stitching (covered by the design fee), and you approve the result before production.",
   },
 ];
 
@@ -96,7 +96,7 @@ export default function CustomHatsPage() {
       "@type": "Product",
       name: "Custom Embroidered Hats",
       description:
-        "Custom embroidered fitted, snapback, and trucker hats with no minimum order. Free logo digitizing and proof.",
+        "Custom embroidered fitted, snapback, and trucker hats stitched in-house in Ocala, Florida. 6-hat minimum per design.",
       brand: { "@type": "Brand", name: "Slugger Athletics" },
       offers: {
         "@type": "AggregateOffer",
@@ -124,16 +124,16 @@ export default function CustomHatsPage() {
 
       {/* Hero */}
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-16 text-center">
-        <span className="display text-brand text-sm">No Minimums · Free Digitizing · Free Proof</span>
+        <span className="display text-brand text-sm">Stitched In-House · Fast Turnaround · From $25</span>
         <h1 className="display text-4xl sm:text-6xl text-foreground mt-2">
           Custom Embroidered Hats
         </h1>
         <p className="mt-5 text-lg text-muted max-w-2xl mx-auto">
-          Fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo -{" "}
-          <strong className="text-foreground">no minimum order</strong>. Flat pricing at{" "}
-          <strong className="text-foreground">$25-30 per hat</strong>, free logo digitizing, and a
-          free proof before we stitch. Order one hat or a hundred - same price, same quality.
-          Every hat is embroidered right here in our Ocala shop, so smaller orders are often
+          Fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo - flat
+          pricing at <strong className="text-foreground">$25-30 per hat</strong> with a{" "}
+          <strong className="text-foreground">6-hat minimum per design</strong>. The one-time
+          design fee covers your logo digitizing and a stitched proof you approve before we run
+          anything. Every hat is embroidered right here in our Ocala shop, so orders are often
           ready in just days.
         </p>
         <div className="mt-8 flex flex-wrap gap-4 justify-center">

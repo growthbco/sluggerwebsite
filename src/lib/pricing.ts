@@ -1,7 +1,7 @@
 // Public 2026 retail price list (owner-confirmed, Jul 2026). Per piece, plus
 // tax. Prices are reviewed as market costs / rates / duties change.
 // Flat pricing, no quantity tiers; 6-piece minimum per custom design (hats
-// excluded - embroidered in-house with no minimum). Custom design included.
+// hats included; embroidered in-house so they turn fast). Custom design included.
 // Anything not listed here (specialty items) is quoted custom.
 
 export type PriceRow = { item: string; priceCents: number; note?: string };

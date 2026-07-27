@@ -124,7 +124,7 @@ export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; 
           ))}
         </div>
         <p className="mt-3 text-xs text-muted">
-          Design included · names & numbers included · same price youth to 5XL · 6-piece minimum per design (hats have no minimum)
+          Design included · names & numbers included · same price youth to 5XL · 6-piece minimum per design (hats included)
         </p>
       </section>
 

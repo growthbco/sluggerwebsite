@@ -60,7 +60,7 @@ export default function ServicesPage() {
 
       {/* Hero */}
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-16 text-center">
-        <span className="display text-brand text-sm">No Minimums · Free Design · Upfront Pricing</span>
+        <span className="display text-brand text-sm">In-House Production · Free Mockups · Upfront Pricing</span>
         <h1 className="display text-4xl sm:text-6xl text-foreground mt-2">Our Services</h1>
         <p className="mt-5 text-lg text-muted max-w-2xl mx-auto">
           Everything we make and how much it costs - custom embroidered hats, fully sublimated

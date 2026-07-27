@@ -141,7 +141,7 @@ function buildGrounding(design: DesignContext, order: OrderContext | null, messa
         ]
       : []),
     "",
-    "PRICE LIST (per piece, plus tax, design included; custom orders have a 6-piece minimum per design - embroidered hats, shop items, and drops have NO minimum):",
+    "PRICE LIST (per piece, plus tax, design included; ALL custom orders - INCLUDING embroidered hats - have a 6-piece minimum per design, and every custom design starts with the design fee. Hats are embroidered in-house so they turn around fast, but the 6-hat minimum and design fee still apply):",
     priceList,
     "",
     "2026 BUNDLES (per player, plus tax - suggest the matching bundle when someone is pricing multiple pieces, especially Home & Away when they only mention jerseys):",

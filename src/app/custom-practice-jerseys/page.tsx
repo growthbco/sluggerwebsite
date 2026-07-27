@@ -36,7 +36,7 @@ export default function PracticeJerseysPage() {
         <>
           Made for Ocala and Central Florida teams with free design and local pickup - and shipped
           nationwide. Pair them with{" "}
-          <a href="/custom-hats" className="text-brand hover:underline">no-minimum embroidered hats</a>{" "}
+          <a href="/custom-hats" className="text-brand hover:underline">in-house embroidered hats</a>{" "}
           or add them to any <a href="/team-order" className="text-brand hover:underline">team order</a>.
         </>
       }

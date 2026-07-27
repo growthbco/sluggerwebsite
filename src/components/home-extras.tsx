@@ -198,7 +198,7 @@ export function AboutBand() {
 
 const FAQS = [
   { q: "How do I place a team order?", a: "Head to Team Order, pick your jersey style, then either enter your roster yourself or share a link so each player adds their own name, number, and size. We email your total and a free design proof to approve before production." },
-  { q: "Is there a minimum order?", a: "Team orders are built for groups, but reach out for small runs - we'll work with you. Individual buy-in drops have no minimum; you just buy your size." },
+  { q: "Is there a minimum order?", a: "Custom orders start at 6 pieces per design - including embroidered hats. Every design takes real mockup and setup work, so 6 is the floor." },
   { q: "How long does production take?", a: "Most orders ship in 2-3 weeks after you approve your design. Need it sooner? Rush gets you there in about a week (specialty items may add a few days)." },
   { q: "How does sizing work?", a: "Our signature jerseys have a relaxed fit and run slightly large. Each product page has a size guide, and players pick their own size on team orders to cut down on returns." },
   { q: "Do you really design for free?", a: DESIGN_FEE_WAIVED

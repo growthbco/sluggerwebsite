@@ -45,7 +45,7 @@ export default async function ServiceAreaPage({ params }: { params: Promise<{ ci
       offeringsBlurb="Travel ball, rec leagues, schools, businesses - if it needs a uniform, we make it."
       offerings={[
         { t: "Custom Jerseys", d: "Fully sublimated crew, two-button, full-button, and quarter-zip styles from $28 - names, numbers, and unlimited colors included." },
-        { t: "Embroidered Hats", d: "Fitted and snapback caps embroidered in our Ocala shop - small orders often ready in days, no minimum." },
+        { t: "Embroidered Hats", d: "Fitted and snapback caps embroidered in our Ocala shop - 6-hat minimum per design, often ready in days." },
         { t: "Full Uniform Bundles", d: "Game Day, Home & Away, and Total Package bundles - one per-player price for the whole set." },
         { t: "Free Team Stores", d: "We set up a free online store for your team so every player and parent orders their own gear - no collecting money or sizes." },
       ]}
