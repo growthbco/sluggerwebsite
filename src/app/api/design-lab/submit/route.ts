@@ -6,6 +6,39 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const TEST_KEY = process.env.DESIGN_LAB_KEY || "slugger26";
+
+// Decompose the chosen concept into designer-usable pieces: the background
+// pattern as a flat print swatch and the wordmark isolated on white (plus the
+// emblem when the customer didn't supply a real logo file). Raster, not
+// vector - but sublimation patterns print as raster anyway, and an isolated
+// wordmark traces in minutes.
+async function extractAsset(conceptB64: { mime: string; data: string }, prompt: string): Promise<string | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  const call = () =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }, { inline_data: { mime_type: conceptB64.mime, data: conceptB64.data } }] }],
+        generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "1:1" } },
+      }),
+      signal: AbortSignal.timeout(40000),
+    });
+  try {
+    let res = await call();
+    if (!res.ok) res = await call();
+    if (!res.ok) return null;
+    const data = await res.json();
+    const img = data?.candidates?.[0]?.content?.parts?.find(
+      (x: { inlineData?: { data: string }; inline_data?: { data: string } }) => x.inlineData || x.inline_data,
+    );
+    const payload = img?.inlineData ?? img?.inline_data;
+    return payload?.data ?? null;
+  } catch {
+    return null;
+  }
+}
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
 
 // "Proceed with this design": wraps the chosen AI concept + the customer's
@@ -56,17 +89,29 @@ export async function POST(req: Request) {
       return null;
     }
   }
-  const [conceptUrl, logoUrl, referenceUrl] = await Promise.all([
+  const conceptB64 = { mime: concept[1], data: concept[2] };
+  const [conceptUrl, logoUrl, referenceUrl, patternB64, wordmarkB64, emblemB64] = await Promise.all([
     upload("concept.png", body.concept),
     upload("logo.png", body.logo),
     upload("reference.png", body.reference),
+    extractAsset(conceptB64, "From this jersey design, extract ONLY the background pattern/texture as a flat, full-bleed, seamless square print swatch: the complete pattern at full intensity edge to edge, straight-on view, no garment, no fabric folds, no lettering, no numbers, no logos, no shadows. Production artwork style."),
+    extractAsset(conceptB64, "From this jersey design, extract ONLY the team name wordmark/lettering exactly as styled (same font, colors, outlines, and any swoosh/underline), laid out flat and large, perfectly centered on a plain solid white background. No garment, no pattern, no other elements. Clean logo-sheet presentation."),
+    body.logo ? Promise.resolve(null) : extractAsset(conceptB64, "From this jersey design, extract ONLY the logo/emblem/mascot graphic (if one exists besides the team name lettering), isolated large and centered on a plain solid white background. If there is no distinct emblem, reproduce the most distinctive graphic element instead. No garment, no pattern."),
   ]);
   if (!conceptUrl) return NextResponse.json({ error: "Could not save the concept image." }, { status: 500 });
+  const [patternUrl, wordmarkUrl, emblemUrl] = await Promise.all([
+    patternB64 ? upload("pattern-swatch.png", `data:image/png;base64,${patternB64}`) : null,
+    wordmarkB64 ? upload("wordmark.png", `data:image/png;base64,${wordmarkB64}`) : null,
+    emblemB64 ? upload("emblem.png", `data:image/png;base64,${emblemB64}`) : null,
+  ]);
 
   const vision = [
     "AI DESIGN LAB CONCEPT - the customer designed this in our AI lab and wants THIS design produced.",
     "The FIRST inspiration image is their chosen concept (front and back views) - recreate it faithfully as the production design.",
     logoUrl ? "Their actual team logo file is attached as a separate image - use the real file, not the AI's rendering of it." : "",
+    patternUrl ? `EXTRACTED PATTERN SWATCH (flat, print-style): ${patternUrl}` : "",
+    wordmarkUrl ? `EXTRACTED WORDMARK on white (trace-ready): ${wordmarkUrl}` : "",
+    emblemUrl ? `EXTRACTED EMBLEM on white (AI-invented - trace or redraw): ${emblemUrl}` : "",
     referenceUrl ? "They also supplied a reference jersey (style inspiration) - attached." : "",
     body.backNumber?.trim() ? `Back number shown in concept: ${body.backNumber.trim().slice(0, 4)}.` : "",
     body.idea?.trim() ? `Customer's own description: ${body.idea.trim().slice(0, 600)}` : "",
@@ -86,7 +131,7 @@ export async function POST(req: Request) {
       colorHexes: (body.colorHexes ?? []).slice(0, 6),
       productTypes: ["Jerseys"],
       jerseyStyle: (body.style ?? "").trim().slice(0, 30) || undefined,
-      inspirationImages: [conceptUrl, logoUrl, referenceUrl].filter(Boolean),
+      inspirationImages: [conceptUrl, logoUrl, referenceUrl, patternUrl, wordmarkUrl, emblemUrl].filter(Boolean),
       estimatedPieces: (body.estimatedPieces ?? "").trim().slice(0, 20) || undefined,
     }),
   });

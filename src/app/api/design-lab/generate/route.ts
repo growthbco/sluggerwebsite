@@ -70,6 +70,15 @@ export async function POST(req: Request) {
   const clean = (s: string | undefined, n: number) => (s ?? "").replace(/[\r\n]+/g, " ").trim().slice(0, n);
   const sport = clean(body.sport, 40) || "baseball";
   const style = clean(body.style, 40) || "crew neck";
+  const STYLE_SPECS: Record<string, string> = {
+    "crew neck": "a round crew-neck collar; NO buttons, NO placket, NO zipper",
+    "two-button": "a short two-button placket at the neckline with EXACTLY TWO visible buttons and a sport collar; the placket ends at mid-chest",
+    "full-button": "a full button-down front: a placket running the ENTIRE length of the jersey with a visible row of buttons top to bottom, classic baseball collar",
+    "quarter-zip": "a stand-up quarter-zip collar with a visible ZIPPER from the neck ending at mid-chest; NO buttons",
+    "sleeveless / tank": "a sleeveless tank cut with finished armholes; NO sleeves, NO buttons, NO zipper",
+    "reversible": "a sleeveless reversible basketball cut with finished armholes and contrasting trim; NO buttons, NO zipper",
+  };
+  const styleSpec = STYLE_SPECS[style.toLowerCase()] ?? "";
   const teamName = clean(body.teamName, 40);
   const idea = clean(body.idea, 500);
   const refinement = clean(body.refinement, 500);
@@ -109,7 +118,7 @@ export async function POST(req: Request) {
     const reference = parseDataUrl(body.reference);
     const logo = parseDataUrl(body.logo);
     const prompt = [
-      `Professional e-commerce product mockup of a fully custom sublimated ${sport} jersey, ${style} cut, floating ghost-mannequin style, pure white background, studio lighting. Show TWO views side by side in one image: the FRONT of the jersey on the left and the BACK of the same jersey on the right. The back shows the same design language with a large player number ${backNumber} centered below the shoulders.`,
+      `Professional e-commerce product mockup of a fully custom sublimated ${sport} jersey, ${style} cut, floating ghost-mannequin style, pure white background, studio lighting. Show TWO views side by side in one image: the FRONT of the jersey on the left and the BACK of the same jersey on the right. The back shows the same design language with a large player number ${backNumber} centered below the shoulders.${styleSpec ? ` GARMENT CONSTRUCTION (must match exactly): ${styleSpec}.` : ""}`,
       reference
         ? `A REFERENCE JERSEY image is provided: recreate its overall design language - layout, paneling, stripe/graphic placement, and general vibe - as a NEW original design (do not copy logos or team names from the reference).`
         : "",
