@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import { DesignLab } from "@/components/design-lab";
 
 export const metadata: Metadata = {
-  title: "Free AI Jersey Design Lab - See Your Uniform in Seconds",
+  title: "Jersey Maker - Design Your Own Custom Jersey Free",
   description:
-    "Design your team's custom jersey with AI - pick your sport, colors, and idea, upload a logo or sketch, and see a front-and-back concept in seconds. Free to try; our real designer makes the production version.",
-  alternates: { canonical: "/design-lab" },
+    "Free online jersey maker: pick your sport and colors, describe your idea, upload a logo or sketch, and see your custom jersey - front and back - in seconds. Our real designer then makes it production-ready.",
+  alternates: { canonical: "/jersey-maker" },
 };
 
 export default async function DesignLabPage({ searchParams }: { searchParams: Promise<{ key?: string; ladder?: string; paid?: string }> }) {
@@ -13,7 +13,7 @@ export default async function DesignLabPage({ searchParams }: { searchParams: Pr
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-14">
       <span className="display text-brand text-sm">Free To Try · Front &amp; Back · Made Real By Our Designer</span>
-      <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">AI Jersey Design Lab</h1>
+      <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">Jersey Maker - Design Your Own</h1>
       <p className="mt-3 text-muted max-w-2xl">
         Describe the uniform, drop in a logo or even a hand-drawn sketch, and see a concept in
         seconds - front and back, in your exact colors.

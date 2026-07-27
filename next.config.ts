@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
       { source: "/shop", destination: "/team-uniforms", permanent: true },
       { source: "/shop/:category", destination: "/team-uniforms", permanent: true },
       { source: "/drops", destination: "/team-uniforms", permanent: true },
+      { source: "/design-lab", destination: "/jersey-maker", permanent: true },
     ];
   },
   images: {
