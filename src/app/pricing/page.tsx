@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { ExpandableImage } from "@/components/expandable-image";
 import { PRICE_LIST, BUNDLES, BUNDLE_UPGRADE_NOTE, formatDollars } from "@/lib/pricing";
 
 export const metadata: Metadata = {
@@ -31,7 +32,9 @@ export default function PricingPage() {
       <section className="mt-10">
         <h2 className="display text-2xl text-foreground">Jersey Styles</h2>
         <p className="mt-2 text-sm text-muted">
-          Every style is fully custom sublimated - your colors, logos, names, and numbers, design included.
+          Every style is fully custom sublimated - your colors, logos, names, and numbers, design
+          included. Same flat prices for every sport: baseball, basketball, soccer, volleyball,
+          flag, and beyond. Tap any style to see it up close.
         </p>
         <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
@@ -42,7 +45,7 @@ export default function PricingPage() {
           ].map((s) => (
             <div key={s.name} className="bg-steel border border-line">
               <div className="relative aspect-square bg-white">
-                <Image src={s.img} alt={`Custom ${s.name} jersey by Slugger Athletics`} fill sizes="(max-width: 1024px) 50vw, 25vw" className="object-cover" />
+                <ExpandableImage src={s.img} alt={`Custom ${s.name} jersey by Slugger Athletics`} />
               </div>
               <div className="px-3 py-2.5 flex items-baseline justify-between">
                 <span className="display text-sm text-foreground">{s.name}</span>

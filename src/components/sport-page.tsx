@@ -111,14 +111,14 @@ export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; 
           <Link href="/pricing" className="text-sm text-brand hover:underline">Full price list →</Link>
         </div>
         <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-          {[
-            { label: "Jerseys from", price: 2800 },
-            { label: "Practice shirts", price: 2000 },
-            { label: "Hats from", price: 2500 },
-            { label: "Bundles from", price: BUNDLES[0].priceCents },
-          ].map((x) => (
+          {(page.pricing ?? [
+            { label: "Jerseys from", cents: 2800 },
+            { label: "Practice shirts", cents: 2000 },
+            { label: "Hats from", cents: 2500 },
+            { label: "Bundles from", cents: BUNDLES[0].priceCents },
+          ]).map((x) => (
             <div key={x.label} className="bg-ink border border-line px-3 py-4">
-              <p className="display text-2xl text-brand">{formatDollars(x.price)}</p>
+              <p className="display text-2xl text-brand">{formatDollars(x.cents)}</p>
               <p className="text-xs text-muted mt-1">{x.label}</p>
             </div>
           ))}

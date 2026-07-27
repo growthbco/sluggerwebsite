@@ -17,6 +17,8 @@ export type SportPage = {
   faqs: { q: string; a: string }[];
   /** Real product photos of gear we actually made (shown before gallery). */
   realPhotos?: { src: string; alt: string }[];
+  /** Sport-specific rows for the pricing strip (from the 2026 price sheet). */
+  pricing?: { label: string; cents: number }[];
 };
 
 export const SPORT_PAGES: SportPage[] = [
@@ -40,6 +42,7 @@ export const SPORT_PAGES: SportPage[] = [
       "We outfit baseball teams across Ocala, Marion County, and Central Florida - and ship nationwide. Local travel ball clubs get free design proofs, a team store for parent orders, and pickup at our Ocala shop.",
     deepDive: ["Baseball is where Slugger started, and it is still most of what leaves our shop. We build full-dye sublimated jerseys - the same construction the big travel programs wear - where your colors, logos, pinstripes, and numbers are dyed into the polyester instead of pressed on top. That means a 10U team's jerseys look as sharp in the last tournament of the season as the first, with no cracked numbers and no peeling logos.", "Every order starts with a free mockup from our in-house designer: send your logo and colors (or just an idea) and you will see your exact uniform before spending a dollar on production. Once you approve, your coaches and parents use a shared roster link so every player's name, number, and size lands correctly - and our AI print-file check verifies every piece against the roster before production starts."],
     faqs: [{"q": "How much do custom baseball uniforms cost?", "a": "Jerseys run $28 (crew), $32 (two-button), $35 (full-button), and $38 (quarter-zip) with the design included. Pants are $40, hats $25-30. Our Game Day bundle (jersey + pants + hat) starts at $85 per player."}, {"q": "How long does a baseball uniform order take?", "a": "Most orders ship 2-3 weeks after you approve the design and pay the deposit. Rush production is about a week when your season sneaks up on you."}, {"q": "Do you do travel ball home and away sets?", "a": "All the time - our Home & Away bundle (2 jerseys + pants) starts at $90 per player, and each family can buy their own set through your free team store."}],
+    pricing: [{ label: "Jerseys from", cents: 2800 }, { label: "Full-button jerseys", cents: 3500 }, { label: "Custom pants", cents: 4000 }, { label: "Hats from", cents: 2500 }],
   },
   {
     slug: "custom-softball-uniforms",
@@ -61,6 +64,7 @@ export const SPORT_PAGES: SportPage[] = [
       "From Ocala fastpitch to The Villages' massive rec softball scene, we outfit Central Florida softball teams with free design work and local pickup - and ship anywhere in the US.",
     deepDive: ["Softball uniforms have their own rules: racerbacks and sleeveless cuts have to fit right, colors run brighter, and half the roster wants a different cut than the other half. Our sublimated softball jerseys handle all of it - every player picks her own cut and size through the roster link while the design stays identical across the team.", "From Ocala fastpitch to The Villages' senior leagues, we outfit programs with a free design mockup first, revisions included, and production only after you approve. Names, numbers, and unlimited colors are part of the price - no per-color charges, ever."],
     faqs: [{"q": "How much do custom softball uniforms cost?", "a": "Sublimated jerseys start at $28 with the design, names, and numbers included. Racerback and sleeveless cuts price the same as short-sleeve - no upcharges by cut or size."}, {"q": "Can players choose different cuts in the same design?", "a": "Yes - racerback, sleeveless, or short-sleeve per player. Everyone picks their own cut and size through your team's roster link, and the design stays consistent."}, {"q": "Do you make matching visors and hats?", "a": "Yes - embroidered visors, snapbacks, and fitted caps are made in-house in Ocala with a 6-hat minimum per design, often ready in days."}],
+    pricing: [{ label: "Jerseys from", cents: 2800 }, { label: "Practice jerseys", cents: 2000 }, { label: "Hats & visors from", cents: 2500 }, { label: "Bundles from", cents: 8500 }],
   },
   {
     slug: "custom-basketball-uniforms",
@@ -83,6 +87,7 @@ export const SPORT_PAGES: SportPage[] = [
     deepDive: ["Basketball programs love one thing above all: the reversible. Ours is $85 for a fully sublimated uniform with home colors on one side and away on the other - one purchase, two looks, no second order halfway through the season. AAU clubs run them all year.", "Standard jersey-and-shorts sets are fully custom too, from youth rec leagues to men's league teams that want to look like they mean it. Free design mockup first, per-player sizing through the roster link, and matching practice jerseys at $20 for scrimmage nights."],
     faqs: [{"q": "How much are custom basketball uniforms?", "a": "Reversible uniforms are $85 (two looks in one). Standard sublimated jerseys start at $28, with matching shorts and $20 practice jerseys available in the same design."}, {"q": "Do you outfit AAU teams outside Florida?", "a": "Yes - design and approval happen online, and we ship nationwide. Central Florida teams can pick up at our Ocala shop."}, {"q": "Can we get names and numbers on both sides of a reversible?", "a": "Numbers yes - both sides are fully sublimated, so numbers on each side are included in the price. We will lay it out in your free mockup."}],
     realPhotos: [{ src: "/styles/basketball-reversible.jpg", alt: "Reversible custom basketball jersey - black side and royal blue MAVS side, made by Slugger Athletics" }],
+    pricing: [{ label: "Reversible uniform", cents: 8500 }, { label: "Jerseys from", cents: 2800 }, { label: "Custom shorts", cents: 2500 }, { label: "Practice jerseys", cents: 2000 }],
   },
   {
     slug: "custom-soccer-uniforms",
@@ -105,6 +110,7 @@ export const SPORT_PAGES: SportPage[] = [
     deepDive: ["Soccer kits live and die on the details: the crest has to be crisp, the sponsor logos have to be right, and the keeper needs to stand out without looking like a different team. Because our kits are fully sublimated, crests, sponsors, and pattern work cost nothing extra - the whole design is dyed into the fabric in one pass.", "We build kits for clubs, schools, and adult leagues: jerseys from $28, shorts and custom socks to match, and keeper kits in contrast colors within the same design language. Free mockup first, sizes youth through 5X at one price."],
     faqs: [{"q": "How much does a custom soccer kit cost?", "a": "Jerseys start at $28 with crests, sponsors, names, and numbers included. Add shorts ($25) and custom socks ($15) for a full kit - bundle pricing available per player."}, {"q": "Are sponsor logos extra?", "a": "No - sublimation prints the whole design at once, so sponsor logos, crests, and patterns are included no matter how many you add."}, {"q": "Can you do goalkeeper kits?", "a": "Yes - keeper kits come in contrast colors within your team's design so the ref is happy and the kit still looks like yours."}],
     realPhotos: [{ src: "/styles/soccer-kit-black.jpg", alt: "Custom sublimated soccer kit - black and white striped jersey and shorts made by Slugger Athletics" }, { src: "/styles/soccer-kit-blue.jpg", alt: "Custom sublimated soccer kit - royal blue and white youth jersey and shorts made by Slugger Athletics" }],
+    pricing: [{ label: "Jerseys from", cents: 2800 }, { label: "Custom shorts", cents: 2500 }, { label: "Custom socks", cents: 1500 }, { label: "Practice jerseys", cents: 2000 }],
   },
   {
     slug: "custom-flag-football-uniforms",
@@ -126,6 +132,7 @@ export const SPORT_PAGES: SportPage[] = [
       "From Ocala youth leagues to adult flag nights, we keep Central Florida flag teams looking sharp - free designs, per-player sizing, and pickup at the shop.",
     deepDive: ["Flag football is the fastest-growing team sport in Florida - youth leagues, adult co-ed nights, and now girls' high school flag. We build loose, breathable sublimated jerseys made for flag pulls and July humidity, with names and numbers dyed in so they survive a whole season of turf.", "Leagues love ordering with us because every team can run its own colorway inside one design family, and each roster fills itself through a shared link - no size spreadsheets, no collecting cash."],
     faqs: [{"q": "How much are custom flag football jerseys?", "a": "Sublimated jerseys start at $28 with names and numbers included, youth through adult sizes at one flat price. Practice-weight dry-fit shirts are $20."}, {"q": "Can you outfit an entire league?", "a": "Yes - we run one design family with a different colorway per team, and each team gets its own roster link. Ask about league pricing on the total piece count."}, {"q": "How fast can a flag order turn around?", "a": "Most orders ship 2-3 weeks after design approval; rush is about a week. Short season? Start the free design now and lock sizes later."}],
+    pricing: [{ label: "Jerseys from", cents: 2800 }, { label: "Custom shorts", cents: 2500 }, { label: "Practice jerseys", cents: 2000 }, { label: "Hats from", cents: 2500 }],
   },
   {
     slug: "custom-football-uniforms",
@@ -148,6 +155,7 @@ export const SPORT_PAGES: SportPage[] = [
     deepDive: ["From youth tackle programs to 7v7 circuits, football uniforms take the most abuse of any sport we make - which is exactly why sublimation matters. Numbers and logos dyed into the fabric cannot crack in a pile-up or peel in the wash, and the breathable poly holds up under pads.", "We outfit full programs: game jerseys, $20 dry-fit practice shirts in team colors, and sideline gear - hoodies, quarter-zips, and embroidered caps for coaches and staff, all in one design language."],
     faqs: [{"q": "How much are custom football jerseys?", "a": "Sublimated game jerseys start at $28 with numbers and names included; practice-weight dry-fit shirts are $20. Sideline hoodies are $40 and embroidered caps $25-30."}, {"q": "Do the jerseys work with pads?", "a": "Yes - we size for over-pads wear on tackle orders. Tell us the age group and we will recommend sizing in your free mockup review."}, {"q": "Can you outfit coaches and staff to match?", "a": "Absolutely - matching polos, quarter-zips, hoodies, and caps in the same design family, added to the same team order."}],
     realPhotos: [{ src: "/styles/football-game-jersey.jpg", alt: "Custom sublimated tackle football game jersey - red Georgia design with over-pads cut and mesh panels, made by Slugger Athletics" }],
+    pricing: [{ label: "Game jerseys from", cents: 2800 }, { label: "Practice jerseys", cents: 2000 }, { label: "Sideline hoodies", cents: 4000 }, { label: "Hats from", cents: 2500 }],
   },
   {
     slug: "custom-pickleball-shirts",
@@ -169,6 +177,7 @@ export const SPORT_PAGES: SportPage[] = [
       "Between Ocala, Top of the World, and The Villages, Central Florida is pickleball country - and we are its local custom shirt shop. Club orders get free design and quick local turnaround.",
     deepDive: ["Central Florida is the pickleball capital of America, and club shirts are how you tell your ladder from the visitors. Our $20 dry-fit shirts carry your club name, colors, and sponsors in full sublimation - breathable enough for an August round-robin, sharp enough for tournament photos.", "Clubs order with one shared link: every member picks their own size (and name on the back if you want), pays for their own shirt through your free club store, and we produce the whole batch in one run. No treasurer required."],
     faqs: [{"q": "How much are custom pickleball shirts?", "a": "Quality dry-fit club shirts are $20 each with your design included. Premium jersey builds start at $28, and matching embroidered visors and hats start at 6 per design."}, {"q": "Can members buy their own shirts?", "a": "Yes - we set up a free online club store where every member orders and pays for their own shirt and size. The club never collects money."}, {"q": "Do you serve The Villages?", "a": "We are about 40 minutes north in Ocala - delivery to The Villages or pickup at the shop, whichever your club prefers."}],
+    pricing: [{ label: "Dry-fit club shirts", cents: 2000 }, { label: "Premium jerseys from", cents: 2800 }, { label: "Hats & visors from", cents: 2500 }, { label: "Quarter-zips", cents: 3800 }],
   },
   {
     slug: "custom-volleyball-uniforms",
@@ -190,6 +199,7 @@ export const SPORT_PAGES: SportPage[] = [
       "We outfit school and club volleyball across Marion County and Central Florida with free designs and local pickup - and ship club kits nationwide.",
     deepDive: ["Volleyball kits need to move - and the libero needs contrast that officials accept. We build sublimated indoor and beach kits where every jersey, tank, and short comes from one design, with libero sets handled correctly from the first mockup.", "Club seasons are long: our bundles price a home-and-away set per player, and $20 practice shirts in the same design keep every gym session on brand."],
     faqs: [{"q": "How much do custom volleyball jerseys cost?", "a": "Sublimated jerseys start at $28 with numbers and names included; shorts and tanks match in the same design. Practice shirts are $20."}, {"q": "Do you handle libero jerseys?", "a": "Yes - libero contrast sets come standard in our layouts so your kit passes officials' checks without looking like an afterthought."}, {"q": "Can each player pick her own size?", "a": "Yes - share one roster link and every player enters her own name, number, and sizes. No spreadsheets."}],
+    pricing: [{ label: "Jerseys from", cents: 2800 }, { label: "Custom shorts", cents: 2500 }, { label: "Practice jerseys", cents: 2000 }, { label: "Quarter-zips", cents: 3800 }],
   },
   {
     slug: "custom-hockey-jerseys",
@@ -211,6 +221,7 @@ export const SPORT_PAGES: SportPage[] = [
       "Florida hockey is real - from Central Florida roller rinks to travel ice programs, we build custom jerseys with free design work, local pickup in Ocala, and nationwide shipping.",
     deepDive: ["Florida hockey is real - roller rinks, ball hockey leagues, and travel ice programs all over the state. We make loose-cut sublimated hockey jerseys with proper shoulder yokes and lace-collar looks, sized for pads or none, with every logo and number dyed in.", "Beer leagues get the same treatment as travel programs: bold logos, nicknames on the back if that is your thing, and a free mockup before anything is produced. 6-piece minimum per design."],
     faqs: [{"q": "How much are custom hockey jerseys?", "a": "Sublimated hockey jerseys start at $28 with names, numbers, and unlimited colors included in the design."}, {"q": "Are they cut for pads?", "a": "Your call per roster - we size loose for ice with pads or trimmer for roller and ball hockey. Mixed rosters are fine."}, {"q": "Can we put nicknames instead of last names?", "a": "Yes - whatever your league allows, we print. Each player enters their own name through the roster link."}],
+    pricing: [{ label: "Jerseys from", cents: 2800 }, { label: "Practice jerseys", cents: 2000 }, { label: "Hoodies", cents: 4000 }, { label: "Hats from", cents: 2500 }],
   },
   {
     slug: "custom-bowling-shirts",
@@ -232,5 +243,6 @@ export const SPORT_PAGES: SportPage[] = [
       "From Ocala league nights to tournament travel teams, we make custom bowling shirts with free design work and local pickup - and ship to leagues nationwide.",
     deepDive: ["A league team in matching custom shirts just bowls better - that is science we refuse to check. We make both the classic retro camp-collar bowling shirt and modern dry-fit jersey cuts, with team names, nicknames, and sponsor logos sublimated into the fabric.", "Sponsor bars love us: logos cost nothing extra with sublimation, so your backer gets prime real estate on the back panel without changing the price of the shirt."],
     faqs: [{"q": "How much are custom bowling shirts?", "a": "Custom bowling shirts start at $28 with your full design - team name, nicknames, and sponsor logos - included. 6-piece minimum per design."}, {"q": "Can you do the retro camp-collar style?", "a": "Yes - the classic two-tone camp collar look is our favorite bowling build, alongside modern dry-fit crews for teams that want the athletic cut."}, {"q": "Are sponsor logos extra?", "a": "No - sublimation prints everything at once, so sponsor logos and back panels are included."}],
+    pricing: [{ label: "Bowling shirts from", cents: 2800 }, { label: "Dry-fit shirts", cents: 2000 }, { label: "Hats from", cents: 2500 }, { label: "Quarter-zips", cents: 3800 }],
   },
 ];
