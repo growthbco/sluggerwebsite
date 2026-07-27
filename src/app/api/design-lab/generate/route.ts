@@ -36,6 +36,7 @@ export async function POST(req: Request) {
     secondaryColor?: string;
     teamName?: string;
     backNumber?: string;
+    extraColors?: string[];
     idea?: string;
     logo?: string; // data URL
     reference?: string; // data URL of a jersey the customer likes
@@ -73,6 +74,7 @@ export async function POST(req: Request) {
   const idea = clean(body.idea, 500);
   const refinement = clean(body.refinement, 500);
   const backNumber = clean(body.backNumber, 4) || "12";
+  const extraColors = (body.extraColors ?? []).map((x) => clean(String(x), 20)).filter(Boolean).slice(0, 3);
 
   const parts: Record<string, unknown>[] = [];
   const parseDataUrl = (u?: string) => {
@@ -111,7 +113,7 @@ export async function POST(req: Request) {
       reference
         ? `A REFERENCE JERSEY image is provided: recreate its overall design language - layout, paneling, stripe/graphic placement, and general vibe - as a NEW original design (do not copy logos or team names from the reference).`
         : "",
-      `Primary color ${clean(body.primaryColor, 30) || "black"}, accent color ${clean(body.secondaryColor, 30) || "gold"}.`,
+      `Primary color ${clean(body.primaryColor, 30) || "black"}, accent color ${clean(body.secondaryColor, 30) || "gold"}${extraColors.length ? `, additional colors: ${extraColors.join(", ")}` : ""}.`,
       teamName ? `The team name "${teamName}" appears across the chest in bold athletic lettering, spelled exactly: ${teamName}.` : "",
       idea ? `Design direction from the customer: ${idea}.` : "",
       logo ? "A TEAM LOGO image is also provided: incorporate that logo naturally into the design (chest or sleeve), keeping it recognizable." : "",

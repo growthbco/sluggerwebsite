@@ -10,8 +10,9 @@ const STYLES = ["Crew Neck", "Two-Button", "Full-Button", "Quarter-Zip", "Sleeve
 export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; ladder?: boolean; paidJustNow?: boolean }) {
   const [sport, setSport] = useState("Baseball");
   const [style, setStyle] = useState("Crew Neck");
-  const [primaryColor, setPrimaryColor] = useState("black");
-  const [secondaryColor, setSecondaryColor] = useState("gold");
+  const [primaryColor, setPrimaryColor] = useState("#0A0A0A");
+  const [secondaryColor, setSecondaryColor] = useState("#B8A36C");
+  const [extraColors, setExtraColors] = useState<string[]>([]);
   const [teamName, setTeamName] = useState("");
   const [backNumber, setBackNumber] = useState("");
   const [idea, setIdea] = useState("");
@@ -24,6 +25,13 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
   const [error, setError] = useState<string | null>(null);
   const [usage, setUsage] = useState<{ used: number; cap: number } | null>(null);
   const [need, setNeed] = useState<"email" | "upgrade" | null>(null);
+  const [proceedOpen, setProceedOpen] = useState(false);
+  const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [estimatedPieces, setEstimatedPieces] = useState("10-14");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState<{ reference: string; statusUrl?: string; checkoutUrl?: string } | null>(null);
   const [email, setEmail] = useState("");
   const [unlocking, setUnlocking] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -57,7 +65,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
         body: JSON.stringify({
           key: testKey,
           ladder: ladder || undefined,
-          sport, style, primaryColor, secondaryColor, teamName, backNumber, idea,
+          sport, style, primaryColor, secondaryColor, extraColors, teamName, backNumber, idea,
           logo: logo ?? undefined,
           reference: reference ?? undefined,
           ...(refine && image ? { previousImage: image, refinement } : {}),
@@ -106,15 +114,35 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
             </select>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-wrap items-end gap-3">
           <div>
-            <label className={label}>PRIMARY COLOR</label>
-            <input value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} placeholder="black, navy, royal blue…" className={input} />
+            <label className={label}>PRIMARY</label>
+            <div className="flex items-center gap-2">
+              <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="h-10 w-12 bg-steel border border-line cursor-pointer rounded" />
+              <span className="text-xs text-muted font-mono">{primaryColor}</span>
+            </div>
           </div>
           <div>
-            <label className={label}>ACCENT COLOR</label>
-            <input value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} placeholder="gold, white, red…" className={input} />
+            <label className={label}>ACCENT</label>
+            <div className="flex items-center gap-2">
+              <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="h-10 w-12 bg-steel border border-line cursor-pointer rounded" />
+              <span className="text-xs text-muted font-mono">{secondaryColor}</span>
+            </div>
           </div>
+          {extraColors.map((col, i) => (
+            <div key={i}>
+              <label className={label}>COLOR {i + 3}</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={col} onChange={(e) => setExtraColors((a) => a.map((v, j) => (j === i ? e.target.value : v)))} className="h-10 w-12 bg-steel border border-line cursor-pointer rounded" />
+                <button type="button" onClick={() => setExtraColors((a) => a.filter((_, j) => j !== i))} className="text-xs text-muted underline">remove</button>
+              </div>
+            </div>
+          ))}
+          {extraColors.length < 2 && (
+            <button type="button" onClick={() => setExtraColors((a) => [...a, "#FFFFFF"])} className="h-10 border border-dashed border-line text-muted display text-xs px-3 hover:border-brand/60">
+              + Color
+            </button>
+          )}
         </div>
         <div className="grid grid-cols-[1fr_7rem] gap-3">
           <div>
@@ -249,9 +277,74 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
                 Refine
               </button>
             </div>
-            <a href={image} download="slugger-ai-concept.png" className="inline-block text-sm text-brand underline underline-offset-2">
-              Download this concept
-            </a>
+            <div className="flex items-center justify-between gap-3">
+              <a href={image} download="slugger-ai-concept.png" className="text-sm text-brand underline underline-offset-2">
+                Download this concept
+              </a>
+              {!submitted && (
+                <button type="button" onClick={() => setProceedOpen((v) => !v)}
+                  className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-sm px-5 py-2.5 transition-colors">
+                  Proceed With This Design →
+                </button>
+              )}
+            </div>
+            {submitted && (
+              <div className="border border-green-600/60 bg-green-600/10 p-4 rounded space-y-1">
+                <p className="display text-foreground">🎉 Sent to our designer - {submitted.reference}</p>
+                <p className="text-sm text-muted">Your concept, logo, and colors are in the designer&apos;s hands. You&apos;ll get a real proof to approve.</p>
+                {submitted.checkoutUrl ? (
+                  <a href={submitted.checkoutUrl} className="inline-block mt-1 clip-slant bg-brand text-on-brand display text-sm px-4 py-2">Finish: pay the design fee</a>
+                ) : submitted.statusUrl ? (
+                  <a href={submitted.statusUrl} className="text-sm text-brand underline">Track your design here</a>
+                ) : null}
+              </div>
+            )}
+            {proceedOpen && !submitted && (
+              <div className="border border-brand/50 bg-brand/10 p-4 rounded space-y-3">
+                <p className="display text-foreground">Send this concept to our designer</p>
+                <p className="text-sm text-muted">We attach this exact design, your logo file, reference, and colors. Our designer turns it into a production-ready proof for your approval - free revisions before anything is made.</p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Your name" className={input} maxLength={60} />
+                  <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} type="email" placeholder="Email" className={input} maxLength={100} />
+                  <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="Phone (optional)" className={input} maxLength={20} />
+                  <select value={estimatedPieces} onChange={(e) => setEstimatedPieces(e.target.value)} className={input}>
+                    {["6-9", "10-14", "15-24", "25+"].map((r) => <option key={r} value={r}>{r} pieces</option>)}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  disabled={submitting || !contactName.trim() || !contactEmail.includes("@") || !teamName.trim()}
+                  onClick={async () => {
+                    setSubmitting(true);
+                    setError(null);
+                    try {
+                      const r = await fetch("/api/design-lab/submit", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          key: testKey, contactName, contactEmail, contactPhone,
+                          teamName, sport, style, backNumber, idea, estimatedPieces,
+                          colorHexes: [primaryColor, secondaryColor, ...extraColors],
+                          concept: image, logo: logo ?? undefined, reference: reference ?? undefined,
+                        }),
+                      });
+                      const d = await r.json();
+                      if (!r.ok || !d.reference) { setError(d.error ?? "Could not send - try again"); return; }
+                      setSubmitted({ reference: d.reference, statusUrl: d.statusUrl, checkoutUrl: d.checkoutUrl });
+                      setProceedOpen(false);
+                    } catch {
+                      setError("Could not send - try again");
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  }}
+                  className="w-full clip-slant bg-brand hover:bg-brand-dark text-on-brand display py-3 disabled:opacity-60"
+                >
+                  {submitting ? "Sending to designer…" : "Send to Our Designer - Free Proof"}
+                </button>
+                {!teamName.trim() && <p className="text-xs text-red-400">Add your team name above first.</p>}
+              </div>
+            )}
             {history.length > 1 && (
               <div>
                 <p className="display text-xs text-muted tracking-wide mt-2">EARLIER CONCEPTS - TAP TO BRING BACK</p>
