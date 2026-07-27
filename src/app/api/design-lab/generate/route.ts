@@ -54,6 +54,40 @@ function backgroundMask(rgba: Buffer, width: number, height: number): Uint8Array
     if (i >= width) stack.push(i - width);
     if (i < width * (height - 1)) stack.push(i + width);
   }
+  // Chamfer distance transform from the garment (non-background) region, so
+  // the watermark keeps a clean margin away from the jersey and its shadow
+  // instead of butting right against the hem.
+  const margin = Math.max(24, Math.round(width * 0.03)) * 3; // orthogonal step = 3
+  const INF = 1 << 29;
+  const dist = new Int32Array(width * height);
+  for (let i = 0; i < dist.length; i++) dist[i] = mask[i] ? INF : 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      if (!dist[i]) continue;
+      let d = dist[i];
+      if (x > 0) d = Math.min(d, dist[i - 1] + 3);
+      if (y > 0) d = Math.min(d, dist[i - width] + 3);
+      if (x > 0 && y > 0) d = Math.min(d, dist[i - width - 1] + 4);
+      if (x < width - 1 && y > 0) d = Math.min(d, dist[i - width + 1] + 4);
+      dist[i] = d;
+    }
+  }
+  for (let y = height - 1; y >= 0; y--) {
+    for (let x = width - 1; x >= 0; x--) {
+      const i = y * width + x;
+      if (!dist[i]) continue;
+      let d = dist[i];
+      if (x < width - 1) d = Math.min(d, dist[i + 1] + 3);
+      if (y < height - 1) d = Math.min(d, dist[i + width] + 3);
+      if (x < width - 1 && y < height - 1) d = Math.min(d, dist[i + width + 1] + 4);
+      if (x > 0 && y < height - 1) d = Math.min(d, dist[i + width - 1] + 4);
+      dist[i] = d;
+    }
+  }
+  for (let i = 0; i < mask.length; i++) {
+    if (dist[i] < margin) mask[i] = 0;
+  }
   return mask;
 }
 
