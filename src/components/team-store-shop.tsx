@@ -218,7 +218,7 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
                             aria-pressed={active}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={dz.image} alt={dz.label} className="h-16 w-full object-cover bg-white" />
+                            <img src={dz.image} alt={dz.label} className="h-16 w-full object-contain bg-white" />
                             <span className={`block px-1.5 py-1 text-[11px] leading-tight ${active ? "text-brand" : "text-muted"}`}>{dz.label}</span>
                           </button>
                         );
