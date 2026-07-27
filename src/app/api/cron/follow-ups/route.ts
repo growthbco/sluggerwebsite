@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { healMissingSheets } from "@/lib/design-lab-assets";
 import { dbEnabled } from "@/db";
 import {
   findProofFollowUpCandidates,
@@ -177,12 +178,19 @@ export async function GET(req: Request) {
     }
   }
 
+  // ── 5. Heal AI-lab submissions whose asset sheets failed to extract ────
+  let healedSheets: { reference: string; added: string[] }[] = [];
+  if (!dryRun) {
+    try { healedSheets = await healMissingSheets(2); } catch (e) { console.error("sheet healing failed:", e); }
+  }
+
   return NextResponse.json({
     dryRun,
-    count: results.length + invoiceResults.length + staleResults.length + inboundResults.length,
+    count: results.length + invoiceResults.length + staleResults.length + inboundResults.length + healedSheets.length,
     results,
     invoiceReminders: invoiceResults,
     designerReminders: staleResults,
     inboundStalls: inboundResults,
+    healedSheets,
   });
 }
