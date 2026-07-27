@@ -112,6 +112,7 @@ export async function POST(req: Request) {
     specLine,
     "AI DESIGN LAB CONCEPT - the customer designed this in our AI lab and wants THIS design produced.",
     "The FIRST inspiration image is their chosen concept (front and back views) - recreate it faithfully as the production design.",
+    "If production constraints force any deviation from the concept (fonts, spacing, pattern scale), call out those changes when sending the proof so the client is not surprised.",
     logoUrl ? "Their actual team logo file is attached as a separate image - use the real file, not the AI's rendering of it." : "",
     "Production asset sheets (pattern swatch, wordmark on white) are being extracted and will be posted to this thread within a few minutes.",
     referenceUrl ? "They also supplied a reference jersey (style inspiration) - attached." : "",
