@@ -75,21 +75,31 @@ export async function POST(req: Request) {
   }
 
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts }],
-          generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "1:1" } },
-        }),
-        signal: AbortSignal.timeout(55000),
-      },
-    );
+    const callGemini = () =>
+      fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts }],
+            generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "1:1" } },
+          }),
+          signal: AbortSignal.timeout(45000),
+        },
+      );
+    let res = await callGemini();
     if (!res.ok) {
-      console.error("design-lab generate failed:", res.status, await res.text().catch(() => ""));
-      return NextResponse.json({ error: "Generation failed - try again" }, { status: 502 });
+      console.error("design-lab attempt 1 failed:", res.status, await res.text().catch(() => ""));
+      res = await callGemini(); // transient 5xx from the image model is common
+    }
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.error("design-lab generate failed:", res.status, detail.slice(0, 300));
+      return NextResponse.json(
+        { error: `Generation failed (${res.status}) - try rewording your idea or using a smaller image` },
+        { status: 502 },
+      );
     }
     const data = await res.json();
     const img = data?.candidates?.[0]?.content?.parts?.find(

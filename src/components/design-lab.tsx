@@ -25,7 +25,18 @@ export function DesignLab({ testKey }: { testKey?: string }) {
   function onLogoPick(file: File | undefined) {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setLogo(reader.result as string);
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => {
+        const scale = Math.min(1, 1024 / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setLogo(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.src = reader.result as string;
+    };
     reader.readAsDataURL(file);
   }
 
