@@ -18,6 +18,7 @@ export function DesignLab({ testKey }: { testKey?: string }) {
   const [logo, setLogo] = useState<string | null>(null);
   const [reference, setReference] = useState<string | null>(null);
   const [image, setImage] = useState<string | null>(null);
+  const [history, setHistory] = useState<string[]>([]);
   const [refinement, setRefinement] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +62,7 @@ export function DesignLab({ testKey }: { testKey?: string }) {
       const data = await res.json();
       if (!res.ok || !data.image) { setError(data.error ?? "Generation failed"); return; }
       setImage(data.image);
+      setHistory((h) => [data.image, ...h].slice(0, 12));
       setRefinement("");
       if (data.usedToday) setUsage({ used: data.usedToday, cap: data.capToday });
     } catch {
@@ -188,6 +190,25 @@ export function DesignLab({ testKey }: { testKey?: string }) {
             <a href={image} download="slugger-ai-concept.png" className="inline-block text-sm text-brand underline underline-offset-2">
               Download this concept
             </a>
+            {history.length > 1 && (
+              <div>
+                <p className="display text-xs text-muted tracking-wide mt-2">EARLIER CONCEPTS - TAP TO BRING BACK</p>
+                <div className="mt-1.5 flex gap-2 overflow-x-auto pb-1">
+                  {history.map((h, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setImage(h)}
+                      className={`shrink-0 h-16 w-[5.3rem] bg-white rounded overflow-hidden border-2 ${h === image ? "border-brand" : "border-line opacity-70 hover:opacity-100"}`}
+                      aria-label={`Show concept ${history.length - i}`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={h} alt={`Concept ${history.length - i}`} className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
