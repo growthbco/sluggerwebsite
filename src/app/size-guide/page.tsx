@@ -14,6 +14,7 @@ import {
 } from "@/components/size-charts";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/size-guide" },
   title: "Size Guide - Jerseys, Hoodies & Pants",
   description:
     "Sizing charts for Slugger Athletics custom jerseys, hoodies, and pants. Measurements in inches for youth and adult sizes.",

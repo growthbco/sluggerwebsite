@@ -3,6 +3,7 @@ import Image from "next/image";
 import { galleryPhotos } from "@/lib/gallery";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/gallery" },
   title: "Gallery - Custom Uniforms, Jerseys & Drops",
   description:
     "See custom team uniforms, embroidered hats, hype chains, and limited drops made by Slugger Athletics.",

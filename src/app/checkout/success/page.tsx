@@ -24,7 +24,7 @@ export default function CheckoutSuccessPage() {
         start now.
       </p>
       <Link
-        href="/shop"
+        href="/team-uniforms"
         className="inline-block mt-8 clip-slant bg-brand text-on-brand display px-8 py-3.5 hover:bg-brand-dark transition-colors"
       >
         Keep Shopping

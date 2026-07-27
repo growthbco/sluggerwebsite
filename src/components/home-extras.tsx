@@ -183,7 +183,7 @@ export function AboutBand() {
           <p className="mt-5 text-muted">
             We&apos;re your team&apos;s partner in performance. Every set is designed
             in-house, field-tested, and built to survive the season - not one wash.
-            From buy-in drops to full team stores, we make standing out easy.
+            From free team stores to full uniform programs, we make standing out easy.
           </p>
           <ul className="mt-6 space-y-2 text-foreground/90">
             {["Field-tested, durable fabrics", "Free in-house design proofs", "Flexible delivery - 2-3 weeks or 1-week rush", "Real people, real customer support"].map((b) => (

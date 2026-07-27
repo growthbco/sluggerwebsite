@@ -5,6 +5,7 @@ import { getByStatusToken } from "@/lib/design-requests";
 import { itemKeysFromDesignProducts } from "@/lib/order-items";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/team-order" },
   title: "Team Order - Outfit Your Whole Team",
   description:
     "Start a custom team order with Slugger Athletics. Pick your jersey style and add your roster - name, number, and size. Free design, fast turnaround.",

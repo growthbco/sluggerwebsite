@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ContactForm } from "@/components/contact-form";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/contact" },
   title: "Contact - Get in Touch",
   description:
     "Reach Slugger Athletics about team orders, custom designs, order status, and returns. Email, call, or send us a message - we reply within one business day.",

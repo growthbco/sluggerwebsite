@@ -20,6 +20,7 @@ export async function generateMetadata({
   return {
     title: p.name,
     description: p.description?.slice(0, 155) || `${p.name} - custom gear from Slugger Athletics.`,
+    alternates: { canonical: `/product/${p.slug}` },
     openGraph: { title: p.name, images: [primaryImage(p)] },
   };
 }
@@ -68,9 +69,9 @@ export default async function ProductPage({
 
       {/* Breadcrumb */}
       <nav className="text-sm text-muted mb-6">
-        <Link href="/shop" className="hover:text-foreground">Shop</Link>
+        <Link href="/team-uniforms" className="hover:text-foreground">Gear</Link>
         <span className="mx-2">/</span>
-        <Link href={`/shop/${p.category}`} className="hover:text-foreground capitalize">{p.category}</Link>
+        <span className="capitalize">{p.category}</span>
         <span className="mx-2">/</span>
         <span className="text-foreground/80">{p.name}</span>
       </nav>

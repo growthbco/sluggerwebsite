@@ -9,11 +9,11 @@ export default function NotFound() {
       </h1>
       <p className="text-muted mt-4">
         The page you&apos;re looking for doesn&apos;t exist or may have moved.
-        Head back to the shop or start a custom design.
+        Browse our team uniforms or start a custom design.
       </p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Link
-          href="/shop"
+          href="/team-uniforms"
           className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-sm px-6 py-3 transition-colors"
         >
           Shop Gear

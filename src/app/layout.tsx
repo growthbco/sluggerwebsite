@@ -13,7 +13,7 @@ const LOCAL_BUSINESS_JSONLD = {
   "@context": "https://schema.org",
   "@type": "LocalBusiness",
   name: "Slugger Athletics",
-  url: "https://www.sluggerathletics.com",
+  url: "https://sluggerathletics.com",
   email: "apparel@sluggerathletics.com",
   telephone: "+1-352-660-1232",
   address: { "@type": "PostalAddress", addressLocality: "Ocala", addressRegion: "FL", addressCountry: "US" },
@@ -43,7 +43,7 @@ const display = Oswald({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.sluggerathletics.com"),
+  metadataBase: new URL("https://sluggerathletics.com"),
   title: {
     default: "Slugger Athletics - Custom Team Uniforms, Jerseys & Embroidered Hats",
     template: "%s | Slugger Athletics",

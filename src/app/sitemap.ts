@@ -3,14 +3,14 @@ import { products } from "@/lib/catalog";
 import { SPORT_PAGES } from "@/lib/sport-pages";
 import { SERVICE_AREAS } from "@/lib/service-areas";
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.sluggerathletics.com";
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticPaths = [
     "", "/team-uniforms", "/embroidery", "/custom-hats", "/hype-chains", "/gallery",
     "/team-order", "/services", "/pricing", "/track", "/size-guide", "/faq", "/contact", "/shipping", "/returns",
     "/privacy", "/terms",
-    "/custom-sublimated-jerseys", "/custom-practice-jerseys",
+    "/custom-sublimated-jerseys", "/custom-practice-jerseys", "/design", "/team-stores",
     ...SPORT_PAGES.map((p) => `/${p.slug}`),
     ...SERVICE_AREAS.map((a) => `/custom-uniforms/${a.slug}`),
   ];

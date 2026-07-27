@@ -44,7 +44,7 @@ export default function CartPage() {
         <div className="mt-8">
           <p className="text-muted">Your cart is empty.</p>
           <Link
-            href="/shop"
+            href="/team-uniforms"
             className="inline-block mt-5 clip-slant bg-brand text-on-brand display px-6 py-3 hover:bg-brand-dark transition-colors"
           >
             Shop Now

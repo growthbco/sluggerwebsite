@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/returns" },
   title: "Returns & Exchanges - Custom Gear Policy",
   description:
     "Slugger Athletics returns and exchanges policy for custom and personalized team gear, plus how we handle defects, sizing, and errors.",

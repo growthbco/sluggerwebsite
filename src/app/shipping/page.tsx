@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/shipping" },
   title: "Shipping & Delivery - Turnaround & Rates",
   description:
-    "How Slugger Athletics produces and ships custom team orders and buy-ins: production turnaround, rush options, shipping rates, and tracking.",
+    "How Slugger Athletics produces and ships custom team orders: production turnaround, rush options, shipping rates, and tracking.",
 };
 
 const SECTIONS = [

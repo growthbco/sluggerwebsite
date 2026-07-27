@@ -71,7 +71,7 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
       },
       {
         name: "Logo Digitizing",
-        price: "Free",
+        price: "One-time fee",
         description:
           "We convert your logo into a stitch-ready embroidery file in-house for a one-time digitizing fee - or bring your own DST/EMB file and skip it. Send a PNG, JPG, PDF, or even a photo; you approve a proof before we stitch anything.",
         href: "/embroidery",
@@ -118,14 +118,14 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
       },
       {
         name: "Two-Button Jerseys",
-        price: "$35",
+        price: "$32",
         description:
           "Classic two-button baseball and softball jerseys, fully sublimated with your design, names, and numbers. Free design and proof included.",
         href: "/pricing",
       },
       {
         name: "Full-Button Jerseys",
-        price: "$38",
+        price: "$35",
         description:
           "Pro-style full-button jerseys, fully sublimated in your team's colors with names and numbers. Free design and proof included.",
         href: "/pricing",
@@ -185,13 +185,6 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
         description:
           "Custom 3D hype chains for dugout celebrations - built to match your team's logo and colors. Free mockup; one-time $50 3D design file fee, then each chain starts at $40 depending on detail and colors.",
         href: "/hype-chains",
-      },
-      {
-        name: "Limited Drops & Buy-Ins",
-        price: null,
-        description:
-          "Limited themed collections you can buy into while the window is open - horror drops, seasonal designs, and more.",
-        href: "/drops",
       },
     ],
   },

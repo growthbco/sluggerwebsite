@@ -3,9 +3,10 @@ import Link from "next/link";
 import { FAQS } from "@/lib/faqs";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/faq" },
   title: "FAQ - Ordering, Sizing, Turnaround",
   description:
-    "Answers about custom team orders, buy-ins, sizing, turnaround time, and free design proofs at Slugger Athletics.",
+    "Answers about custom team orders, sizing, turnaround time, minimums, and free design mockups at Slugger Athletics.",
 };
 
 

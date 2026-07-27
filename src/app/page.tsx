@@ -6,6 +6,12 @@ import { heroPhoto } from "@/lib/gallery";
 import { ElevateSection, SystemSection, Reviews, SocialGrid, AboutBand, FaqTeaser } from "@/components/home-extras";
 import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
 
+export const metadata = {
+  description:
+    "Custom team uniforms for every sport, embroidered hats made in-house in Ocala FL, and free team stores. Free design mockups, 2-3 week turnaround, 1-week rush.",
+  alternates: { canonical: "/" },
+};
+
 export default function Home() {
   return (
     <>

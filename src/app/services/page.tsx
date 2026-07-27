@@ -5,11 +5,11 @@ import { SERVICE_GROUPS, type Service } from "@/lib/services-list";
 export const metadata: Metadata = {
   title: "Services & Pricing - Custom Hats, Uniforms & Embroidery",
   description:
-    "Every service we offer with upfront pricing - custom embroidered hats from $25, sublimated team uniforms, free design, free digitizing, and team order tools.",
+    "Every service we offer with upfront pricing - custom embroidered hats from $25, sublimated team uniforms, free mockups, and easy team ordering tools.",
   openGraph: {
     title: "Services & Pricing - Custom Hats, Uniforms & Embroidery",
     description:
-      "Every service we offer with upfront pricing - embroidered hats from $25, sublimated uniforms, free design and digitizing, and team order tools.",
+      "Every service we offer with upfront pricing - embroidered hats from $25, sublimated uniforms, free mockups, and easy team ordering tools.",
     type: "website",
     url: "/services",
   },

@@ -176,9 +176,8 @@ export default function CustomHatsPage() {
         <section className="mx-auto max-w-7xl px-4 sm:px-6 py-16">
           <h2 className="display text-3xl sm:text-4xl text-foreground">Recent Custom Hats</h2>
           <p className="mt-3 text-muted max-w-2xl">
-            A few embroidered hats fresh off the machine - or{" "}
-            <Link href="/shop/hats" className="text-brand hover:underline">shop ready-made embroidered hats</Link>{" "}
-            you can buy today.
+            A few embroidered hats fresh off the machine - see more real work in{" "}
+            <Link href="/gallery" className="text-brand hover:underline">the gallery</Link>.
           </p>
           <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
             {hatExamples.map((p) => (
@@ -213,8 +212,8 @@ export default function CustomHatsPage() {
             </div>
           </div>
           <p className="mt-8 text-center text-muted">
-            Not sure which fits your logo? Send it over - we&apos;ll digitize it free and show you a
-            proof in both directions if it&apos;s a close call.
+            Not sure which fits your logo? Send it over - we&apos;ll show you a proof in both
+            directions if it&apos;s a close call.
           </p>
         </div>
       </section>
@@ -224,7 +223,7 @@ export default function CustomHatsPage() {
         <h2 className="display text-3xl sm:text-4xl text-foreground text-center">How It Works</h2>
         <div className="mt-10 grid gap-6 md:grid-cols-3">
           {[
-            { n: 1, t: "Send your logo", d: "Share your logo or idea - our in-house team digitizes it for embroidery at no charge." },
+            { n: 1, t: "Send your logo", d: "Share your logo or idea - our in-house team digitizes it into a stitch-ready file (one-time fee, skipped if you bring your own embroidery file)." },
             { n: 2, t: "Approve a proof", d: "We send a free proof so you see exactly how the stitch-out will look before we run it." },
             { n: 3, t: "We stitch & ship", d: "Hats are stitched in-house, so most orders are ready fast - days for small runs, about a week or two for big ones." },
           ].map((s) => (
