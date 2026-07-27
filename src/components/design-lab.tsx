@@ -33,6 +33,9 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<{ reference: string; statusUrl?: string; checkoutUrl?: string } | null>(null);
   const [email, setEmail] = useState("");
+  const [leadFirst, setLeadFirst] = useState("");
+  const [leadLast, setLeadLast] = useState("");
+  const [leadPhone, setLeadPhone] = useState("");
   const [unlocking, setUnlocking] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const refFileRef = useRef<HTMLInputElement>(null);
@@ -201,55 +204,6 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
           {busy ? "Designing… (about 15 seconds)" : image ? "Generate a Fresh Design" : "Generate My Jersey"}
         </button>
         {error && <p className="text-sm text-red-400">{error}</p>}
-        {need === "email" && (
-          <div className="border border-brand/50 bg-brand/10 p-4 rounded space-y-2">
-            <p className="display text-foreground">Like what you see? Keep designing free.</p>
-            <p className="text-sm text-muted">Enter your email to unlock 5 more concepts - we&apos;ll also save your designs so our designer can pick up where you left off.</p>
-            <div className="flex gap-2">
-              <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@email.com" className={input} />
-              <button
-                type="button"
-                disabled={unlocking || !email.includes("@")}
-                onClick={async () => {
-                  setUnlocking(true);
-                  try {
-                    const r = await fetch("/api/design-lab/unlock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
-                    if (r.ok) { setNeed(null); setError(null); } else { setError((await r.json()).error ?? "Try again"); }
-                  } finally { setUnlocking(false); }
-                }}
-                className="shrink-0 clip-slant bg-brand text-on-brand display text-sm px-4 disabled:opacity-50"
-              >
-                Unlock
-              </button>
-            </div>
-          </div>
-        )}
-        {need === "upgrade" && (
-          <div className="border border-brand/50 bg-brand/10 p-4 rounded space-y-2">
-            <p className="display text-foreground">Reserve your designer - $10, credited to your order</p>
-            <ul className="text-sm text-muted list-disc pl-5 space-y-1">
-              <li>Unlimited AI concepts for this project</li>
-              <li>Priority proof from our real designer</li>
-              <li>The full $10 comes off your order</li>
-            </ul>
-            <button
-              type="button"
-              disabled={unlocking}
-              onClick={async () => {
-                setUnlocking(true);
-                try {
-                  const r = await fetch("/api/design-lab/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ returnTo: window.location.pathname + window.location.search }) });
-                  const d = await r.json();
-                  if (d.url) window.location.href = d.url;
-                  else { setError(d.error ?? "Checkout unavailable"); setUnlocking(false); }
-                } catch { setError("Checkout unavailable"); setUnlocking(false); }
-              }}
-              className="w-full clip-slant bg-brand hover:bg-brand-dark text-on-brand display py-3 disabled:opacity-60"
-            >
-              {unlocking ? "Opening checkout…" : "Reserve My Designer - $10"}
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Result */}
@@ -367,6 +321,95 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
         )}
       </div>
     </div>
+
+      {/* Gate modal: unmissable, centered, dark scrim. */}
+      {need && (
+        <div className="fixed inset-0 z-[70] bg-black/75 grid place-items-center p-4">
+          <div className="w-full max-w-md bg-ink border border-brand/60 rounded-lg shadow-2xl p-6 space-y-4">
+            {need === "email" ? (
+              <>
+                <div>
+                  <p className="display text-2xl text-foreground">🔥 You&apos;re on a roll!</p>
+                  <p className="text-sm text-muted mt-1">
+                    Unlock <span className="text-brand font-semibold">5 more free designs</span> - and we&apos;ll save
+                    your concepts so our designer can pick up right where you leave off.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <input value={leadFirst} onChange={(e) => setLeadFirst(e.target.value)} placeholder="First name" className={input} maxLength={40} />
+                  <input value={leadLast} onChange={(e) => setLeadLast(e.target.value)} placeholder="Last name" className={input} maxLength={40} />
+                  <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email" className={`${input} col-span-2`} maxLength={100} />
+                  <input value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)} type="tel" placeholder="Phone" className={`${input} col-span-2`} maxLength={20} />
+                </div>
+                {error && <p className="text-sm text-red-400">{error}</p>}
+                <button
+                  type="button"
+                  disabled={unlocking || !leadFirst.trim() || !leadLast.trim() || !email.includes("@") || leadPhone.replace(/\D/g, "").length < 10}
+                  onClick={async () => {
+                    setUnlocking(true);
+                    setError(null);
+                    try {
+                      const r = await fetch("/api/design-lab/unlock", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email, firstName: leadFirst, lastName: leadLast, phone: leadPhone }),
+                      });
+                      if (r.ok) {
+                        setNeed(null);
+                        setContactName(`${leadFirst.trim()} ${leadLast.trim()}`);
+                        setContactEmail(email);
+                        setContactPhone(leadPhone);
+                      } else {
+                        setError((await r.json()).error ?? "Try again");
+                      }
+                    } finally {
+                      setUnlocking(false);
+                    }
+                  }}
+                  className="w-full clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg py-3.5 disabled:opacity-50"
+                >
+                  {unlocking ? "Unlocking…" : "Unlock 5 More Free Designs"}
+                </button>
+                <p className="text-[11px] text-muted text-center">No spam - we only reach out about your designs.</p>
+              </>
+            ) : (
+              <>
+                <div>
+                  <p className="display text-2xl text-foreground">Reserve your designer</p>
+                  <p className="text-sm text-muted mt-1">
+                    <span className="text-brand font-semibold">$10 - credited in full to your order.</span>
+                  </p>
+                </div>
+                <ul className="text-sm text-muted list-disc pl-5 space-y-1">
+                  <li>Unlimited AI concepts for this project</li>
+                  <li>Priority proof from our real designer</li>
+                  <li>The full $10 comes off your order</li>
+                </ul>
+                {error && <p className="text-sm text-red-400">{error}</p>}
+                <button
+                  type="button"
+                  disabled={unlocking}
+                  onClick={async () => {
+                    setUnlocking(true);
+                    try {
+                      const r = await fetch("/api/design-lab/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ returnTo: window.location.pathname + window.location.search }) });
+                      const d = await r.json();
+                      if (d.url) window.location.href = d.url;
+                      else { setError(d.error ?? "Checkout unavailable"); setUnlocking(false); }
+                    } catch { setError("Checkout unavailable"); setUnlocking(false); }
+                  }}
+                  className="w-full clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg py-3.5 disabled:opacity-60"
+                >
+                  {unlocking ? "Opening checkout…" : "Reserve My Designer - $10"}
+                </button>
+              </>
+            )}
+            <button type="button" onClick={() => setNeed(null)} className="w-full text-center text-xs text-muted underline">
+              Not now - back to my designs
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

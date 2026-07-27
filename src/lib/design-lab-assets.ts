@@ -7,7 +7,7 @@ import { designRequests } from "@/db/schema";
 // and by the daily cron to heal submissions whose sheets failed (the image
 // model periodically runs slow enough to blow the inline timeouts).
 
-const WM = " The source image contains a diagonal watermark - completely remove it; output clean artwork with no watermark text.";
+const WM = " The source image contains a repeated semi-transparent logo watermark overlay - completely remove it; output clean artwork with no watermark.";
 
 export const SHEET_PROMPTS = {
   "pattern-swatch.png":

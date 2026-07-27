@@ -19,6 +19,24 @@ const DAILY_CAP = 150;
 let dayStamp = "";
 let used = 0;
 
+// Dark version of the Slugger logo for tiling over white mockups; fetched
+// once per instance from the site's own public asset.
+let darkLogoB64: string | null = null;
+async function getDarkLogo(): Promise<string | null> {
+  if (darkLogoB64) return darkLogoB64;
+  try {
+    const site = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+    const res = await fetch(`${site}/slugger-logo.png`);
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    const dark = await sharp(buf).negate({ alpha: false }).png().toBuffer();
+    darkLogoB64 = dark.toString("base64");
+    return darkLogoB64;
+  } catch {
+    return null;
+  }
+}
+
 function checkCap(): boolean {
   const today = new Date().toISOString().slice(0, 10);
   if (today !== dayStamp) { dayStamp = today; used = 0; }
@@ -181,11 +199,15 @@ export async function POST(req: Request) {
     try {
       const src = sharp(Buffer.from(outB64, "base64"));
       const { width = 1024, height = 768 } = await src.metadata();
+      const logo = await getDarkLogo();
+      const tile = logo
+        ? `<image href="data:image/png;base64,${logo}" x="20" y="30" width="240" opacity="0.09"/>`
+        : `<text x="0" y="90" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" fill="#555555" fill-opacity="0.14">SLUGGER ATHLETICS · CONCEPT</text>`;
       const wm = Buffer.from(
         `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            <pattern id="p" width="420" height="180" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
-              <text x="0" y="90" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" fill="#555555" fill-opacity="0.16">SLUGGER ATHLETICS · CONCEPT</text>
+            <pattern id="p" width="380" height="300" patternUnits="userSpaceOnUse" patternTransform="rotate(-22)">
+              ${tile}
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill="url(#p)"/>
