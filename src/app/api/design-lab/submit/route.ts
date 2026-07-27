@@ -102,7 +102,14 @@ export async function POST(req: Request) {
   if (!conceptUrl) return NextResponse.json({ error: "Could not save the concept image." }, { status: 500 });
   const hasRealLogo = Boolean(logoUrl);
 
+  const specLine = [
+    `TEAM: ${body.teamName.trim()}`,
+    body.sport?.trim() ? `SPORT: ${body.sport.trim()}` : "",
+    body.style?.trim() ? `STYLE: ${body.style.trim()}` : "",
+    body.backNumber?.trim() ? `BACK #: ${body.backNumber.trim().slice(0, 4)}` : "",
+  ].filter(Boolean).join(" · ");
   const vision = [
+    specLine,
     "AI DESIGN LAB CONCEPT - the customer designed this in our AI lab and wants THIS design produced.",
     "The FIRST inspiration image is their chosen concept (front and back views) - recreate it faithfully as the production design.",
     logoUrl ? "Their actual team logo file is attached as a separate image - use the real file, not the AI's rendering of it." : "",
@@ -166,7 +173,7 @@ export async function POST(req: Request) {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 username: "Slugger AI Design Lab",
-                content: `📦 **Production asset sheets for ${reference}**\n` + found.map((f) => `${f.label}: ${f.url}`).join("\n"),
+                content: `📦 **Production asset sheets - ${body.teamName?.trim()}${body.sport ? ` (${body.sport}${body.style ? `, ${body.style}` : ""})` : ""} - ${reference}**\n` + found.map((f) => `${f.label}: ${f.url}`).join("\n"),
                 embeds: found.slice(0, 4).map((f) => ({ image: { url: f.url } })),
               }),
             }).catch((e) => console.error("asset thread post failed:", e));
