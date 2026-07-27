@@ -67,11 +67,11 @@ const FAQS = [
   },
   {
     q: "How much do custom embroidered hats cost?",
-    a: "Snapback and trucker hats are $25, fitted Flexfit hats are $30, and an embroidered number on the back adds $5. Our one-time design fee covers the logo digitizing, design work, and your proof.",
+    a: "Snapback and trucker hats are $25, fitted Flexfit hats are $30, and an embroidered number on the back adds $5. Mockups are free; a one-time digitizing fee applies if we create the embroidery file from your logo - bring your own stitch file and there is no fee.",
   },
   {
     q: "Do you charge a digitizing or setup fee?",
-    a: "There is a one-time design fee per design - it covers digitizing your logo for embroidery and the proof you approve before we stitch anything. No other setup fees.",
+    a: "The mockup is free. If we create the stitch-ready embroidery file from your logo, there is a one-time digitizing fee per design. Already have an embroidery file (DST or EMB)? Bring it and there is no fee at all.",
   },
   {
     q: "Can you do 3D puff embroidery?",
@@ -83,7 +83,7 @@ const FAQS = [
   },
   {
     q: "What logo file do I need?",
-    a: "Anything works - a PNG, JPG, PDF, or even a photo of your old gear. We redraw and digitize it for stitching (covered by the design fee), and you approve the result before production.",
+    a: "Anything works - a PNG, JPG, PDF, or even a photo of your old gear. We redraw and digitize it into a stitch-ready file (one-time digitizing fee), and you approve the result before production. If you already have a DST or EMB embroidery file, send that and skip the fee.",
   },
 ];
 
@@ -124,17 +124,17 @@ export default function CustomHatsPage() {
 
       {/* Hero */}
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-16 text-center">
-        <span className="display text-brand text-sm">Stitched In-House · Fast Turnaround · From $25</span>
+        <span className="display text-brand text-sm">Stitched In-House · Free Mockups · From $25</span>
         <h1 className="display text-4xl sm:text-6xl text-foreground mt-2">
           Custom Embroidered Hats
         </h1>
         <p className="mt-5 text-lg text-muted max-w-2xl mx-auto">
           Fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo - flat
           pricing at <strong className="text-foreground">$25-30 per hat</strong> with a{" "}
-          <strong className="text-foreground">6-hat minimum per design</strong>. The one-time
-          design fee covers your logo digitizing and a stitched proof you approve before we run
-          anything. Every hat is embroidered right here in our Ocala shop, so orders are often
-          ready in just days.
+          <strong className="text-foreground">6-hat minimum per design</strong>. Your mockup is
+          free. If we create the stitch-ready embroidery file from your logo there is a one-time
+          digitizing fee - or bring your own embroidery file and skip it. Every hat is embroidered
+          right here in our Ocala shop, so orders are often ready in just days.
         </p>
         <div className="mt-8 flex flex-wrap gap-4 justify-center">
           <Link href="/team-order" className="clip-slant bg-brand text-on-brand display text-lg px-8 py-4 hover:bg-brand-dark transition-colors">
