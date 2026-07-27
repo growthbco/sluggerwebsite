@@ -50,12 +50,6 @@ export const metadata: Metadata = {
   },
   description:
     "Custom team uniforms for every sport, embroidered hats, and 3D hype chains. Fast turnaround, in-house design, and easy team ordering.",
-  openGraph: {
-    title: "Slugger Athletics - Custom Team Gear",
-    description:
-      "Custom uniforms, embroidered hats, and hype chains for teams and fans.",
-    type: "website",
-  },
 };
 
 export default function RootLayout({
