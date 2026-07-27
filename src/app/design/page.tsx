@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { DesignIntakeForm } from "@/components/design-intake-form";
 import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
 
@@ -15,6 +16,14 @@ export default function DesignPage() {
       <header className="max-w-2xl">
         <span className="display text-brand text-sm">Free with Order</span>
         <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">Start Your Design</h1>
+        <div className="mt-6 max-w-2xl">
+          <Link href="/design-lab" className="block bg-brand/10 border border-brand/60 hover:bg-brand/20 p-5 transition-colors">
+            <span className="display text-[11px] tracking-wider text-brand">⚡ NEW - IMPATIENT? TRY THIS</span>
+            <p className="display text-xl sm:text-2xl mt-1 text-foreground">Design It Yourself With AI →</p>
+            <p className="text-sm text-muted mt-1">Pick colors, describe your idea, see a front-and-back concept in seconds - then our designer makes it real. Free to try.</p>
+          </Link>
+          <p className="mt-4 display text-sm text-muted">OR DESCRIBE IT AND OUR DESIGNER TAKES IT FROM HERE ↓</p>
+        </div>
         <p className="mt-3 text-muted">
           Tell us what you want. Drop in inspiration images or describe your
           vision &mdash; our in-house designer works up a mockup, sends it

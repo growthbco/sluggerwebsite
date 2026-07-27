@@ -15,7 +15,7 @@ export const maxDuration = 60;
 // Gated: admin session OR the shared test key. Each generation on
 // gemini-3-pro-image costs ~$0.134, so a daily cap keeps testing bounded.
 const TEST_KEY = process.env.DESIGN_LAB_KEY || "slugger26";
-const DAILY_CAP = 60;
+const DAILY_CAP = 150;
 let dayStamp = "";
 let used = 0;
 
