@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { isAdmin } from "@/lib/admin-auth";
+import { waitUntil } from "@vercel/functions";
+import { eq } from "drizzle-orm";
+import { getDb, dbEnabled } from "@/db";
+import { designRequests } from "@/db/schema";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const TEST_KEY = process.env.DESIGN_LAB_KEY || "slugger26";
 
@@ -23,7 +27,7 @@ async function extractAsset(conceptB64: { mime: string; data: string }, prompt: 
         contents: [{ role: "user", parts: [{ text: prompt }, { inline_data: { mime_type: conceptB64.mime, data: conceptB64.data } }] }],
         generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "1:1" } },
       }),
-      signal: AbortSignal.timeout(40000),
+      signal: AbortSignal.timeout(120000),
     });
   try {
     let res = await call();
@@ -90,28 +94,19 @@ export async function POST(req: Request) {
     }
   }
   const conceptB64 = { mime: concept[1], data: concept[2] };
-  const [conceptUrl, logoUrl, referenceUrl, patternB64, wordmarkB64, emblemB64] = await Promise.all([
+  const [conceptUrl, logoUrl, referenceUrl] = await Promise.all([
     upload("concept.png", body.concept),
     upload("logo.png", body.logo),
     upload("reference.png", body.reference),
-    extractAsset(conceptB64, "From this jersey design, extract ONLY the background pattern/texture as a flat, full-bleed, seamless square print swatch: the complete pattern at full intensity edge to edge, straight-on view, no garment, no fabric folds, no lettering, no numbers, no logos, no shadows. Production artwork style. The source image contains a diagonal watermark - completely remove it; output clean artwork with no watermark text."),
-    extractAsset(conceptB64, "From this jersey design, extract ONLY the team name wordmark/lettering exactly as styled (same font, colors, outlines, and any swoosh/underline), laid out flat and large, perfectly centered on a plain solid white background. No garment, no pattern, no other elements. Clean logo-sheet presentation. The source image contains a diagonal watermark - completely remove it; output clean artwork with no watermark text."),
-    body.logo ? Promise.resolve(null) : extractAsset(conceptB64, "From this jersey design, extract ONLY the logo/emblem/mascot graphic (if one exists besides the team name lettering), isolated large and centered on a plain solid white background. If there is no distinct emblem, reproduce the most distinctive graphic element instead. No garment, no pattern. The source image contains a diagonal watermark - completely remove it; output clean artwork with no watermark text."),
   ]);
   if (!conceptUrl) return NextResponse.json({ error: "Could not save the concept image." }, { status: 500 });
-  const [patternUrl, wordmarkUrl, emblemUrl] = await Promise.all([
-    patternB64 ? upload("pattern-swatch.png", `data:image/png;base64,${patternB64}`) : null,
-    wordmarkB64 ? upload("wordmark.png", `data:image/png;base64,${wordmarkB64}`) : null,
-    emblemB64 ? upload("emblem.png", `data:image/png;base64,${emblemB64}`) : null,
-  ]);
+  const hasRealLogo = Boolean(logoUrl);
 
   const vision = [
     "AI DESIGN LAB CONCEPT - the customer designed this in our AI lab and wants THIS design produced.",
     "The FIRST inspiration image is their chosen concept (front and back views) - recreate it faithfully as the production design.",
     logoUrl ? "Their actual team logo file is attached as a separate image - use the real file, not the AI's rendering of it." : "",
-    patternUrl ? `EXTRACTED PATTERN SWATCH (flat, print-style): ${patternUrl}` : "",
-    wordmarkUrl ? `EXTRACTED WORDMARK on white (trace-ready): ${wordmarkUrl}` : "",
-    emblemUrl ? `EXTRACTED EMBLEM on white (AI-invented - trace or redraw): ${emblemUrl}` : "",
+    "Production asset sheets (pattern swatch, wordmark on white) are being extracted and will be posted to this thread within a few minutes.",
     referenceUrl ? "They also supplied a reference jersey (style inspiration) - attached." : "",
     body.backNumber?.trim() ? `Back number shown in concept: ${body.backNumber.trim().slice(0, 4)}.` : "",
     body.idea?.trim() ? `Customer's own description: ${body.idea.trim().slice(0, 600)}` : "",
@@ -131,7 +126,7 @@ export async function POST(req: Request) {
       colorHexes: (body.colorHexes ?? []).slice(0, 6),
       productTypes: ["Jerseys"],
       jerseyStyle: (body.style ?? "").trim().slice(0, 30) || undefined,
-      inspirationImages: [conceptUrl, logoUrl, referenceUrl, patternUrl, wordmarkUrl, emblemUrl].filter(Boolean),
+      inspirationImages: [conceptUrl, logoUrl, referenceUrl].filter(Boolean),
       estimatedPieces: (body.estimatedPieces ?? "").trim().slice(0, 20) || undefined,
     }),
   });
@@ -139,5 +134,49 @@ export async function POST(req: Request) {
   if (!res.ok || !data?.ok) {
     return NextResponse.json({ error: data?.error ?? "Could not create the design request." }, { status: 502 });
   }
+  const reference: string = data.reference;
+  waitUntil((async () => {
+    try {
+      const jobs: [string, string][] = [
+        ["pattern-swatch.png", "From this jersey design, extract ONLY the background pattern/texture as a flat, full-bleed, seamless square print swatch: the complete pattern at full intensity edge to edge, straight-on view, no garment, no fabric folds, no lettering, no numbers, no logos, no shadows. Production artwork style. The source image contains a diagonal watermark - completely remove it; output clean artwork with no watermark text."],
+        ["wordmark.png", "From this jersey design, extract ONLY the team name wordmark/lettering exactly as styled (same font, colors, outlines, and any swoosh/underline), laid out flat and large, perfectly centered on a plain solid white background. No garment, no pattern, no other elements. Clean logo-sheet presentation. The source image contains a diagonal watermark - completely remove it; output clean artwork with no watermark text."],
+      ];
+      if (!hasRealLogo) {
+        jobs.push(["emblem.png", "From this jersey design, extract ONLY the logo/emblem/mascot graphic (if one exists besides the team name lettering), isolated large and centered on a plain solid white background. If there is no distinct emblem, reproduce the most distinctive graphic element instead. No garment, no pattern. The source image contains a diagonal watermark - completely remove it; output clean artwork with no watermark text."]);
+      }
+      const results = await Promise.all(jobs.map(async ([name, prompt]) => {
+        const b64 = await extractAsset(conceptB64, prompt);
+        return b64 ? await upload(name, `data:image/png;base64,${b64}`) : null;
+      }));
+      const labels = ["🎨 Pattern swatch (print-style)", "🔤 Wordmark on white (trace-ready)", "🛡️ Emblem on white (AI-invented - trace/redraw)"];
+      const found = results.map((url, i) => ({ url, label: labels[i] })).filter((r): r is { url: string; label: string } => Boolean(r.url));
+      if (!found.length) { console.error("design-lab: all extractions failed for", reference); return; }
+      if (dbEnabled()) {
+        const db = getDb();
+        const [row] = await db.select({ id: designRequests.id, imgs: designRequests.inspirationImages, thread: designRequests.discordThreadId })
+          .from(designRequests).where(eq(designRequests.reference, reference)).limit(1);
+        if (row) {
+          await db.update(designRequests)
+            .set({ inspirationImages: [...(row.imgs ?? []), ...found.map((f) => f.url)] })
+            .where(eq(designRequests.id, row.id));
+          const hook = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
+          if (hook && row.thread) {
+            await fetch(`${hook}?thread_id=${row.thread}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                username: "Slugger AI Design Lab",
+                content: `📦 **Production asset sheets for ${reference}**\n` + found.map((f) => `${f.label}: ${f.url}`).join("\n"),
+                embeds: found.slice(0, 4).map((f) => ({ image: { url: f.url } })),
+              }),
+            }).catch((e) => console.error("asset thread post failed:", e));
+          }
+        }
+      }
+      console.log(`design-lab: posted ${found.length} asset sheets for ${reference}`);
+    } catch (e) {
+      console.error("design-lab background extraction failed:", e);
+    }
+  })());
   return NextResponse.json(data);
 }
