@@ -163,12 +163,15 @@ export function DesignLab({ testKey }: { testKey?: string }) {
 
       {/* Result */}
       <div>
-        <div className="relative aspect-[4/3] bg-white border border-line rounded overflow-hidden grid place-items-center">
+        <div className={`relative aspect-[4/3] border border-line rounded overflow-hidden grid place-items-center ${image ? "bg-white" : "bg-steel"}`}>
           {image ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={image} alt="AI jersey concept" className="h-full w-full object-contain" />
           ) : (
-            <p className="text-muted text-sm px-8 text-center">Your AI jersey concept will appear here - front and back, side by side.</p>
+            <div className="text-center px-8">
+              <svg className="mx-auto mb-3 opacity-30" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M16 3l5 3-2 4-2-1v11H7V9L5 10 3 6l5-3c0 1.1 1.8 2 4 2s4-.9 4-2z" strokeLinejoin="round"/></svg>
+              <p className="text-muted text-sm">Your concept appears here - front and back, side by side.</p>
+            </div>
           )}
           {busy && <div className="absolute inset-0 bg-black/40 grid place-items-center"><p className="display text-white">Designing…</p></div>}
         </div>
