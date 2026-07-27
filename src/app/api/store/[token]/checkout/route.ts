@@ -12,6 +12,7 @@ type IncomingItem = {
   playerName?: string;
   playerNumber?: string;
   quantity: number;
+  design?: string;
 };
 
 // Shipping choices for the Stripe page: standard ground (live rate + margin
@@ -94,6 +95,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     const qty = Math.max(1, Math.min(99, Number(item.quantity) || 1));
     const size = def.sizes.includes(item.size ?? "") ? item.size : def.sizes[0];
     const details = [size];
+    // Multi-design teams: the chosen colorway leads the line item so it
+    // reaches production/Discord/emails unambiguously.
+    const chosenDesign = def.designs?.find((dz: { label: string }) => dz.label === item.design)?.label
+      ?? def.designs?.[0]?.label;
+    if (chosenDesign) details.unshift(chosenDesign);
     let unitCents = def.priceCents;
     if (def.nameNumber) {
       const nm = (item.playerName ?? "").trim().slice(0, 30);

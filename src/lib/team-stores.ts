@@ -19,6 +19,8 @@ export type StoreItem = {
   numberAddOnCents?: number;
   /** Approx shipping weight in ounces; drives the weight-based ship fee. */
   weightOz: number;
+  /** Optional approved colorways buyers pick between. */
+  designs?: { label: string; image: string }[];
 };
 
 // Everything a store can offer. The owner picks a subset per team when the

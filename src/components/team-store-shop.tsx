@@ -11,6 +11,8 @@ type StoreItem = {
   nameNumber?: boolean;
   numberAddOnCents?: number;
   weightOz: number;
+  /** Approved colorways the buyer chooses between (teams with multiple designs). */
+  designs?: { label: string; image: string }[];
 };
 
 type Selection = {
@@ -18,6 +20,7 @@ type Selection = {
   label: string;
   priceCents: number;
   size: string;
+  design?: string;
   playerName?: string;
   playerNumber?: string;
   quantity: number;
@@ -88,10 +91,10 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zip, totalOz]);
   // Per-item draft state, keyed by item key.
-  const [drafts, setDrafts] = useState<Record<string, { size: string; playerName: string; playerNumber: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, { size: string; playerName: string; playerNumber: string; design?: string }>>({});
 
   const draft = (k: string, sizes: string[]) => drafts[k] ?? { size: sizes[0], playerName: "", playerNumber: "" };
-  const setDraft = (k: string, patch: Partial<{ size: string; playerName: string; playerNumber: string }>) =>
+  const setDraft = (k: string, patch: Partial<{ size: string; playerName: string; playerNumber: string; design: string }>) =>
     setDrafts((d) => ({ ...d, [k]: { ...draft(k, items.find((i) => i.key === k)?.sizes ?? []), ...patch } }));
 
   function add(item: StoreItem) {
@@ -106,6 +109,7 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
         // the store snapshot at checkout regardless.
         priceCents: item.priceCents + (number && item.numberAddOnCents ? item.numberAddOnCents : 0),
         size: d.size,
+        design: item.designs?.length ? (d.design ?? item.designs[0].label) : undefined,
         // On print items the name goes ON the gear; on everything else it's a
         // tracking-only "whose is this" label.
         playerName: d.playerName.trim() || undefined,
@@ -156,6 +160,7 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
           label: def.label,
           priceCents: def.priceCents + (number && def.numberAddOnCents ? def.numberAddOnCents : 0),
           size: def.sizes.includes(size) ? size : def.sizes[0],
+          design: def.designs?.[0]?.label,
           playerName: r.name || undefined,
           playerNumber: number,
           quantity: 1,
@@ -198,6 +203,29 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
               </div>
 
               <div className="mt-3 space-y-2 flex-1">
+                {(item.designs?.length ?? 0) > 1 && (
+                  <div className="mb-3">
+                    <p className="display text-xs text-muted tracking-wide mb-1.5">PICK YOUR DESIGN</p>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {item.designs!.map((dz) => {
+                        const active = (d.design ?? item.designs![0].label) === dz.label;
+                        return (
+                          <button
+                            key={dz.label}
+                            type="button"
+                            onClick={() => setDraft(item.key, { design: dz.label })}
+                            className={`shrink-0 w-24 text-left border-2 rounded overflow-hidden ${active ? "border-brand" : "border-line opacity-75 hover:opacity-100"}`}
+                            aria-pressed={active}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={dz.image} alt={dz.label} className="h-16 w-full object-cover bg-white" />
+                            <span className={`block px-1.5 py-1 text-[11px] leading-tight ${active ? "text-brand" : "text-muted"}`}>{dz.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <select
                   value={d.size}
                   onChange={(e) => setDraft(item.key, { size: e.target.value })}
@@ -289,7 +317,7 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
                 <div>
                   <p className="text-foreground">{s.label}</p>
                   <p className="text-xs text-muted">
-                    {[s.size, s.playerName?.toUpperCase(), s.playerNumber ? `#${s.playerNumber}` : null]
+                    {[s.design, s.size, s.playerName?.toUpperCase(), s.playerNumber ? `#${s.playerNumber}` : null]
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
