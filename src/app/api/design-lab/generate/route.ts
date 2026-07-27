@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     primaryColor?: string;
     secondaryColor?: string;
     teamName?: string;
+    backNumber?: string;
     idea?: string;
     logo?: string; // data URL
     reference?: string; // data URL of a jersey the customer likes
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
   const teamName = clean(body.teamName, 40);
   const idea = clean(body.idea, 500);
   const refinement = clean(body.refinement, 500);
+  const backNumber = clean(body.backNumber, 4) || "12";
 
   const parts: Record<string, unknown>[] = [];
   const parseDataUrl = (u?: string) => {
@@ -77,13 +79,13 @@ export async function POST(req: Request) {
     )) as { instruction?: string } | null;
     if (interpreted?.instruction) instruction = interpreted.instruction.slice(0, 600);
     // Guardrail 2: hard rules appended to every refinement.
-    parts.push({ text: `Edit this custom ${sport} jersey product mockup. ${instruction} STRICT RULES: the output must remain a crisp, full-contrast, professional product photo - floating ghost-mannequin, front view, pure white background, normal exposure and saturation. NEVER fade, wash out, blur, or change the brightness of the whole photo or the whole garment. Change ONLY the specific design elements mentioned; keep the fabric base color, lettering, fit, framing, and photo quality exactly as they are unless explicitly asked.` });
+    parts.push({ text: `Edit this custom ${sport} jersey product mockup. ${instruction} STRICT RULES: the output must remain a crisp, full-contrast, professional product photo - floating ghost-mannequin, pure white background, normal exposure and saturation, keeping the same front-and-back side-by-side layout as the input image. NEVER fade, wash out, blur, or change the brightness of the whole photo or the whole garment. Change ONLY the specific design elements mentioned; keep the fabric base color, lettering, fit, framing, and photo quality exactly as they are unless explicitly asked.` });
     parts.push({ inline_data: prev });
   } else {
     const reference = parseDataUrl(body.reference);
     const logo = parseDataUrl(body.logo);
     const prompt = [
-      `Professional e-commerce product mockup of a fully custom sublimated ${sport} jersey, ${style} cut, floating ghost-mannequin style, front view, pure white background, studio lighting.`,
+      `Professional e-commerce product mockup of a fully custom sublimated ${sport} jersey, ${style} cut, floating ghost-mannequin style, pure white background, studio lighting. Show TWO views side by side in one image: the FRONT of the jersey on the left and the BACK of the same jersey on the right. The back shows the same design language with a large player number ${backNumber} centered below the shoulders.`,
       reference
         ? `A REFERENCE JERSEY image is provided: recreate its overall design language - layout, paneling, stripe/graphic placement, and general vibe - as a NEW original design (do not copy logos or team names from the reference).`
         : "",
@@ -113,7 +115,7 @@ export async function POST(req: Request) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [{ role: "user", parts }],
-            generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "1:1" } },
+            generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "4:3" } },
           }),
           signal: AbortSignal.timeout(45000),
         },

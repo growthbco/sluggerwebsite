@@ -13,6 +13,7 @@ export function DesignLab({ testKey }: { testKey?: string }) {
   const [primaryColor, setPrimaryColor] = useState("black");
   const [secondaryColor, setSecondaryColor] = useState("gold");
   const [teamName, setTeamName] = useState("");
+  const [backNumber, setBackNumber] = useState("");
   const [idea, setIdea] = useState("");
   const [logo, setLogo] = useState<string | null>(null);
   const [reference, setReference] = useState<string | null>(null);
@@ -51,7 +52,7 @@ export function DesignLab({ testKey }: { testKey?: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           key: testKey,
-          sport, style, primaryColor, secondaryColor, teamName, idea,
+          sport, style, primaryColor, secondaryColor, teamName, backNumber, idea,
           logo: logo ?? undefined,
           reference: reference ?? undefined,
           ...(refine && image ? { previousImage: image, refinement } : {}),
@@ -100,9 +101,15 @@ export function DesignLab({ testKey }: { testKey?: string }) {
             <input value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} placeholder="gold, white, red…" className={input} />
           </div>
         </div>
-        <div>
-          <label className={label}>TEAM NAME (ON THE CHEST)</label>
-          <input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="e.g. MONSTARS" className={input} maxLength={30} />
+        <div className="grid grid-cols-[1fr_7rem] gap-3">
+          <div>
+            <label className={label}>TEAM NAME (ON THE CHEST)</label>
+            <input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="e.g. MONSTARS" className={input} maxLength={30} />
+          </div>
+          <div>
+            <label className={label}>BACK #</label>
+            <input value={backNumber} onChange={(e) => setBackNumber(e.target.value)} placeholder="12" className={input} maxLength={4} />
+          </div>
         </div>
         <div>
           <label className={label}>DESCRIBE YOUR IDEA</label>
@@ -156,12 +163,12 @@ export function DesignLab({ testKey }: { testKey?: string }) {
 
       {/* Result */}
       <div>
-        <div className="relative aspect-square bg-white border border-line rounded overflow-hidden grid place-items-center">
+        <div className="relative aspect-[4/3] bg-white border border-line rounded overflow-hidden grid place-items-center">
           {image ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={image} alt="AI jersey concept" className="h-full w-full object-contain" />
           ) : (
-            <p className="text-muted text-sm px-8 text-center">Your AI jersey concept will appear here.</p>
+            <p className="text-muted text-sm px-8 text-center">Your AI jersey concept will appear here - front and back, side by side.</p>
           )}
           {busy && <div className="absolute inset-0 bg-black/40 grid place-items-center"><p className="display text-white">Designing…</p></div>}
         </div>
