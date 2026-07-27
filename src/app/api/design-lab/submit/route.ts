@@ -5,6 +5,7 @@ import { waitUntil } from "@vercel/functions";
 import { eq } from "drizzle-orm";
 import { getDb, dbEnabled } from "@/db";
 import { designRequests } from "@/db/schema";
+import { decryptCleanUrl } from "@/lib/design-lab";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -62,7 +63,8 @@ export async function POST(req: Request) {
     idea?: string;
     estimatedPieces?: string;
     notes?: string;
-    concept?: string; // data URL - the chosen AI concept (front+back)
+    concept?: string; // data URL - the chosen AI concept (front+back, watermarked)
+    cleanToken?: string; // encrypted URL of the clean master saved at generation time
     logo?: string;
     reference?: string;
   } = {};
@@ -75,8 +77,19 @@ export async function POST(req: Request) {
   if (!body.contactName?.trim() || !body.contactEmail?.trim() || !body.teamName?.trim()) {
     return NextResponse.json({ error: "Name, email, and team name are required." }, { status: 400 });
   }
+  // Prefer the clean (unwatermarked) master saved at generation time; fall
+  // back to the customer's watermarked copy if the token is missing/stale.
+  let cleanConcept: { mime: string; data: string } | null = null;
+  let cleanUrl: string | null = body.cleanToken ? decryptCleanUrl(body.cleanToken) : null;
+  if (cleanUrl) {
+    try {
+      const res = await fetch(cleanUrl);
+      if (res.ok) cleanConcept = { mime: "image/png", data: Buffer.from(await res.arrayBuffer()).toString("base64") };
+      else cleanUrl = null;
+    } catch { cleanUrl = null; }
+  }
   const concept = body.concept?.match(/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/);
-  if (!concept) return NextResponse.json({ error: "No concept image attached." }, { status: 400 });
+  if (!concept && !cleanConcept) return NextResponse.json({ error: "No concept image attached." }, { status: 400 });
 
   // Upload the customer's chosen assets so the designer gets real files.
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -93,12 +106,13 @@ export async function POST(req: Request) {
       return null;
     }
   }
-  const conceptB64 = { mime: concept[1], data: concept[2] };
-  const [conceptUrl, logoUrl, referenceUrl] = await Promise.all([
-    upload("concept.png", body.concept),
+  const conceptB64 = cleanConcept ?? { mime: concept![1], data: concept![2] };
+  const [uploadedConceptUrl, logoUrl, referenceUrl] = await Promise.all([
+    cleanUrl ? Promise.resolve(null) : upload("concept.png", body.concept),
     upload("logo.png", body.logo),
     upload("reference.png", body.reference),
   ]);
+  const conceptUrl = cleanUrl ?? uploadedConceptUrl;
   if (!conceptUrl) return NextResponse.json({ error: "Could not save the concept image." }, { status: 500 });
   const hasRealLogo = Boolean(logoUrl);
 

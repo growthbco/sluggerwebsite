@@ -19,7 +19,8 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
   const [logo, setLogo] = useState<string | null>(null);
   const [reference, setReference] = useState<string | null>(null);
   const [image, setImage] = useState<string | null>(null);
-  const [history, setHistory] = useState<string[]>([]);
+  const [cleanToken, setCleanToken] = useState<string | undefined>(undefined);
+  const [history, setHistory] = useState<{ img: string; token?: string }[]>([]);
   const [refinement, setRefinement] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +80,8 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
       if (!res.ok || !data.image) { setError(data.error ?? "Generation failed"); return; }
       setNeed(null);
       setImage(data.image);
-      setHistory((h) => [data.image, ...h].slice(0, 12));
+      setCleanToken(data.cleanToken);
+      setHistory((h) => [{ img: data.image, token: data.cleanToken }, ...h].slice(0, 12));
       setRefinement("");
       if (data.usedToday) setUsage({ used: data.usedToday, cap: data.capToday });
     } catch {
@@ -278,7 +280,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
                           key: testKey, contactName, contactEmail, contactPhone,
                           teamName, sport, style, backNumber, idea, estimatedPieces,
                           colorHexes: [primaryColor, secondaryColor, ...extraColors],
-                          concept: image, logo: logo ?? undefined, reference: reference ?? undefined,
+                          concept: image, cleanToken, logo: logo ?? undefined, reference: reference ?? undefined,
                         }),
                       });
                       const d = await r.json();
@@ -306,12 +308,12 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
                     <button
                       key={i}
                       type="button"
-                      onClick={() => setImage(h)}
-                      className={`shrink-0 h-16 w-[5.3rem] bg-white rounded overflow-hidden border-2 ${h === image ? "border-brand" : "border-line opacity-70 hover:opacity-100"}`}
+                      onClick={() => { setImage(h.img); setCleanToken(h.token); }}
+                      className={`shrink-0 h-16 w-[5.3rem] bg-white rounded overflow-hidden border-2 ${h.img === image ? "border-brand" : "border-line opacity-70 hover:opacity-100"}`}
                       aria-label={`Show concept ${history.length - i}`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={h} alt={`Concept ${history.length - i}`} className="h-full w-full object-cover" />
+                      <img src={h.img} alt={`Concept ${history.length - i}`} className="h-full w-full object-cover" />
                     </button>
                   ))}
                 </div>

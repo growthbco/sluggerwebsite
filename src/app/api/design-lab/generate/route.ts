@@ -6,7 +6,7 @@ import sharp from "sharp";
 import { eq, sql } from "drizzle-orm";
 import { getDb, dbEnabled } from "@/db";
 import { designLabVisitors } from "@/db/schema";
-import { getOrCreateVisitor, tierFor, LAB_COOKIE } from "@/lib/design-lab";
+import { getOrCreateVisitor, tierFor, LAB_COOKIE, encryptCleanUrl } from "@/lib/design-lab";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -191,6 +191,19 @@ export async function POST(req: Request) {
     );
     const payload = img?.inlineData ?? img?.inline_data;
     if (!payload?.data) return NextResponse.json({ error: "No image came back - try rewording" }, { status: 502 });
+    // Save the CLEAN master first - the designer handoff uses this; the
+    // customer only ever receives the watermarked copy below.
+    let cleanToken: string | undefined;
+    try {
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const cleanBlob = await put(`design-lab/clean/${stamp}.png`, Buffer.from(payload.data, "base64"), {
+        access: "public", contentType: payload.mimeType ?? payload.mime_type ?? "image/png", addRandomSuffix: true,
+      });
+      cleanToken = encryptCleanUrl(cleanBlob.url);
+    } catch (e) {
+      console.error("clean master save failed:", e);
+    }
+
     // Bake a diagonal SLUGGER ATHLETICS watermark into every concept so the
     // artwork can't be shopped to another printer; the clean version only
     // ever exists as the designer's real proof.
@@ -238,7 +251,7 @@ export async function POST(req: Request) {
         .returning();
       ladderState = { used: updated.generations, free: 3 };
     }
-    const out = NextResponse.json({ image: `data:${mime};base64,${payload.data}`, usedToday: used, capToday: DAILY_CAP, ladder: ladderState });
+    const out = NextResponse.json({ image: `data:${mime};base64,${payload.data}`, cleanToken, usedToday: used, capToday: DAILY_CAP, ladder: ladderState });
     if (visitorCtx?.setCookie) out.cookies.set(LAB_COOKIE, visitorCtx.setCookie, { httpOnly: true, maxAge: 31536000, path: "/" });
     return out;
   } catch (e) {

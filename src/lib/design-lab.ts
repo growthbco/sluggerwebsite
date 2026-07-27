@@ -37,3 +37,34 @@ export function tierFor(v: LabVisitor): { allowed: boolean; need?: "email" | "up
   if (v.generations < EMAIL_GENS) return { allowed: true };
   return { allowed: false, need: "upgrade" };
 }
+
+// Clean-master tokens: the unwatermarked render lives in Blob; its URL is
+// returned to the browser only as an AES-encrypted token so customers can't
+// fish the clean file out of dev tools, while submit can recover it.
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
+
+function tokenKey(): Buffer {
+  return createHash("sha256").update(`slugger-lab:${process.env.GEMINI_API_KEY ?? "dev"}`).digest();
+}
+
+export function encryptCleanUrl(url: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", tokenKey(), iv);
+  const enc = Buffer.concat([cipher.update(url, "utf8"), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), enc]).toString("base64url");
+}
+
+export function decryptCleanUrl(token: string): string | null {
+  try {
+    const raw = Buffer.from(token, "base64url");
+    const iv = raw.subarray(0, 12);
+    const tag = raw.subarray(12, 28);
+    const enc = raw.subarray(28);
+    const decipher = createDecipheriv("aes-256-gcm", tokenKey(), iv);
+    decipher.setAuthTag(tag);
+    const url = Buffer.concat([decipher.update(enc), decipher.final()]).toString("utf8");
+    return url.startsWith("https://") ? url : null;
+  } catch {
+    return null;
+  }
+}
