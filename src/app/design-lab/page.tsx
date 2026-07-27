@@ -8,8 +8,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function DesignLabPage({ searchParams }: { searchParams: Promise<{ key?: string }> }) {
-  const { key } = await searchParams;
+export default async function DesignLabPage({ searchParams }: { searchParams: Promise<{ key?: string; ladder?: string; paid?: string }> }) {
+  const { key, ladder, paid } = await searchParams;
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-14">
       <span className="display text-brand text-sm">Private Preview · Not Public</span>
@@ -19,7 +19,7 @@ export default async function DesignLabPage({ searchParams }: { searchParams: Pr
         seconds. Each generation costs about 13 cents; the daily cap is 60.
       </p>
       <div className="mt-10">
-        <DesignLab testKey={key} />
+        <DesignLab testKey={key} ladder={ladder === "1"} paidJustNow={paid === "1"} />
       </div>
     </div>
   );

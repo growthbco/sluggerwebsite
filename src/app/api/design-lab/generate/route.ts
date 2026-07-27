@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/admin-auth";
 import { generateJson } from "@/lib/design-assistant";
+import { put } from "@vercel/blob";
+import { eq, sql } from "drizzle-orm";
+import { getDb, dbEnabled } from "@/db";
+import { designLabVisitors } from "@/db/schema";
+import { getOrCreateVisitor, tierFor, LAB_COOKIE } from "@/lib/design-lab";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -24,6 +29,7 @@ function checkCap(): boolean {
 export async function POST(req: Request) {
   let body: {
     key?: string;
+    ladder?: boolean;
     sport?: string;
     style?: string;
     primaryColor?: string;
@@ -38,8 +44,23 @@ export async function POST(req: Request) {
   } = {};
   try { body = await req.json(); } catch {}
 
-  const authed = (await isAdmin()) || body.key === TEST_KEY;
-  if (!authed) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+  const keyed = (await isAdmin()) || body.key === TEST_KEY;
+  const isPublic = process.env.DESIGN_LAB_PUBLIC === "true";
+  if (!keyed && !isPublic) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+  // Ladder applies to public visitors, and to key holders who ask for it (testing).
+  const ladderActive = (isPublic && !keyed) || body.ladder === true;
+  let visitorCtx: Awaited<ReturnType<typeof getOrCreateVisitor>> = null;
+  if (ladderActive) {
+    if (!dbEnabled()) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+    visitorCtx = await getOrCreateVisitor();
+    if (!visitorCtx) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
+    const tier = tierFor(visitorCtx.visitor);
+    if (!tier.allowed) {
+      const res = NextResponse.json({ need: tier.need, used: visitorCtx.visitor.generations }, { status: 403 });
+      if (visitorCtx.setCookie) res.cookies.set(LAB_COOKIE, visitorCtx.setCookie, { httpOnly: true, maxAge: 31536000, path: "/" });
+      return res;
+    }
+  }
   if (!checkCap()) return NextResponse.json({ error: "Daily generation cap reached - try tomorrow." }, { status: 429 });
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -72,6 +93,7 @@ export async function POST(req: Request) {
         "Rewrite this as ONE precise image-edit instruction for an image model. Rules:",
         "- The request refers to the JERSEY'S DESIGN (patterns, lettering, graphics, trim, colors) unless it explicitly mentions the photo, lighting, or background.",
         "- Words like lighter/darker/softer/transparent mean the intensity of specific design elements, NOT the exposure of the photo or the whole garment.",
+        "- COLOR CHANGES: if they ask for a different color (of the jersey, a panel, lettering, or the whole scheme), the instruction must say to RECOLOR those parts while keeping every pattern, graphic, texture, stripe, logo, and layout element exactly where and how it is - a recolor never removes or simplifies the design.",
         "- Name the specific element(s) to change and state that everything else stays identical.",
         'Return ONLY JSON: { "instruction": string }',
       ].join("\n"),
@@ -79,7 +101,7 @@ export async function POST(req: Request) {
     )) as { instruction?: string } | null;
     if (interpreted?.instruction) instruction = interpreted.instruction.slice(0, 600);
     // Guardrail 2: hard rules appended to every refinement.
-    parts.push({ text: `Edit this custom ${sport} jersey product mockup. ${instruction} STRICT RULES: the output must remain a crisp, full-contrast, professional product photo - floating ghost-mannequin, pure white background, normal exposure and saturation, keeping the same front-and-back side-by-side layout as the input image. NEVER fade, wash out, blur, or change the brightness of the whole photo or the whole garment. Change ONLY the specific design elements mentioned; keep the fabric base color, lettering, fit, framing, and photo quality exactly as they are unless explicitly asked.` });
+    parts.push({ text: `Edit this custom ${sport} jersey product mockup. ${instruction} STRICT RULES: the output must remain a crisp, full-contrast, professional product photo - floating ghost-mannequin, pure white background, normal exposure and saturation, keeping the same front-and-back side-by-side layout as the input image. NEVER fade, wash out, blur, or change the brightness of the whole photo or the whole garment. Change ONLY the specific design elements mentioned; keep the lettering, fit, framing, and photo quality exactly as they are unless explicitly asked. If the change is a COLOR change, recolor while preserving every existing pattern, graphic, and design detail in place - do not remove, simplify, or redraw them.` });
     parts.push({ inline_data: prev });
   } else {
     const reference = parseDataUrl(body.reference);
@@ -141,7 +163,26 @@ export async function POST(req: Request) {
     if (!payload?.data) return NextResponse.json({ error: "No image came back - try rewording" }, { status: 502 });
     const mime = payload.mimeType ?? payload.mime_type ?? "image/png";
     console.log(`design-lab generation #${used} today (~$${(used * 0.134).toFixed(2)} spent)`);
-    return NextResponse.json({ image: `data:${mime};base64,${payload.data}`, usedToday: used, capToday: DAILY_CAP });
+    // Persist every render (fire-and-forget) so there's a reviewable history.
+    try {
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const note = [sport, style, teamName, refinement ? `refine: ${refinement}` : idea].filter(Boolean).join(" | ").slice(0, 180);
+      void put(`design-lab/${stamp}.png`, Buffer.from(payload.data, "base64"), {
+        access: "public", contentType: mime, addRandomSuffix: true,
+      }).then((b) => console.log(`design-lab saved: ${b.url} :: ${note}`)).catch(() => {});
+    } catch {}
+    let ladderState: { used: number; free: number } | undefined;
+    if (ladderActive && visitorCtx) {
+      const [updated] = await getDb()
+        .update(designLabVisitors)
+        .set({ generations: sql`${designLabVisitors.generations} + 1` })
+        .where(eq(designLabVisitors.id, visitorCtx.visitor.id))
+        .returning();
+      ladderState = { used: updated.generations, free: 3 };
+    }
+    const out = NextResponse.json({ image: `data:${mime};base64,${payload.data}`, usedToday: used, capToday: DAILY_CAP, ladder: ladderState });
+    if (visitorCtx?.setCookie) out.cookies.set(LAB_COOKIE, visitorCtx.setCookie, { httpOnly: true, maxAge: 31536000, path: "/" });
+    return out;
   } catch (e) {
     console.error("design-lab error:", e);
     return NextResponse.json({ error: "Generation failed - try again" }, { status: 500 });

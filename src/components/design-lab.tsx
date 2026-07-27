@@ -7,7 +7,7 @@ const STYLES = ["Crew Neck", "Two-Button", "Full-Button", "Quarter-Zip", "Sleeve
 
 /** Private AI jersey designer preview. Each generation ~13 cents; the API
  *  enforces a daily cap and requires the test key or an admin session. */
-export function DesignLab({ testKey }: { testKey?: string }) {
+export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; ladder?: boolean; paidJustNow?: boolean }) {
   const [sport, setSport] = useState("Baseball");
   const [style, setStyle] = useState("Crew Neck");
   const [primaryColor, setPrimaryColor] = useState("black");
@@ -23,6 +23,9 @@ export function DesignLab({ testKey }: { testKey?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usage, setUsage] = useState<{ used: number; cap: number } | null>(null);
+  const [need, setNeed] = useState<"email" | "upgrade" | null>(null);
+  const [email, setEmail] = useState("");
+  const [unlocking, setUnlocking] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const refFileRef = useRef<HTMLInputElement>(null);
 
@@ -53,6 +56,7 @@ export function DesignLab({ testKey }: { testKey?: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           key: testKey,
+          ladder: ladder || undefined,
           sport, style, primaryColor, secondaryColor, teamName, backNumber, idea,
           logo: logo ?? undefined,
           reference: reference ?? undefined,
@@ -60,7 +64,9 @@ export function DesignLab({ testKey }: { testKey?: string }) {
         }),
       });
       const data = await res.json();
+      if (res.status === 403 && data.need) { setNeed(data.need); return; }
       if (!res.ok || !data.image) { setError(data.error ?? "Generation failed"); return; }
+      setNeed(null);
       setImage(data.image);
       setHistory((h) => [data.image, ...h].slice(0, 12));
       setRefinement("");
@@ -76,6 +82,13 @@ export function DesignLab({ testKey }: { testKey?: string }) {
   const label = "display text-xs text-muted tracking-wide";
 
   return (
+    <div className="space-y-6">
+      {paidJustNow && (
+        <div className="border border-green-600/60 bg-green-600/10 text-foreground p-4 rounded">
+          <p className="display">✅ Design session active</p>
+          <p className="text-sm text-muted mt-1">Unlimited concepts for this project - and your $10 is credited toward your order.</p>
+        </div>
+      )}
     <div className="grid gap-8 lg:grid-cols-2">
       {/* Controls */}
       <div className="space-y-4">
@@ -160,6 +173,55 @@ export function DesignLab({ testKey }: { testKey?: string }) {
           {busy ? "Designing… (about 15 seconds)" : image ? "Generate a Fresh Design" : "Generate My Jersey"}
         </button>
         {error && <p className="text-sm text-red-400">{error}</p>}
+        {need === "email" && (
+          <div className="border border-brand/50 bg-brand/10 p-4 rounded space-y-2">
+            <p className="display text-foreground">Like what you see? Keep designing free.</p>
+            <p className="text-sm text-muted">Enter your email to unlock 5 more concepts - we&apos;ll also save your designs so our designer can pick up where you left off.</p>
+            <div className="flex gap-2">
+              <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@email.com" className={input} />
+              <button
+                type="button"
+                disabled={unlocking || !email.includes("@")}
+                onClick={async () => {
+                  setUnlocking(true);
+                  try {
+                    const r = await fetch("/api/design-lab/unlock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+                    if (r.ok) { setNeed(null); setError(null); } else { setError((await r.json()).error ?? "Try again"); }
+                  } finally { setUnlocking(false); }
+                }}
+                className="shrink-0 clip-slant bg-brand text-on-brand display text-sm px-4 disabled:opacity-50"
+              >
+                Unlock
+              </button>
+            </div>
+          </div>
+        )}
+        {need === "upgrade" && (
+          <div className="border border-brand/50 bg-brand/10 p-4 rounded space-y-2">
+            <p className="display text-foreground">Reserve your designer - $10, credited to your order</p>
+            <ul className="text-sm text-muted list-disc pl-5 space-y-1">
+              <li>Unlimited AI concepts for this project</li>
+              <li>Priority proof from our real designer</li>
+              <li>The full $10 comes off your order</li>
+            </ul>
+            <button
+              type="button"
+              disabled={unlocking}
+              onClick={async () => {
+                setUnlocking(true);
+                try {
+                  const r = await fetch("/api/design-lab/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ returnTo: window.location.pathname + window.location.search }) });
+                  const d = await r.json();
+                  if (d.url) window.location.href = d.url;
+                  else { setError(d.error ?? "Checkout unavailable"); setUnlocking(false); }
+                } catch { setError("Checkout unavailable"); setUnlocking(false); }
+              }}
+              className="w-full clip-slant bg-brand hover:bg-brand-dark text-on-brand display py-3 disabled:opacity-60"
+            >
+              {unlocking ? "Opening checkout…" : "Reserve My Designer - $10"}
+            </button>
+          </div>
+        )}
         {usage && <p className="text-xs text-muted">{usage.used}/{usage.cap} generations today (~${(usage.used * 0.134).toFixed(2)} spent)</p>}
       </div>
 
@@ -212,6 +274,7 @@ export function DesignLab({ testKey }: { testKey?: string }) {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

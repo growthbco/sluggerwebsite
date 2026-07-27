@@ -709,6 +709,18 @@ export const dropProductsRelations = relations(dropProducts, ({ one }) => ({
   product: one(products, { fields: [dropProducts.productId], references: [products.id] }),
 }));
 
+// AI design lab ladder: 3 free generations -> email unlocks 5 more -> $10
+// credited "design session" unlocks the rest. One row per browser visitor.
+export const designLabVisitors = pgTable("design_lab_visitors", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  visitorKey: text("visitor_key").notNull().unique(),
+  email: text("email"),
+  generations: integer("generations").notNull().default(0),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  stripeRef: text("stripe_ref"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const teamsRelations = relations(teams, ({ many }) => ({
   teamStoreProducts: many(teamStoreProducts),
 }));

@@ -33,6 +33,17 @@ export async function POST(req: Request) {
     const session = event.data.object as Stripe.Checkout.Session;
 
     // Free-form custom invoice paid: flip status + tell the orders channel.
+    if (session.metadata?.kind === "design_lab" && session.metadata?.visitorId && dbEnabled()) {
+      const { designLabVisitors } = await import("@/db/schema");
+      const { eq } = await import("drizzle-orm");
+      await getDb()
+        .update(designLabVisitors)
+        .set({ paidAt: new Date(), stripeRef: session.id })
+        .where(eq(designLabVisitors.id, session.metadata.visitorId));
+      console.log("design lab session paid:", session.metadata.visitorId);
+      return NextResponse.json({ received: true });
+    }
+
     if (session.metadata?.kind === "custom_invoice" && session.metadata?.customInvoiceId && dbEnabled()) {
       try {
         const { customInvoices } = await import("@/db/schema");
