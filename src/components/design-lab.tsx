@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 
 const SPORTS = ["Baseball", "Softball", "Basketball", "Soccer", "Flag Football", "Football", "Volleyball", "Hockey", "Pickleball", "Bowling"];
 const STYLES = ["Crew Neck", "Two-Button", "Full-Button", "Quarter-Zip", "Sleeveless / Tank", "Reversible"];
@@ -39,6 +39,52 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
   const [leadPhone, setLeadPhone] = useState("");
   const [unlocking, setUnlocking] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Persist the whole working session to localStorage so an accidental reload
+  // or a new window doesn't wipe the design in progress. Restored on mount.
+  const LS_KEY = "slugger_jersey_maker_v1";
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d.sport) setSport(d.sport);
+      if (d.style) setStyle(d.style);
+      if (d.primaryColor) setPrimaryColor(d.primaryColor);
+      if (d.secondaryColor) setSecondaryColor(d.secondaryColor);
+      if (Array.isArray(d.extraColors)) setExtraColors(d.extraColors);
+      if (typeof d.teamName === "string") setTeamName(d.teamName);
+      if (typeof d.backNumber === "string") setBackNumber(d.backNumber);
+      if (typeof d.idea === "string") setIdea(d.idea);
+      if (d.logo) setLogo(d.logo);
+      if (d.reference) setReference(d.reference);
+      if (d.image) setImage(d.image);
+      if (d.cleanToken) setCleanToken(d.cleanToken);
+      if (Array.isArray(d.history)) setHistory(d.history);
+    } catch { /* ignore corrupt/oversized */ }
+  }, []);
+
+  useEffect(() => {
+    if (!restored.current) return;
+    // Trim history images down until it fits localStorage's ~5MB quota.
+    let hist = history;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify({
+          sport, style, primaryColor, secondaryColor, extraColors, teamName, backNumber, idea,
+          logo, reference, image, cleanToken, history: hist,
+        }));
+        return;
+      } catch {
+        if (hist.length > 1) hist = hist.slice(0, Math.max(1, Math.floor(hist.length / 2)));
+        else break; // even one image too big; give up quietly
+      }
+    }
+  }, [sport, style, primaryColor, secondaryColor, extraColors, teamName, backNumber, idea, logo, reference, image, cleanToken, history]);
+
   const refFileRef = useRef<HTMLInputElement>(null);
 
   function pickImage(file: File | undefined, set: (v: string) => void) {
