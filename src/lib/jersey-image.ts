@@ -84,9 +84,14 @@ async function openaiImage(parts: ImagePart[], aspectRatio: string): Promise<{ d
 
 /** Generate/edit an image from parts. Tries Gemini Pro once, then Flash (with a
  *  retry); if Google is down, falls back to OpenAI gpt-image-1. Returns base64
- *  data + mime, or an error. */
-export async function generateJerseyImage(parts: ImagePart[], aspectRatio = "4:3"): Promise<GenResult> {
-  const apiKey = process.env.GEMINI_API_KEY;
+ *  data + mime, or an error. Pass { forceOpenai: true } to skip Gemini and go
+ *  straight to the OpenAI tier (used to verify the backstop works). */
+export async function generateJerseyImage(
+  parts: ImagePart[],
+  aspectRatio = "4:3",
+  opts: { forceOpenai?: boolean } = {},
+): Promise<GenResult> {
+  const apiKey = opts.forceOpenai ? undefined : process.env.GEMINI_API_KEY;
 
   // Tier 1 + 2: Gemini (Pro once, then Flash with a retry). Skipped entirely
   // if no Gemini key is configured (OpenAI-only setups still work).
