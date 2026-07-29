@@ -267,6 +267,13 @@
       "when": 1785287981475,
       "tag": "0037_striped_overlord",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1785291112841,
+      "tag": "0038_yummy_living_lightning",
+      "breakpoints": true
     }
   ]
 }

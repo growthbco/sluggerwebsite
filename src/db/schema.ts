@@ -219,6 +219,17 @@ export const teams = pgTable(
     // Persistent Discord forum thread for this store: all orders (incl. later
     // family add-ons) post into this one thread instead of scattering.
     storeThreadId: text("store_thread_id"),
+    // Store add-on print-file QA (mirrors team-order print-file verification).
+    storePrintFileUrls: jsonb("store_print_file_urls").$type<string[]>(),
+    storePrintFileQa: jsonb("store_print_file_qa").$type<{
+      ok: boolean;
+      summary: string;
+      extracted: { name: string; number: string; size: string }[];
+      mismatches: { kind: "missing" | "extra" | "wrong_size" | "wrong_number" | "name_typo"; roster?: { name?: string; number?: string; size?: string }; printed?: { name?: string; number?: string; size?: string }; detail: string }[];
+      dismissed?: number[];
+      verifiedAt: string;
+      model: string;
+    }>(),
     approvedDesignUrl: text("approved_design_url"),
     designRequestId: uuid("design_request_id"),
     // Items purchasable in this store (label/price/sizes snapshot so catalog

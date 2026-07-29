@@ -43,6 +43,8 @@ type StoreOrderPayload = {
   items: { quantity: number; label: string }[];
   /** Public store link so the designer can reference the exact jersey design. */
   storeUrl?: string;
+  /** Designer-only print-file QA link. */
+  verifyUrl?: string;
   /** Persistent per-store thread in the design forum; create-once, reuse. */
   existingThreadId?: string | null;
 };
@@ -67,6 +69,7 @@ export async function postStoreOrderToDiscord(order: StoreOrderPayload): Promise
     { name: `Make (${order.items.length})`, value: (itemText || "-").slice(0, 1024), inline: false },
   ];
   if (order.storeUrl) fields.push({ name: "Team store (design reference)", value: order.storeUrl, inline: false });
+  if (order.verifyUrl) fields.push({ name: "🔍 Print-file QA (before printing)", value: order.verifyUrl, inline: false });
   if (order.shipping) fields.push({ name: "Ship to", value: order.shipping.slice(0, 1024), inline: false });
 
   const embed: Record<string, unknown> = {

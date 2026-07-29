@@ -344,7 +344,7 @@ export async function POST(req: Request) {
           // the designer works, so every add-on stays together.
           try {
             const [team] = await getDb()
-              .select({ name: teams.name, slug: teams.slug, thread: teams.storeThreadId, design: teams.approvedDesignUrl })
+              .select({ name: teams.name, slug: teams.slug, token: teams.storeToken, thread: teams.storeThreadId, design: teams.approvedDesignUrl })
               .from(teams).where(eq(teams.id, teamId)).limit(1);
             const garmentLines = lines.filter((l) => !/tax/i.test(l.name));
             const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
@@ -357,6 +357,7 @@ export async function POST(req: Request) {
               shipping,
               items: garmentLines.map((l) => ({ quantity: l.quantity, label: l.name })),
               storeUrl: team?.slug ? `${SITE}/store/${team.slug}` : undefined,
+              verifyUrl: team?.token ? `${SITE}/store/${team.token}/verify` : undefined,
               existingThreadId: team?.thread ?? null,
             });
             if (!team?.thread && posted.threadId) {

@@ -25,7 +25,8 @@ type VerifyResult = {
 type RosterEntry = { name: string; number: string; size: string };
 
 type Props = {
-  token: string; // team order manage token
+  token: string; // team order manage token (or store token)
+  basePath?: string; // API base; defaults to the team-order endpoints
   rosterCount: number;
   roster?: RosterEntry[];
   initialPrintFileUrls?: string[] | null;
@@ -40,7 +41,8 @@ const KIND_LABEL: Record<Mismatch["kind"], string> = {
   name_typo: "Name typo",
 };
 
-export function PrintFileQA({ token, rosterCount, roster = [], initialPrintFileUrls, initialResult }: Props) {
+export function PrintFileQA({ token, basePath, rosterCount, roster = [], initialPrintFileUrls, initialResult }: Props) {
+  const api = basePath ?? `/api/team-order/${token}`;
   const [printFileUrls, setPrintFileUrls] = useState<string[]>(initialPrintFileUrls ?? []);
   const [status, setStatus] = useState<"idle" | "uploading" | "verifying" | "done" | "error">(
     initialResult ? "done" : "idle",
@@ -55,7 +57,7 @@ export function PrintFileQA({ token, rosterCount, roster = [], initialPrintFileU
     const next = dismissed.includes(i) ? dismissed.filter((x) => x !== i) : [...dismissed, i];
     setDismissed(next);
     try {
-      await fetch(`/api/team-order/${token}/print-file-override`, {
+      await fetch(`${api}/print-file-override`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dismissed: next }),
@@ -97,7 +99,7 @@ export function PrintFileQA({ token, rosterCount, roster = [], initialPrintFileU
     setError(null);
     setStatus("verifying");
     try {
-      const res = await fetch(`/api/team-order/${token}/verify-print-file`, {
+      const res = await fetch(`${api}/verify-print-file`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ printFileUrls }),
