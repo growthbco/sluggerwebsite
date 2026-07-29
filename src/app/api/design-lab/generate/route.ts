@@ -199,7 +199,7 @@ export async function POST(req: Request) {
       teamName ? `The team name "${teamName}" appears across the chest in bold athletic lettering, spelled exactly: ${teamName}.` : "",
       idea ? `Design direction from the customer: ${idea}.` : "",
       logo ? "A TEAM LOGO image is also provided: incorporate that logo naturally into the design (chest or sleeve), keeping it recognizable." : "",
-      "Make it look like a premium, print-ready team uniform design - tasteful, modern, athletic. No mannequin, no human, no watermark, no extra text besides the jersey design itself.",
+      "Make it look like a premium, print-ready team uniform design - tasteful, modern, athletic. No mannequin, no human, no watermark, no extra text besides the jersey design itself. Do NOT add any MLB/NBA/NFL or other league logos, pro-team marks, or brand swooshes - only the team's own name and provided logo.",
     ].filter(Boolean).join(" ");
     parts.push({ text: prompt });
     if (reference) {

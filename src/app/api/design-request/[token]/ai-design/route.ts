@@ -35,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     if (!instruction) return NextResponse.json({ error: "Describe the change you want." }, { status: 400 });
     try {
       const buf = Buffer.from(await (await fetch(baseUrl)).arrayBuffer());
-      parts.push({ text: `Edit this custom ${request.sport ?? "team"} jersey mockup. Keep it a professional front-and-back ghost-mannequin product shot on a pure white background. Apply this change: ${instruction}. Change only what's asked; keep everything else identical.` });
+      parts.push({ text: `Edit this custom ${request.sport ?? "team"} jersey mockup. Keep it a professional front-and-back ghost-mannequin product shot on a pure white background. Apply this change: ${instruction}. Change only what's asked; keep everything else identical. Do not add any league/MLB/pro-team logos or third-party brand marks.` });
       parts.push({ inline_data: { mime_type: "image/png", data: buf.toString("base64") } });
     } catch {
       return NextResponse.json({ error: "Could not load the base image." }, { status: 502 });
@@ -49,7 +49,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       request.teamName ? `Team name "${request.teamName}" across the chest in bold athletic lettering.` : "",
       request.vision ? `Design direction: ${request.vision.slice(0, 500)}.` : "",
       instruction ? `Additional direction: ${instruction}.` : "",
-      "Premium, print-ready, tasteful. No mannequin, no human, no watermark.",
+      "Premium, print-ready, tasteful. No mannequin, no human, no watermark. Do NOT add any MLB, NBA, NFL, or other league logos, no pro-team marks, no swooshes or brand logos - use ONLY the team's own name and any logo the customer provided.",
     ].filter(Boolean).join(" ") });
     // Seed with the customer's logo/reference if they supplied any.
     for (const url of (request.inspirationImages ?? []).slice(0, 2)) {
