@@ -84,7 +84,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         parts.push({ inline_data: chainRef });
       }
       if (pendantLogo) {
-        parts.push({ text: "PENDANT LOGO - reproduce THIS exact logo as the solid flat pendant, keeping ALL of its shapes (the outer circle/ring, the arrow, and the letterforms). Do not reduce it to a plain letter, do not make it out of chain links:" });
+        parts.push({ text: "PENDANT LOGO - print THIS exact logo onto the face of the flat pendant plate (like a logo printed on a jersey), keeping ALL of its shapes and colors (the outer circle/ring, the arrow, the letterforms). Do not reduce it to a plain letter, do not die-cut the plate into the logo shape, do not make it out of chain links:" });
         parts.push({ inline_data: pendantLogo });
       }
     } else {
