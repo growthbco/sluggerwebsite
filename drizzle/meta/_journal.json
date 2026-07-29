@@ -288,6 +288,13 @@
       "when": 1785331495398,
       "tag": "0040_lumpy_exodus",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1785349522007,
+      "tag": "0041_calm_lightspeed",
+      "breakpoints": true
     }
   ]
 }

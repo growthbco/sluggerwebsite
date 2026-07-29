@@ -599,6 +599,9 @@ export const designRequests = pgTable(
     inspirationImages: jsonb("inspiration_images").$type<string[]>().default([]),
     // Proof/mockup images uploaded by the designer.
     proofImages: jsonb("proof_images").$type<string[]>().default([]),
+    // Optional human labels for proofs, keyed by image URL (e.g. "Practice
+    // Jersey 1"), shown to staff and the client.
+    proofLabels: jsonb("proof_labels").$type<Record<string, string>>().default({}),
     // Persistent AI design memory: the iterative concept + every revision, so
     // the designer can "pick up where we left off" when a customer requests
     // changes - survives sessions, browsers, and staff handoffs.

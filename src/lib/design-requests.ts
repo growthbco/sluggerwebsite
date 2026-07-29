@@ -202,17 +202,38 @@ export async function getById(id: string) {
 }
 
 /** Designer uploads proof image(s); auto-bumps status to proof_sent. */
-export async function addProofImages(id: string, urls: string[]) {
+export async function addProofImages(id: string, urls: string[], labels?: Record<string, string>) {
   const db = getDb();
   const [existing] = await db.select().from(designRequests).where(eq(designRequests.id, id)).limit(1);
   if (!existing) return null;
   const merged = [...(existing.proofImages ?? []), ...urls];
+  const mergedLabels = { ...(existing.proofLabels ?? {}) };
+  for (const [url, label] of Object.entries(labels ?? {})) {
+    if (label?.trim()) mergedLabels[url] = label.trim().slice(0, 60);
+  }
   const now = new Date();
   await db
     .update(designRequests)
-    .set({ proofImages: merged, status: "proof_sent", proofSentAt: now, updatedAt: now })
+    .set({ proofImages: merged, proofLabels: mergedLabels, status: "proof_sent", proofSentAt: now, updatedAt: now })
     .where(eq(designRequests.id, id));
   return merged;
+}
+
+/** Remove a single proof image (and its label + any approval of it). */
+export async function removeProofImage(id: string, url: string) {
+  const db = getDb();
+  const [existing] = await db.select().from(designRequests).where(eq(designRequests.id, id)).limit(1);
+  if (!existing) return null;
+  const proofImages = (existing.proofImages ?? []).filter((u) => u !== url);
+  const proofLabels = { ...(existing.proofLabels ?? {}) };
+  delete proofLabels[url];
+  const approvedDesignUrls = (existing.approvedDesignUrls ?? []).filter((u) => u !== url);
+  const approvedDesignUrl = existing.approvedDesignUrl === url ? (approvedDesignUrls[0] ?? null) : existing.approvedDesignUrl;
+  await db
+    .update(designRequests)
+    .set({ proofImages, proofLabels, approvedDesignUrls, approvedDesignUrl, updatedAt: new Date() })
+    .where(eq(designRequests.id, id));
+  return proofImages;
 }
 
 /** Client approves the proof (optionally with a chosen image url). */

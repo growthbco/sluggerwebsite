@@ -55,6 +55,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
         teamName={request.teamName}
         status={request.status}
         proofImages={request.proofImages ?? []}
+        proofLabels={request.proofLabels ?? {}}
         initialApprovedUrl={request.approvedDesignUrl}
         teamOrderUrl={`/team-order?design=${token}`}
         revisionsUsed={request.revisionsUsed ?? 0}

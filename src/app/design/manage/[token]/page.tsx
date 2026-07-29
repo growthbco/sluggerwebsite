@@ -130,6 +130,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         contact={{ name: request.contactName, email: request.contactEmail, phone: request.contactPhone }}
         inspirationImages={request.inspirationImages ?? []}
         proofImages={request.proofImages ?? []}
+        proofLabels={request.proofLabels ?? {}}
         approvedUrls={request.approvedDesignUrls ?? (request.approvedDesignUrl ? [request.approvedDesignUrl] : [])}
         statusUrl={`${SITE}/design/status/${request.statusToken}`}
         revisionsUsed={request.revisionsUsed ?? 0}

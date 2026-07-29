@@ -25,6 +25,7 @@ type Props = {
   contact: { name: string; email: string; phone: string | null };
   inspirationImages: string[];
   proofImages: string[];
+  proofLabels?: Record<string, string>;
   approvedUrls: string[];
   statusUrl: string;
   revisionsUsed: number;
@@ -47,6 +48,7 @@ export function DesignManagePanel({
   contact,
   inspirationImages,
   proofImages,
+  proofLabels = {},
   approvedUrls,
   statusUrl,
   revisionsUsed,
@@ -56,14 +58,18 @@ export function DesignManagePanel({
   neededBy,
 }: Props) {
   const [proofs, setProofs] = useState<string[]>(proofImages);
+  const [labels, setLabels] = useState<Record<string, string>>(proofLabels);
+  const [removing, setRemoving] = useState<string | null>(null);
   const [approved, setApproved] = useState<string[]>(approvedUrls);
   const [settingApproved, setSettingApproved] = useState<string | null>(null);
   const [approvedMessage, setApprovedMessage] = useState("");
   const [uploading, setUploading] = useState(false);
   const [posting, setPosting] = useState(false);
   const [pending, setPending] = useState<string[]>([]);
+  const [pendingLabels, setPendingLabels] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   async function handleFiles(files: FileList | null) {
     if (!files?.length) return;
@@ -80,10 +86,31 @@ export function DesignManagePanel({
         newUrls.push(blob.url);
       }
       setPending((p) => [...p, ...newUrls]);
+      setPendingLabels((l) => [...l, ...newUrls.map(() => "")]);
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function removeProof(url: string) {
+    setRemoving(url);
+    setMessage("");
+    try {
+      const res = await fetch(`/api/design-request/${token}/proof`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Could not remove proof.");
+      setProofs((p) => p.filter((u) => u !== url));
+      setApproved((a) => a.filter((u) => u !== url));
+      setLabels((l) => { const n = { ...l }; delete n[url]; return n; });
+    } catch (e) {
+      setMessage((e as Error).message);
+    } finally {
+      setRemoving(null);
     }
   }
 
@@ -92,15 +119,18 @@ export function DesignManagePanel({
     setPosting(true);
     setMessage("");
     try {
+      const labels: Record<string, string> = {};
+      pending.forEach((u, i) => { const t = (pendingLabels[i] ?? "").trim(); if (t) labels[u] = t; });
       const res = await fetch(`/api/design-request/${token}/proof`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls: pending }),
+        body: JSON.stringify({ urls: pending, labels }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not send proof.");
       setProofs((p) => [...p, ...pending]);
       setPending([]);
+      setPendingLabels([]);
       setMessage("Proof sent! Client has been emailed.");
     } catch (e) {
       setMessage((e as Error).message);
@@ -327,16 +357,28 @@ export function DesignManagePanel({
             {proofs.filter((u) => !approved.includes(u)).map((u, i) => (
               <div key={u} className="border border-line">
                 <a href={u} target="_blank" rel="noopener noreferrer" className="relative aspect-square bg-white overflow-hidden block">
-                  <Image src={u} alt={`Proof ${i + 1}`} fill sizes="25vw" className="object-contain p-1" unoptimized />
+                  <Image src={u} alt={labels[u] || `Proof ${i + 1}`} fill sizes="25vw" className="object-contain p-1" unoptimized />
                 </a>
-                <button
-                  type="button"
-                  onClick={() => toggleApproved(u, true)}
-                  disabled={settingApproved !== null}
-                  className="w-full text-[11px] display text-muted border-t border-line px-1 py-1.5 hover:text-foreground hover:bg-steel disabled:opacity-50"
-                >
-                  {settingApproved === u ? "Saving..." : "Mark approved"}
-                </button>
+                {labels[u] && <p className="text-[11px] text-foreground px-2 py-1 border-t border-line truncate" title={labels[u]}>{labels[u]}</p>}
+                <div className="flex border-t border-line">
+                  <button
+                    type="button"
+                    onClick={() => toggleApproved(u, true)}
+                    disabled={settingApproved !== null || removing !== null}
+                    className="flex-1 text-[11px] display text-muted px-1 py-1.5 hover:text-foreground hover:bg-steel disabled:opacity-50"
+                  >
+                    {settingApproved === u ? "Saving..." : "Mark approved"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeProof(u)}
+                    disabled={removing !== null || settingApproved !== null}
+                    className="text-[11px] display text-muted border-l border-line px-2 py-1.5 hover:text-red-400 hover:bg-steel disabled:opacity-50"
+                    title="Remove this proof"
+                  >
+                    {removing === u ? "…" : "Remove"}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -351,16 +393,30 @@ export function DesignManagePanel({
         <h2 className="display text-xl text-foreground">Upload a proof</h2>
         <p className="text-sm text-muted mt-1">Add one or more proof images. When you click "Send to Client", they're emailed a link to approve.</p>
 
-        <label className="mt-3 block cursor-pointer border-2 border-dashed border-line hover:border-brand/50 transition-colors p-6 text-center bg-steel">
+        <label
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+          className={`mt-3 block cursor-pointer border-2 border-dashed transition-colors p-8 text-center ${dragOver ? "border-brand bg-brand/10" : "border-line hover:border-brand/50 bg-steel"}`}
+        >
           <input type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
-          <span className="display text-foreground">{uploading ? "Uploading..." : "Click or drop proof files"}</span>
+          <span className="display text-foreground">{uploading ? "Uploading..." : dragOver ? "Drop to upload" : "Drag & drop proof files here, or click to browse"}</span>
         </label>
 
         {pending.length > 0 && (
-          <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2">
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {pending.map((u, i) => (
-              <div key={i} className="relative aspect-square bg-white border border-line overflow-hidden">
-                <Image src={u} alt={`Pending proof ${i + 1}`} fill sizes="20vw" className="object-contain p-1" unoptimized />
+              <div key={i}>
+                <div className="relative aspect-square bg-white border border-line overflow-hidden">
+                  <Image src={u} alt={`Pending proof ${i + 1}`} fill sizes="20vw" className="object-contain p-1" unoptimized />
+                </div>
+                <input
+                  value={pendingLabels[i] ?? ""}
+                  onChange={(e) => setPendingLabels((l) => l.map((v, j) => (j === i ? e.target.value : v)))}
+                  placeholder={`Label (e.g. Practice Jersey ${i + 1})`}
+                  maxLength={60}
+                  className="mt-1.5 w-full bg-steel border border-line px-2 py-1.5 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                />
               </div>
             ))}
           </div>

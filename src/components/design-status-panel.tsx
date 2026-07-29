@@ -12,6 +12,7 @@ type Props = {
   teamName: string;
   status: string;
   proofImages: string[];
+  proofLabels?: Record<string, string>;
   initialApprovedUrl: string | null;
   teamOrderUrl: string;
   revisionsUsed: number;
@@ -34,6 +35,7 @@ export function DesignStatusPanel({
   teamName,
   status,
   proofImages,
+  proofLabels = {},
   initialApprovedUrl,
   teamOrderUrl,
   revisionsUsed,
@@ -141,9 +143,12 @@ export function DesignStatusPanel({
                   chosen === u ? "border-brand" : "border-line hover:border-brand/50"
                 }`}
               >
-                <Image src={u} alt="Proof" fill sizes="(max-width: 640px) 100vw, 50vw" className="object-contain p-2" unoptimized />
+                <Image src={u} alt={proofLabels[u] || "Proof"} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-contain p-2" unoptimized />
                 {chosen === u && !isApproved && (
                   <span className="absolute top-2 right-2 grid place-items-center h-7 w-7 bg-brand text-on-brand display text-xs">✓</span>
+                )}
+                {proofLabels[u] && (
+                  <span className="absolute top-2 left-2 bg-black/75 text-white text-[11px] display px-2 py-1 pointer-events-none">{proofLabels[u]}</span>
                 )}
                 <span className="absolute bottom-2 left-2 bg-black/70 text-white text-[11px] px-2 py-1 pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
                   Click to enlarge

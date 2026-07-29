@@ -32,6 +32,7 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [zoom, setZoom] = useState<string | null>(null);
+  const [proofLabel, setProofLabel] = useState("");
 
   // Staff-supplied reference image + colors (optional overrides).
   const [refImage, setRefImage] = useState<string | null>(null);
@@ -108,9 +109,10 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
     try {
       const res = await fetch(`/api/design-request/${token}/proof`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls: [active.url] }),
+        body: JSON.stringify({ urls: [active.url], labels: proofLabel.trim() ? { [active.url]: proofLabel.trim() } : {} }),
       });
       if (!res.ok) { setError((await res.json()).error ?? "Could not send proof"); return; }
+      setProofLabel("");
       setNote("Sent to the customer as a proof - it's in Sent proofs above and pinged the thread.");
     } catch { setError("Could not send proof"); } finally { setBusy(false); }
   }
@@ -145,13 +147,24 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
             {busy && <span className="absolute inset-0 bg-black/40 grid place-items-center"><span className="display text-white">Working…</span></span>}
           </button>
           {active && (
+            <>
             <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
               <button type="button" onClick={() => setZoom(active.url)} className="text-brand underline underline-offset-2">Enlarge</button>
               <a href={downloadUrl} download target="_blank" rel="noopener noreferrer" className="text-brand underline underline-offset-2">Download (clean)</a>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <input
+                value={proofLabel}
+                onChange={(e) => setProofLabel(e.target.value)}
+                placeholder="Label (e.g. Practice Jersey 1)"
+                maxLength={60}
+                className="flex-1 min-w-[10rem] bg-steel border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+              />
               <button type="button" onClick={sendAsProof} disabled={busy} className="bg-brand text-on-brand display text-sm px-4 py-2 rounded disabled:opacity-50">
                 Send to customer as proof →
               </button>
             </div>
+            </>
           )}
           {versions.length > 1 && (
             <div className="mt-3">
