@@ -226,6 +226,16 @@ async function callGemini(prompt: string, schema: object): Promise<Record<string
   }
 }
 
+/** Shared human-tone rules for every client-facing reply (public chat, the
+ *  design-thread auto-answer, and the staff draft), so they all read like a
+ *  real person - not a repetitive, exclamation-happy bot. */
+const TONE_RULES = [
+  "- Do NOT repeat yourself: never restate a price, the hat minimum, the digitizing fee, the mockup-is-free policy, or any detail you already gave earlier in this conversation - the client already read it. Answer only what is new.",
+  "- Go easy on exclamation points: at most ONE per message, often zero. Warm and calm, not hype-y. Do not open every message with 'Happy to help!' / 'Awesome!' / 'Sounds great!'.",
+  "- NEVER use the long dash characters (the em dash or the en dash). Use a plain hyphen (-), a comma, or a period instead.",
+  "- Ask at most ONE short follow-up question, and only when you genuinely need it. Do not tack an upsell question onto every reply.",
+];
+
 /** Decide how (or whether) to auto-respond to the newest client message.
  *  Returns null when the assistant is unavailable (no API key, API error) -
  *  callers must treat that as "do nothing", never as an answer. */
@@ -249,6 +259,8 @@ export async function assistDesignThread(input: {
     "",
     "Reply in the language the client wrote in - if they wrote in Spanish, answer in natural Spanish (keep product names and dollar amounts as-is). Same for any other language.",
     "Never contradict anything a staff member said earlier in the conversation.",
+    "When you do write a reply, follow these tone rules:",
+    ...TONE_RULES,
     'Return ONLY JSON: { "action": "answer" | "escalate" | "none", "reply": string, "reason": string, "flagStaff": boolean }',
   ].join("\n");
 
@@ -305,7 +317,8 @@ export async function suggestStaffReply(input: {
     "- Discount asks: follow the discount policy in the facts - we can work with them, it depends on the total piece count, ask what number they were hoping for, and offer a quick phone call. Never name a specific discount or price.",
     "- Design changes after approval/payment: the design is locked once approved and production starts on payment. Draft a reply that says the team will check whether production has already started before anything can be considered - never promise the change.",
     "- You may address other sensitive topics (complaints, exceptions) since a human reviews this, but NEVER invent a specific price, amount, or date that is not in the facts. Where a business decision is needed, insert a placeholder like [YOUR CALL: amount] so the staff member fills it in.",
-    "- Match the tone of earlier staff messages: friendly, brief, plain text. 2-6 sentences. No markdown, no em dashes - use hyphens. Do not sign a name.",
+    "- Match the tone of earlier staff messages: friendly, brief, plain text. 2-6 sentences. No markdown. Do not sign a name.",
+    ...TONE_RULES,
     "- Write in the language the client writes in.",
     'Return ONLY JSON: { "draft": string }',
   ].join("\n");
@@ -360,10 +373,7 @@ export async function answerPublicChat(history: ChatTurn[], extraContext?: strin
     "",
     "Reply to the visitor's last message:",
     "- Answer ONLY from the facts above. Short, warm, plain text - 1-4 sentences. No markdown.",
-    "- NEVER use the long dash characters (the em dash or the en dash). Use a plain hyphen (-), a comma, or a period instead.",
-    "- Go easy on exclamation points: at most ONE in a reply, and often zero. Warm and calm, not hype-y. Do not open every message with 'Happy to help!' / 'Awesome!' / 'Sounds great!'.",
-    "- DO NOT REPEAT yourself. If you already stated a price, the hat minimum, the digitizing fee, the mockup-is-free policy, or any other detail earlier in this conversation, do NOT restate it - the visitor already read it. Answer only what they just asked and add new information; never re-explain something you covered a message or two ago.",
-    "- Ask at most ONE short follow-up question, and only when you genuinely need it. Do not tack an upsell question onto every reply.",
+    ...TONE_RULES,
     "- Never invent prices, dates, or policies. If you do not know, say so and offer the text line: (352) 660-1232.",
     "- Questions about a SPECIFIC existing order or design: you cannot see orders - point them to the status link in their email, or to text (352) 660-1232.",
     "- Discount asks: we can work with them, it depends on total piece count - ask their target number and offer a call. Never name a discount.",
