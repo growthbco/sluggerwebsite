@@ -11,6 +11,10 @@ const FALLBACK = process.env.DESIGN_LAB_FALLBACK_MODEL || "gemini-2.5-flash-imag
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const OPENAI_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2-2026-04-21";
 const OPENAI_QUALITY = process.env.OPENAI_IMAGE_QUALITY || "high";
+// gpt-image-2 at high quality routinely takes 60-150s. The old 75s cap made
+// every call abort and silently fall back to Gemini - the "why does the app
+// look worse than the playground" bug. Give it real time to finish.
+const OPENAI_TIMEOUT_MS = Number(process.env.OPENAI_IMAGE_TIMEOUT_MS) || 180000;
 // Which vendor leads. Default OpenAI (image-2) - it renders embroidery,
 // logos, and lettering more crisply; Gemini is the fallback. Set
 // IMAGE_PRIMARY_VENDOR=gemini to flip back without a code change.
@@ -63,14 +67,14 @@ async function openaiImage(parts: ImagePart[], aspectRatio: string, quality: str
         method: "POST",
         headers: { Authorization: `Bearer ${key}` },
         body: form,
-        signal: AbortSignal.timeout(75000),
+        signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
       });
     } else {
       res = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model: OPENAI_MODEL, prompt, size, quality, n: 1 }),
-        signal: AbortSignal.timeout(75000),
+        signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
       });
     }
     if (!res.ok) {
@@ -145,10 +149,12 @@ export async function generateJerseyImage(
 
   const tryOpenai = async (isPrimary: boolean): Promise<GenResult | null> => {
     const r = await openaiImage(parts, aspectRatio, quality);
+    if (r) console.log(`image: OpenAI ${OPENAI_MODEL} (${quality})${isPrimary ? "" : " [fallback]"}`);
     return r ? { data: r.data, mime: r.mime, usedFallback: !isPrimary } : null;
   };
   const tryGemini = async (isPrimary: boolean): Promise<GenResult | null> => {
     const r = await geminiImage(parts, aspectRatio);
+    if (r) console.log(`image: Gemini ${r.usedFlash ? FALLBACK : PRIMARY}${isPrimary ? "" : " [fallback]"}`);
     return r ? { data: r.data, mime: r.mime, usedFallback: !isPrimary || r.usedFlash } : null;
   };
 

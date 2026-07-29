@@ -87,18 +87,16 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
       );
       break;
     case "hype-chain":
+      // Kept deliberately short: the REFERENCE CHAIN photo and PENDANT LOGO
+      // images (sent by the caller) carry the design. Over-prompting hurts.
       lines.push(
-        "Professional product mockup of a custom 3D-PRINTED team hype chain - a chunky plastic novelty dugout-celebration necklace. This is NOT metal jewelry, NOT a gold rope chain, and has NO gemstones.",
-        "Show the ENTIRE necklace as one complete closed loop, laid flat and fully in frame, with the PENDANT hanging at the bottom center.",
-        "The CHAIN is built from thick, rounded, oversized oval links that ALTERNATE between the two team colors, with a smooth matte 3D-printed plastic finish, clear dimensional depth, rounded edges, and soft drop shadows so it reads as a solid 3D object on the surface.",
-        "CRITICAL - the PENDANT is a SINGLE solid, smooth, flat 3D-printed piece: one continuous printed plate/charm. It is NOT built from chain links, NOT hollow, NOT made of connected rings or loops. It hangs from the bottom link by one small loop.",
+        "A custom 3D-printed plastic hype chain necklace, same style and construction as the REFERENCE CHAIN photo.",
         i.hasPendantLogo
-          ? "The pendant is a solid, flat 3D-printed plate (a rounded rectangular backer plaque, one continuous printed piece) with the provided PENDANT LOGO reproduced ON ITS FACE, exactly as shown - the same way a logo is printed on the chest of a jersey. Reproduce the COMPLETE logo faithfully with all its elements (any outer ring, arrow, and the exact letterforms), and keep the logo's OWN colors exactly as in the PENDANT LOGO image - do NOT invert, swap, or recolor its fill and outline. Do NOT simplify it to a plain letter, do NOT die-cut the plate into the logo's outline, and do NOT build it from chain links - it is a flat plate with the logo printed on it."
+          ? `The pendant hanging at the bottom is a flat 3D-printed piece of the provided PENDANT LOGO. Chain links in ${i.colors}.`
           : team
-            ? `Shape the pendant as a solid, flat 3D-printed nameplate reading "${team}" in bold block letters, team colors with a contrasting outline.`
-            : "Shape the pendant as a solid, flat 3D-printed team logo, team colors with a contrasting outline.",
-        `Colors: ${i.colors} (alternating links and the pendant).`,
-        "Top-down flat-lay view, evenly lit, the whole necklace and pendant fully visible with a small margin. No person, no neck, no mannequin, no metal, no rope, no jewels.",
+            ? `The pendant is a flat 3D-printed "${team}" nameplate. Chain links in ${i.colors}.`
+            : `The pendant is a flat 3D-printed team logo. Chain links in ${i.colors}.`,
+        "Show the whole necklace laid flat, fully in frame.",
       );
       break;
     case "hoodie":
@@ -134,7 +132,11 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
       break;
   }
 
-  lines.push(`Use ONLY these colors: ${i.colors}, plus neutral white/black/gray where needed. Do NOT introduce any other color - no gold or extra accent colors unless they are explicitly listed here.`);
+  // Strict color guard for garments (where hex->name drift caused stray gold);
+  // the hype chain states its colors inline and leans on its reference images.
+  if (product !== "hype-chain") {
+    lines.push(`Use ONLY these colors: ${i.colors}, plus neutral white/black/gray where needed. Do NOT introduce any other color - no gold or extra accent colors unless they are explicitly listed here.`);
+  }
   if (i.vision) lines.push(`Design direction: ${i.vision.slice(0, 500)}.`);
   if (i.instruction) lines.push(`Additional direction: ${i.instruction}.`);
   // Hype chain images are labeled inline by the caller (REFERENCE CHAIN /

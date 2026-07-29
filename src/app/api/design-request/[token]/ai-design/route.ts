@@ -8,7 +8,7 @@ import { generateJerseyImage, parseDataUrl, watermarkImage, type ImagePart } fro
 import { buildProductPrompt, buildRefinePrompt, productAspect, colorName, PRODUCTS, type ProductType } from "@/lib/product-mockups";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 // Staff-only AI design studio for a specific design request. "generate" starts
 // a fresh mockup from the brief; "refine" edits the current version with a
@@ -80,11 +80,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         hasRef: !!(chainRef || pendantLogo), hasPendantLogo: !!pendantLogo,
       }) });
       if (chainRef) {
-        parts.push({ text: "REFERENCE CHAIN - match this exact 3D-printed chain construction (link shape, thickness, matte printed finish). Do NOT copy its colors, and do NOT copy its pendant:" });
+        parts.push({ text: "REFERENCE CHAIN (match this chain's style/construction, not its colors or pendant):" });
         parts.push({ inline_data: chainRef });
       }
       if (pendantLogo) {
-        parts.push({ text: "PENDANT LOGO - print THIS exact logo onto the face of the flat pendant plate (like a logo printed on a jersey), keeping ALL of its shapes and colors (the outer circle/ring, the arrow, the letterforms). Do not reduce it to a plain letter, do not die-cut the plate into the logo shape, do not make it out of chain links:" });
+        parts.push({ text: "PENDANT LOGO (the bottom pendant is this logo):" });
         parts.push({ inline_data: pendantLogo });
       }
     } else {

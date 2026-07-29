@@ -9,7 +9,7 @@ import { getOrCreateVisitor, tierFor, LAB_COOKIE, encryptCleanUrl } from "@/lib/
 import { watermarkImage, generateJerseyImage, type ImagePart } from "@/lib/jersey-image";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 // PRIVATE preview of the AI jersey designer (not linked from the site).
 // Gated: admin session OR the shared test key. Each generation on
