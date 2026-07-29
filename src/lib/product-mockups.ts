@@ -149,10 +149,12 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
   return lines.filter(Boolean).join(" ");
 }
 
-/** Build the "edit the current version" prompt for a product type. */
-export function buildRefinePrompt(product: ProductType, sport: string | null | undefined, instruction: string): string {
+/** Build the "edit the current version" prompt. The FIRST image is the current
+ *  mockup to keep; if hasAsset, a second image is a logo/graphic to incorporate
+ *  per the instruction (e.g. "add this logo to the sleeves"). */
+export function buildRefinePrompt(product: ProductType, sport: string | null | undefined, instruction: string, hasAsset = false): string {
   const noun = productNoun(product);
-  return `Edit this ${noun} image. Apply this change: ${instruction}. Change ONLY what's asked; keep everything else - the design, colors, lettering, layout, and framing - exactly identical. Do not add any team name, text, or logo that is not already in the image.`;
+  return `Edit the FIRST image, which is the current ${noun} mockup. Apply this change: ${instruction}. Change ONLY what's asked; keep everything else - the design, colors, patterns, lettering, layout, and framing - exactly identical.${hasAsset ? " A SECOND image is provided as a logo/graphic: use it ONLY as directed in the change (e.g. place it where asked). Do not otherwise redesign the mockup from it." : ""} Do not add any team name, text, or logo that is not already in the mockup or explicitly requested.`;
 }
 
 /** Minimal, reference-driven prompt for when staff upload a reference image to
@@ -162,10 +164,10 @@ export function buildRefinePrompt(product: ProductType, sport: string | null | u
 export function buildReferencePrompt(product: ProductType, opts: { instruction?: string; colors?: string }): string {
   const noun = productNoun(product);
   return [
-    `Recreate the ${noun} shown in the REFERENCE image as a clean e-commerce product mockup on a pure white background.`,
-    "Keep its design, layout, lettering, and colors exactly as in the reference.",
+    `Create a clean e-commerce ${noun} product mockup on a pure white background based on the REFERENCE image.`,
+    `If the reference is a full ${noun}, recreate its design, layout, and colors faithfully. If the reference is a logo or graphic, design a ${noun} that prominently features that logo.`,
     opts.colors ? `Colors: ${opts.colors}.` : "",
     opts.instruction ? `Make this change: ${opts.instruction}. Change ONLY that; keep everything else identical.` : "",
-    "Do not add any team name, text, or logo that is not already in the reference. No MLB/NBA/NFL or other brand logos.",
+    "Do not add any team name or text that is not in the reference or requested. No MLB/NBA/NFL or other brand logos.",
   ].filter(Boolean).join(" ");
 }

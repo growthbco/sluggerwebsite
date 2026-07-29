@@ -45,21 +45,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   if (action === "refine") {
     if (!instruction) return NextResponse.json({ error: "Describe the change you want." }, { status: 400 });
+    // Base = the current mockup (keep it). The explicitly chosen version, else latest.
+    const baseUrl = body.baseUrl || state.versions[state.versions.length - 1]?.url;
+    if (!baseUrl) return NextResponse.json({ error: "Nothing to revise yet - generate a mockup first." }, { status: 400 });
+    try {
+      const buf = Buffer.from(await (await fetch(baseUrl)).arrayBuffer());
+      parts.push({ text: buildRefinePrompt(product, request.sport, instruction, !!refImage) });
+      parts.push({ inline_data: { mime_type: "image/png", data: buf.toString("base64") } });
+    } catch {
+      return NextResponse.json({ error: "Could not load the base image." }, { status: 502 });
+    }
+    // An uploaded reference on a revision is a LOGO/GRAPHIC to incorporate per
+    // the instruction (e.g. "add this snake logo to the sleeves"), NOT a new
+    // base to redraw. Keep the current mockup; use this only as directed.
     if (refImage) {
-      // Staff uploaded a reference to edit directly ("look at this and change X").
-      parts.push({ text: buildRefinePrompt(product, request.sport, instruction) });
+      parts.push({ text: "SECOND image - a logo/graphic to use ONLY as directed in the change above (e.g. add it where asked). Do not redesign the mockup from it:" });
       parts.push({ inline_data: refImage });
-    } else {
-      // Base = the explicitly chosen version, else the latest.
-      const baseUrl = body.baseUrl || state.versions[state.versions.length - 1]?.url;
-      if (!baseUrl) return NextResponse.json({ error: "Nothing to refine yet - generate a mockup first, or upload a reference." }, { status: 400 });
-      try {
-        const buf = Buffer.from(await (await fetch(baseUrl)).arrayBuffer());
-        parts.push({ text: buildRefinePrompt(product, request.sport, instruction) });
-        parts.push({ inline_data: { mime_type: "image/png", data: buf.toString("base64") } });
-      } catch {
-        return NextResponse.json({ error: "Could not load the base image." }, { status: 502 });
-      }
     }
   } else {
     // Map hex codes to human color NAMES - image models ignore raw hex.

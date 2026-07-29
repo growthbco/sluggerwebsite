@@ -210,7 +210,7 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
                   <input ref={fileRef} type="file" accept="image/*" className="hidden"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickFile(f); }} />
                 </div>
-                <p className="mt-1 text-xs text-muted">A jersey, sketch, or inspo the AI should riff on.</p>
+                <p className="mt-1 text-xs text-muted">On a fresh mockup: a jersey/sketch to riff on. On Generate revision: a logo/graphic to add to the current design.</p>
               </div>
               <div>
                 <label className="flex items-center gap-2 text-sm text-foreground">
