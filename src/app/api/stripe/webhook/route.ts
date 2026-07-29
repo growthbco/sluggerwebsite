@@ -4,7 +4,7 @@ import { getStripe } from "@/lib/stripe";
 import { eq } from "drizzle-orm";
 import { postOrderToDiscord, postDesignRequestToDiscord, postTeamOrderPaidToDiscord, postAddonToDesignerDiscord } from "@/lib/discord";
 import { dbEnabled, getDb } from "@/db";
-import { teamOrders } from "@/db/schema";
+import { teamOrders, teams } from "@/db/schema";
 import { getById, markDesignFeePaid, setDiscordThreadId, formatProducts } from "@/lib/design-requests";
 import { emailDesignRequestToDesigner, emailDesignRequestConfirmation, emailOrderConfirmation } from "@/lib/email";
 import { persistPaidOrder } from "@/lib/orders";
@@ -335,20 +335,41 @@ export async function POST(req: Request) {
       }
 
       if (isNewOrder) {
-        // Thread grouping: team stores group by team name; drops group by the
-        // primary product (drop) name.
-        const threadName = session.metadata?.teamName || lines[0]?.name;
+        // Team stores get ONE persistent thread so every order (and future
+        // family add-ons) stays together; drops group by the drop name.
+        const isStore = orderTypeKey === "team_store";
+        const teamId = session.metadata?.teamId || undefined;
+        let existingThreadId: string | null = null;
+        if (isStore && teamId && dbEnabled()) {
+          try {
+            const [t] = await getDb().select({ thread: teams.storeThreadId }).from(teams).where(eq(teams.id, teamId)).limit(1);
+            existingThreadId = t?.thread ?? null;
+          } catch (e) { console.error("store thread lookup failed:", e); }
+        }
+        const threadName = isStore
+          ? `🏪 ${session.metadata?.teamName ?? "Team"} Store`
+          : session.metadata?.teamName || lines[0]?.name;
 
-        await postOrderToDiscord({
+        const posted = await postOrderToDiscord({
           reference,
           orderType: typeMap[orderTypeKey] ?? "Shop",
           customerName: session.customer_details?.name ?? undefined,
           customerEmail: session.customer_details?.email ?? undefined,
           shipping,
           lines,
+          subtotalCents: session.amount_subtotal ?? undefined,
+          shippingCents: session.total_details?.amount_shipping ?? 0,
           totalCents: session.amount_total ?? 0,
           threadName,
+          existingThreadId,
         });
+
+        // First order for a store creates its thread; persist it for next time.
+        if (isStore && teamId && dbEnabled() && !existingThreadId && posted.threadId) {
+          try {
+            await getDb().update(teams).set({ storeThreadId: posted.threadId }).where(eq(teams.id, teamId));
+          } catch (e) { console.error("store thread persist failed:", e); }
+        }
 
         const buyerEmail = session.customer_details?.email;
         if (buyerEmail) {

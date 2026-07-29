@@ -260,6 +260,13 @@
       "when": 1785173372434,
       "tag": "0036_petite_rick_jones",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1785287981475,
+      "tag": "0037_striped_overlord",
+      "breakpoints": true
     }
   ]
 }

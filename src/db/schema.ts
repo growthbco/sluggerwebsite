@@ -216,6 +216,9 @@ export const teams = pgTable(
     // Per-person team store: private link where players/parents buy their own
     // gear at list prices. Created from an approved design request.
     storeToken: text("store_token"),
+    // Persistent Discord forum thread for this store: all orders (incl. later
+    // family add-ons) post into this one thread instead of scattering.
+    storeThreadId: text("store_thread_id"),
     approvedDesignUrl: text("approved_design_url"),
     designRequestId: uuid("design_request_id"),
     // Items purchasable in this store (label/price/sizes snapshot so catalog

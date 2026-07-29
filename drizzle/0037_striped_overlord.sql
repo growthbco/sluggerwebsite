@@ -1,0 +1,1 @@
+ALTER TABLE "teams" ADD COLUMN "store_thread_id" text;

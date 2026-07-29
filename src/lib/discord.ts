@@ -18,20 +18,25 @@ type OrderPayload = {
   customerEmail?: string;
   shipping?: string;
   lines: OrderLine[];
+  subtotalCents?: number;
+  shippingCents?: number;
   totalCents: number;
   // When the #buy-in-orders channel is a Discord Forum, this becomes the post
   // title so each drop's orders group under their own thread.
   threadName?: string;
+  // Team stores: post INTO this existing thread instead of creating a new one,
+  // so all of a store's orders (and later add-ons) stay in one place.
+  existingThreadId?: string | null;
 };
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
 /** Post a paid order to the #orders channel. Returns true on success. */
-export async function postOrderToDiscord(order: OrderPayload): Promise<boolean> {
+export async function postOrderToDiscord(order: OrderPayload): Promise<{ ok: boolean; threadId?: string }> {
   const url = process.env.DISCORD_ORDERS_WEBHOOK_URL;
   if (!url) {
     console.warn("DISCORD_ORDERS_WEBHOOK_URL not set - skipping Discord post");
-    return false;
+    return { ok: false };
   }
 
   const itemLines = order.lines
@@ -48,6 +53,14 @@ export async function postOrderToDiscord(order: OrderPayload): Promise<boolean> 
     },
     { name: "Items", value: itemLines.slice(0, 1024) || "-", inline: false },
   ];
+  // Always surface shipping so a paid order's charges are unambiguous.
+  if (typeof order.shippingCents === "number") {
+    fields.push({
+      name: "Shipping",
+      value: order.shippingCents > 0 ? money(order.shippingCents) : "Free / local pickup",
+      inline: true,
+    });
+  }
   if (order.shipping) fields.push({ name: "Ship to", value: order.shipping.slice(0, 1024), inline: false });
 
   // Put the drop name in the title so orders are scannable by drop even in a
@@ -69,12 +82,24 @@ export async function postOrderToDiscord(order: OrderPayload): Promise<boolean> 
     ],
   };
 
-  // If the channel is a Forum, also route into a per-drop thread (its title).
-  if (process.env.DISCORD_ORDERS_FORUM === "true" && order.threadName) {
-    body.thread_name = order.threadName.slice(0, 100);
+  // Team stores: post into the store's existing thread when we have one, so
+  // every order for that store (and future add-ons) lands in one place.
+  if (order.existingThreadId) {
+    const sep = url.includes("?") ? "&" : "?";
+    const ok = await send(`${url}${sep}thread_id=${order.existingThreadId}`, body);
+    return { ok, threadId: order.existingThreadId };
   }
 
-  return send(url, body);
+  // Otherwise, on a Forum channel, open a new thread and capture its id so the
+  // caller can persist it (team stores) and reuse it next time.
+  if (process.env.DISCORD_ORDERS_FORUM === "true" && order.threadName) {
+    body.thread_name = order.threadName.slice(0, 100);
+    const msg = await sendAndReturn(url, body);
+    return { ok: Boolean(msg), threadId: msg?.channel_id };
+  }
+
+  const ok = await send(url, body);
+  return { ok };
 }
 
 type RosterRow = {
