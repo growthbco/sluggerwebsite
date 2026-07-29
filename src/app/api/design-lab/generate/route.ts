@@ -9,7 +9,7 @@ import { designLabVisitors } from "@/db/schema";
 import { getOrCreateVisitor, tierFor, LAB_COOKIE, encryptCleanUrl } from "@/lib/design-lab";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 // PRIVATE preview of the AI jersey designer (not linked from the site).
 // Gated: admin session OR the shared test key. Each generation on
@@ -213,9 +213,14 @@ export async function POST(req: Request) {
   }
 
   try {
-    const callGemini = () =>
+    // Primary: gemini-3-pro-image (crisp lettering). Fallback: a Flash image
+    // model when Pro is overloaded (Google returns 503 "high demand"), so the
+    // tool keeps working through Pro outages instead of dying.
+    const PRIMARY = "gemini-3-pro-image";
+    const FALLBACK = process.env.DESIGN_LAB_FALLBACK_MODEL || "gemini-2.5-flash-image";
+    const callModel = (model: string) =>
       fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -223,22 +228,32 @@ export async function POST(req: Request) {
             contents: [{ role: "user", parts }],
             generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "4:3" } },
           }),
-          signal: AbortSignal.timeout(45000),
+          signal: AbortSignal.timeout(40000),
         },
       );
-    let res = await callGemini();
-    if (!res.ok) {
-      console.error("design-lab attempt 1 failed:", res.status, await res.text().catch(() => ""));
-      res = await callGemini(); // transient 5xx from the image model is common
+    // Try primary once; if it's overloaded/unavailable/timeout, fall back to Flash.
+    let usedFallback = false;
+    let res: Response | null = null;
+    for (const model of [PRIMARY, FALLBACK]) {
+      try {
+        res = await callModel(model);
+        if (res.ok) { usedFallback = model === FALLBACK; break; }
+        const status = res.status;
+        console.error(`design-lab ${model} failed:`, status, (await res.text().catch(() => "")).slice(0, 150));
+        // Only fall back on capacity/5xx; a 400 won't improve on Flash.
+        if (!(status === 429 || status >= 500)) break;
+      } catch (e) {
+        console.error(`design-lab ${model} threw:`, String(e).slice(0, 120));
+        res = null; // timeout/abort -> try fallback
+      }
     }
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      console.error("design-lab generate failed:", res.status, detail.slice(0, 300));
+    if (!res || !res.ok) {
       return NextResponse.json(
-        { error: `Generation failed (${res.status}) - try rewording your idea or using a smaller image` },
-        { status: 502 },
+        { error: "Our image AI is briefly overloaded (Google-side). Give it a minute and try again." },
+        { status: 503 },
       );
     }
+    if (usedFallback) console.log("design-lab used Flash fallback (Pro overloaded)");
     const data = await res.json();
     const img = data?.candidates?.[0]?.content?.parts?.find(
       (p: { inlineData?: { data: string; mimeType: string }; inline_data?: { data: string; mime_type: string } }) => p.inlineData || p.inline_data,
