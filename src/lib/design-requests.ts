@@ -236,17 +236,20 @@ export async function removeProofImage(id: string, url: string) {
   return proofImages;
 }
 
-/** Client approves the proof (optionally with a chosen image url). */
-export async function approveDesign(id: string, approvedUrl?: string) {
+/** Client approves one OR MORE proofs (e.g. a jersey + hat + pants set, or
+ *  several practice jerseys). The first stays in approvedDesignUrl for older
+ *  single-URL surfaces; all of them go in approvedDesignUrls. */
+export async function approveDesign(id: string, approvedUrls?: string | string[]) {
   const db = getDb();
   const now = new Date();
+  const urls = (Array.isArray(approvedUrls) ? approvedUrls : approvedUrls ? [approvedUrls] : []).filter(Boolean);
   await db
     .update(designRequests)
     .set({
       status: "approved",
       approvedAt: now,
-      approvedDesignUrl: approvedUrl ?? null,
-      approvedDesignUrls: approvedUrl ? [approvedUrl] : null,
+      approvedDesignUrl: urls[0] ?? null,
+      approvedDesignUrls: urls.length ? urls : null,
       updatedAt: now,
     })
     .where(eq(designRequests.id, id));

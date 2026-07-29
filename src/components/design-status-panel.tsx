@@ -42,7 +42,15 @@ export function DesignStatusPanel({
   maxRevisions,
 }: Props) {
   const [currentStatus, setCurrentStatus] = useState(status);
-  const [chosen, setChosen] = useState<string | null>(initialApprovedUrl ?? proofImages[proofImages.length - 1] ?? null);
+  // Multi-select: a project can have several finals (jersey, hat, pants, or a
+  // few practice jerseys), so the client can pick more than one to approve.
+  const [selected, setSelected] = useState<string[]>(
+    initialApprovedUrl ? [initialApprovedUrl] : proofImages.length === 1 ? [proofImages[0]] : [],
+  );
+  // The proof the change-request editor / lightbox act on (last one tapped).
+  const [activeProof, setActiveProof] = useState<string>(
+    initialApprovedUrl ?? proofImages[proofImages.length - 1] ?? "",
+  );
   const [busy, setBusy] = useState<"" | "approving" | "requesting">("");
   const [message, setMessage] = useState("");
   const [showChanges, setShowChanges] = useState(false);
@@ -57,15 +65,21 @@ export function DesignStatusPanel({
   const revisionsLeft = Math.max(0, maxRevisions - used);
   const maxedOut = revisionsLeft === 0;
 
+  function toggleSelect(u: string) {
+    if (isApproved) return;
+    setActiveProof(u);
+    setSelected((s) => (s.includes(u) ? s.filter((x) => x !== u) : [...s, u]));
+  }
+
   async function approve() {
-    if (!chosen) return;
+    if (selected.length === 0) return;
     setBusy("approving");
     setMessage("");
     try {
       const res = await fetch(`/api/design-request/${token}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approvedUrl: chosen }),
+        body: JSON.stringify({ approvedUrls: selected }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not approve");
@@ -92,7 +106,7 @@ export function DesignStatusPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           generalNote: generalNote.trim() || undefined,
-          proofImageUrl: chosen ?? undefined,
+          proofImageUrl: activeProof || undefined,
           annotations: annotations.filter((a) => a.note.trim().length > 0),
         }),
       });
@@ -127,8 +141,12 @@ export function DesignStatusPanel({
       {hasProof && (
         <section>
           <h2 className="display text-xl text-foreground">Your proof{proofImages.length > 1 ? "s" : ""}</h2>
-          {proofImages.length > 1 && !isApproved && (
-            <p className="text-sm text-muted mt-1">Click a proof to select and enlarge it, then approve or request changes.</p>
+          {!isApproved && (
+            <p className="text-sm text-muted mt-1">
+              {proofImages.length > 1
+                ? "Tap each proof you want to approve (you can pick more than one). Use the magnifier to enlarge."
+                : "Tap the proof to select it, then approve or request changes."}
+            </p>
           )}
           <p className="text-xs text-muted mt-1">
             Note: every finished jersey includes standard Slugger Athletics branding - a size barcode
@@ -136,30 +154,38 @@ export function DesignStatusPanel({
             &quot;Slugger Athletics&quot; - even if it isn&apos;t shown on the proof.
           </p>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {proofImages.map((u) => (
-              <button
-                key={u}
-                type="button"
-                onClick={() => {
-                  if (!isApproved) setChosen(u);
-                  setExpanded(u);
-                }}
-                className={`group relative aspect-[4/3] bg-white border-2 overflow-hidden cursor-zoom-in ${
-                  chosen === u ? "border-brand" : "border-line hover:border-brand/50"
-                }`}
-              >
-                <Image src={u} alt={proofLabels[u] || "Proof"} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-contain p-2" unoptimized />
-                {chosen === u && !isApproved && (
-                  <span className="absolute top-2 right-2 grid place-items-center h-7 w-7 bg-brand text-on-brand display text-xs">✓</span>
-                )}
-                {proofLabels[u] && (
-                  <span className="absolute top-2 left-2 bg-black/75 text-white text-[11px] display px-2 py-1 pointer-events-none">{proofLabels[u]}</span>
-                )}
-                <span className="absolute bottom-2 left-2 bg-black/70 text-white text-[11px] px-2 py-1 pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
-                  Click to enlarge
-                </span>
-              </button>
-            ))}
+            {proofImages.map((u) => {
+              const isSel = selected.includes(u);
+              return (
+                <div
+                  key={u}
+                  onClick={() => toggleSelect(u)}
+                  className={`group relative aspect-[4/3] bg-white border-2 overflow-hidden ${isApproved ? "" : "cursor-pointer"} ${
+                    isSel ? "border-brand ring-2 ring-brand/40" : "border-line hover:border-brand/50"
+                  }`}
+                >
+                  <Image src={u} alt={proofLabels[u] || "Proof"} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-contain p-2" unoptimized />
+                  {!isApproved && (
+                    <span className={`absolute top-2 right-2 grid place-items-center h-7 w-7 display text-sm rounded-full border-2 ${isSel ? "bg-brand text-on-brand border-brand" : "bg-white/90 text-muted border-line"}`}>
+                      {isSel ? "✓" : ""}
+                    </span>
+                  )}
+                  {proofLabels[u] && (
+                    <span className="absolute top-2 left-2 bg-black/75 text-white text-[11px] display px-2 py-1 pointer-events-none">{proofLabels[u]}</span>
+                  )}
+                  {/* Enlarge is its own control so tapping the image selects it. */}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setExpanded(u); }}
+                    className="absolute bottom-2 right-2 grid place-items-center h-8 w-8 bg-black/70 text-white rounded hover:bg-black/85"
+                    title="Enlarge"
+                    aria-label="Enlarge proof"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" strokeLinecap="round" /></svg>
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}
@@ -190,10 +216,14 @@ export function DesignStatusPanel({
         <section className="flex flex-wrap gap-3">
           <button
             onClick={approve}
-            disabled={!chosen || busy !== ""}
+            disabled={selected.length === 0 || busy !== ""}
             className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors disabled:opacity-60"
           >
-            {busy === "approving" ? "Approving..." : "✓ Approve This Proof"}
+            {busy === "approving"
+              ? "Approving..."
+              : selected.length > 1
+                ? `✓ Approve ${selected.length} Selected`
+                : "✓ Approve This Proof"}
           </button>
           <button
             onClick={() => setShowChanges((v) => !v)}
@@ -225,11 +255,16 @@ export function DesignStatusPanel({
               Click pins on the proof to mark exactly what to change. You have{" "}
               <strong className="text-foreground">{revisionsLeft}</strong> revision{revisionsLeft === 1 ? "" : "s"} left.
             </p>
+            {proofImages.length > 1 && (
+              <p className="text-xs text-muted mt-1">
+                Editing: <strong className="text-foreground">{proofLabels[activeProof] || "the selected proof"}</strong>. Tap a different proof above to switch.
+              </p>
+            )}
           </div>
 
-          {chosen && (
+          {activeProof && (
             <ProofAnnotator
-              proofUrl={chosen}
+              proofUrl={activeProof}
               generalNote={generalNote}
               setGeneralNote={setGeneralNote}
               annotations={annotations}

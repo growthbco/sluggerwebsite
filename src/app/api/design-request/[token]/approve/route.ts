@@ -19,22 +19,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     return NextResponse.json({ error: "There's no proof to approve yet." }, { status: 400 });
   }
 
-  let body: { approvedUrl?: string } = {};
+  let body: { approvedUrl?: string; approvedUrls?: string[] } = {};
   try {
     body = await req.json();
   } catch {}
 
-  // Default to the most recent proof image if none specified.
-  const approvedUrl = body.approvedUrl ?? request.proofImages[request.proofImages.length - 1];
+  // Accept one or many selected proofs; keep only URLs that are real proofs.
+  const requested = body.approvedUrls?.length ? body.approvedUrls : body.approvedUrl ? [body.approvedUrl] : [];
+  const valid = requested.filter((u) => request.proofImages!.includes(u));
+  // Default to the most recent proof image if none specified/valid.
+  const approvedUrls = valid.length ? valid : [request.proofImages[request.proofImages.length - 1]];
 
   try {
-    await approveDesign(request.id, approvedUrl);
+    await approveDesign(request.id, approvedUrls);
     // Post into the same Discord thread so the team sees the approval inline.
     await postDesignThreadUpdate({
       threadId: request.discordThreadId ?? undefined,
       title: `✅ Approved - ${request.teamName} (${request.reference})`,
-      description: "Client approved the design. The customer is being routed into the Team Order form (their team + contact pre-filled, design auto-attached).",
-      imageUrl: approvedUrl,
+      description: `Client approved ${approvedUrls.length === 1 ? "the design" : `${approvedUrls.length} designs`}. The customer is being routed into the Team Order form (their team + contact pre-filled, design auto-attached).`,
+      imageUrl: approvedUrls[0],
       username: "Slugger Design Requests",
     });
     await setThreadStageTag(request.discordThreadId, "✅ Approved");

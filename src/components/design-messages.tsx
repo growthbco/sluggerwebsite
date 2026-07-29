@@ -88,7 +88,7 @@ export function DesignMessages({
   const sub =
     role === "designer"
       ? "Ask the client a question - they get an email with a link back here to answer."
-      : "Have a question, or need to clarify something about your design? Ask here.";
+      : "Have a general question? Ask here. To change the design itself, use the \"Request Changes\" button on your proof above - you can pin the exact spot so nothing gets lost.";
 
   async function handleFiles(files: FileList | null) {
     if (!files?.length) return;
