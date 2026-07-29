@@ -13,8 +13,8 @@ type Props = {
 
 /** Staff-only AI design studio on the designer's manage page. Generate a
  *  mockup from the brief, refine it with change instructions, and every
- *  version is saved to the design request - so you can pick up exactly where
- *  you (or the designer) left off, and jump in when he's slow. */
+ *  version is saved to the design request - so anyone on the team can pick up
+ *  exactly where the design left off. */
 export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVersions = [] }: Props) {
   const [versions, setVersions] = useState<Version[]>(initialVersions);
   const [activeIdx, setActiveIdx] = useState(initialVersions.length - 1);
@@ -73,8 +73,8 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
         <h2 className="display text-xl text-foreground">AI Design Studio</h2>
       </div>
       <p className="mt-1 text-sm text-muted">
-        Create or revise {teamName}&apos;s mockup with AI - jump in when the designer&apos;s slow.
-        Every version is saved here, so you can always pick up where you left off.
+        Create or revise {teamName}&apos;s mockup with AI. Every version is saved here, so anyone on
+        the team can pick up exactly where the design left off.
       </p>
 
       <div className="mt-5 grid gap-6 lg:grid-cols-2">
