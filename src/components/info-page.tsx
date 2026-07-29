@@ -4,6 +4,7 @@ import { byCategory, primaryImage, type Category } from "@/lib/catalog";
 
 export type Offering = { t: string; d: string };
 export type Step = { n: number; t: string; d: string };
+export type Faq = { q: string; a: string };
 
 export type InfoPageProps = {
   eyebrow: string;
@@ -18,6 +19,11 @@ export type InfoPageProps = {
   // Manual example images (used when there are no catalog products yet).
   manualExamples?: { src: string; alt: string }[];
   steps?: Step[];
+  // Optional deeper content section (plain prose paragraphs) for SEO depth.
+  bodyTitle?: string;
+  body?: React.ReactNode;
+  // Optional FAQ - rendered as a section AND emitted as FAQPage schema.
+  faq?: Faq[];
   localTitle: string;
   localBody: React.ReactNode;
   jsonLd: object;
@@ -37,9 +43,23 @@ export function InfoPage(props: InfoPageProps) {
       ? catalogExamples.map((p) => ({ href: `/product/${p.slug}`, src: primaryImage(p), alt: `${p.name}${props.exampleAltSuffix ?? ""}` }))
       : (props.manualExamples ?? []).map((m) => ({ href: undefined as string | undefined, src: m.src, alt: m.alt }));
 
+  const faqLd =
+    props.faq && props.faq.length > 0
+      ? {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: props.faq.map((f) => ({
+            "@type": "Question",
+            name: f.q,
+            acceptedAnswer: { "@type": "Answer", text: f.a },
+          })),
+        }
+      : null;
+
   return (
     <div>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(props.jsonLd) }} />
+      {faqLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />}
 
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-16 text-center">
         <span className="display text-brand text-sm">{props.eyebrow}</span>
@@ -104,6 +124,29 @@ export function InfoPage(props: InfoPageProps) {
           </div>
         </div>
       </section>
+
+      {props.body && (
+        <section className="mx-auto max-w-3xl px-4 sm:px-6 py-16">
+          {props.bodyTitle && <h2 className="display text-3xl sm:text-4xl text-foreground">{props.bodyTitle}</h2>}
+          <div className="mt-6 space-y-4 text-muted leading-relaxed">{props.body}</div>
+        </section>
+      )}
+
+      {props.faq && props.faq.length > 0 && (
+        <section className="bg-steel border-y border-line">
+          <div className="mx-auto max-w-3xl px-4 sm:px-6 py-16">
+            <h2 className="display text-3xl sm:text-4xl text-foreground text-center">Frequently Asked Questions</h2>
+            <div className="mt-8 divide-y divide-line">
+              {props.faq.map((f) => (
+                <div key={f.q} className="py-5">
+                  <h3 className="display text-lg text-foreground">{f.q}</h3>
+                  <p className="mt-2 text-muted">{f.a}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-16 text-center">
         <h2 className="display text-3xl sm:text-4xl text-foreground">{props.localTitle}</h2>

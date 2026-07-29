@@ -198,9 +198,48 @@ async function getLogo(): Promise<string | null> {
   }
 }
 
-/** Bake a repeating diagonal Slugger-logo watermark across the WHOLE frame so
- *  the branding flows continuously (never cut off behind the mockup) and the
- *  artwork can't be shopped to another printer. Uses the logo image (renders
+// Flood-fill the near-white background inward from the image borders, so we
+// know which pixels are the empty backdrop vs. the product. mask[i] === 1 means
+// background. A small margin keeps the watermark off the product's edge/shadow.
+function backgroundMask(rgba: Buffer, width: number, height: number): Uint8Array {
+  const mask = new Uint8Array(width * height);
+  const nearWhite = (i: number) => rgba[i * 4] >= 236 && rgba[i * 4 + 1] >= 236 && rgba[i * 4 + 2] >= 236;
+  const stack: number[] = [];
+  for (let x = 0; x < width; x++) { stack.push(x, (height - 1) * width + x); }
+  for (let y = 0; y < height; y++) { stack.push(y * width, y * width + width - 1); }
+  while (stack.length) {
+    const i = stack.pop()!;
+    if (mask[i] || !nearWhite(i)) continue;
+    mask[i] = 1;
+    const x = i % width;
+    if (x > 0) stack.push(i - 1);
+    if (x < width - 1) stack.push(i + 1);
+    if (i >= width) stack.push(i - width);
+    if (i < width * (height - 1)) stack.push(i + width);
+  }
+  // Erode the background by a small margin so the watermark keeps clear of the
+  // product's hem and soft shadow instead of butting right against it.
+  const margin = Math.max(10, Math.round(width * 0.012));
+  const eroded = mask.slice();
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      if (!mask[i]) continue;
+      for (let dy = -margin; dy <= margin && eroded[i]; dy += margin) {
+        for (let dx = -margin; dx <= margin; dx += margin) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height || !mask[ny * width + nx]) { eroded[i] = 0; break; }
+        }
+      }
+    }
+  }
+  return eroded;
+}
+
+/** Bake a repeating diagonal Slugger-logo watermark BEHIND the mockup: the logo
+ *  tiles across the frame but only shows in the empty background around the
+ *  product (masked off the garment/chain itself), so the design stays clean and
+ *  the branding still protects the artwork. Uses the logo image (renders
  *  reliably in serverless, unlike SVG text). Returns base64 PNG (falls back to
  *  the input on error). */
 export async function watermarkImage(b64: string): Promise<string> {
@@ -212,16 +251,25 @@ export async function watermarkImage(b64: string): Promise<string> {
     const tileW = Math.round(width * 0.34);
     const tileH = Math.round(width * 0.28);
     const logoW = Math.round(width * 0.22);
-    const overlay = Buffer.from(
+    const overlaySvg = Buffer.from(
       `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern id="p" width="${tileW}" height="${tileH}" patternUnits="userSpaceOnUse" patternTransform="rotate(-20)">
-            <image href="data:image/png;base64,${logo}" x="0" y="${Math.round(tileH * 0.2)}" width="${logoW}" opacity="0.16"/>
+            <image href="data:image/png;base64,${logo}" x="0" y="${Math.round(tileH * 0.2)}" width="${logoW}" opacity="0.18"/>
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#p)"/>
       </svg>`,
     );
+    // Render the tiled overlay to raw RGBA, then knock out its alpha wherever
+    // the source is the product (mask === 0), leaving the logo in the backdrop.
+    const overlayRaw = Buffer.from(await sharp(overlaySvg).resize(width, height).ensureAlpha().raw().toBuffer());
+    const srcRaw = await sharp(srcBuf).ensureAlpha().raw().toBuffer();
+    const mask = backgroundMask(srcRaw, width, height);
+    for (let i = 0; i < mask.length; i++) {
+      if (!mask[i]) overlayRaw[i * 4 + 3] = 0; // product pixel -> hide watermark
+    }
+    const overlay = await sharp(overlayRaw, { raw: { width, height, channels: 4 } }).png().toBuffer();
     const stamped = await sharp(srcBuf).composite([{ input: overlay }]).png().toBuffer();
     return stamped.toString("base64");
   } catch (e) {
