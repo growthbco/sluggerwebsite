@@ -27,15 +27,16 @@ export default function HypeChainsPage() {
         <>
           Every big hit deserves a moment. Slugger Athletics makes{" "}
           <strong className="text-foreground">custom 3D-printed hype chains</strong> that turn a home
-          run or a clutch strikeout into a dugout celebration. Built in your team&apos;s colors with
-          your own logo or mascot on the pendant - lightweight, bold, and made to be worn all season.
+          run or a clutch strikeout into a dugout celebration. Made to match your team&apos;s colors as
+          closely as our 3D filament allows, with your own logo or mascot on the pendant - lightweight,
+          bold, and built to be worn all season.
           Designed and printed in Ocala, shipped anywhere.
         </>
       }
       offeringsTitle="Bring the Hype"
       offeringsBlurb="The finishing touch on game day - personalized to your team's look."
       offerings={[
-        { t: "3D-Printed Chains", d: "Bold, lightweight links in your team colors - alternate two colors for that unmistakable dugout look." },
+        { t: "3D-Printed Chains", d: "Bold, lightweight links in colors matched from our available filament - alternate two colors for that unmistakable dugout look." },
         { t: "Custom Pendants", d: "Your logo, mascot, initials, or number rendered as a solid, colorful pendant that pops on camera." },
         { t: "Team Sets", d: "Order for the whole roster so the chain gets passed to whoever comes up clutch." },
         { t: "Simple Pricing", d: "Free mockup so you see it first. One-time $50 for the production 3D file, then each chain starts at $40 depending on detail and colors." },
@@ -43,8 +44,11 @@ export default function HypeChainsPage() {
       exampleCategory="chains"
       exampleTitle="Hype Chains We've Made"
       exampleAltSuffix=" - custom 3D hype chain Ocala FL"
+      exampleFit="cover"
       manualExamples={[
+        { src: "/products/chains/knicks-blue-orange.jpg", alt: "Blue and orange custom Knicks hype chain with 3D-printed pendant - Slugger Athletics Ocala FL" },
         { src: "/products/chains/avengers-red-blue.jpg", alt: "Red and blue custom Avengers hype chain with 3D-printed pendant - Slugger Athletics Ocala FL" },
+        { src: "/products/chains/ocala-grind.jpg", alt: "Ocala Grind blue and black custom baseball hype chain - Slugger Athletics Ocala FL" },
         { src: "/products/chains/big-baller.jpg", alt: "Big Baller custom hype chain - Slugger Athletics Ocala FL" },
       ]}
       steps={[
@@ -58,9 +62,10 @@ export default function HypeChainsPage() {
           <p>
             A hype chain is the celebration prop that&apos;s taken over dugouts and sidelines: a chunky,
             3D-printed necklace a player throws on after a big moment - a home run, a stolen base, a
-            game-saving play. Ours are printed from durable, lightweight plastic in your{" "}
-            <strong className="text-foreground">exact team colors</strong>, with oversized links that
-            alternate two colors so they read from across the field and on video.
+            game-saving play. Ours are printed from durable, lightweight plastic in colors{" "}
+            <strong className="text-foreground">matched as closely as possible to your team&apos;s</strong>{" "}
+            from our available 3D filament, with oversized links that alternate two colors so they read
+            from across the field and on video.
           </p>
           <p>
             The pendant is where it gets personal. We build it from your team&apos;s logo, mascot,
@@ -86,8 +91,8 @@ export default function HypeChainsPage() {
           a: "Most orders ship in about 2 to 3 weeks after you approve the mockup, and we can often turn a rush order in about a week. Timing depends on the size of the order and how many chains you need.",
         },
         {
-          q: "Can you match our exact team colors and logo?",
-          a: "Yes. We print in your specific team colors and build the pendant from your logo, mascot, initials, or number. The chain links can alternate two colors for that classic dugout look.",
+          q: "Can you match our team colors and logo?",
+          a: "We get as close as we can. Chains are 3D-printed, so colors are matched from the filament we have on hand rather than a Pantone-exact match - for most team colors that's a very close match. We build the pendant from your logo, mascot, initials, or number, and the links can alternate two colors for that classic dugout look.",
         },
         {
           q: "Is there a minimum order?",

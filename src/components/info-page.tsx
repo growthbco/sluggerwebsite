@@ -18,6 +18,9 @@ export type InfoPageProps = {
   exampleAltSuffix?: string;
   // Manual example images (used when there are no catalog products yet).
   manualExamples?: { src: string; alt: string }[];
+  // "contain" (default) frames product cutouts on white; "cover" fills the
+  // tile edge-to-edge (for full-photo examples like the grass hype-chain shots).
+  exampleFit?: "contain" | "cover";
   steps?: Step[];
   // Optional deeper content section (plain prose paragraphs) for SEO depth.
   bodyTitle?: string;
@@ -95,15 +98,17 @@ export function InfoPage(props: InfoPageProps) {
           <h2 className="display text-3xl sm:text-4xl text-foreground">{props.exampleTitle ?? "Recent Work"}</h2>
           <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
             {examples.map((ex, i) => {
+              const cover = props.exampleFit === "cover";
               const inner = (
                 <div className="relative aspect-square">
-                  <Image src={ex.src} alt={ex.alt} fill sizes="25vw" className="object-contain p-2 transition-transform group-hover:scale-105" unoptimized />
+                  <Image src={ex.src} alt={ex.alt} fill sizes="25vw" className={`${cover ? "object-cover" : "object-contain p-2"} transition-transform group-hover:scale-105`} unoptimized />
                 </div>
               );
+              const cls = cover ? "border border-line group overflow-hidden" : "bg-white p-3 border border-line group";
               return ex.href ? (
-                <Link key={i} href={ex.href} className="bg-white p-3 border border-line group">{inner}</Link>
+                <Link key={i} href={ex.href} className={cls}>{inner}</Link>
               ) : (
-                <div key={i} className="bg-white p-3 border border-line group">{inner}</div>
+                <div key={i} className={cls}>{inner}</div>
               );
             })}
           </div>
