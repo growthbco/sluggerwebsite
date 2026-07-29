@@ -62,7 +62,7 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
         "The CHAIN is built from thick, rounded, oversized oval links that ALTERNATE between the two team colors, with a smooth matte 3D-printed plastic finish, clear dimensional depth, rounded edges, and soft drop shadows so it reads as a solid 3D object on the surface.",
         "CRITICAL - the PENDANT is a SINGLE solid, smooth, flat 3D-printed piece: one continuous printed plate/charm. It is NOT built from chain links, NOT hollow, NOT made of connected rings or loops. It hangs from the bottom link by one small loop.",
         i.hasPendantLogo
-          ? "Shape the pendant as a solid, flat, filled-in 3D-printed rendering of the provided PENDANT LOGO image - solid material where the logo is solid, in the team colors with a contrasting outline. Do not turn the logo into chain links."
+          ? "Shape the pendant as a solid, flat, filled-in 3D-printed rendering of the provided PENDANT LOGO image. Reproduce the COMPLETE logo mark faithfully - every element (any surrounding circle or ring, arrows, and the exact letterforms) - do NOT simplify it to a plain single letter. Solid printed material where the logo is solid, in the team colors with a contrasting outline. Do not turn the logo into chain links."
           : team
             ? `Shape the pendant as a solid, flat 3D-printed nameplate reading "${team}" in bold block letters, team colors with a contrasting outline.`
             : "Shape the pendant as a solid, flat 3D-printed team logo, team colors with a contrasting outline.",
