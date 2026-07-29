@@ -132,6 +132,7 @@ function buildGrounding(design: DesignContext, order: OrderContext | null, messa
     "- Payment flow: Slugger emails an invoice; a 50% deposit starts production and the balance (plus shipping) is due before the order ships. 7% Florida sales tax applies to goods.",
     "- Production: most orders ship 2-3 weeks after design approval and deposit; rush is about a week. Hats are embroidered in-house and small hat orders are often ready in days.",
     `- Revisions: ${MAX_REVISIONS} revision rounds are included with a design - but ONLY BEFORE the client approves it. Once the design is approved (status approved/ordered), and especially once any payment has been made, production starts immediately and the design is LOCKED: no design changes are possible. Never promise a design change or mention revision rounds after approval.`,
+    "- Standard branding on final jerseys: every finished production jersey includes a size barcode tag on the lower-right front, the SA (Slugger Athletics) logo at the top of the back, and a neck label that reads Slugger Athletics. These may not show on every mockup/proof but ARE on the final product. If a customer asks about the barcode/tag/neck label, confirm this is standard on all finished jerseys.",
     "",
     ...(taughtFacts.length
       ? [

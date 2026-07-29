@@ -26,6 +26,16 @@ export default function TermsPage() {
           </p>
         </div>
         <div>
+          <h2 className="display text-xl text-foreground">Standard Slugger Athletics Branding</h2>
+          <p className="mt-2">
+            Every final production jersey includes standard Slugger Athletics branding: a
+            size barcode tag on the lower-right front, our SA logo at the top of the back,
+            and a woven neck label that reads &quot;Slugger Athletics.&quot; These elements
+            may not appear on every mockup or proof, but they are included on the finished
+            product.
+          </p>
+        </div>
+        <div>
           <h2 className="display text-xl text-foreground">Turnaround &amp; Shipping</h2>
           <p className="mt-2">
             Standard production is typically 2-3 weeks after proof approval; rush is

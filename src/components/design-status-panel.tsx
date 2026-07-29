@@ -130,6 +130,11 @@ export function DesignStatusPanel({
           {proofImages.length > 1 && !isApproved && (
             <p className="text-sm text-muted mt-1">Click a proof to select and enlarge it, then approve or request changes.</p>
           )}
+          <p className="text-xs text-muted mt-1">
+            Note: every finished jersey includes standard Slugger Athletics branding - a size barcode
+            tag on the lower-right front, the SA logo at the top of the back, and a neck label reading
+            &quot;Slugger Athletics&quot; - even if it isn&apos;t shown on the proof.
+          </p>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {proofImages.map((u) => (
               <button

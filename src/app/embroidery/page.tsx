@@ -32,7 +32,11 @@ const PROCESS = [
 ];
 
 export default function EmbroideryPage() {
-  const hatExamples = byCategory("hats").slice(0, 4);
+  const manualHats = [
+    { src: "/products/hats/pine-ridge-flexfit.jpg", alt: "Pine Ridge Outdoors custom embroidered Flexfit hat - Slugger Athletics Ocala FL" },
+    { src: "/products/hats/mamba-m-flexfit.jpg", alt: "Black Flexfit hat with white 3D puff M embroidery - Slugger Athletics Ocala FL" },
+  ];
+  const hatExamples = byCategory("hats").slice(0, 4 - manualHats.length);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -98,10 +102,17 @@ export default function EmbroideryPage() {
       </section>
 
       {/* Examples */}
-      {hatExamples.length > 0 && (
+      {(hatExamples.length > 0 || manualHats.length > 0) && (
         <section className="mx-auto max-w-7xl px-4 sm:px-6 py-16">
           <h2 className="display text-3xl sm:text-4xl text-foreground">Recent Embroidered Hats</h2>
           <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {manualHats.map((m) => (
+              <div key={m.src} className="bg-white p-3 border border-line">
+                <div className="relative aspect-square">
+                  <Image src={m.src} alt={m.alt} fill sizes="25vw" className="object-contain p-2" unoptimized />
+                </div>
+              </div>
+            ))}
             {hatExamples.map((p) => (
               <div key={p.slug} className="bg-white p-3 border border-line">
                 <div className="relative aspect-square">
