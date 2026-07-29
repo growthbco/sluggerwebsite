@@ -4,7 +4,7 @@ import { put } from "@vercel/blob";
 import { dbEnabled, getDb } from "@/db";
 import { designRequests } from "@/db/schema";
 import { getByManageToken } from "@/lib/design-requests";
-import { generateJerseyImage, parseDataUrl, type ImagePart } from "@/lib/jersey-image";
+import { generateJerseyImage, parseDataUrl, watermarkImage, type ImagePart } from "@/lib/jersey-image";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -20,10 +20,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const request = await getByManageToken(token);
   if (!request) return NextResponse.json({ error: "Link not found" }, { status: 404 });
 
-  let body: { action?: "generate" | "refine"; instruction?: string; baseUrl?: string; style?: string } = {};
+  let body: {
+    action?: "generate" | "refine";
+    instruction?: string;
+    baseUrl?: string;
+    style?: string;
+    colors?: string[];
+    refImage?: string; // staff-uploaded reference, as a data URL
+  } = {};
   try { body = await req.json(); } catch {}
   const action = body.action === "refine" ? "refine" : "generate";
   const instruction = (body.instruction ?? "").trim().slice(0, 800);
+  // Colors the staff typed in override the customer's on-file colors.
+  const staffColors = (body.colors ?? []).map((c) => (c || "").trim()).filter(Boolean).slice(0, 4);
+  const refImage = parseDataUrl(body.refImage);
 
   const state = request.aiDesignState ?? { versions: [] as { url: string; note: string; at: string }[] };
   const parts: ImagePart[] = [];
@@ -41,33 +51,52 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       return NextResponse.json({ error: "Could not load the base image." }, { status: 502 });
     }
   } else {
-    const colors = (request.colorHexes ?? []).join(", ") || request.colors || "team colors";
+    const colors = staffColors.length
+      ? staffColors.join(", ")
+      : (request.colorHexes ?? []).join(", ") || request.colors || "team colors";
     const style = (body.style ?? request.jerseyStyle ?? "").trim();
     parts.push({ text: [
       `Professional e-commerce product mockup of a fully custom sublimated ${request.sport ?? "baseball"} jersey${style ? `, ${style} cut` : ""}, floating ghost-mannequin style, pure white background, studio lighting. Show FRONT (left) and BACK (right) side by side.`,
+      "Frame the two jerseys large and close-up so they fill most of the image with only a small even margin around them; do not leave big empty white space or push them far into the distance.",
       `Colors: ${colors}.`,
       request.teamName ? `Team name "${request.teamName}" across the chest in bold athletic lettering.` : "",
       request.vision ? `Design direction: ${request.vision.slice(0, 500)}.` : "",
       instruction ? `Additional direction: ${instruction}.` : "",
+      refImage ? "A REFERENCE image is provided: use its design language, colors, and vibe as inspiration for a new original design." : "",
       "Premium, print-ready, tasteful. No mannequin, no human, no watermark. Do NOT add any MLB, NBA, NFL, or other league logos, no pro-team marks, no swooshes or brand logos - use ONLY the team's own name and any logo the customer provided.",
     ].filter(Boolean).join(" ") });
-    // Seed with the customer's logo/reference if they supplied any.
+    // Seed with the staff-uploaded reference first, then the customer's
+    // logo/reference if they supplied any (cap the total we send).
+    const seeds: { mime_type: string; data: string }[] = [];
+    if (refImage) seeds.push(refImage);
     for (const url of (request.inspirationImages ?? []).slice(0, 2)) {
       try {
         const buf = Buffer.from(await (await fetch(url)).arrayBuffer());
-        parts.push({ inline_data: { mime_type: "image/png", data: buf.toString("base64") } });
+        seeds.push({ mime_type: "image/png", data: buf.toString("base64") });
       } catch { /* skip */ }
     }
+    for (const s of seeds.slice(0, 3)) parts.push({ inline_data: s });
   }
 
   const result = await generateJerseyImage(parts);
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
 
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const blob = await put(`design-studio/${request.reference}-${stamp}.png`, Buffer.from(result.data, "base64"), {
+  // Save the CLEAN master first (the designer works from this and refines edit
+  // from it), then a Slugger-watermarked copy that's what the customer sees.
+  const cleanBlob = await put(`design-studio/${request.reference}-${stamp}-clean.png`, Buffer.from(result.data, "base64"), {
     access: "public", contentType: result.mime, addRandomSuffix: true,
   });
-  const version = { url: blob.url, note: (instruction || (action === "generate" ? "initial mockup" : "revision")).slice(0, 200), at: new Date().toISOString() };
+  const watermarked = await watermarkImage(result.data);
+  const blob = await put(`design-studio/${request.reference}-${stamp}.png`, Buffer.from(watermarked, "base64"), {
+    access: "public", contentType: "image/png", addRandomSuffix: true,
+  });
+  const version = {
+    url: blob.url,
+    cleanUrl: cleanBlob.url,
+    note: (instruction || (action === "generate" ? "initial mockup" : "revision")).slice(0, 200),
+    at: new Date().toISOString(),
+  };
   const nextState = {
     sport: request.sport ?? undefined,
     style: (body.style ?? request.jerseyStyle) ?? undefined,

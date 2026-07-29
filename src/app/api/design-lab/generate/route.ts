@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/admin-auth";
 import { generateJson } from "@/lib/design-assistant";
 import { put } from "@vercel/blob";
-import sharp from "sharp";
 import { eq, sql } from "drizzle-orm";
 import { getDb, dbEnabled } from "@/db";
 import { designLabVisitors } from "@/db/schema";
 import { getOrCreateVisitor, tierFor, LAB_COOKIE, encryptCleanUrl } from "@/lib/design-lab";
+import { watermarkImage } from "@/lib/jersey-image";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -18,78 +18,6 @@ const TEST_KEY = process.env.DESIGN_LAB_KEY || "slugger26";
 const DAILY_CAP = 150;
 let dayStamp = "";
 let used = 0;
-
-// Full-color Slugger logo for the background watermark; fetched once per
-// instance from the site's own public asset.
-let logoB64: string | null = null;
-async function getLogo(): Promise<string | null> {
-  if (logoB64) return logoB64;
-  try {
-    const site = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
-    const res = await fetch(`${site}/slugger-logo.png`);
-    if (!res.ok) return null;
-    logoB64 = Buffer.from(await res.arrayBuffer()).toString("base64");
-    return logoB64;
-  } catch {
-    return null;
-  }
-}
-
-// Background mask via flood fill from the image borders: marks near-white
-// pixels connected to the edge, so the watermark lands BEHIND the jersey
-// (background only) and never covers the garment or its soft shadow.
-function backgroundMask(rgba: Buffer, width: number, height: number): Uint8Array {
-  const mask = new Uint8Array(width * height);
-  const nearWhite = (i: number) => rgba[i * 4] >= 240 && rgba[i * 4 + 1] >= 240 && rgba[i * 4 + 2] >= 240;
-  const stack: number[] = [];
-  for (let x = 0; x < width; x++) { stack.push(x, (height - 1) * width + x); }
-  for (let y = 0; y < height; y++) { stack.push(y * width, y * width + width - 1); }
-  while (stack.length) {
-    const i = stack.pop()!;
-    if (mask[i] || !nearWhite(i)) continue;
-    mask[i] = 1;
-    const x = i % width;
-    if (x > 0) stack.push(i - 1);
-    if (x < width - 1) stack.push(i + 1);
-    if (i >= width) stack.push(i - width);
-    if (i < width * (height - 1)) stack.push(i + width);
-  }
-  // Chamfer distance transform from the garment (non-background) region, so
-  // the watermark keeps a clean margin away from the jersey and its shadow
-  // instead of butting right against the hem.
-  const margin = Math.max(24, Math.round(width * 0.03)) * 3; // orthogonal step = 3
-  const INF = 1 << 29;
-  const dist = new Int32Array(width * height);
-  for (let i = 0; i < dist.length; i++) dist[i] = mask[i] ? INF : 0;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = y * width + x;
-      if (!dist[i]) continue;
-      let d = dist[i];
-      if (x > 0) d = Math.min(d, dist[i - 1] + 3);
-      if (y > 0) d = Math.min(d, dist[i - width] + 3);
-      if (x > 0 && y > 0) d = Math.min(d, dist[i - width - 1] + 4);
-      if (x < width - 1 && y > 0) d = Math.min(d, dist[i - width + 1] + 4);
-      dist[i] = d;
-    }
-  }
-  for (let y = height - 1; y >= 0; y--) {
-    for (let x = width - 1; x >= 0; x--) {
-      const i = y * width + x;
-      if (!dist[i]) continue;
-      let d = dist[i];
-      if (x < width - 1) d = Math.min(d, dist[i + 1] + 3);
-      if (y < height - 1) d = Math.min(d, dist[i + width] + 3);
-      if (x < width - 1 && y < height - 1) d = Math.min(d, dist[i + width + 1] + 4);
-      if (x > 0 && y < height - 1) d = Math.min(d, dist[i + width - 1] + 4);
-      dist[i] = d;
-    }
-  }
-  for (let i = 0; i < mask.length; i++) {
-    if (dist[i] < margin) mask[i] = 0;
-  }
-  return mask;
-}
 
 function checkCap(): boolean {
   const today = new Date().toISOString().slice(0, 10);
@@ -273,56 +201,12 @@ export async function POST(req: Request) {
       console.error("clean master save failed:", e);
     }
 
-    // Bake a diagonal SLUGGER ATHLETICS watermark into every concept so the
-    // artwork can't be shopped to another printer; the clean version only
-    // ever exists as the designer's real proof.
-    let outB64 = payload.data as string;
-    let mime = payload.mimeType ?? payload.mime_type ?? "image/png";
-    try {
-      const srcBuf = Buffer.from(outB64, "base64");
-      const srcSharp = sharp(srcBuf);
-      const { width = 1200, height = 900 } = await srcSharp.metadata();
-      const logo = await getLogo();
-      let overlay: Buffer;
-      if (logo) {
-        // Colored logo tiled across the whole frame...
-        const wmSvg = Buffer.from(
-          `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="p" width="400" height="320" patternUnits="userSpaceOnUse" patternTransform="rotate(-18)">
-                <image href="data:image/png;base64,${logo}" x="20" y="40" width="280" opacity="0.5"/>
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#p)"/>
-          </svg>`,
-        );
-        const wmRaw = Buffer.from(await sharp(wmSvg).ensureAlpha().raw().toBuffer());
-        // ...then masked to the background only, so it sits BEHIND the jersey.
-        const srcRaw = await sharp(srcBuf).ensureAlpha().raw().toBuffer();
-        const mask = backgroundMask(srcRaw, width, height);
-        for (let i = 0; i < mask.length; i++) {
-          if (!mask[i]) wmRaw[i * 4 + 3] = 0;
-        }
-        overlay = await sharp(wmRaw, { raw: { width, height, channels: 4 } }).png().toBuffer();
-      } else {
-        overlay = Buffer.from(
-          `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="p" width="420" height="180" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
-                <text x="0" y="90" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" fill="#555555" fill-opacity="0.14">SLUGGER ATHLETICS · CONCEPT</text>
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#p)"/>
-          </svg>`,
-        );
-      }
-      const stamped = await sharp(srcBuf).composite([{ input: overlay }]).png().toBuffer();
-      outB64 = stamped.toString("base64");
-      mime = "image/png";
-    } catch (e) {
-      console.error("watermark failed (returning unstamped):", e);
-    }
-    payload.data = outB64;
+    // Bake a continuous diagonal SLUGGER ATHLETICS watermark across the whole
+    // concept so the wording flows through uninterrupted (never cut off behind
+    // the mockup) and the artwork can't be shopped to another printer; the
+    // clean version only ever exists as the designer's real proof.
+    payload.data = await watermarkImage(payload.data as string);
+    const mime = "image/png"; // watermarkImage always returns PNG
     console.log(`design-lab generation #${used} today (~$${(used * 0.134).toFixed(2)} spent)`);
     // Persist every render (fire-and-forget) so there's a reviewable history.
     try {

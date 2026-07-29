@@ -608,7 +608,7 @@ export const designRequests = pgTable(
       primaryColor?: string;
       secondaryColor?: string;
       teamName?: string;
-      versions: { url: string; note: string; at: string }[];
+      versions: { url: string; cleanUrl?: string; note: string; at: string }[];
     }>(),
     // The single approved proof URL (selected on approval) - attached to the team order.
     approvedDesignUrl: text("approved_design_url"),
