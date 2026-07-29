@@ -152,5 +152,20 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
 /** Build the "edit the current version" prompt for a product type. */
 export function buildRefinePrompt(product: ProductType, sport: string | null | undefined, instruction: string): string {
   const noun = productNoun(product);
-  return `Edit this custom ${sport ?? "team"} ${noun} mockup. Keep it a professional product shot on a pure white background, same framing and views. Apply this change: ${instruction}. Change only what's asked; keep everything else identical. Do not add any league/MLB/pro-team logos or third-party brand marks.`;
+  return `Edit this ${noun} image. Apply this change: ${instruction}. Change ONLY what's asked; keep everything else - the design, colors, lettering, layout, and framing - exactly identical. Do not add any team name, text, or logo that is not already in the image.`;
+}
+
+/** Minimal, reference-driven prompt for when staff upload a reference image to
+ *  riff on. Deliberately does NOT inject the design request's team name,
+ *  colors, or vision - those forced "Orlando Avengers" onto everything and
+ *  fought the uploaded image. Lean on the reference; let the instruction steer. */
+export function buildReferencePrompt(product: ProductType, opts: { instruction?: string; colors?: string }): string {
+  const noun = productNoun(product);
+  return [
+    `Recreate the ${noun} shown in the REFERENCE image as a clean e-commerce product mockup on a pure white background.`,
+    "Keep its design, layout, lettering, and colors exactly as in the reference.",
+    opts.colors ? `Colors: ${opts.colors}.` : "",
+    opts.instruction ? `Make this change: ${opts.instruction}. Change ONLY that; keep everything else identical.` : "",
+    "Do not add any team name, text, or logo that is not already in the reference. No MLB/NBA/NFL or other brand logos.",
+  ].filter(Boolean).join(" ");
 }

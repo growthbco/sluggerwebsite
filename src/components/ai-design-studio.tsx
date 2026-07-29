@@ -84,7 +84,9 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
           baseUrl: action === "refine" ? (active?.cleanUrl ?? active?.url) : undefined,
           // Refine keeps the active version's product; generate uses the picker.
           product: action === "refine" ? (active?.product ?? product) : product,
-          refImage: action === "generate" ? refImage ?? undefined : undefined,
+          // Send the uploaded reference on BOTH actions: on refine it becomes
+          // the image being edited ("look at this and change X").
+          refImage: refImage ?? undefined,
           colors: action === "generate" && useColors ? [primary, accent] : undefined,
         }),
       });

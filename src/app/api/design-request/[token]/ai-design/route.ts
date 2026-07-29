@@ -5,7 +5,7 @@ import { dbEnabled, getDb } from "@/db";
 import { designRequests } from "@/db/schema";
 import { getByManageToken } from "@/lib/design-requests";
 import { generateJerseyImage, parseDataUrl, watermarkImage, type ImagePart } from "@/lib/jersey-image";
-import { buildProductPrompt, buildRefinePrompt, productAspect, colorName, PRODUCTS, type ProductType } from "@/lib/product-mockups";
+import { buildProductPrompt, buildRefinePrompt, buildReferencePrompt, productAspect, colorName, PRODUCTS, type ProductType } from "@/lib/product-mockups";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -44,16 +44,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const parts: ImagePart[] = [];
 
   if (action === "refine") {
-    // Base = the explicitly chosen version, else the latest.
-    const baseUrl = body.baseUrl || state.versions[state.versions.length - 1]?.url;
-    if (!baseUrl) return NextResponse.json({ error: "Nothing to refine yet - generate a mockup first." }, { status: 400 });
     if (!instruction) return NextResponse.json({ error: "Describe the change you want." }, { status: 400 });
-    try {
-      const buf = Buffer.from(await (await fetch(baseUrl)).arrayBuffer());
+    if (refImage) {
+      // Staff uploaded a reference to edit directly ("look at this and change X").
       parts.push({ text: buildRefinePrompt(product, request.sport, instruction) });
-      parts.push({ inline_data: { mime_type: "image/png", data: buf.toString("base64") } });
-    } catch {
-      return NextResponse.json({ error: "Could not load the base image." }, { status: 502 });
+      parts.push({ inline_data: refImage });
+    } else {
+      // Base = the explicitly chosen version, else the latest.
+      const baseUrl = body.baseUrl || state.versions[state.versions.length - 1]?.url;
+      if (!baseUrl) return NextResponse.json({ error: "Nothing to refine yet - generate a mockup first, or upload a reference." }, { status: 400 });
+      try {
+        const buf = Buffer.from(await (await fetch(baseUrl)).arrayBuffer());
+        parts.push({ text: buildRefinePrompt(product, request.sport, instruction) });
+        parts.push({ inline_data: { mime_type: "image/png", data: buf.toString("base64") } });
+      } catch {
+        return NextResponse.json({ error: "Could not load the base image." }, { status: 502 });
+      }
     }
   } else {
     // Map hex codes to human color NAMES - image models ignore raw hex.
@@ -87,10 +93,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         parts.push({ text: "PENDANT LOGO (the bottom pendant is this logo):" });
         parts.push({ inline_data: pendantLogo });
       }
+    } else if (refImage) {
+      // Reference-driven: lean on the staff's uploaded image with a minimal
+      // prompt. Do NOT inject the design request's team name / vision (that's
+      // what forced "Orlando Avengers" and the wrong colors onto everything).
+      const refColors = staffColors.length ? staffColors.map(colorName).join(", ") : "";
+      parts.push({ text: buildReferencePrompt(product, { instruction, colors: refColors }) });
+      parts.push({ inline_data: refImage });
     } else {
-      // Seed images: staff reference first, then the customer's logo/reference.
+      // Brief-driven: no reference uploaded, so build from the design request
+      // (team name, colors, vision) and seed with the customer's logo/reference.
       const seeds: { mime_type: string; data: string }[] = [];
-      if (refImage) seeds.push(refImage);
       for (const url of (request.inspirationImages ?? []).slice(0, 2)) {
         const s = await fetchImage(url);
         if (s) seeds.push(s);
