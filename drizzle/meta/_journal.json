@@ -281,6 +281,13 @@
       "when": 1785293431531,
       "tag": "0039_icy_famine",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1785331495398,
+      "tag": "0040_lumpy_exodus",
+      "breakpoints": true
     }
   ]
 }

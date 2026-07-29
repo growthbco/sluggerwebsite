@@ -599,6 +599,17 @@ export const designRequests = pgTable(
     inspirationImages: jsonb("inspiration_images").$type<string[]>().default([]),
     // Proof/mockup images uploaded by the designer.
     proofImages: jsonb("proof_images").$type<string[]>().default([]),
+    // Persistent AI design memory: the iterative concept + every revision, so
+    // the designer can "pick up where we left off" when a customer requests
+    // changes - survives sessions, browsers, and staff handoffs.
+    aiDesignState: jsonb("ai_design_state").$type<{
+      sport?: string;
+      style?: string;
+      primaryColor?: string;
+      secondaryColor?: string;
+      teamName?: string;
+      versions: { url: string; note: string; at: string }[];
+    }>(),
     // The single approved proof URL (selected on approval) - attached to the team order.
     approvedDesignUrl: text("approved_design_url"),
     // ALL approved proofs. A project can have several final mockups (jersey,

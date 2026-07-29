@@ -6,6 +6,7 @@ import { JERSEY_MATERIALS, itemLabel, isInHouseItem } from "@/lib/order-items";
 import { getStoreByDesignRequestId, STORE_ITEM_PRESETS } from "@/lib/team-stores";
 import { DesignManagePanel } from "@/components/design-manage-panel";
 import { DesignMessages } from "@/components/design-messages";
+import { AiDesignStudio } from "@/components/ai-design-studio";
 import { DesignProgress } from "@/components/design-progress";
 import { TeamStoreTeaser } from "@/components/team-store-teaser";
 import { PrintFileQA } from "@/components/print-file-qa";
@@ -136,6 +137,17 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         changeRequests={request.changeRequests ?? []}
         rush={request.rush}
         neededBy={request.neededBy ? request.neededBy.toISOString() : null}
+      />
+
+      <AiDesignStudio
+        token={token}
+        teamName={request.teamName}
+        latestChangeRequest={(() => {
+          const cr = (request.changeRequests ?? [])[(request.changeRequests ?? []).length - 1];
+          if (!cr) return undefined;
+          return [cr.generalNote, ...(cr.annotations ?? []).map((a) => a.note)].filter(Boolean).join("; ") || undefined;
+        })()}
+        initialVersions={request.aiDesignState?.versions ?? []}
       />
 
       <div className="pt-6 border-t border-line">
