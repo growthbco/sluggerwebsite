@@ -1,0 +1,1 @@
+ALTER TABLE "teams" DROP COLUMN "store_print_file_urls";
