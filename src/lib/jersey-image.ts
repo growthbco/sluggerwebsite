@@ -26,17 +26,25 @@ export async function generateJerseyImage(parts: ImagePart[], aspectRatio = "4:3
       signal: AbortSignal.timeout(40000),
     });
 
+  // Try Pro once; then Flash with a retry, since Flash is fast and a single
+  // transient 503 shouldn't sink the whole request.
+  const plan: { model: string; tries: number }[] = [
+    { model: PRIMARY, tries: 1 },
+    { model: FALLBACK, tries: 2 },
+  ];
   let res: Response | null = null;
   let usedFallback = false;
-  for (const model of [PRIMARY, FALLBACK]) {
-    try {
-      res = await call(model);
-      if (res.ok) { usedFallback = model === FALLBACK; break; }
-      const status = res.status;
-      console.error(`jersey-image ${model} failed:`, status);
-      if (!(status === 429 || status >= 500)) break;
-    } catch {
-      res = null;
+  outer: for (const { model, tries } of plan) {
+    for (let t = 0; t < tries; t++) {
+      try {
+        res = await call(model);
+        if (res.ok) { usedFallback = model === FALLBACK; break outer; }
+        const status = res.status;
+        console.error(`jersey-image ${model} attempt ${t + 1} failed:`, status);
+        if (!(status === 429 || status >= 500)) break outer; // 400 won't improve
+      } catch {
+        res = null; // timeout/abort -> retry or fall through
+      }
     }
   }
   if (!res || !res.ok) return { error: "Image AI is briefly overloaded - try again in a minute.", status: 503 };
