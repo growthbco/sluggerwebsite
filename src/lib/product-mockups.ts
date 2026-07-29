@@ -25,8 +25,14 @@ export function productAspect(p: ProductType): string {
   return p === "hype-chain" ? "3:4" : "4:3";
 }
 
-const COMMON_TAIL =
-  "Frame the product large and close-up so it fills most of the image with only a small even margin; do not leave big empty white space or push it far into the distance. Premium, print-ready, tasteful. No mannequin, no human, no watermark. Do NOT add any MLB, NBA, NFL, or other league logos, no pro-team marks, no swooshes or brand logos - use ONLY the team's own name and any logo the customer provided.";
+// Framing: most products fill the frame; the hype chain must instead show the
+// WHOLE necklace + pendant without cropping, so it gets its own framing line.
+const FRAME_TIGHT =
+  "Frame the product large and close-up so it fills most of the image with only a small even margin; do not leave big empty white space or push it far into the distance.";
+const FRAME_FULL =
+  "Zoom out enough that the ENTIRE piece - the whole chain loop AND the complete pendant - is fully visible with clear empty margin on ALL sides. Nothing is cropped or touching any edge; the bottom of the pendant must have space beneath it.";
+const GUARDRAIL =
+  "Premium, print-ready, tasteful. No mannequin, no human, no watermark. Do NOT add any MLB, NBA, NFL, or other league logos, no pro-team marks, no swooshes or brand logos - use ONLY the team's own name and any logo the customer provided.";
 
 type PromptInput = {
   sport?: string | null;
@@ -62,7 +68,7 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
         "The CHAIN is built from thick, rounded, oversized oval links that ALTERNATE between the two team colors, with a smooth matte 3D-printed plastic finish, clear dimensional depth, rounded edges, and soft drop shadows so it reads as a solid 3D object on the surface.",
         "CRITICAL - the PENDANT is a SINGLE solid, smooth, flat 3D-printed piece: one continuous printed plate/charm. It is NOT built from chain links, NOT hollow, NOT made of connected rings or loops. It hangs from the bottom link by one small loop.",
         i.hasPendantLogo
-          ? "The pendant is a solid, flat 3D-printed plate (a rounded rectangular backer plaque, one continuous printed piece) with the provided PENDANT LOGO reproduced ON ITS FACE, exactly as shown - the same way a logo is printed on the chest of a jersey. Reproduce the COMPLETE logo faithfully with all its elements (any outer ring, arrow, and the exact letterforms) in its real colors. Do NOT simplify it to a plain letter, do NOT die-cut the plate into the logo's outline, and do NOT build it from chain links - it is a flat plate with the logo printed on it."
+          ? "The pendant is a solid, flat 3D-printed plate (a rounded rectangular backer plaque, one continuous printed piece) with the provided PENDANT LOGO reproduced ON ITS FACE, exactly as shown - the same way a logo is printed on the chest of a jersey. Reproduce the COMPLETE logo faithfully with all its elements (any outer ring, arrow, and the exact letterforms), and keep the logo's OWN colors exactly as in the PENDANT LOGO image - do NOT invert, swap, or recolor its fill and outline. Do NOT simplify it to a plain letter, do NOT die-cut the plate into the logo's outline, and do NOT build it from chain links - it is a flat plate with the logo printed on it."
           : team
             ? `Shape the pendant as a solid, flat 3D-printed nameplate reading "${team}" in bold block letters, team colors with a contrasting outline.`
             : "Shape the pendant as a solid, flat 3D-printed team logo, team colors with a contrasting outline.",
@@ -110,7 +116,8 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
   if (i.hasRef && product !== "hype-chain") {
     lines.push("A REFERENCE image is provided: use its design language, colors, and vibe as inspiration for a new original design.");
   }
-  lines.push(COMMON_TAIL);
+  lines.push(product === "hype-chain" ? FRAME_FULL : FRAME_TIGHT);
+  lines.push(GUARDRAIL);
   return lines.filter(Boolean).join(" ");
 }
 
