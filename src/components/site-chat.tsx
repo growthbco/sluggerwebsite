@@ -53,6 +53,13 @@ export function SiteChat() {
     setTurns(next);
     setDraft("");
     setBusy(true);
+    // Hold the reply behind a human-like pause (30-60s) so it reads like a
+    // real person typing, not an instant bot. The "typing…" indicator shows
+    // the whole time; we run the request during the wait so the answer is
+    // ready the moment the pause ends.
+    const started = Date.now();
+    const humanDelay = 30000 + Math.floor(Math.random() * 30000);
+    let reply = "Text us at (352) 660-1232 and we'll help right away.";
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -60,12 +67,14 @@ export function SiteChat() {
         body: JSON.stringify({ messages: next.slice(1) }), // drop the canned welcome
       });
       const data = await res.json();
-      setTurns((t) => [...t, { role: "bot", text: data.reply ?? "Text us at (352) 660-1232 and we'll help right away." }]);
+      if (data.reply) reply = data.reply;
     } catch {
-      setTurns((t) => [...t, { role: "bot", text: "I'm having trouble connecting - text us at (352) 660-1232 and we'll help right away." }]);
-    } finally {
-      setBusy(false);
+      reply = "I'm having trouble connecting - text us at (352) 660-1232 and we'll help right away.";
     }
+    const remaining = humanDelay - (Date.now() - started);
+    if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
+    setTurns((t) => [...t, { role: "bot", text: reply }]);
+    setBusy(false);
   }
 
   return (
@@ -89,7 +98,7 @@ export function SiteChat() {
         <div className="fixed bottom-20 left-3 right-3 sm:left-auto sm:right-4 z-50 sm:w-96 bg-ink border border-line rounded-lg overflow-hidden shadow-2xl flex flex-col" style={{ height: "min(560px, 70dvh)" }}>
           <div className="px-4 py-3 border-b border-line bg-steel">
             <p className="display text-foreground">Slugger Athletics</p>
-            <p className="text-xs text-muted">Usually replies instantly · or text (352) 660-1232</p>
+            <p className="text-xs text-muted">Usually replies in a minute · or text (352) 660-1232</p>
           </div>
 
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2.5">
@@ -120,7 +129,7 @@ export function SiteChat() {
               placeholder="Ask about pricing, turnaround…"
               className="flex-1 min-w-0 bg-steel border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
             />
-            <button type="button" onClick={() => send(draft)} disabled={busy || !draft.trim()} className="clip-slant bg-brand text-on-brand display text-sm px-4 disabled:opacity-50">
+            <button type="button" onClick={() => send(draft)} disabled={busy || !draft.trim()} className="rounded bg-brand text-on-brand display text-sm px-4 disabled:opacity-50">
               Send
             </button>
           </div>

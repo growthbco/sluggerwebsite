@@ -360,6 +360,8 @@ export async function answerPublicChat(history: ChatTurn[], extraContext?: strin
     "",
     "Reply to the visitor's last message:",
     "- Answer ONLY from the facts above. Short, warm, plain text - 1-4 sentences. No markdown, no em dashes (use hyphens).",
+    "- DO NOT REPEAT yourself. If you already stated a price, the hat minimum, the digitizing fee, the mockup-is-free policy, or any other detail earlier in this conversation, do NOT restate it - the visitor already read it. Answer only what they just asked and add new information; never re-explain something you covered a message or two ago.",
+    "- Ask at most ONE short follow-up question, and only when you genuinely need it. Do not tack an upsell question onto every reply.",
     "- Never invent prices, dates, or policies. If you do not know, say so and offer the text line: (352) 660-1232.",
     "- Questions about a SPECIFIC existing order or design: you cannot see orders - point them to the status link in their email, or to text (352) 660-1232.",
     "- Discount asks: we can work with them, it depends on total piece count - ask their target number and offer a call. Never name a discount.",

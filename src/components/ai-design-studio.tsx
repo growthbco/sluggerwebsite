@@ -2,7 +2,16 @@
 
 import { useRef, useState } from "react";
 
-type Version = { url: string; cleanUrl?: string; note: string; at: string };
+type Version = { url: string; cleanUrl?: string; product?: string; note: string; at: string };
+
+const PRODUCTS = [
+  { id: "jersey", label: "Jersey" },
+  { id: "hat", label: "Hat" },
+  { id: "hype-chain", label: "Hype chain" },
+  { id: "hoodie", label: "Hoodie" },
+  { id: "pants", label: "Pants" },
+  { id: "socks", label: "Socks" },
+];
 
 type Props = {
   token: string;
@@ -26,6 +35,7 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
 
   // Staff-supplied reference image + colors (optional overrides).
   const [refImage, setRefImage] = useState<string | null>(null);
+  const [product, setProduct] = useState<string>("jersey");
   const [useColors, setUseColors] = useState(false);
   const [primary, setPrimary] = useState("#1f4fd8");
   const [accent, setAccent] = useState("#d81f1f");
@@ -72,6 +82,8 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
           instruction,
           // Refine from the CLEAN master so the watermark never gets baked in.
           baseUrl: action === "refine" ? (active?.cleanUrl ?? active?.url) : undefined,
+          // Refine keeps the active version's product; generate uses the picker.
+          product: action === "refine" ? (active?.product ?? product) : product,
           refImage: action === "generate" ? refImage ?? undefined : undefined,
           colors: action === "generate" && useColors ? [primary, accent] : undefined,
         }),
@@ -165,9 +177,20 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
               className={`${input} resize-y`} />
           </div>
 
-          {/* Staff reference + colors - only used when starting a fresh mockup. */}
-          {!active && (
-            <div className="space-y-3 border border-line rounded p-3 bg-steel/40">
+          {/* Product type + staff reference + colors - applied to a fresh mockup
+              (Generate / Start a fresh mockup). Refine ignores these. */}
+          <div className="space-y-3 border border-line rounded p-3 bg-steel/40">
+              <div>
+                <label className="display text-xs text-muted tracking-wide">PRODUCT {active ? "(for a fresh mockup)" : ""}</label>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {PRODUCTS.map((p) => (
+                    <button key={p.id} type="button" onClick={() => setProduct(p.id)}
+                      className={`text-sm px-3 py-1.5 rounded border ${product === p.id ? "bg-brand text-on-brand border-brand" : "border-line text-foreground hover:bg-brand/10"}`}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div>
                 <label className="display text-xs text-muted tracking-wide">REFERENCE IMAGE (optional)</label>
                 <div className="mt-1.5 flex items-center gap-3">
@@ -203,8 +226,7 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
                   </div>
                 )}
               </div>
-            </div>
-          )}
+          </div>
 
           <div className="flex flex-wrap gap-2">
             {active && (
@@ -221,7 +243,7 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
           {error && <p className="text-sm text-red-400">{error}</p>}
           {note && <p className="text-sm text-green-400">{note}</p>}
           <p className="text-xs text-muted">
-            Front &amp; back, in the team&apos;s colors, seeded with the customer&apos;s logo/reference plus anything you add above. ~13¢ each.
+            Jerseys, hats, hype chains, hoodies, pants, socks - in the team&apos;s colors, seeded with the customer&apos;s logo/reference plus anything you add above. ~13¢ each.
           </p>
         </div>
       </div>
