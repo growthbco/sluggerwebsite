@@ -156,10 +156,11 @@ export default async function AdminPage() {
         labelUrl: orders.labelUrl,
         shippedAt: orders.shippedAt,
         createdAt: orders.createdAt,
+        teamId: orders.teamId,
       })
       .from(orders)
       .orderBy(desc(orders.createdAt))
-      .limit(15),
+      .limit(60),
     db
       .select({
         teamOrderId: teamOrderAddons.teamOrderId,
@@ -277,6 +278,15 @@ export default async function AdminPage() {
     if (inv.status === "paid" && inv.paidAt) {
       paymentEvents.push({ at: inv.paidAt, label: inv.customerName, sub: `custom invoice · ${inv.reference}`, amountCents: inv.totalCents });
     }
+  }
+  // Shop / team-store / buy-in orders (from the orders table) also count as
+  // money moments - they were previously invisible in this feed.
+  const storeNameById = new Map(stores.map((s) => [s.id, s.name]));
+  for (const o of recentOrders) {
+    if (o.status !== "paid" && o.status !== "fulfilled") continue;
+    const who = o.teamId ? (storeNameById.get(o.teamId) ?? o.customerName ?? "Store order") : (o.customerName ?? "Order");
+    const kind = o.type === "team_store" ? "team store" : o.type === "buy_in" ? "buy-in" : "shop";
+    paymentEvents.push({ at: o.createdAt, label: who, sub: `${kind} · ${o.reference}`, amountCents: o.totalCents });
   }
   paymentEvents.sort((a, b) => +b.at - +a.at);
   const recentPayments = paymentEvents.slice(0, 12);
@@ -743,21 +753,47 @@ export default async function AdminPage() {
           </details>
           <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
             {stores.length === 0 && <p className="px-3 py-3 text-sm text-muted">No stores yet.</p>}
-            {stores.map((s) => (
-              <div key={s.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                <div>
-                  <Link href={`/store/${s.storeToken}`} className="text-brand hover:underline">
-                    {s.name}
-                  </Link>
-                  <span className={`ml-2 text-xs display ${s.storeActive ? "text-green-400" : "text-muted"}`}>
-                    {s.storeActive ? "OPEN" : "CLOSED"}
-                  </span>
+            {stores.map((s) => {
+              const storeOrders = recentOrders.filter((o) => o.teamId === s.id);
+              return (
+              <details key={s.id} className="group">
+                <summary className="flex items-center justify-between gap-3 px-3 py-2 text-sm cursor-pointer list-none">
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted text-xs transition-transform group-open:rotate-90">▶</span>
+                    <Link href={`/store/${s.storeToken}`} onClick={(e) => e.stopPropagation()} className="text-brand hover:underline">
+                      {s.name}
+                    </Link>
+                    <span className={`text-xs display ${s.storeActive ? "text-green-400" : "text-muted"}`}>
+                      {s.storeActive ? "OPEN" : "CLOSED"}
+                    </span>
+                  </div>
+                  <p className="text-muted shrink-0">
+                    {s.orderCount} orders · {money(Number(s.revenueCents))}
+                  </p>
+                </summary>
+                <div className="bg-ink/40 border-t border-line/50 px-3 py-2">
+                  {storeOrders.length === 0 ? (
+                    <p className="text-xs text-muted">No orders yet. Share the store link so families can order.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {storeOrders.map((o) => (
+                        <li key={o.reference} className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <span>
+                            <span className="font-mono text-foreground">{o.reference}</span>
+                            <span className="ml-2 text-muted">{o.customerName ?? "-"}</span>
+                          </span>
+                          <span className="text-foreground whitespace-nowrap">
+                            {money(o.totalCents)} <span className="text-muted">{fmtDate(o.createdAt)}</span>
+                            {o.shippedAt ? <span className="ml-1 text-green-400">🚚</span> : null}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                <p className="text-muted shrink-0">
-                  {s.orderCount} orders · {money(Number(s.revenueCents))}
-                </p>
-              </div>
-            ))}
+              </details>
+              );
+            })}
           </div>
         </section>
 
