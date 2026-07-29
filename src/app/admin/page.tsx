@@ -760,7 +760,7 @@ export default async function AdminPage() {
                 <summary className="flex items-center justify-between gap-3 px-3 py-2 text-sm cursor-pointer list-none">
                   <div className="flex items-center gap-2">
                     <span className="text-muted text-xs transition-transform group-open:rotate-90">▶</span>
-                    <Link href={`/store/${s.storeToken}`} onClick={(e) => e.stopPropagation()} className="text-brand hover:underline">
+                    <Link href={`/store/${s.storeToken}`} className="text-brand hover:underline">
                       {s.name}
                     </Link>
                     <span className={`text-xs display ${s.storeActive ? "text-green-400" : "text-muted"}`}>
