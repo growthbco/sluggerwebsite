@@ -724,6 +724,52 @@ export default async function AdminPage() {
         </div>
       </section>
 
+      <div className="mt-6">
+        <section>
+          <h2 className="display text-xl text-foreground">Shop &amp; store orders</h2>
+          <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
+            {recentOrders.length === 0 && (
+              <p className="px-3 py-3 text-sm text-muted">
+                No shop or team-store purchases yet. Team order payments show above.
+              </p>
+            )}
+            {recentOrders.map((o) => (
+              <div key={o.reference} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
+                <div>
+                  <span className="font-mono text-xs text-foreground">{o.reference}</span>
+                  <span className="ml-2 text-muted">{o.customerName ?? "-"}</span>
+                  <span className="ml-2 text-xs text-muted">({o.type})</span>
+                </div>
+                <span className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
+                  <span className="text-foreground whitespace-nowrap">
+                    {money(o.totalCents)} <span className="text-muted text-xs">{fmtDate(o.createdAt)}</span>
+                  </span>
+                  {o.shippedAt ? (
+                    <>
+                      <span className="text-xs display text-green-400">🚚</span>
+                      {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
+                    </>
+                  ) : o.status === "paid" ? (
+                    o.trackingNumber ? (
+                      <>
+                        <span className="text-xs display text-amber-400" title="Label/tracking ready - customer not emailed yet">READY</span>
+                        <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
+                        <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email" />
+                      </>
+                    ) : (
+                      <>
+                        <AdminLabelButton kind="order" id={o.id} who={o.customerName ?? o.reference} />
+                        <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} label="➕ Add tracking" />
+                      </>
+                    )
+                  ) : null}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
       {archivedOrders.length > 0 && (
         <details className="mt-6 border border-line bg-steel/50 group">
           <summary className="flex cursor-pointer items-center justify-between px-4 py-3 list-none">
@@ -809,50 +855,6 @@ export default async function AdminPage() {
               </details>
               );
             })}
-          </div>
-        </section>
-
-        <section>
-          <h2 className="display text-xl text-foreground">Shop &amp; store orders</h2>
-          <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
-            {recentOrders.length === 0 && (
-              <p className="px-3 py-3 text-sm text-muted">
-                No shop or team-store purchases yet. Team order payments show above.
-              </p>
-            )}
-            {recentOrders.map((o) => (
-              <div key={o.reference} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
-                <div>
-                  <span className="font-mono text-xs text-foreground">{o.reference}</span>
-                  <span className="ml-2 text-muted">{o.customerName ?? "-"}</span>
-                  <span className="ml-2 text-xs text-muted">({o.type})</span>
-                </div>
-                <span className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
-                  <span className="text-foreground whitespace-nowrap">
-                    {money(o.totalCents)} <span className="text-muted text-xs">{fmtDate(o.createdAt)}</span>
-                  </span>
-                  {o.shippedAt ? (
-                    <>
-                      <span className="text-xs display text-green-400">🚚</span>
-                      {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
-                    </>
-                  ) : o.status === "paid" ? (
-                    o.trackingNumber ? (
-                      <>
-                        <span className="text-xs display text-amber-400" title="Label/tracking ready - customer not emailed yet">READY</span>
-                        <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
-                        <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email" />
-                      </>
-                    ) : (
-                      <>
-                        <AdminLabelButton kind="order" id={o.id} who={o.customerName ?? o.reference} />
-                        <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} label="➕ Add tracking" />
-                      </>
-                    )
-                  ) : null}
-                </span>
-              </div>
-            ))}
           </div>
         </section>
 

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { eq } from "drizzle-orm";
-import { postOrderToDiscord, postStoreOrderToDiscord, postDesignRequestToDiscord, postTeamOrderPaidToDiscord, postAddonToDesignerDiscord } from "@/lib/discord";
+import { postOrderToDiscord, postStoreOrderToDiscord, postDesignRequestToDiscord, postTeamOrderPaidToDiscord, postAddonToDesignerDiscord, postDesignThreadUpdate } from "@/lib/discord";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders, teams } from "@/db/schema";
 import { getById, markDesignFeePaid, setDiscordThreadId, formatProducts } from "@/lib/design-requests";
@@ -362,6 +362,35 @@ export async function POST(req: Request) {
             });
             if (!team?.thread && posted.threadId) {
               await getDb().update(teams).set({ storeThreadId: posted.threadId }).where(eq(teams.id, teamId));
+            }
+
+            // A new order for a design invalidates that design's prior print-file
+            // QA - the file now needs the new jersey, so the ✅ must be re-earned.
+            const { parseStoreLine } = await import("@/lib/store-print-file");
+            const [full] = await getDb().select({ qa: teams.storePrintFileQa, thread: teams.storeThreadId }).from(teams).where(eq(teams.id, teamId)).limit(1);
+            const qa = full?.qa;
+            if (qa) {
+              const affected = new Set<string>();
+              for (const l of garmentLines) {
+                const parsed = parseStoreLine(l.name);
+                if (parsed && qa[parsed.groupKey]) affected.add(parsed.groupKey);
+              }
+              if (affected.size > 0) {
+                const next = { ...qa };
+                const labels: string[] = [];
+                for (const key of affected) { labels.push(next[key]?.summary ? key : key); delete next[key]; }
+                await getDb().update(teams).set({ storePrintFileQa: next }).where(eq(teams.id, teamId));
+                const groupLabels = garmentLines.map((l) => parseStoreLine(l.name)).filter((x): x is NonNullable<typeof x> => Boolean(x) && affected.has(x!.groupKey)).map((x) => x!.groupLabel);
+                const uniqLabels = [...new Set(groupLabels)];
+                if (full?.thread && uniqLabels.length) {
+                  await postDesignThreadUpdate({
+                    threadId: full.thread,
+                    title: `⚠️ Re-verify needed - ${team?.name ?? "store"}`,
+                    description: `This new order adds jerseys to a design that was already print-file verified (${uniqLabels.join(", ")}). The print file must include the new piece - re-run QA before producing that design.`,
+                    username: "Slugger Print QA",
+                  });
+                }
+              }
             }
           } catch (e) { console.error("store order Discord post failed:", e); }
         } else {
