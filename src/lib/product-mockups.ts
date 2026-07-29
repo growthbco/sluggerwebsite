@@ -67,21 +67,21 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
       break;
     case "hoodie":
       lines.push(
-        `Professional e-commerce product mockup of a custom team ${sport} hoodie (pullover hooded sweatshirt)${style ? `, ${style}` : ""}, floating ghost-mannequin style on a pure white background with studio lighting. Show the FRONT (left) and BACK (right) side by side.`,
+        `Professional e-commerce product mockup of a custom fully SUBLIMATED (all-over dye-sublimation print, not embroidery or screen print) team ${sport} hoodie (pullover hooded sweatshirt)${style ? `, ${style}` : ""}, floating ghost-mannequin style on a pure white background with studio lighting. Show the FRONT (left) and BACK (right) side by side.`,
         team ? `Team name "${team}" across the chest and a larger graphic across the back in bold athletic lettering.` : "Bold athletic team graphic on chest and back.",
         `Colors: ${i.colors}.`,
       );
       break;
     case "pants":
       lines.push(
-        `Professional e-commerce product mockup of custom team ${sport} pants (athletic game pants)${style ? `, ${style}` : ""}, floating ghost-mannequin style on a pure white background with studio lighting. Show a FRONT view and a SIDE/BACK view side by side.`,
+        `Professional e-commerce product mockup of custom fully SUBLIMATED (all-over dye-sublimation print, not embroidery or screen print) team ${sport} pants (athletic game pants)${style ? `, ${style}` : ""}, floating ghost-mannequin style on a pure white background with studio lighting. Show a FRONT view and a SIDE/BACK view side by side.`,
         "Tasteful contrast piping/braid down the outside seam in the accent color; clean waistband and belt loops.",
         `Colors: ${i.colors} (base and piping).`,
       );
       break;
     case "socks":
       lines.push(
-        "Professional e-commerce product mockup of custom team athletic socks - a matching PAIR standing side by side - on a pure white background with studio lighting, front view.",
+        "Professional e-commerce product mockup of custom fully SUBLIMATED (all-over dye-sublimation print, not embroidery or screen print) team athletic socks - a matching PAIR standing side by side - on a pure white background with studio lighting, front view.",
         "Bold stripes/pattern and a small woven team monogram near the top; crew-height athletic knit texture.",
         `Colors: ${i.colors}.`,
         team ? `Team monogram: "${team}".` : "",
