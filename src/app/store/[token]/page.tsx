@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { dbEnabled } from "@/db";
 import { getStoreByHandle } from "@/lib/team-stores";
-import { getById } from "@/lib/design-requests";
 import { TeamStoreShop } from "@/components/team-store-shop";
 import { ProofGallery } from "@/components/proof-gallery";
 import { AllSizeCharts } from "@/components/size-charts";
@@ -60,11 +59,14 @@ export default async function TeamStorePage({ params }: { params: Promise<{ toke
     );
   }
 
-  // Gallery: the approved design first, then every proof view from the linked
-  // design request (front/back/detail shots), deduped.
-  const design = store.designRequestId ? await getById(store.designRequestId) : null;
+  // Gallery: built from the store's OWN design images (the colorways sold
+  // here), NOT the linked design request's proofs - those belong to the
+  // designer/approval flow and may move on to a new design entirely.
+  const storeDesignImages = (store.storeItems ?? [])
+    .flatMap((it) => (it.designs ?? []).map((d) => d.image))
+    .filter(Boolean);
   const galleryImages = Array.from(
-    new Set([store.approvedDesignUrl, design?.approvedDesignUrl, ...(design?.proofImages ?? [])].filter(Boolean)),
+    new Set([store.approvedDesignUrl, ...storeDesignImages].filter(Boolean)),
   ) as string[];
 
   return (
