@@ -41,10 +41,8 @@ type StoreOrderPayload = {
   shipping?: string;
   /** Garment lines (tax line excluded by the caller). */
   items: { quantity: number; label: string }[];
-  garmentsCents: number;
-  taxCents: number;
-  shippingCents: number;
-  totalCents: number;
+  /** Public store link so the designer can reference the exact jersey design. */
+  storeUrl?: string;
   /** Persistent per-store thread in the design forum; create-once, reuse. */
   existingThreadId?: string | null;
 };
@@ -61,17 +59,14 @@ export async function postStoreOrderToDiscord(order: StoreOrderPayload): Promise
     return { ok: false };
   }
   const itemText = order.items.map((i) => `• ${i.quantity}× ${i.label}`).join("\n");
+  // Designer-facing: what to make, not what we make on it. No prices/totals
+  // (matches the design-request and add-on posts).
   const fields = [
-    { name: "Status", value: "✅ **PAID IN FULL** - ready to produce", inline: true },
-    { name: "Order", value: `\`${order.reference}\` · Team Store add-on`, inline: true },
-    { name: `Items (${order.items.length})`, value: (itemText || "-").slice(0, 1024), inline: false },
-    {
-      name: "Charges",
-      value: `Gear: ${money(order.garmentsCents)}\nTax: ${money(order.taxCents)}\nShipping: ${order.shippingCents > 0 ? money(order.shippingCents) : "Free / pickup"}\n**Total: ${money(order.totalCents)}**`,
-      inline: true,
-    },
-    { name: "Customer", value: [order.customerName, order.customerEmail].filter(Boolean).join("\n") || "-", inline: true },
+    { name: "Status", value: "✅ **PAID** - ready to produce", inline: true },
+    { name: "Order", value: `\`${order.reference}\` · add-on for ${order.customerName ?? "a player"}`, inline: true },
+    { name: `Make (${order.items.length})`, value: (itemText || "-").slice(0, 1024), inline: false },
   ];
+  if (order.storeUrl) fields.push({ name: "Team store (design reference)", value: order.storeUrl, inline: false });
   if (order.shipping) fields.push({ name: "Ship to", value: order.shipping.slice(0, 1024), inline: false });
 
   const embed: Record<string, unknown> = {

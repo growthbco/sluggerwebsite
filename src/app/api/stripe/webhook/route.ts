@@ -344,12 +344,10 @@ export async function POST(req: Request) {
           // the designer works, so every add-on stays together.
           try {
             const [team] = await getDb()
-              .select({ name: teams.name, thread: teams.storeThreadId, design: teams.approvedDesignUrl })
+              .select({ name: teams.name, slug: teams.slug, thread: teams.storeThreadId, design: teams.approvedDesignUrl })
               .from(teams).where(eq(teams.id, teamId)).limit(1);
-            const shippingCents = session.total_details?.amount_shipping ?? 0;
-            const taxCents = lines.filter((l) => /tax/i.test(l.name)).reduce((sum, l) => sum + l.amountCents, 0);
             const garmentLines = lines.filter((l) => !/tax/i.test(l.name));
-            const garmentsCents = garmentLines.reduce((sum, l) => sum + l.amountCents, 0);
+            const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
             const posted = await postStoreOrderToDiscord({
               reference,
               teamName: team?.name ?? session.metadata?.teamName ?? "Team",
@@ -357,11 +355,8 @@ export async function POST(req: Request) {
               customerName: session.customer_details?.name ?? undefined,
               customerEmail: session.customer_details?.email ?? undefined,
               shipping,
-              items: garmentLines.map((l) => ({ quantity: l.quantity, label: l.name.replace("Full-Button Jersey - ", "") })),
-              garmentsCents,
-              taxCents,
-              shippingCents,
-              totalCents: session.amount_total ?? 0,
+              items: garmentLines.map((l) => ({ quantity: l.quantity, label: l.name })),
+              storeUrl: team?.slug ? `${SITE}/store/${team.slug}` : undefined,
               existingThreadId: team?.thread ?? null,
             });
             if (!team?.thread && posted.threadId) {
