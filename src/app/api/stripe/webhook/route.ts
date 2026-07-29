@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { eq } from "drizzle-orm";
-import { postOrderToDiscord, postDesignRequestToDiscord, postTeamOrderPaidToDiscord, postAddonToDesignerDiscord } from "@/lib/discord";
+import { postOrderToDiscord, postStoreOrderToDiscord, postDesignRequestToDiscord, postTeamOrderPaidToDiscord, postAddonToDesignerDiscord } from "@/lib/discord";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders, teams } from "@/db/schema";
 import { getById, markDesignFeePaid, setDiscordThreadId, formatProducts } from "@/lib/design-requests";
@@ -335,40 +335,53 @@ export async function POST(req: Request) {
       }
 
       if (isNewOrder) {
-        // Team stores get ONE persistent thread so every order (and future
-        // family add-ons) stays together; drops group by the drop name.
         const isStore = orderTypeKey === "team_store";
         const teamId = session.metadata?.teamId || undefined;
-        let existingThreadId: string | null = null;
+
         if (isStore && teamId && dbEnabled()) {
+          // Team-store orders are paid add-ons: post into the store's own
+          // persistent thread in the DESIGN forum (create-once, reuse), where
+          // the designer works, so every add-on stays together.
           try {
-            const [t] = await getDb().select({ thread: teams.storeThreadId }).from(teams).where(eq(teams.id, teamId)).limit(1);
-            existingThreadId = t?.thread ?? null;
-          } catch (e) { console.error("store thread lookup failed:", e); }
-        }
-        const threadName = isStore
-          ? `🏪 ${session.metadata?.teamName ?? "Team"} Store`
-          : session.metadata?.teamName || lines[0]?.name;
-
-        const posted = await postOrderToDiscord({
-          reference,
-          orderType: typeMap[orderTypeKey] ?? "Shop",
-          customerName: session.customer_details?.name ?? undefined,
-          customerEmail: session.customer_details?.email ?? undefined,
-          shipping,
-          lines,
-          subtotalCents: session.amount_subtotal ?? undefined,
-          shippingCents: session.total_details?.amount_shipping ?? 0,
-          totalCents: session.amount_total ?? 0,
-          threadName,
-          existingThreadId,
-        });
-
-        // First order for a store creates its thread; persist it for next time.
-        if (isStore && teamId && dbEnabled() && !existingThreadId && posted.threadId) {
-          try {
-            await getDb().update(teams).set({ storeThreadId: posted.threadId }).where(eq(teams.id, teamId));
-          } catch (e) { console.error("store thread persist failed:", e); }
+            const [team] = await getDb()
+              .select({ name: teams.name, thread: teams.storeThreadId, design: teams.approvedDesignUrl })
+              .from(teams).where(eq(teams.id, teamId)).limit(1);
+            const shippingCents = session.total_details?.amount_shipping ?? 0;
+            const taxCents = lines.filter((l) => /tax/i.test(l.name)).reduce((sum, l) => sum + l.amountCents, 0);
+            const garmentLines = lines.filter((l) => !/tax/i.test(l.name));
+            const garmentsCents = garmentLines.reduce((sum, l) => sum + l.amountCents, 0);
+            const posted = await postStoreOrderToDiscord({
+              reference,
+              teamName: team?.name ?? session.metadata?.teamName ?? "Team",
+              approvedDesignUrl: team?.design ?? undefined,
+              customerName: session.customer_details?.name ?? undefined,
+              customerEmail: session.customer_details?.email ?? undefined,
+              shipping,
+              items: garmentLines.map((l) => ({ quantity: l.quantity, label: l.name.replace("Full-Button Jersey - ", "") })),
+              garmentsCents,
+              taxCents,
+              shippingCents,
+              totalCents: session.amount_total ?? 0,
+              existingThreadId: team?.thread ?? null,
+            });
+            if (!team?.thread && posted.threadId) {
+              await getDb().update(teams).set({ storeThreadId: posted.threadId }).where(eq(teams.id, teamId));
+            }
+          } catch (e) { console.error("store order Discord post failed:", e); }
+        } else {
+          // Shop / buy-in orders: general orders channel, grouped by drop name.
+          await postOrderToDiscord({
+            reference,
+            orderType: typeMap[orderTypeKey] ?? "Shop",
+            customerName: session.customer_details?.name ?? undefined,
+            customerEmail: session.customer_details?.email ?? undefined,
+            shipping,
+            lines,
+            subtotalCents: session.amount_subtotal ?? undefined,
+            shippingCents: session.total_details?.amount_shipping ?? 0,
+            totalCents: session.amount_total ?? 0,
+            threadName: session.metadata?.teamName || lines[0]?.name,
+          });
         }
 
         const buyerEmail = session.customer_details?.email;

@@ -32,6 +32,75 @@ type OrderPayload = {
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
 /** Post a paid order to the #orders channel. Returns true on success. */
+type StoreOrderPayload = {
+  reference: string;
+  teamName: string;
+  approvedDesignUrl?: string | null;
+  customerName?: string;
+  customerEmail?: string;
+  shipping?: string;
+  /** Garment lines (tax line excluded by the caller). */
+  items: { quantity: number; label: string }[];
+  garmentsCents: number;
+  taxCents: number;
+  shippingCents: number;
+  totalCents: number;
+  /** Persistent per-store thread in the design forum; create-once, reuse. */
+  existingThreadId?: string | null;
+};
+
+/** Post a paid team-store order as an "add-on" into the store's own thread in
+ *  the DESIGN-REQUESTS forum (where the designer works and threads exist).
+ *  Creates the "🏪 <Team> Store" thread on the first order, then every later
+ *  order (family add-ons) posts into that same thread. Returns the thread id
+ *  so the caller can persist it. */
+export async function postStoreOrderToDiscord(order: StoreOrderPayload): Promise<{ ok: boolean; threadId?: string }> {
+  const url = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
+  if (!url) {
+    console.warn("DISCORD_DESIGN_REQUESTS_WEBHOOK_URL not set - skipping store order post");
+    return { ok: false };
+  }
+  const itemText = order.items.map((i) => `• ${i.quantity}× ${i.label}`).join("\n");
+  const fields = [
+    { name: "Status", value: "✅ **PAID IN FULL** - ready to produce", inline: true },
+    { name: "Order", value: `\`${order.reference}\` · Team Store add-on`, inline: true },
+    { name: `Items (${order.items.length})`, value: (itemText || "-").slice(0, 1024), inline: false },
+    {
+      name: "Charges",
+      value: `Gear: ${money(order.garmentsCents)}\nTax: ${money(order.taxCents)}\nShipping: ${order.shippingCents > 0 ? money(order.shippingCents) : "Free / pickup"}\n**Total: ${money(order.totalCents)}**`,
+      inline: true,
+    },
+    { name: "Customer", value: [order.customerName, order.customerEmail].filter(Boolean).join("\n") || "-", inline: true },
+  ];
+  if (order.shipping) fields.push({ name: "Ship to", value: order.shipping.slice(0, 1024), inline: false });
+
+  const embed: Record<string, unknown> = {
+    title: `🏪 ${order.teamName} Team Store`,
+    color: GOLD,
+    fields,
+    timestamp: new Date().toISOString(),
+  };
+
+  const body: Record<string, unknown> = {
+    username: "Slugger Team Stores",
+    content: "@here 🏪 New **Team Store** order (add-on) - PAID, ready to produce.",
+    allowed_mentions: { parse: ["everyone"] },
+    embeds: [embed],
+  };
+
+  // Reuse the store's thread when we have it; otherwise open it (and show the
+  // approved design as the anchor image).
+  if (order.existingThreadId) {
+    const sep = url.includes("?") ? "&" : "?";
+    const ok = await send(`${url}${sep}thread_id=${order.existingThreadId}`, body);
+    return { ok, threadId: order.existingThreadId };
+  }
+  if (order.approvedDesignUrl) embed.image = { url: order.approvedDesignUrl };
+  body.thread_name = `🏪 ${order.teamName} Store`.slice(0, 100);
+  const msg = await sendAndReturn(url, body);
+  return { ok: Boolean(msg), threadId: msg?.channel_id };
+}
+
 export async function postOrderToDiscord(order: OrderPayload): Promise<{ ok: boolean; threadId?: string }> {
   const url = process.env.DISCORD_ORDERS_WEBHOOK_URL;
   if (!url) {
