@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { dbEnabled } from "@/db";
 import { getByManageToken, getByStatusToken, addDesignMessage } from "@/lib/design-requests";
 import { getByDesignRequestId, getRoster } from "@/lib/team-orders";
@@ -8,6 +9,10 @@ import { emailDesignerMessage } from "@/lib/email";
 import { postDesignThreadUpdate } from "@/lib/discord";
 
 export const runtime = "nodejs";
+// Headroom for the human-like reply pause below (client's own message still
+// returns instantly - the AI answer is posted after the delay in the
+// background via waitUntil).
+export const maxDuration = 90;
 
 const MAX_MESSAGE_LENGTH = 2000;
 
@@ -52,7 +57,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const name = from === "designer" ? (body.name ?? "").trim().slice(0, 40) || undefined : undefined;
 
   try {
-    let messages = await addDesignMessage(request.id, from, text, name, attachments);
+    const messages = await addDesignMessage(request.id, from, text, name, attachments);
     if (!messages) return NextResponse.json({ error: "Could not save" }, { status: 500 });
 
     // Notifications describe attachments even when there's no text.
@@ -89,67 +94,71 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         username: "Slugger Design Requests",
       });
 
-      // AI assistant: answer routine questions instantly; escalate anything
-      // sensitive (discounts, refunds, complaints) to staff instead of
-      // replying. Best-effort - a failure here never fails the client's send.
+      // AI assistant: answer routine questions; escalate anything sensitive
+      // (discounts, refunds, complaints) to staff instead of replying. This
+      // runs in the BACKGROUND after a human-like pause (30-60s) so it does
+      // not reply the instant the client hits send, and so the client's own
+      // message returns to them immediately. Best-effort - never fails the send.
       if (text) {
-        try {
-          const order = await getByDesignRequestId(request.id);
-          const roster = order ? await getRoster(order.id) : [];
-          const result = await assistDesignThread({
-            design: {
-              reference: request.reference,
-              teamName: request.teamName,
-              status: request.status,
-              revisionsUsed: request.revisionsUsed,
-              proofCount: request.proofImages?.length ?? 0,
-              rush: request.rush,
-              neededBy: request.neededBy,
-            },
-            order: order
-              ? {
-                  reference: order.reference,
-                  status: order.status,
-                  items: order.items ?? ["jersey"],
-                  rosterCount: roster.length,
-                  estimateCents: roster.length ? computeTeamOrderQuote(order, roster).totalCents : null,
-                  quotedTotalCents: order.quotedTotalCents,
-                  depositPaidAt: order.depositPaidAt,
-                  invoicePaidAt: order.invoicePaidAt,
-                  shippedAt: order.shippedAt,
-                }
-              : null,
-            messages,
-          });
-          if (result?.action === "answer" && result.reply) {
-            // Clients see "Support · Slugger Athletics" - never an AI label. Staff
-            // can tell it was the bot from the Discord log.
-            const updated = await addDesignMessage(request.id, "designer", result.reply, "Support");
-            if (updated) messages = updated;
-            // Log the exchange to Discord so staff can correct a bad answer.
-            // flagStaff (discount asks): the AI sent the holding reply per
-            // policy, but the real number needs a human - ping for follow-up.
-            await postDesignThreadUpdate({
-              threadId: request.discordThreadId ?? undefined,
-              title: result.flagStaff
-                ? `🤖🙋 AI sent a holding reply - follow up personally - ${request.teamName} (${request.reference})`
-                : `🤖 AI answered - ${request.teamName} (${request.reference})`,
-              description: `**Q:** ${text.slice(0, 600)}\n**A:** ${result.reply.slice(0, 1200)}`,
-              username: "Slugger Design Requests",
-              mention: Boolean(result.flagStaff),
+        waitUntil((async () => {
+          try {
+            await new Promise((r) => setTimeout(r, 30000 + Math.floor(Math.random() * 30000)));
+            const order = await getByDesignRequestId(request.id);
+            const roster = order ? await getRoster(order.id) : [];
+            const result = await assistDesignThread({
+              design: {
+                reference: request.reference,
+                teamName: request.teamName,
+                status: request.status,
+                revisionsUsed: request.revisionsUsed,
+                proofCount: request.proofImages?.length ?? 0,
+                rush: request.rush,
+                neededBy: request.neededBy,
+              },
+              order: order
+                ? {
+                    reference: order.reference,
+                    status: order.status,
+                    items: order.items ?? ["jersey"],
+                    rosterCount: roster.length,
+                    estimateCents: roster.length ? computeTeamOrderQuote(order, roster).totalCents : null,
+                    quotedTotalCents: order.quotedTotalCents,
+                    depositPaidAt: order.depositPaidAt,
+                    invoicePaidAt: order.invoicePaidAt,
+                    shippedAt: order.shippedAt,
+                  }
+                : null,
+              messages,
             });
-          } else if (result?.action === "escalate") {
-            await postDesignThreadUpdate({
-              threadId: request.discordThreadId ?? undefined,
-              title: `🙋 Needs a human reply - ${request.teamName} (${request.reference})`,
-              description: `${result.reason ? `${result.reason}\n` : ""}**Client:** ${text.slice(0, 1000)}`,
-              username: "Slugger Design Requests",
-              mention: true,
-            });
+            if (result?.action === "answer" && result.reply) {
+              // Clients see "Support · Slugger Athletics" - never an AI label.
+              // Staff can tell it was the bot from the Discord log.
+              await addDesignMessage(request.id, "designer", result.reply, "Support");
+              // Log the exchange to Discord so staff can correct a bad answer.
+              // flagStaff (discount asks): the AI sent the holding reply per
+              // policy, but the real number needs a human - ping for follow-up.
+              await postDesignThreadUpdate({
+                threadId: request.discordThreadId ?? undefined,
+                title: result.flagStaff
+                  ? `🤖🙋 AI sent a holding reply - follow up personally - ${request.teamName} (${request.reference})`
+                  : `🤖 AI answered - ${request.teamName} (${request.reference})`,
+                description: `**Q:** ${text.slice(0, 600)}\n**A:** ${result.reply.slice(0, 1200)}`,
+                username: "Slugger Design Requests",
+                mention: Boolean(result.flagStaff),
+              });
+            } else if (result?.action === "escalate") {
+              await postDesignThreadUpdate({
+                threadId: request.discordThreadId ?? undefined,
+                title: `🙋 Needs a human reply - ${request.teamName} (${request.reference})`,
+                description: `${result.reason ? `${result.reason}\n` : ""}**Client:** ${text.slice(0, 1000)}`,
+                username: "Slugger Design Requests",
+                mention: true,
+              });
+            }
+          } catch (e) {
+            console.error("design assistant hook failed:", e);
           }
-        } catch (e) {
-          console.error("design assistant hook failed:", e);
-        }
+        })());
       }
     }
 

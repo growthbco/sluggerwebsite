@@ -138,11 +138,33 @@ export function DesignMessages({
       setMessages(data.messages);
       setDraft("");
       setPending([]);
+      // The support reply is posted after a short pause (server-side), so
+      // poll a few times to pick it up without a manual refresh.
+      if (role === "client" && Array.isArray(data.messages)) pollForReply(data.messages.length);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy("");
     }
+  }
+
+  // Poll GET /message for ~90s after a client sends, so a delayed support
+  // reply appears on its own. Stops as soon as a new message shows up.
+  function pollForReply(startCount: number) {
+    let tries = 0;
+    const tick = async () => {
+      tries += 1;
+      try {
+        const res = await fetch(`/api/design-request/${token}/message`);
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.messages) && data.messages.length > startCount) {
+          setMessages(data.messages);
+          return;
+        }
+      } catch {}
+      if (tries < 12) setTimeout(tick, 8000);
+    };
+    setTimeout(tick, 8000);
   }
 
   async function suggestReply() {
