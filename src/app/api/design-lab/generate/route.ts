@@ -6,7 +6,7 @@ import { eq, sql } from "drizzle-orm";
 import { getDb, dbEnabled } from "@/db";
 import { designLabVisitors } from "@/db/schema";
 import { getOrCreateVisitor, tierFor, LAB_COOKIE, encryptCleanUrl } from "@/lib/design-lab";
-import { watermarkImage } from "@/lib/jersey-image";
+import { watermarkImage, generateJerseyImage, type ImagePart } from "@/lib/jersey-image";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -65,9 +65,6 @@ export async function POST(req: Request) {
   }
   if (!checkCap()) return NextResponse.json({ error: "Daily generation cap reached - try tomorrow." }, { status: 429 });
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "Image AI not configured" }, { status: 503 });
-
   const clean = (s: string | undefined, n: number) => (s ?? "").replace(/[\r\n]+/g, " ").trim().slice(0, n);
   const sport = clean(body.sport, 40) || "baseball";
   const style = clean(body.style, 40) || "crew neck";
@@ -86,7 +83,7 @@ export async function POST(req: Request) {
   const backNumber = clean(body.backNumber, 4) || "12";
   const extraColors = (body.extraColors ?? []).map((x) => clean(String(x), 20)).filter(Boolean).slice(0, 3);
 
-  const parts: Record<string, unknown>[] = [];
+  const parts: ImagePart[] = [];
   const parseDataUrl = (u?: string) => {
     const m = u?.match(/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/);
     return m ? { mime_type: m[1], data: m[2] } : null;
@@ -141,60 +138,20 @@ export async function POST(req: Request) {
   }
 
   try {
-    // Primary: gemini-3-pro-image (crisp lettering). Fallback: a Flash image
-    // model when Pro is overloaded (Google returns 503 "high demand"), so the
-    // tool keeps working through Pro outages instead of dying.
-    const PRIMARY = "gemini-3-pro-image";
-    const FALLBACK = process.env.DESIGN_LAB_FALLBACK_MODEL || "gemini-2.5-flash-image";
-    const callModel = (model: string) =>
-      fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts }],
-            generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "4:3" } },
-          }),
-          signal: AbortSignal.timeout(40000),
-        },
-      );
-    // Try primary once; if it's overloaded/unavailable/timeout, fall back to Flash.
-    let usedFallback = false;
-    let res: Response | null = null;
-    for (const model of [PRIMARY, FALLBACK]) {
-      try {
-        res = await callModel(model);
-        if (res.ok) { usedFallback = model === FALLBACK; break; }
-        const status = res.status;
-        console.error(`design-lab ${model} failed:`, status, (await res.text().catch(() => "")).slice(0, 150));
-        // Only fall back on capacity/5xx; a 400 won't improve on Flash.
-        if (!(status === 429 || status >= 500)) break;
-      } catch (e) {
-        console.error(`design-lab ${model} threw:`, String(e).slice(0, 120));
-        res = null; // timeout/abort -> try fallback
-      }
-    }
-    if (!res || !res.ok) {
-      return NextResponse.json(
-        { error: "Our image AI is briefly overloaded (Google-side). Give it a minute and try again." },
-        { status: 503 },
-      );
-    }
-    if (usedFallback) console.log("design-lab used Flash fallback (Pro overloaded)");
-    const data = await res.json();
-    const img = data?.candidates?.[0]?.content?.parts?.find(
-      (p: { inlineData?: { data: string; mimeType: string }; inline_data?: { data: string; mime_type: string } }) => p.inlineData || p.inline_data,
-    );
-    const payload = img?.inlineData ?? img?.inline_data;
-    if (!payload?.data) return NextResponse.json({ error: "No image came back - try rewording" }, { status: 502 });
+    // Shared two-vendor engine: OpenAI image-2 primary, Gemini fallback.
+    // Medium quality here - the public maker is high-volume and visitors are
+    // just exploring; the staff studio uses high quality for client proofs.
+    const result = await generateJerseyImage(parts, "4:3", { quality: "medium" });
+    if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
+    if (result.usedFallback) console.log("design-lab used fallback vendor");
+    const payload: { data: string; mimeType: string } = { data: result.data, mimeType: result.mime };
     // Save the CLEAN master first - the designer handoff uses this; the
     // customer only ever receives the watermarked copy below.
     let cleanToken: string | undefined;
     try {
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
       const cleanBlob = await put(`design-lab/clean/${stamp}.png`, Buffer.from(payload.data, "base64"), {
-        access: "public", contentType: payload.mimeType ?? payload.mime_type ?? "image/png", addRandomSuffix: true,
+        access: "public", contentType: payload.mimeType ?? "image/png", addRandomSuffix: true,
       });
       cleanToken = encryptCleanUrl(cleanBlob.url);
     } catch (e) {

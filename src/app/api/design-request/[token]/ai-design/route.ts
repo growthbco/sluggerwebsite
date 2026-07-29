@@ -90,7 +90,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     for (const s of seeds.slice(0, 3)) parts.push({ inline_data: s });
   }
 
-  const result = await generateJerseyImage(parts);
+  // High quality here - staff studio output goes to clients as proofs.
+  const result = await generateJerseyImage(parts, "4:3", { quality: "high" });
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
 
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");

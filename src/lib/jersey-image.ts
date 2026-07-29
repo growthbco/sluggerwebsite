@@ -9,8 +9,12 @@ import sharp from "sharp";
 const PRIMARY = "gemini-3-pro-image";
 const FALLBACK = process.env.DESIGN_LAB_FALLBACK_MODEL || "gemini-2.5-flash-image";
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
-const OPENAI_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
+const OPENAI_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2-2026-04-21";
 const OPENAI_QUALITY = process.env.OPENAI_IMAGE_QUALITY || "high";
+// Which vendor leads. Default OpenAI (image-2) - it renders embroidery,
+// logos, and lettering more crisply; Gemini is the fallback. Set
+// IMAGE_PRIMARY_VENDOR=gemini to flip back without a code change.
+const PRIMARY_VENDOR = (process.env.IMAGE_PRIMARY_VENDOR || "openai").toLowerCase();
 
 export type ImagePart =
   | { text: string }
@@ -32,7 +36,7 @@ function openaiSize(aspectRatio: string): string {
 /** Cross-vendor backstop: generate/edit on OpenAI's gpt-image-1. Uses the
  *  edits endpoint when seed/reference images are present (logo, base mockup),
  *  otherwise plain generation. Returns base64 PNG or null (never throws). */
-async function openaiImage(parts: ImagePart[], aspectRatio: string): Promise<{ data: string; mime: string } | null> {
+async function openaiImage(parts: ImagePart[], aspectRatio: string, quality: string): Promise<{ data: string; mime: string } | null> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
   const prompt = parts
@@ -50,7 +54,7 @@ async function openaiImage(parts: ImagePart[], aspectRatio: string): Promise<{ d
       form.append("model", OPENAI_MODEL);
       form.append("prompt", prompt);
       form.append("size", size);
-      form.append("quality", OPENAI_QUALITY);
+      form.append("quality", quality);
       images.slice(0, 4).forEach((im, i) => {
         const buf = Buffer.from(im.inline_data.data, "base64");
         form.append("image[]", new Blob([new Uint8Array(buf)], { type: im.inline_data.mime_type || "image/png" }), `ref${i}.png`);
@@ -65,7 +69,7 @@ async function openaiImage(parts: ImagePart[], aspectRatio: string): Promise<{ d
       res = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: OPENAI_MODEL, prompt, size, quality: OPENAI_QUALITY, n: 1 }),
+        body: JSON.stringify({ model: OPENAI_MODEL, prompt, size, quality, n: 1 }),
         signal: AbortSignal.timeout(75000),
       });
     }
@@ -82,68 +86,86 @@ async function openaiImage(parts: ImagePart[], aspectRatio: string): Promise<{ d
   }
 }
 
-/** Generate/edit an image from parts. Tries Gemini Pro once, then Flash (with a
- *  retry); if Google is down, falls back to OpenAI gpt-image-1. Returns base64
- *  data + mime, or an error. Pass { forceOpenai: true } to skip Gemini and go
- *  straight to the OpenAI tier (used to verify the backstop works). */
+// Gemini tier (Pro once, then Flash with a retry). Returns the image, or null
+// if Gemini is unconfigured / down / returned no image.
+async function geminiImage(parts: ImagePart[], aspectRatio: string): Promise<{ data: string; mime: string; usedFlash: boolean } | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  const call = (model: string) =>
+    fetch(`${API_BASE}/${model}:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts }],
+        generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio } },
+      }),
+      signal: AbortSignal.timeout(40000),
+    });
+
+  const plan: { model: string; tries: number }[] = [
+    { model: PRIMARY, tries: 1 },
+    { model: FALLBACK, tries: 2 },
+  ];
+  let res: Response | null = null;
+  let usedFlash = false;
+  outer: for (const { model, tries } of plan) {
+    for (let t = 0; t < tries; t++) {
+      try {
+        res = await call(model);
+        if (res.ok) { usedFlash = model === FALLBACK; break outer; }
+        console.error(`jersey-image ${model} attempt ${t + 1} failed:`, res.status);
+        if (!(res.status === 429 || res.status >= 500)) break outer; // 400 won't improve
+      } catch {
+        res = null; // timeout/abort -> retry or fall through
+      }
+    }
+  }
+  if (!res || !res.ok) return null;
+  const data = await res.json();
+  const img = data?.candidates?.[0]?.content?.parts?.find(
+    (p: { inlineData?: { data: string; mimeType: string }; inline_data?: { data: string; mime_type: string } }) => p.inlineData || p.inline_data,
+  );
+  const payload = img?.inlineData ?? img?.inline_data;
+  if (!payload?.data) return null;
+  return { data: payload.data, mime: payload.mimeType ?? payload.mime_type ?? "image/png", usedFlash };
+}
+
+/** Generate/edit an image from parts across two vendors for reliability.
+ *  Default order is OpenAI (image-2) first, then Gemini as the fallback
+ *  (flip with IMAGE_PRIMARY_VENDOR=gemini). `usedFallback` is true whenever
+ *  the non-primary vendor (or Gemini's Flash tier) produced the image. Pass
+ *  { forceOpenai: true } to use only the OpenAI tier. */
 export async function generateJerseyImage(
   parts: ImagePart[],
   aspectRatio = "4:3",
-  opts: { forceOpenai?: boolean } = {},
+  opts: { forceOpenai?: boolean; quality?: string } = {},
 ): Promise<GenResult> {
-  const apiKey = opts.forceOpenai ? undefined : process.env.GEMINI_API_KEY;
+  const openaiFirst = opts.forceOpenai || PRIMARY_VENDOR === "openai";
+  const quality = opts.quality || OPENAI_QUALITY;
 
-  // Tier 1 + 2: Gemini (Pro once, then Flash with a retry). Skipped entirely
-  // if no Gemini key is configured (OpenAI-only setups still work).
-  if (apiKey) {
-    const call = (model: string) =>
-      fetch(`${API_BASE}/${model}:generateContent?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts }],
-          generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio } },
-        }),
-        signal: AbortSignal.timeout(40000),
-      });
+  const tryOpenai = async (isPrimary: boolean): Promise<GenResult | null> => {
+    const r = await openaiImage(parts, aspectRatio, quality);
+    return r ? { data: r.data, mime: r.mime, usedFallback: !isPrimary } : null;
+  };
+  const tryGemini = async (isPrimary: boolean): Promise<GenResult | null> => {
+    const r = await geminiImage(parts, aspectRatio);
+    return r ? { data: r.data, mime: r.mime, usedFallback: !isPrimary || r.usedFlash } : null;
+  };
 
-    const plan: { model: string; tries: number }[] = [
-      { model: PRIMARY, tries: 1 },
-      { model: FALLBACK, tries: 2 },
-    ];
-    let res: Response | null = null;
-    let usedFallback = false;
-    outer: for (const { model, tries } of plan) {
-      for (let t = 0; t < tries; t++) {
-        try {
-          res = await call(model);
-          if (res.ok) { usedFallback = model === FALLBACK; break outer; }
-          const status = res.status;
-          console.error(`jersey-image ${model} attempt ${t + 1} failed:`, status);
-          if (!(status === 429 || status >= 500)) break outer; // 400 won't improve
-        } catch {
-          res = null; // timeout/abort -> retry or fall through
-        }
-      }
-    }
-    if (res && res.ok) {
-      const data = await res.json();
-      const img = data?.candidates?.[0]?.content?.parts?.find(
-        (p: { inlineData?: { data: string; mimeType: string }; inline_data?: { data: string; mime_type: string } }) => p.inlineData || p.inline_data,
-      );
-      const payload = img?.inlineData ?? img?.inline_data;
-      if (payload?.data) {
-        return { data: payload.data, mime: payload.mimeType ?? payload.mime_type ?? "image/png", usedFallback };
-      }
-      // Gemini answered but with no image - fall through to the OpenAI backstop.
-    }
+  const tiers = opts.forceOpenai
+    ? [() => tryOpenai(true)]
+    : openaiFirst
+      ? [() => tryOpenai(true), () => tryGemini(false)]
+      : [() => tryGemini(true), () => tryOpenai(false)];
+
+  for (const tier of tiers) {
+    const out = await tier();
+    if (out) return out;
   }
 
-  // Tier 3: OpenAI cross-vendor backstop (only if OPENAI_API_KEY is set).
-  const openai = await openaiImage(parts, aspectRatio);
-  if (openai) return { data: openai.data, mime: openai.mime, usedFallback: true };
-
-  if (!apiKey && !process.env.OPENAI_API_KEY) return { error: "Image AI not configured", status: 503 };
+  if (!process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) {
+    return { error: "Image AI not configured", status: 503 };
+  }
   return { error: "Image AI is briefly overloaded - try again in a minute.", status: 503 };
 }
 
