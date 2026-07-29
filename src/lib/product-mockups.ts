@@ -19,6 +19,31 @@ export function productNoun(p: ProductType): string {
   return PRODUCTS.find((x) => x.id === p)?.noun ?? "product";
 }
 
+// Image models don't reliably understand hex codes (a "#d81f1f" gets ignored
+// or free-associated), so map any hex to the nearest human color NAME before
+// it hits the prompt. Non-hex input (already a name) passes through.
+const NAMED_COLORS: [string, number, number, number][] = [
+  ["white", 255, 255, 255], ["black", 20, 20, 20], ["gray", 128, 128, 128], ["silver", 200, 200, 205],
+  ["red", 210, 30, 30], ["maroon", 100, 25, 25], ["orange", 232, 121, 43],
+  ["gold", 200, 165, 60], ["yellow", 240, 208, 40],
+  ["green", 40, 150, 50], ["dark green", 20, 80, 45], ["teal", 23, 145, 155], ["lime", 140, 200, 60],
+  ["royal blue", 31, 79, 216], ["navy", 25, 40, 90], ["light blue", 120, 170, 220], ["cyan", 40, 190, 210],
+  ["purple", 110, 50, 180], ["pink", 224, 95, 160], ["brown", 107, 68, 35], ["tan", 200, 176, 107],
+];
+
+export function colorName(input: string): string {
+  const m = input.trim().match(/^#?([0-9a-fA-F]{6})$/);
+  if (!m) return input.trim(); // already a name
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  let best = input.trim(), bd = Infinity;
+  for (const [name, cr, cg, cb] of NAMED_COLORS) {
+    const d = (r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2;
+    if (d < bd) { bd = d; best = name; }
+  }
+  return best;
+}
+
 /** Frame shape per product. A hanging hype-chain necklace reads best tall;
  *  everything else is the side-by-side landscape front/back. */
 export function productAspect(p: ProductType): string {
@@ -109,6 +134,7 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
       break;
   }
 
+  lines.push(`Use ONLY these colors: ${i.colors}, plus neutral white/black/gray where needed. Do NOT introduce any other color - no gold or extra accent colors unless they are explicitly listed here.`);
   if (i.vision) lines.push(`Design direction: ${i.vision.slice(0, 500)}.`);
   if (i.instruction) lines.push(`Additional direction: ${i.instruction}.`);
   // Hype chain images are labeled inline by the caller (REFERENCE CHAIN /

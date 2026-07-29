@@ -5,7 +5,7 @@ import { dbEnabled, getDb } from "@/db";
 import { designRequests } from "@/db/schema";
 import { getByManageToken } from "@/lib/design-requests";
 import { generateJerseyImage, parseDataUrl, watermarkImage, type ImagePart } from "@/lib/jersey-image";
-import { buildProductPrompt, buildRefinePrompt, productAspect, PRODUCTS, type ProductType } from "@/lib/product-mockups";
+import { buildProductPrompt, buildRefinePrompt, productAspect, colorName, PRODUCTS, type ProductType } from "@/lib/product-mockups";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -56,9 +56,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       return NextResponse.json({ error: "Could not load the base image." }, { status: 502 });
     }
   } else {
-    const colors = staffColors.length
-      ? staffColors.join(", ")
-      : (request.colorHexes ?? []).join(", ") || request.colors || "team colors";
+    // Map hex codes to human color NAMES - image models ignore raw hex.
+    const colorList = (staffColors.length ? staffColors : (request.colorHexes ?? [])).map(colorName);
+    const colors = colorList.length ? colorList.join(", ") : (request.colors || "team colors");
     const style = (body.style ?? request.jerseyStyle ?? "").trim();
     const fetchImage = async (url: string, mime = "image/png") => {
       try {

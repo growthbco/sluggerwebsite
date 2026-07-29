@@ -174,23 +174,43 @@ export function parseDataUrl(u?: string | null): { mime_type: string; data: stri
   return m ? { mime_type: m[1], data: m[2] } : null;
 }
 
-/** Bake a repeating diagonal "SLUGGER ATHLETICS" watermark across the WHOLE
- *  frame - over the jerseys included - so the wording flows continuously and
- *  never gets cut off behind the mockup, while still protecting the artwork
- *  from being shopped to another printer. Returns base64 PNG (falls back to
+// The Slugger logo, fetched once per instance from the site's public asset.
+// We watermark with the logo IMAGE (not SVG text) because the serverless
+// runtime's librsvg has no fonts - SVG <text> renders blank there, which is
+// why the old text watermark silently disappeared.
+let logoB64: string | null = null;
+async function getLogo(): Promise<string | null> {
+  if (logoB64) return logoB64;
+  try {
+    const site = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+    const res = await fetch(`${site}/slugger-logo.png`);
+    if (!res.ok) return null;
+    logoB64 = Buffer.from(await res.arrayBuffer()).toString("base64");
+    return logoB64;
+  } catch {
+    return null;
+  }
+}
+
+/** Bake a repeating diagonal Slugger-logo watermark across the WHOLE frame so
+ *  the branding flows continuously (never cut off behind the mockup) and the
+ *  artwork can't be shopped to another printer. Uses the logo image (renders
+ *  reliably in serverless, unlike SVG text). Returns base64 PNG (falls back to
  *  the input on error). */
 export async function watermarkImage(b64: string): Promise<string> {
   try {
     const srcBuf = Buffer.from(b64, "base64");
     const { width = 1200, height = 900 } = await sharp(srcBuf).metadata();
-    const tileW = Math.round(width * 0.36);
-    const tileH = Math.round(height * 0.2);
-    const fontSize = Math.max(22, Math.round(width * 0.03));
+    const logo = await getLogo();
+    if (!logo) return b64; // no logo asset -> leave unstamped rather than blank
+    const tileW = Math.round(width * 0.34);
+    const tileH = Math.round(width * 0.28);
+    const logoW = Math.round(width * 0.22);
     const overlay = Buffer.from(
       `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <pattern id="p" width="${tileW}" height="${tileH}" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
-            <text x="0" y="${Math.round(tileH * 0.55)}" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="bold" letter-spacing="3" fill="#5b6470" fill-opacity="0.17">SLUGGER ATHLETICS</text>
+          <pattern id="p" width="${tileW}" height="${tileH}" patternUnits="userSpaceOnUse" patternTransform="rotate(-20)">
+            <image href="data:image/png;base64,${logo}" x="0" y="${Math.round(tileH * 0.2)}" width="${logoW}" opacity="0.16"/>
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#p)"/>
