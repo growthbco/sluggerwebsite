@@ -35,6 +35,7 @@ export default function EmbroideryPage() {
   const manualHats = [
     { src: "/products/hats/pine-ridge-flexfit.jpg", alt: "Pine Ridge Outdoors custom embroidered Flexfit hat - Slugger Athletics Ocala FL" },
     { src: "/products/hats/mamba-m-flexfit.jpg", alt: "Black Flexfit hat with white 3D puff M embroidery - Slugger Athletics Ocala FL" },
+    { src: "/products/hats/palma-cleaning-flexfit.jpg", alt: "Palma Cleaning custom embroidered black Flexfit hat - Slugger Athletics Ocala FL" },
   ];
   const hatExamples = byCategory("hats").slice(0, 4 - manualHats.length);
 

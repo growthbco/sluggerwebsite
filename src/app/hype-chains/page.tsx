@@ -41,7 +41,6 @@ export default function HypeChainsPage() {
         { t: "Team Sets", d: "Order for the whole roster so the chain gets passed to whoever comes up clutch." },
         { t: "Simple Pricing", d: "Free mockup so you see it first. One-time $50 for the production 3D file, then each chain starts at $40 depending on detail and colors." },
       ]}
-      exampleCategory="chains"
       exampleTitle="Hype Chains We've Made"
       exampleAltSuffix=" - custom 3D hype chain Ocala FL"
       exampleFit="cover"
@@ -78,6 +77,15 @@ export default function HypeChainsPage() {
             <a href="/team-uniforms" className="text-brand hover:underline">custom uniform set</a> or{" "}
             <a href="/custom-hats" className="text-brand hover:underline">team hats</a> - one look, head
             to toe, for teams that want to stand out.
+          </p>
+          <p>
+            <a
+              href="/product/custom-hype-chain"
+              className="inline-block clip-slant bg-brand text-on-brand display text-lg px-8 py-4 hover:bg-brand-dark transition-colors"
+            >
+              Buy a Custom Hype Chain - $40
+            </a>
+            <span className="block mt-2 text-sm text-muted">$40 per chain, plus a one-time $50 design-file fee. Free mockup - we finalize your colors and pendant after you order.</span>
           </p>
         </>
       }

@@ -1095,5 +1095,25 @@
       }
     ],
     "sourceUrl": "https://www.sluggerathletics.com/product/slugger-athletics-90s-themed-hat/"
+  },
+  {
+    "legacyWooId": "custom-hype-chain",
+    "slug": "custom-hype-chain",
+    "name": "Custom 3D Hype Chain",
+    "description": "A custom 3D-printed team hype chain in your colors with your logo or wording on the pendant. Colors are matched as closely as our filament allows. The mockup is free before we print. A one-time $50 design-file fee applies per order (added at checkout). After you order, we'll reach out to finalize your colors, pendant, and logo.",
+    "category": "chains",
+    "priceCents": 4000,
+    "inStock": true,
+    "categoriesRaw": [
+      "Hype Chains"
+    ],
+    "sizes": [],
+    "images": [
+      {
+        "src": "/products/chains/avengers-red-blue.jpg",
+        "alt": "Custom 3D hype chain - Slugger Athletics Ocala FL"
+      }
+    ],
+    "sourceUrl": "/hype-chains"
   }
 ]

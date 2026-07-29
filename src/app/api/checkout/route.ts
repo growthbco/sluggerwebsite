@@ -52,9 +52,11 @@ export async function POST(req: Request) {
 
   // Build line items from the trusted catalog price, not the client-sent price.
   const lineItems: CheckoutLineItem[] = [];
+  let hasChain = false;
   for (const item of items) {
     const product = getProduct(item.slug);
     if (!product) continue;
+    if (product.category === "chains") hasChain = true;
     const qty = Math.max(1, Math.min(999, Number(item.quantity) || 1));
     const desc = describe(item.size, item.customization);
     const img = primaryImage(product);
@@ -75,6 +77,18 @@ export async function POST(req: Request) {
 
   if (lineItems.length === 0) {
     return NextResponse.json({ error: "No valid items in cart" }, { status: 400 });
+  }
+
+  // One-time $50 design-file fee per order that includes a custom hype chain.
+  if (hasChain) {
+    lineItems.push({
+      quantity: 1,
+      price_data: {
+        currency: "usd",
+        unit_amount: 5000,
+        product_data: { name: "Custom design file (one-time)", description: "One-time 3D design-file setup per hype-chain order" },
+      },
+    });
   }
 
   // Flat 7% FL sales tax on the goods, as its own line.

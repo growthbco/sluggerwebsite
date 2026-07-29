@@ -33,6 +33,13 @@ function customFieldsFor(category: string) {
       { label: "Number", maxLength: 4 },
     ];
   }
+  if (category === "chains") {
+    return [
+      { label: "Chain colors", maxLength: 60 },
+      { label: "Pendant / logo idea", maxLength: 120 },
+      { label: "Team or wording", maxLength: 40 },
+    ];
+  }
   return [];
 }
 
