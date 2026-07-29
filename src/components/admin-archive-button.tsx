@@ -10,7 +10,7 @@ export function AdminArchiveButton({
   id,
   archived,
 }: {
-  kind: "team_order" | "design_request";
+  kind: "team_order" | "design_request" | "order";
   id: string;
   archived: boolean;
 }) {

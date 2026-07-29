@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
-import { teamOrders, designRequests } from "@/db/schema";
+import { teamOrders, designRequests, orders } from "@/db/schema";
 import { isAdmin } from "@/lib/admin-auth";
 import { archiveDiscordThread } from "@/lib/discord-bot";
 
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {}
-  if (!body.id || typeof body.archive !== "boolean" || !["team_order", "design_request"].includes(body.kind ?? "")) {
+  if (!body.id || typeof body.archive !== "boolean" || !["team_order", "design_request", "order"].includes(body.kind ?? "")) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     : { archivedAt: null, archivedNote: null };
 
   const db = getDb();
-  const table = body.kind === "team_order" ? teamOrders : designRequests;
+  const table = body.kind === "team_order" ? teamOrders : body.kind === "order" ? orders : designRequests;
   const [row] = await db.update(table).set(values).where(eq(table.id, body.id)).returning({ id: table.id });
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 

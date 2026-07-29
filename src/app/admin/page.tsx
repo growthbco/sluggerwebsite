@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { desc, sql, eq, isNotNull } from "drizzle-orm";
+import { desc, sql, eq, isNotNull, isNull } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { designRequests, teamOrders, teams, orders, teamOrderAddons, assistantFacts, customInvoices } from "@/db/schema";
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
@@ -157,6 +157,7 @@ export default async function AdminPage() {
         teamId: orders.teamId,
       })
       .from(orders)
+      .where(isNull(orders.archivedAt))
       .orderBy(desc(orders.createdAt))
       .limit(60),
     db
@@ -744,25 +745,20 @@ export default async function AdminPage() {
                   <span className="text-foreground whitespace-nowrap">
                     {money(o.totalCents)} <span className="text-muted text-xs">{fmtDate(o.createdAt)}</span>
                   </span>
-                  {o.shippedAt ? (
-                    <>
-                      <span className="text-xs display text-green-400">🚚</span>
-                      {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
-                    </>
-                  ) : o.status === "paid" ? (
-                    o.trackingNumber ? (
-                      <>
-                        <span className="text-xs display text-amber-400" title="Label/tracking ready - customer not emailed yet">READY</span>
-                        <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
-                        <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email" />
-                      </>
-                    ) : (
-                      <>
-                        <AdminLabelButton kind="order" id={o.id} who={o.customerName ?? o.reference} />
-                        <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} label="➕ Add tracking" />
-                      </>
-                    )
-                  ) : null}
+                  {o.shippedAt && <span className="text-xs display text-green-400">🚚</span>}
+                  {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
+                  {!o.shippedAt && o.status === "paid" && !o.trackingNumber && (
+                    <AdminLabelButton kind="order" id={o.id} who={o.customerName ?? o.reference} />
+                  )}
+                  <AdminRowMenu>
+                    <a href={`/api/admin/order-view?id=${o.id}`} target="_blank" rel="noopener noreferrer">View order</a>
+                    {!o.shippedAt && o.status === "paid" && (
+                      o.trackingNumber
+                        ? <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} existingTracking={o.trackingNumber} label="Mark shipped + email" />
+                        : <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} label="Add tracking" />
+                    )}
+                    <AdminArchiveButton kind="order" id={o.id} archived={false} />
+                  </AdminRowMenu>
                 </span>
               </div>
             ))}

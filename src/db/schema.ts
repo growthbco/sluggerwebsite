@@ -312,6 +312,8 @@ export const orders = pgTable(
     trackingNumber: text("tracking_number"),
     labelUrl: text("label_url"),
     shippedAt: timestamp("shipped_at", { withTimezone: true }),
+    // Admin can hide a fulfilled/void shop or store order from the active list.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
 
     // Origin context (drop or team store) when applicable.
     dropId: uuid("drop_id").references(() => drops.id, { onDelete: "set null" }),
