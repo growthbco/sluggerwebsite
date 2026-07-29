@@ -782,7 +782,11 @@ export default async function AdminPage() {
                     {storeAggMap.get(s.id)?.n ?? 0} orders · {money(Number(storeAggMap.get(s.id)?.sum ?? 0))}
                   </p>
                 </summary>
-                <div className="bg-ink/40 border-t border-line/50 px-3 py-2">
+                <div className="bg-ink/40 border-t border-line/50 px-3 py-2 space-y-2">
+                  <div className="flex flex-wrap gap-3 text-xs">
+                    <Link href={`/store/${s.storeToken}/verify`} className="text-brand hover:underline">🔍 Print-file QA</Link>
+                    <Link href={`/store/${s.storeToken}`} className="text-muted hover:text-foreground hover:underline">View store</Link>
+                  </div>
                   {storeOrders.length === 0 ? (
                     <p className="text-xs text-muted">No orders yet. Share the store link so families can order.</p>
                   ) : (
