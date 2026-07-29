@@ -36,6 +36,7 @@ type PromptInput = {
   vision?: string | null;
   instruction?: string;
   hasRef?: boolean;
+  hasPendantLogo?: boolean; // hype chain: a logo image was supplied for the pendant
 };
 
 /** Build the "generate a fresh mockup" prompt for a given product type. */
@@ -57,11 +58,15 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
     case "hype-chain":
       lines.push(
         "Professional product mockup of a custom 3D-PRINTED team hype chain - a chunky plastic novelty dugout-celebration necklace. This is NOT metal jewelry, NOT a gold rope chain, and has NO gemstones.",
-        "Show the ENTIRE necklace as one complete closed loop, laid flat and fully in frame, with a flat 3D-printed nameplate pendant hanging at the bottom center.",
-        "The chain is built from thick, rounded, oversized oval links that ALTERNATE between the two team colors. Every link and the pendant have a smooth matte 3D-printed plastic finish with clear dimensional depth, rounded edges, and soft drop shadows, so the whole piece obviously reads as a solid 3D object sitting on the surface.",
-        "The pendant is a bold block-letter nameplate in the team colors with a contrasting outline.",
-        `Colors: ${i.colors} (alternating links and the nameplate).`,
-        team ? `Nameplate wording, in bold block letters: "${team}".` : "",
+        "Show the ENTIRE necklace as one complete closed loop, laid flat and fully in frame, with the PENDANT hanging at the bottom center.",
+        "The CHAIN is built from thick, rounded, oversized oval links that ALTERNATE between the two team colors, with a smooth matte 3D-printed plastic finish, clear dimensional depth, rounded edges, and soft drop shadows so it reads as a solid 3D object on the surface.",
+        "CRITICAL - the PENDANT is a SINGLE solid, smooth, flat 3D-printed piece: one continuous printed plate/charm. It is NOT built from chain links, NOT hollow, NOT made of connected rings or loops. It hangs from the bottom link by one small loop.",
+        i.hasPendantLogo
+          ? "Shape the pendant as a solid, flat, filled-in 3D-printed rendering of the provided PENDANT LOGO image - solid material where the logo is solid, in the team colors with a contrasting outline. Do not turn the logo into chain links."
+          : team
+            ? `Shape the pendant as a solid, flat 3D-printed nameplate reading "${team}" in bold block letters, team colors with a contrasting outline.`
+            : "Shape the pendant as a solid, flat 3D-printed team logo, team colors with a contrasting outline.",
+        `Colors: ${i.colors} (alternating links and the pendant).`,
         "Top-down flat-lay view, evenly lit, the whole necklace and pendant fully visible with a small margin. No person, no neck, no mannequin, no metal, no rope, no jewels.",
       );
       break;
@@ -100,12 +105,10 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
 
   if (i.vision) lines.push(`Design direction: ${i.vision.slice(0, 500)}.`);
   if (i.instruction) lines.push(`Additional direction: ${i.instruction}.`);
-  if (i.hasRef) {
-    lines.push(
-      product === "hype-chain"
-        ? "A REFERENCE PHOTO of our actual 3D-printed chain is provided: match its construction, link shape, thickness, chunkiness, and matte printed finish EXACTLY. Change ONLY the colors and the nameplate wording - keep it the same style of 3D-printed chain."
-        : "A REFERENCE image is provided: use its design language, colors, and vibe as inspiration for a new original design.",
-    );
+  // Hype chain images are labeled inline by the caller (REFERENCE CHAIN /
+  // PENDANT LOGO), so it doesn't use this generic reference line.
+  if (i.hasRef && product !== "hype-chain") {
+    lines.push("A REFERENCE image is provided: use its design language, colors, and vibe as inspiration for a new original design.");
   }
   lines.push(COMMON_TAIL);
   return lines.filter(Boolean).join(" ");

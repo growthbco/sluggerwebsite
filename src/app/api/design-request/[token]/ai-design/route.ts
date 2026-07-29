@@ -60,34 +60,47 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       ? staffColors.join(", ")
       : (request.colorHexes ?? []).join(", ") || request.colors || "team colors";
     const style = (body.style ?? request.jerseyStyle ?? "").trim();
-    // Seed images: staff reference first, then a style baseline (the real
-    // Slugger hype chain from the site so chain concepts match our house look),
-    // then the customer's logo/reference. Cap what we send to the model.
-    const seeds: { mime_type: string; data: string }[] = [];
-    if (refImage) seeds.push(refImage);
-    if (product === "hype-chain" && !refImage) {
-      try {
-        const site = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
-        const buf = Buffer.from(await (await fetch(`${site}/products/chains/big-baller.jpg`)).arrayBuffer());
-        seeds.push({ mime_type: "image/jpeg", data: buf.toString("base64") });
-      } catch { /* skip - fall back to text-only chain prompt */ }
-    }
-    for (const url of (request.inspirationImages ?? []).slice(0, 2)) {
+    const fetchImage = async (url: string, mime = "image/png") => {
       try {
         const buf = Buffer.from(await (await fetch(url)).arrayBuffer());
-        seeds.push({ mime_type: "image/png", data: buf.toString("base64") });
-      } catch { /* skip */ }
+        return { mime_type: mime, data: buf.toString("base64") };
+      } catch { return null; }
+    };
+
+    if (product === "hype-chain") {
+      // Two LABELED references so the model can't confuse them: our real chain
+      // (construction only) and the pendant logo (what the bottom piece is).
+      const site = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+      const chainRef = await fetchImage(`${site}/products/chains/big-baller.jpg`, "image/jpeg");
+      // Pendant logo = staff upload, else the customer's first uploaded logo.
+      const pendantLogo = refImage ?? (await fetchImage((request.inspirationImages ?? [])[0] ?? ""));
+      parts.push({ text: buildProductPrompt(product, {
+        sport: request.sport, style, colors, teamName: request.teamName,
+        vision: request.vision, instruction,
+        hasRef: !!(chainRef || pendantLogo), hasPendantLogo: !!pendantLogo,
+      }) });
+      if (chainRef) {
+        parts.push({ text: "REFERENCE CHAIN - match this exact 3D-printed chain construction (link shape, thickness, matte printed finish). Do NOT copy its colors, and do NOT copy its pendant:" });
+        parts.push({ inline_data: chainRef });
+      }
+      if (pendantLogo) {
+        parts.push({ text: "PENDANT LOGO - the bottom pendant must be a solid, flat, filled-in 3D-printed version of THIS logo (not made of chain links):" });
+        parts.push({ inline_data: pendantLogo });
+      }
+    } else {
+      // Seed images: staff reference first, then the customer's logo/reference.
+      const seeds: { mime_type: string; data: string }[] = [];
+      if (refImage) seeds.push(refImage);
+      for (const url of (request.inspirationImages ?? []).slice(0, 2)) {
+        const s = await fetchImage(url);
+        if (s) seeds.push(s);
+      }
+      parts.push({ text: buildProductPrompt(product, {
+        sport: request.sport, style, colors, teamName: request.teamName,
+        vision: request.vision, instruction, hasRef: seeds.length > 0,
+      }) });
+      for (const s of seeds.slice(0, 3)) parts.push({ inline_data: s });
     }
-    parts.push({ text: buildProductPrompt(product, {
-      sport: request.sport,
-      style,
-      colors,
-      teamName: request.teamName,
-      vision: request.vision,
-      instruction,
-      hasRef: seeds.length > 0,
-    }) });
-    for (const s of seeds.slice(0, 3)) parts.push({ inline_data: s });
   }
 
   // High quality here - staff studio output goes to clients as proofs.
