@@ -19,6 +19,12 @@ export function productNoun(p: ProductType): string {
   return PRODUCTS.find((x) => x.id === p)?.noun ?? "product";
 }
 
+/** Frame shape per product. A hanging hype-chain necklace reads best tall;
+ *  everything else is the side-by-side landscape front/back. */
+export function productAspect(p: ProductType): string {
+  return p === "hype-chain" ? "3:4" : "4:3";
+}
+
 const COMMON_TAIL =
   "Frame the product large and close-up so it fills most of the image with only a small even margin; do not leave big empty white space or push it far into the distance. Premium, print-ready, tasteful. No mannequin, no human, no watermark. Do NOT add any MLB, NBA, NFL, or other league logos, no pro-team marks, no swooshes or brand logos - use ONLY the team's own name and any logo the customer provided.";
 
@@ -50,11 +56,13 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
       break;
     case "hype-chain":
       lines.push(
-        "Professional product mockup of a custom 3D team hype chain (a dugout celebration championship chain): a large ornate metal pendant hanging from a thick gold or silver rope chain, photographed against a pure white background with studio product lighting, front view.",
-        `The pendant is built from the team's initials/logo with bold raised detail and enamel color fill; encrusted, flashy, premium.`,
-        `Colors: ${i.colors} (enamel fill and accents).`,
-        team ? `Team name/initials on the pendant: "${team}".` : "",
-        "No person, no neck, no mannequin - just the chain and pendant.",
+        "Professional product mockup of a custom 3D-PRINTED team hype chain - a chunky plastic novelty dugout-celebration necklace. This is NOT metal jewelry, NOT a gold rope chain, and has NO gemstones.",
+        "Show the ENTIRE necklace as one complete closed loop, laid flat and fully in frame, with a flat 3D-printed nameplate pendant hanging at the bottom center.",
+        "The chain is built from thick, rounded, oversized oval links that ALTERNATE between the two team colors. Every link and the pendant have a smooth matte 3D-printed plastic finish with clear dimensional depth, rounded edges, and soft drop shadows, so the whole piece obviously reads as a solid 3D object sitting on the surface.",
+        "The pendant is a bold block-letter nameplate in the team colors with a contrasting outline.",
+        `Colors: ${i.colors} (alternating links and the nameplate).`,
+        team ? `Nameplate wording, in bold block letters: "${team}".` : "",
+        "Top-down flat-lay view, evenly lit, the whole necklace and pendant fully visible with a small margin. No person, no neck, no mannequin, no metal, no rope, no jewels.",
       );
       break;
     case "hoodie":
@@ -92,7 +100,13 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
 
   if (i.vision) lines.push(`Design direction: ${i.vision.slice(0, 500)}.`);
   if (i.instruction) lines.push(`Additional direction: ${i.instruction}.`);
-  if (i.hasRef) lines.push("A REFERENCE image is provided: use its design language, colors, and vibe as inspiration for a new original design.");
+  if (i.hasRef) {
+    lines.push(
+      product === "hype-chain"
+        ? "A REFERENCE PHOTO of our actual 3D-printed chain is provided: match its construction, link shape, thickness, chunkiness, and matte printed finish EXACTLY. Change ONLY the colors and the nameplate wording - keep it the same style of 3D-printed chain."
+        : "A REFERENCE image is provided: use its design language, colors, and vibe as inspiration for a new original design.",
+    );
+  }
   lines.push(COMMON_TAIL);
   return lines.filter(Boolean).join(" ");
 }
