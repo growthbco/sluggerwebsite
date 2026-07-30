@@ -175,6 +175,9 @@ export type TeamOrderInvoiceContent = {
   roster?: { name: string; number: string; size: string }[];
   payUrl: string;
   payFullUrl?: string;
+  /** The true pay-in-full charge (goods + tax + shipping). Shown on the
+   *  "pay in full instead" link so it matches what Stripe actually charges. */
+  payFullCents?: number;
   /** Order is local pickup in Ocala - no shipping is ever charged. */
   localPickup?: boolean;
 };
@@ -265,7 +268,7 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
         }
         ${
           isDeposit && args.payFullUrl
-            ? `<p style="margin:14px 0 0;text-align:center;">Prefer one payment? <a href="${args.payFullUrl}" style="color:#b8a36c;font-weight:bold;">Pay in full (${money(args.totalCents)}) instead →</a></p>`
+            ? `<p style="margin:14px 0 0;text-align:center;">Prefer one payment? <a href="${args.payFullUrl}" style="color:#b8a36c;font-weight:bold;">Pay in full (${money(args.payFullCents ?? args.totalCents)}) instead →</a></p>`
             : ""
         }
       `,

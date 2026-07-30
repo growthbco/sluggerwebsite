@@ -94,6 +94,33 @@ export async function POST(req: Request) {
     }
   }
 
+  // The "pay in full" option (offered at the deposit stage) must ALSO include
+  // shipping, so paying everything upfront covers it. There's often no address
+  // yet at this point, so we charge the weight-based formula amount (a shippo
+  // quote if an address happens to be on file); local-pickup orders stay $0.
+  let fullShipCents = 0;
+  if (stage === "deposit" && !(body.ship ? body.ship === "pickup" : order.localPickup)) {
+    const weightOz = body.shipWeightOz && body.shipWeightOz > 0 ? Math.round(body.shipWeightOz) : estimateOrderWeightOz(roster);
+    if (weightOz > 0) {
+      const zip = order.shippingAddress?.postalCode;
+      if (zip) {
+        try {
+          const { quoteChargedShipping, shippoEnabled } = await import("@/lib/shippo");
+          if (shippoEnabled()) {
+            const q = await quoteChargedShipping(zip, Math.min(1120, weightOz));
+            if (q) fullShipCents = q.chargedCents;
+          }
+        } catch (e) {
+          console.error("pay-in-full shipping quote failed:", e);
+        }
+      }
+      if (fullShipCents === 0) {
+        const { shippingCentsFor } = await import("@/lib/team-stores");
+        fullShipCents = shippingCentsFor(weightOz);
+      }
+    }
+  }
+
   try {
     const stripe = getStripe();
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
@@ -140,7 +167,7 @@ export async function POST(req: Request) {
       // Deposit + a pay-in-full sibling. Whichever is paid first deactivates
       // the other (via siblingLinkId in the webhook) so nobody double-pays.
       link = await makeLink(`50% Production Deposit - ${order.teamName} (${order.reference})`, dueCents, "deposit");
-      fullLink = await makeLink(`Pay in Full - ${order.teamName} (${order.reference})`, totalCents, "full", { siblingLinkId: link.id });
+      fullLink = await makeLink(`Pay in Full - ${order.teamName} (${order.reference})`, totalCents, "full", { siblingLinkId: link.id, shipCents: String(fullShipCents) }, fullShipCents);
       await stripe.paymentLinks.update(link.id, { metadata: { ...link.metadata, siblingLinkId: fullLink.id } });
     } else {
       link = await makeLink(`Final Balance - ${order.teamName} (${order.reference})`, dueCents, "balance", {}, shipCents);
@@ -177,6 +204,7 @@ export async function POST(req: Request) {
       })),
       payUrl: link.url,
       payFullUrl: fullLink?.url ?? undefined,
+      payFullCents: fullLink ? totalCents + (order.taxExempt ? 0 : taxCents(totalCents)) + fullShipCents : undefined,
     });
 
     return NextResponse.json({ ok: true, stage, totalCents, dueCents, shipCents, taxDueCents: order.taxExempt ? 0 : taxCents(dueCents), invoiceUrl: link.url, fullInvoiceUrl: fullLink?.url, emailed });

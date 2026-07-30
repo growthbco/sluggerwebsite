@@ -229,7 +229,9 @@ export async function POST(req: Request) {
               : {
                   status: "paid",
                   invoicePaidAt: now,
-                  ...(isFull ? { depositPaidAt: now } : {}),
+                  ...(isFull
+                    ? { depositPaidAt: now, ...(session.metadata.shipCents ? { shippingChargedCents: Number(session.metadata.shipCents) || 0 } : {}) }
+                    : {}),
                   invoiceRemindersSent: 0,
                   updatedAt: now,
                   ...addressPatch,
