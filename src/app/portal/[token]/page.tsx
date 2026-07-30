@@ -9,6 +9,35 @@ export const metadata: Metadata = { title: "My Orders", robots: { index: false }
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 const titleCase = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+const shortDate = (d: Date) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+function Receipt({ items, subtotalCents, shippingCents, totalCents }: { items: { name: string; quantity: number; unitPriceCents: number }[]; subtotalCents: number; shippingCents: number; totalCents: number }) {
+  if (!items.length) return null;
+  return (
+    <details className="mt-3 border-t border-line pt-3 group/receipt">
+      <summary className="flex cursor-pointer items-center justify-between list-none text-sm text-brand">
+        <span className="underline underline-offset-2">View receipt</span>
+        <span className="transition-transform group-open/receipt:rotate-45">+</span>
+      </summary>
+      <table className="mt-3 w-full text-sm">
+        <tbody>
+          {items.map((it, i) => (
+            <tr key={i} className="text-muted">
+              <td className="py-1 pr-2">{it.name}</td>
+              <td className="py-1 px-2 text-right whitespace-nowrap">{it.quantity} &times; {money(it.unitPriceCents)}</td>
+              <td className="py-1 pl-2 text-right whitespace-nowrap text-foreground">{money(it.quantity * it.unitPriceCents)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot className="border-t border-line">
+          <tr className="text-muted"><td className="pt-2" colSpan={2}>Subtotal</td><td className="pt-2 text-right">{money(subtotalCents)}</td></tr>
+          <tr className="text-muted"><td colSpan={2}>Shipping</td><td className="text-right">{shippingCents ? money(shippingCents) : "Free"}</td></tr>
+          <tr className="display text-foreground"><td className="pt-1" colSpan={2}>Total</td><td className="pt-1 text-right">{money(totalCents)}</td></tr>
+        </tfoot>
+      </table>
+    </details>
+  );
+}
 
 function Row({ title, sub, status, href, cta, track }: { title: string; sub?: string; status: string; href?: string; cta?: string; track?: string | null }) {
   return (
@@ -52,7 +81,7 @@ export default async function PortalTokenPage({ params }: { params: Promise<{ to
     <div className="mx-auto max-w-2xl px-4 sm:px-6 py-14 space-y-8">
       <header>
         <span className="display text-brand text-sm">Order Portal</span>
-        <h1 className="display text-3xl sm:text-4xl text-foreground mt-1">Your Orders</h1>
+        <h1 className="display text-3xl sm:text-4xl text-foreground mt-1">{data.name ? `Welcome back, ${data.name.split(" ")[0]}` : "Your Orders"}</h1>
         <p className="mt-2 text-muted">{email}</p>
       </header>
 
@@ -82,8 +111,26 @@ export default async function PortalTokenPage({ params }: { params: Promise<{ to
         <section className="space-y-3">
           <h2 className="display text-xl text-foreground">Store & Shop Orders</h2>
           {data.shop.map((s) => (
-            <Row key={s.reference} title={`${titleCase(s.type)} order ${s.reference}`} sub={money(s.totalCents)} status={s.status} track={s.trackingNumber}
-              href={s.addUrl ?? undefined} cta={s.addUrl ? "Add items" : undefined} />
+            <div key={s.reference} className="border border-line bg-steel p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="display text-foreground">{titleCase(s.type)} order {s.reference}</p>
+                  <p className="text-sm text-muted mt-0.5">{shortDate(s.createdAt)} &middot; {money(s.totalCents)}</p>
+                  {s.trackingNumber && (
+                    <a href={trackingUrlFor(s.trackingNumber)} target="_blank" rel="noopener noreferrer" className="text-sm text-brand underline underline-offset-2 mt-1 inline-block">
+                      Track shipment ({s.trackingNumber})
+                    </a>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs display text-brand border border-brand/40 px-2.5 py-1 rounded whitespace-nowrap">{titleCase(s.status)}</span>
+                  {s.addUrl && (
+                    <Link href={s.addUrl} className="text-sm display text-on-brand bg-brand hover:bg-brand-dark px-4 py-2 rounded whitespace-nowrap">Add items</Link>
+                  )}
+                </div>
+              </div>
+              <Receipt items={s.items} subtotalCents={s.subtotalCents} shippingCents={s.shippingCents} totalCents={s.totalCents} />
+            </div>
           ))}
         </section>
       )}
