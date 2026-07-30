@@ -667,10 +667,10 @@ export default async function AdminPage() {
                                 href={`/api/admin/team-order/invoice-view?id=${o.id}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                title={o.invoiceUrl ? "See a copy of the invoice the customer received" : "Preview the deposit invoice before sending it"}
+                                title={paid ? "View the paid receipt (itemized, incl. shipping) - no Stripe login needed" : o.invoiceUrl ? "See a copy of the invoice the customer received" : "Preview the deposit invoice before sending it"}
                                 className="text-xs display text-muted whitespace-nowrap"
                               >
-                                View invoice
+                                {paid ? "View receipt" : "View invoice"}
                               </a>
                             )}
                             {!o.balanceInvoiceUrl && !paid && (

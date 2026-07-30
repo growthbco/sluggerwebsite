@@ -26,6 +26,7 @@ const cols = [
       { href: "/services", label: "All Services & Pricing" },
       { href: "/pricing", label: "Pricing" },
       { href: "/track", label: "Track Order" },
+      { href: "/portal", label: "My Orders" },
       { href: "/faq", label: "FAQs" },
       { href: "/shipping", label: "Shipping & Delivery" },
       { href: "/returns", label: "Returns & Exchanges" },

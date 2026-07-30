@@ -47,6 +47,46 @@ export async function GET(req: Request) {
   const depositCents = order.depositCents ?? Math.round(totalCents / 2);
   const dueCents = stage === "deposit" ? depositCents : totalCents - depositCents;
 
+  // If the order is fully paid, show a RECEIPT (verify payment without Stripe)
+  // instead of an invoice with pay buttons.
+  if (order.invoicePaidAt) {
+    const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+    const tax = order.taxExempt ? 0 : taxCents(totalCents);
+    const ship = order.shippingChargedCents ?? 0;
+    const grand = totalCents + tax + ship;
+    const paidInFull = Boolean(order.depositPaidAt && Math.abs(+order.invoicePaidAt - +order.depositPaidAt) < 60000);
+    const paidDate = order.invoicePaidAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+    const itemRows = (quote?.lines ?? [])
+      .map((l) => `<tr><td style="padding:6px 14px;">${l.label}${l.quantity > 1 ? ` &times; ${l.quantity}` : ""}</td><td style="padding:6px 14px;text-align:right;">${money(l.totalCents)}</td></tr>`)
+      .join("");
+    const line = (label: string, val: string, strong = false) =>
+      `<tr><td style="padding:6px 14px;border-top:1px solid #eee;${strong ? "font-weight:bold;" : ""}">${label}</td><td style="padding:6px 14px;text-align:right;border-top:1px solid #eee;${strong ? "font-weight:bold;" : ""}">${val}</td></tr>`;
+    const receipt = `
+      <div style="max-width:640px;margin:24px auto;font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;border:1px solid #e5e5e5;">
+        <div style="background:#13160b;color:#e8e2d0;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+          <div><div style="font-weight:bold;font-size:18px;">Slugger Athletics</div><div style="font-size:12px;opacity:.8;">Receipt · ${order.reference}</div></div>
+          <span style="background:#1f8a4c;color:#fff;font-weight:bold;padding:6px 12px;border-radius:4px;font-size:13px;">PAID</span>
+        </div>
+        <div style="padding:16px 20px;font-size:14px;">
+          <p style="margin:0 0 4px;"><strong>${order.teamName}</strong></p>
+          <p style="margin:0;color:#666;font-size:13px;">${paidInFull ? "Paid in full" : "Deposit + balance paid"} on ${paidDate}</p>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          ${itemRows}
+          ${line("Subtotal", money(totalCents))}
+          ${order.taxExempt ? line("Sales tax", "Exempt") : line("FL Sales Tax (7%)", money(tax))}
+          ${line("Shipping", ship > 0 ? money(ship) : order.localPickup ? "Local pickup" : "$0.00")}
+          ${line("Total paid", money(grand), true)}
+        </table>
+        <p style="padding:14px 20px;color:#888;font-size:12px;margin:0;">Charged via Stripe to the card on file. This receipt reflects your system's record - no Stripe login needed.</p>
+      </div>`;
+    const banner = `ADMIN RECEIPT - ${order.teamName} (${order.reference}) is PAID (${money(grand)} total). Emailed contact: ${order.contactEmail}.`;
+    return new Response(
+      `<div style="background:#123a22;color:#d6f5e2;font-family:sans-serif;font-size:13px;padding:10px 16px;text-align:center;">${banner}</div>${receipt}`,
+      { headers: { "Content-Type": "text/html; charset=utf-8" } },
+    );
+  }
+
   // Mirror the send route: line items appear on the deposit invoice only.
   let lines = stage === "deposit" && quote ? [...quote.lines] : [];
   if (stage === "deposit" && quote && quote.rushFeeCents > 0) {
