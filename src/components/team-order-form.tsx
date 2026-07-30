@@ -45,6 +45,10 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   // covers (a hoodie design pre-selects hoodie, not the jersey default).
   const [items, setItems] = useState<string[]>(prefill?.items?.length ? prefill.items : ["jersey"]);
   const [rows, setRows] = useState<Row[]>([emptyRow(), emptyRow(), emptyRow()]);
+  // Hats are ordered in bulk by size (not per player): { fitted_hat: { "S/M": 5 } }.
+  const [hatQty, setHatQty] = useState<Record<string, Record<string, number>>>({});
+  const setQty = (key: string, size: string, n: number) =>
+    setHatQty((h) => ({ ...h, [key]: { ...(h[key] ?? {}), [size]: n } }));
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
   const [links, setLinks] = useState<{ shareUrl: string; manageUrl: string } | null>(null);
@@ -80,8 +84,18 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const removeRow = (i: number) => setRows((r) => r.filter((_, idx) => idx !== i));
 
   const filledRows = rows.filter((r) => r.name || r.number || Object.keys(r.sizes).length);
-  // Selected item types in canonical order, jersey first.
+  // Selected item types in canonical order, jersey first. Per-player items get
+  // a size column on each roster row; in-house hats are ordered in bulk by size.
   const selected = ITEM_TYPES.filter((t) => items.includes(t.key));
+  const perPlayerSelected = selected.filter((t) => !t.inHouse);
+  const bulkSelected = selected.filter((t) => t.inHouse);
+  const perPlayerKeys = perPlayerSelected.map((t) => t.key);
+  const bulkRows = () =>
+    bulkSelected.flatMap((t) =>
+      t.sizes
+        .filter((s) => (hatQty[t.key]?.[s] ?? 0) > 0)
+        .map((s) => ({ name: "", number: "", sizes: { [t.key]: s }, notes: "", quantity: hatQty[t.key][s] })),
+    );
   // Jersey style/material only apply when a jersey is actually being ordered
   // - a hoodie-only order must not carry a phantom jersey style.
   const hasJersey = items.includes("jersey");
@@ -92,7 +106,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, roster: rows, designToken: prefill?.designToken }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
@@ -268,7 +282,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
 
             <div className="mt-4">
               <RosterImport
-                itemKeys={items}
+                itemKeys={perPlayerKeys}
                 confirmLabel={undefined}
                 onConfirm={(imported: ImportedRow[]) => {
                   const asRows: Row[] = imported.map((r) => ({
@@ -294,14 +308,16 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
                     <input className={`${inputCls} max-w-24`} value={row.number} onChange={(e) => update(i, "number", e.target.value)} placeholder="#" maxLength={4} />
                     <button onClick={() => removeRow(i)} className="text-muted hover:text-brand px-2 py-2.5" aria-label="Remove player">✕</button>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {selected.map((t) => (
-                      <select key={t.key} className={inputCls} value={row.sizes[t.key] ?? ""} onChange={(e) => updateSize(i, t.key, e.target.value)}>
-                        <option value="">{t.label} size</option>
-                        {t.sizes.map((s) => <option key={s}>{s}</option>)}
-                      </select>
-                    ))}
-                  </div>
+                  {perPlayerSelected.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {perPlayerSelected.map((t) => (
+                        <select key={t.key} className={inputCls} value={row.sizes[t.key] ?? ""} onChange={(e) => updateSize(i, t.key, e.target.value)}>
+                          <option value="">{t.label} size</option>
+                          {t.sizes.map((s) => <option key={s}>{s}</option>)}
+                        </select>
+                      ))}
+                    </div>
+                  )}
                   <input className={inputCls} value={row.notes} onChange={(e) => update(i, "notes", e.target.value)} placeholder="Notes (optional)" />
                 </div>
               ))}
@@ -311,6 +327,43 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
               + Add Player
             </button>
           </div>
+
+          {/* Hats: ordered in bulk by size, not per player. */}
+          {bulkSelected.length > 0 && (
+            <div>
+              <h2 className="display text-xl text-foreground">Hats <span className="text-base text-muted">(order by size)</span></h2>
+              <p className="text-sm text-muted mt-1">Hats aren&apos;t name-specific - just enter how many you need of each size.</p>
+              <div className="mt-3 space-y-3">
+                {bulkSelected.map((t) => {
+                  const total = t.sizes.reduce((a, s) => a + (hatQty[t.key]?.[s] ?? 0), 0);
+                  return (
+                    <div key={t.key} className="border border-line p-3">
+                      <div className="flex items-baseline justify-between">
+                        <p className="display text-sm text-foreground">{t.label}</p>
+                        <span className="text-sm text-muted">{total} total</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {t.sizes.map((s) => (
+                          <label key={s} className="flex items-center gap-2">
+                            <span className="text-sm text-muted min-w-[3.5rem]">{s}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              inputMode="numeric"
+                              value={hatQty[t.key]?.[s] ?? ""}
+                              onChange={(e) => setQty(t.key, s, Math.max(0, parseInt(e.target.value) || 0))}
+                              placeholder="0"
+                              className={`${inputCls} max-w-20`}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {status === "error" && <p className="text-sm text-brand">{message}</p>}
 

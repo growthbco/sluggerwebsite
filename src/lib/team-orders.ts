@@ -20,6 +20,7 @@ export type RosterInput = {
   size?: string;
   sizes?: Record<string, string>;
   notes?: string;
+  quantity?: number;
 };
 
 function ref() {
@@ -103,6 +104,7 @@ export async function addRosterRow(teamOrderId: string, input: RosterInput, fill
       size: input.sizes?.jersey ?? input.size,
       sizes: input.sizes,
       notes: input.notes,
+      quantity: Math.max(1, input.quantity ?? 1),
       filledBy,
       position: existing.length,
     })

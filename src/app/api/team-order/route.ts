@@ -7,7 +7,7 @@ import { createTeamOrder, addRosterRow, submitTeamOrder } from "@/lib/team-order
 
 export const runtime = "nodejs";
 
-type RosterRow = { name?: string; number?: string; size?: string; sizes?: Record<string, string>; notes?: string };
+type RosterRow = { name?: string; number?: string; size?: string; sizes?: Record<string, string>; notes?: string; quantity?: number };
 
 // Manual-roster team order submission (coach typed/imported the full roster).
 // Persists to the DB first - Discord is a notification, not the datastore.
@@ -95,6 +95,7 @@ export async function POST(req: Request) {
           size: r.size,
           sizes: r.sizes,
           notes: r.notes,
+          quantity: r.quantity,
         },
         "coach",
       );

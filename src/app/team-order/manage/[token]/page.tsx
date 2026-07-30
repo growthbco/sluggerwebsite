@@ -81,6 +81,7 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
           size: r.size,
           sizes: r.sizes,
           notes: r.notes,
+          quantity: r.quantity,
         }))}
         submitted={!["draft", "collecting"].includes(order.status)}
       />

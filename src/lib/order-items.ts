@@ -85,7 +85,7 @@ export function sizesFor(key: string): string[] {
  *  5 S/M, 2 L/XL, 3 XXL). Sizes come out in the item's canonical size order,
  *  with any stray sizes appended. Only items that have at least one size go in. */
 export function sizeBreakdown(
-  roster: { size?: string | null; sizes?: Record<string, string> | null }[],
+  roster: { size?: string | null; sizes?: Record<string, string> | null; quantity?: number | null }[],
   items: string[],
 ): { key: string; label: string; parts: { size: string; n: number }[]; total: number }[] {
   return items
@@ -93,7 +93,7 @@ export function sizeBreakdown(
       const counts: Record<string, number> = {};
       for (const r of roster) {
         const v = r.sizes?.[k] ?? (k === "jersey" ? r.size ?? undefined : undefined);
-        if (v) counts[v] = (counts[v] ?? 0) + 1;
+        if (v) counts[v] = (counts[v] ?? 0) + Math.max(1, r.quantity ?? 1);
       }
       const canonical = sizesFor(k);
       const parts = canonical.filter((s) => counts[s]).map((s) => ({ size: s, n: counts[s] }));
