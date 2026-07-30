@@ -2,9 +2,9 @@
 // customer has with Slugger (team orders, store purchases, design requests,
 // custom invoices). No passwords - the link IS the auth, and it's short-lived.
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
-import { sql } from "drizzle-orm";
+import { sql, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
-import { teamOrders, designRequests, customInvoices, orders } from "@/db/schema";
+import { teamOrders, designRequests, customInvoices, orders, teams } from "@/db/schema";
 
 const TTL_MS = 45 * 60 * 1000; // 45 minutes
 
@@ -46,7 +46,7 @@ export type PortalData = {
   teamOrders: { reference: string; teamName: string; status: string; manageToken: string | null; trackingNumber: string | null; createdAt: Date }[];
   designs: { reference: string; teamName: string; status: string; statusToken: string | null; createdAt: Date }[];
   invoices: { reference: string; status: string; totalCents: number; payUrl: string | null; createdAt: Date }[];
-  shop: { reference: string; type: string; status: string; totalCents: number; trackingNumber: string | null; shippedAt: Date | null; createdAt: Date }[];
+  shop: { reference: string; type: string; status: string; totalCents: number; trackingNumber: string | null; shippedAt: Date | null; addUrl: string | null; createdAt: Date }[];
   empty: boolean;
 };
 
@@ -63,7 +63,19 @@ export async function getCustomerOrders(email: string): Promise<PortalData> {
   const teamOrdersV = team.map((o) => ({ reference: o.reference, teamName: o.teamName, status: o.status, manageToken: o.manageToken, trackingNumber: o.trackingNumber, createdAt: o.createdAt }));
   const designsV = designs.map((d) => ({ reference: d.reference, teamName: d.teamName, status: d.status, statusToken: d.statusToken, createdAt: d.createdAt }));
   const invoicesV = invoices.map((i) => ({ reference: i.reference, status: i.status, totalCents: i.totalCents, payUrl: i.payUrl, createdAt: i.createdAt }));
-  const shopV = shop.map((s) => ({ reference: s.reference, type: s.type, status: s.status, totalCents: s.totalCents, trackingNumber: s.trackingNumber, shippedAt: s.shippedAt, createdAt: s.createdAt }));
+  // For unshipped team-store orders, offer a self-serve "add items" link that
+  // reopens the team's store in add-to-order mode (only when the store is live).
+  const storeTeamIds = [...new Set(shop.filter((s) => s.type === "team_store" && !s.shippedAt && s.teamId).map((s) => s.teamId as string))];
+  const storeMap = new Map<string, { token: string | null; active: boolean }>();
+  if (storeTeamIds.length) {
+    const rows = await db.select({ id: teams.id, token: teams.storeToken, active: teams.storeActive }).from(teams).where(inArray(teams.id, storeTeamIds));
+    for (const r of rows) storeMap.set(r.id, { token: r.token, active: Boolean(r.active) });
+  }
+  const shopV = shop.map((s) => {
+    const store = s.teamId ? storeMap.get(s.teamId) : undefined;
+    const addUrl = s.type === "team_store" && !s.shippedAt && store?.active && store.token ? `/store/${store.token}?addTo=${s.reference}` : null;
+    return { reference: s.reference, type: s.type, status: s.status, totalCents: s.totalCents, trackingNumber: s.trackingNumber, shippedAt: s.shippedAt, addUrl, createdAt: s.createdAt };
+  });
   return {
     teamOrders: teamOrdersV,
     designs: designsV,

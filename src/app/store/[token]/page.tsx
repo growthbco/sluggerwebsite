@@ -44,8 +44,9 @@ function themeVars(hex: string | null | undefined): React.CSSProperties | undefi
 // always render fresh so updates appear immediately, never a cached page.
 export const dynamic = "force-dynamic";
 
-export default async function TeamStorePage({ params }: { params: Promise<{ token: string }> }) {
+export default async function TeamStorePage({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ addTo?: string }> }) {
   const { token } = await params;
+  const addToRef = (await searchParams)?.addTo?.trim().toUpperCase() || undefined;
   if (!dbEnabled()) return <Centered title="Not available yet">Team stores aren&apos;t turned on yet.</Centered>;
 
   const store = await getStoreByHandle(token);
@@ -109,7 +110,7 @@ export default async function TeamStorePage({ params }: { params: Promise<{ toke
           <a href="#size-charts" className="text-sm text-brand hover:underline">Not sure on size? Size charts ↓</a>
         </div>
         <div className="mt-4">
-          <TeamStoreShop token={token} items={store.storeItems ?? []} />
+          <TeamStoreShop token={token} items={store.storeItems ?? []} addToRef={addToRef} />
         </div>
       </section>
 

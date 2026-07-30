@@ -90,9 +90,12 @@ async function openaiImage(parts: ImagePart[], aspectRatio: string, quality: str
   }
 }
 
-// Gemini tier (Pro once, then Flash with a retry). Returns the image, or null
-// if Gemini is unconfigured / down / returned no image.
-async function geminiImage(parts: ImagePart[], aspectRatio: string): Promise<{ data: string; mime: string; usedFlash: boolean } | null> {
+// Gemini tier. When it's the PRIMARY vendor it tries Pro (best quality) then
+// Flash; but as a mere FALLBACK (OpenAI is primary) it uses ONLY the cheap
+// Flash model - the expensive Gemini-3-Pro image was quietly running up the
+// bill every time OpenAI failed or moderation-blocked a design. flashOnly cuts
+// that ~10x.
+async function geminiImage(parts: ImagePart[], aspectRatio: string, flashOnly = false): Promise<{ data: string; mime: string; usedFlash: boolean } | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
   const call = (model: string) =>
@@ -106,10 +109,12 @@ async function geminiImage(parts: ImagePart[], aspectRatio: string): Promise<{ d
       signal: AbortSignal.timeout(40000),
     });
 
-  const plan: { model: string; tries: number }[] = [
-    { model: PRIMARY, tries: 1 },
-    { model: FALLBACK, tries: 2 },
-  ];
+  const plan: { model: string; tries: number }[] = flashOnly
+    ? [{ model: FALLBACK, tries: 2 }]
+    : [
+        { model: PRIMARY, tries: 1 },
+        { model: FALLBACK, tries: 2 },
+      ];
   let res: Response | null = null;
   let usedFlash = false;
   outer: for (const { model, tries } of plan) {
@@ -153,7 +158,8 @@ export async function generateJerseyImage(
     return r ? { data: r.data, mime: r.mime, usedFallback: !isPrimary } : null;
   };
   const tryGemini = async (isPrimary: boolean): Promise<GenResult | null> => {
-    const r = await geminiImage(parts, aspectRatio);
+    // As a fallback, only use the cheap Flash model - never the pricey Pro.
+    const r = await geminiImage(parts, aspectRatio, !isPrimary);
     if (r) console.log(`image: Gemini ${r.usedFlash ? FALLBACK : PRIMARY}${isPrimary ? "" : " [fallback]"}`);
     return r ? { data: r.data, mime: r.mime, usedFallback: !isPrimary || r.usedFlash } : null;
   };

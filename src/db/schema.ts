@@ -319,6 +319,10 @@ export const orders = pgTable(
     dropId: uuid("drop_id").references(() => drops.id, { onDelete: "set null" }),
     teamId: uuid("team_id").references(() => teams.id, { onDelete: "set null" }),
 
+    // Self-serve "add to my order" top-ups: Stripe session ids already merged
+    // into this order, so a webhook retry can't append the same items twice.
+    addSessionIds: jsonb("add_session_ids").$type<string[]>().default([]),
+
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

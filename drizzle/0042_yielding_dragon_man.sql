@@ -1,0 +1,1 @@
+ALTER TABLE "orders" ADD COLUMN "add_session_ids" jsonb DEFAULT '[]'::jsonb;

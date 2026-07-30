@@ -2,6 +2,7 @@
 // is the single writer; dedupe rides on the unique index over
 // stripe_checkout_session_id so webhook retries can't double-insert.
 
+import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { orders, orderItems } from "@/db/schema";
 
@@ -67,4 +68,38 @@ export async function persistPaidOrder(args: {
     );
   }
   return { inserted: true };
+}
+
+/** Merge a paid "add to my order" top-up into an existing store order: append
+ *  the new line items and roll up the totals + new shipping. Idempotent -
+ *  the Stripe session id is recorded so a webhook retry can't double-append. */
+export async function mergeStoreOrderAdd(args: {
+  orderId: string;
+  sessionId: string;
+  newShippingCents: number;
+  paidTotalCents: number;
+  lines: PaidOrderLine[];
+}): Promise<{ merged: boolean; teamId: string | null; reference: string; addedLines: PaidOrderLine[] }> {
+  const db = getDb();
+  const [o] = await db.select().from(orders).where(eq(orders.id, args.orderId)).limit(1);
+  if (!o) return { merged: false, teamId: null, reference: "", addedLines: [] };
+  const done = o.addSessionIds ?? [];
+  if (done.includes(args.sessionId)) return { merged: false, teamId: o.teamId, reference: o.reference, addedLines: [] };
+
+  if (args.lines.length) {
+    await db.insert(orderItems).values(
+      args.lines.map((l) => ({ orderId: o.id, name: l.name, quantity: l.quantity, unitPriceCents: l.unitPriceCents })),
+    );
+  }
+  const addGoods = args.lines.reduce((s, l) => s + l.unitPriceCents * l.quantity, 0);
+  await db
+    .update(orders)
+    .set({
+      subtotalCents: (o.subtotalCents ?? 0) + addGoods,
+      shippingCents: args.newShippingCents,
+      totalCents: (o.totalCents ?? 0) + args.paidTotalCents,
+      addSessionIds: [...done, args.sessionId],
+    })
+    .where(eq(orders.id, o.id));
+  return { merged: true, teamId: o.teamId, reference: o.reference, addedLines: args.lines };
 }

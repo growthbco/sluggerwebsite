@@ -50,7 +50,7 @@ const ITEM_ICONS: Record<string, string> = {
 /** Buyer-facing team store: pick items, personalize, pay via Stripe.
  *  Prices shown here are display-only - the checkout endpoint re-prices
  *  everything from the store's server-side snapshot. */
-export function TeamStoreShop({ token, items }: { token: string; items: StoreItem[] }) {
+export function TeamStoreShop({ token, items, addToRef }: { token: string; items: StoreItem[]; addToRef?: string }) {
   const [selections, setSelections] = useState<Selection[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -137,11 +137,17 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
     setBusy(true);
     setError("");
     try {
-      const res = await fetch(`/api/store/${token}/checkout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: selections, rush, shipZip: /^\d{5}$/.test(zip) ? zip : undefined }),
-      });
+      const res = addToRef
+        ? await fetch(`/api/store/${token}/add-checkout`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items: selections, addToRef }),
+          })
+        : await fetch(`/api/store/${token}/checkout`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items: selections, rush, shipZip: /^\d{5}$/.test(zip) ? zip : undefined }),
+          });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not start checkout");
       window.location.href = data.url;
@@ -178,6 +184,11 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
       <div className="space-y-4">
+        {addToRef && (
+          <div className="bg-brand/10 border border-brand/40 px-4 py-3 text-sm text-foreground">
+            <strong>Adding to your order {addToRef}.</strong> Pick the extra pieces below - they&apos;ll ship in the same box as your existing order, so you only pay for the new items (plus any shipping increase, if the added weight bumps it).
+          </div>
+        )}
         <details className="bg-steel border border-brand/30 group">
           <summary className="cursor-pointer px-4 py-3 list-none flex items-center justify-between">
             <span className="display text-sm text-foreground">⚡ Ordering for the whole team? Paste your list</span>
@@ -314,9 +325,11 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
           </div>
         )}
         <p className="mt-2 text-xs text-muted">
-          {shipQuote?.live
-            ? "Live carrier rate to your ZIP - or choose free local pickup in Ocala at checkout. Plus tax."
-            : "Shipping is calculated by weight at checkout, or choose free local pickup in Ocala. Plus tax."}
+          {addToRef
+            ? "Ships with your existing order to the same address. You'll pay for the new items plus any shipping increase from the added weight. Plus tax."
+            : shipQuote?.live
+              ? "Live carrier rate to your ZIP - or choose free local pickup in Ocala at checkout. Plus tax."
+              : "Shipping is calculated by weight at checkout, or choose free local pickup in Ocala. Plus tax."}
         </p>
         <button
           type="button"
@@ -324,7 +337,7 @@ export function TeamStoreShop({ token, items }: { token: string; items: StoreIte
           disabled={busy || selections.length === 0}
           className="mt-4 w-full clip-slant bg-brand text-on-brand display text-lg px-6 py-3 hover:bg-brand-dark disabled:opacity-50"
         >
-          {busy ? "Starting checkout..." : "Checkout"}
+          {busy ? "Starting checkout..." : addToRef ? "Add to my order & pay" : "Checkout"}
         </button>
         {error && <p className="mt-2 text-sm text-brand">{error}</p>}
         <p className="mt-3 text-xs text-muted">

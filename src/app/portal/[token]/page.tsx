@@ -82,7 +82,8 @@ export default async function PortalTokenPage({ params }: { params: Promise<{ to
         <section className="space-y-3">
           <h2 className="display text-xl text-foreground">Store & Shop Orders</h2>
           {data.shop.map((s) => (
-            <Row key={s.reference} title={`${titleCase(s.type)} order ${s.reference}`} sub={money(s.totalCents)} status={s.status} track={s.trackingNumber} />
+            <Row key={s.reference} title={`${titleCase(s.type)} order ${s.reference}`} sub={money(s.totalCents)} status={s.status} track={s.trackingNumber}
+              href={s.addUrl ?? undefined} cta={s.addUrl ? "Add items" : undefined} />
           ))}
         </section>
       )}

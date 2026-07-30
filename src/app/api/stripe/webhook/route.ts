@@ -275,6 +275,53 @@ export async function POST(req: Request) {
       const stripe = getStripe();
       const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 100 });
 
+      // Self-serve "add to my order" top-up: merge the new items into the
+      // existing store order instead of creating a brand-new order.
+      if (session.metadata?.orderType === "store_order_add" && dbEnabled()) {
+        try {
+          const { mergeStoreOrderAdd } = await import("@/lib/orders");
+          const garment = lineItems.data.filter((li) => !/tax|shipping/i.test(li.description ?? ""));
+          const mergeLines = garment.map((li) => ({
+            name: li.description ?? "Item",
+            quantity: li.quantity ?? 1,
+            unitPriceCents: li.price?.unit_amount ?? Math.round((li.amount_total ?? 0) / (li.quantity ?? 1)),
+          }));
+          const res = await mergeStoreOrderAdd({
+            orderId: session.metadata.addToOrderId,
+            sessionId: session.id,
+            newShippingCents: Number(session.metadata.newShippingCents) || 0,
+            paidTotalCents: session.amount_total ?? 0,
+            lines: mergeLines,
+          });
+          if (res.merged && res.teamId) {
+            // Note the add in the store thread and re-open print-file QA for any
+            // affected design groups (the file now needs the new piece).
+            const [team] = await getDb().select({ name: teams.name, thread: teams.storeThreadId, qa: teams.storePrintFileQa }).from(teams).where(eq(teams.id, res.teamId)).limit(1);
+            const { parseStoreLine } = await import("@/lib/store-print-file");
+            if (team?.thread) {
+              await postDesignThreadUpdate({
+                threadId: team.thread,
+                title: `➕ Items added to ${res.reference} - ${team.name ?? "store"}`,
+                description: res.addedLines.map((l) => `${l.quantity}× ${l.name}`).join("\n").slice(0, 1800),
+                username: "Slugger Design Requests",
+              });
+            }
+            if (team?.qa) {
+              const next = { ...team.qa };
+              let changed = false;
+              for (const l of res.addedLines) {
+                const parsed = parseStoreLine(l.name);
+                if (parsed && next[parsed.groupKey]) { delete next[parsed.groupKey]; changed = true; }
+              }
+              if (changed) await getDb().update(teams).set({ storePrintFileQa: next }).where(eq(teams.id, res.teamId));
+            }
+          }
+        } catch (e) {
+          console.error("store_order_add merge failed:", e);
+        }
+        return NextResponse.json({ received: true });
+      }
+
       const addr = session.customer_details?.address;
       const shipping = addr
         ? [addr.line1, addr.line2, `${addr.city ?? ""}, ${addr.state ?? ""} ${addr.postal_code ?? ""}`, addr.country]
