@@ -1,0 +1,1 @@
+ALTER TABLE "customers" ADD COLUMN "referral_rewarded_at" timestamp with time zone;

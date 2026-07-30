@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
 import { getProduct, primaryImage } from "@/lib/catalog";
 import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
+import { refCodeFromCookie } from "@/lib/referral-cookie";
 
 export const runtime = "nodejs";
 
@@ -101,6 +102,8 @@ export async function POST(req: Request) {
     });
   }
 
+  const referralCode = await refCodeFromCookie();
+
   try {
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
@@ -110,7 +113,7 @@ export async function POST(req: Request) {
       cancel_url: `${SITE}/cart`,
       shipping_address_collection: { allowed_countries: ["US", "CA"] },
       phone_number_collection: { enabled: true },
-      metadata: { orderType: "shop" },
+      metadata: { orderType: "shop", ...(referralCode ? { referralCode } : {}) },
     });
     return NextResponse.json({ url: session.url });
   } catch (e) {

@@ -11,6 +11,7 @@ import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
 import { postDesignRequestToDiscord } from "@/lib/discord";
 import { emailDesignRequestToDesigner, emailDesignRequestConfirmation } from "@/lib/email";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
+import { refCodeFromCookie } from "@/lib/referral-cookie";
 
 export const runtime = "nodejs";
 
@@ -100,6 +101,17 @@ export async function POST(req: Request) {
       feeWaivedReason,
       feeWaivedRef,
     });
+
+    // If this coach arrived via a referral link, record the attribution now
+    // (independent of any fee payment). The reward settles when their team
+    // order is actually paid.
+    try {
+      const refCode = await refCodeFromCookie();
+      if (refCode) {
+        const { attributeReferral } = await import("@/lib/customers");
+        await attributeReferral(body.contactEmail, refCode);
+      }
+    } catch (e) { console.error("referral attribution (design request) failed:", e); }
 
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const statusUrl = `${SITE}/design/status/${statusToken}`;

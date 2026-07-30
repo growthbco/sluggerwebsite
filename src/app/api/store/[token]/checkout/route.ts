@@ -3,6 +3,7 @@ import { getStripe, stripeEnabled } from "@/lib/stripe";
 import { dbEnabled } from "@/db";
 import { getStoreByHandle, shippingCentsFor } from "@/lib/team-stores";
 import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
+import { refCodeFromCookie } from "@/lib/referral-cookie";
 
 export const runtime = "nodejs";
 
@@ -161,6 +162,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     }
   }
 
+  const referralCode = await refCodeFromCookie();
+
   try {
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
@@ -178,7 +181,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
           fixed_amount: { amount: o.amountCents, currency: "usd" },
         },
       })),
-      metadata: { orderType: "team_store", teamId: store.id, teamName: store.name, ...(rush ? { rush: "true" } : {}) },
+      metadata: { orderType: "team_store", teamId: store.id, teamName: store.name, ...(rush ? { rush: "true" } : {}), ...(referralCode ? { referralCode } : {}) },
     });
     return NextResponse.json({ url: session.url });
   } catch (e) {

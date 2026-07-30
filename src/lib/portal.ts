@@ -5,6 +5,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypt
 import { sql, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrders, designRequests, customInvoices, orders, orderItems, teams } from "@/db/schema";
+import { getOrCreateCustomer } from "@/lib/customers";
 
 const TTL_MS = 45 * 60 * 1000; // 45 minutes
 
@@ -48,6 +49,7 @@ export type PortalData = {
   invoices: { reference: string; status: string; totalCents: number; payUrl: string | null; createdAt: Date }[];
   shop: { reference: string; type: string; status: string; totalCents: number; subtotalCents: number; shippingCents: number; items: { name: string; quantity: number; unitPriceCents: number }[]; trackingNumber: string | null; shippedAt: Date | null; addUrl: string | null; createdAt: Date }[];
   name: string | null;
+  profile: { name: string | null; phone: string | null; referralCode: string; referralCreditCents: number; hasPassword: boolean };
   empty: boolean;
 };
 
@@ -95,12 +97,23 @@ export async function getCustomerOrders(email: string): Promise<PortalData> {
     [...team].sort((a, b) => +b.createdAt - +a.createdAt).find((t) => t.contactName)?.contactName ||
     invoices.find((i) => i.customerName)?.customerName ||
     null;
+  const phoneSeed =
+    [...team].sort((a, b) => +b.createdAt - +a.createdAt).find((t) => t.contactPhone)?.contactPhone || null;
+  // Ensure a profile exists (gives them a referral code on first portal visit).
+  const customer = await getOrCreateCustomer(e, { name: named, phone: phoneSeed });
   return {
+    profile: {
+      name: customer.name,
+      phone: customer.phone,
+      referralCode: customer.referralCode,
+      referralCreditCents: customer.referralCreditCents,
+      hasPassword: Boolean(customer.passwordHash),
+    },
     teamOrders: teamOrdersV,
     designs: designsV,
     invoices: invoicesV,
     shop: shopV,
-    name: named,
+    name: customer.name || named,
     empty: teamOrdersV.length + designsV.length + invoicesV.length + shopV.length === 0,
   };
 }

@@ -672,6 +672,43 @@ export const designRequests = pgTable(
 );
 
 /* ------------------------------------------------------------------ */
+/* Customers (portal profile)                                          */
+/* ------------------------------------------------------------------ */
+// One profile per buyer, keyed by lowercased email. Orders stay the source of
+// truth for what was bought; this holds portal-level data: editable contact,
+// optional password, and referral state. Rows are created lazily the first
+// time someone opens the portal or gets attributed a referral.
+export const customers = pgTable(
+  "customers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    email: text("email").notNull(), // always stored lowercased
+    name: text("name"),
+    phone: text("phone"),
+    // Optional password: scrypt hash ("salt:hash" hex), null until the
+    // customer sets one.
+    passwordHash: text("password_hash"),
+    // Their own code to share; unique, uppercase, no ambiguous chars.
+    referralCode: text("referral_code").notNull(),
+    // The code that referred THIS customer, if any (set once at first order).
+    referredByCode: text("referred_by_code"),
+    // Store credit earned from referrals, in cents. Applied by staff on the
+    // referrer's next invoice for now.
+    referralCreditCents: integer("referral_credit_cents").notNull().default(0),
+    // Set once this customer's referral reward has been granted, so a second
+    // paid order never double-pays. Null until their first paid order settles.
+    referralRewardedAt: timestamp("referral_rewarded_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("customers_email_idx").on(t.email),
+    uniqueIndex("customers_referral_code_idx").on(t.referralCode),
+    index("customers_referred_by_idx").on(t.referredByCode),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
 /* Relations                                                           */
 /* ------------------------------------------------------------------ */
 

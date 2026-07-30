@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { readPortalToken, getCustomerOrders } from "@/lib/portal";
 import { trackingUrlFor } from "@/lib/tracking";
+import { PortalAccount } from "@/components/portal-account";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,6 +77,8 @@ export default async function PortalTokenPage({ params }: { params: Promise<{ to
   }
 
   const data = await getCustomerOrders(email);
+  const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+  const referralUrl = `${SITE}/r/${data.profile.referralCode}`;
 
   return (
     <div className="mx-auto max-w-2xl px-4 sm:px-6 py-14 space-y-8">
@@ -144,6 +147,10 @@ export default async function PortalTokenPage({ params }: { params: Promise<{ to
           ))}
         </section>
       )}
+
+      <div className="pt-4 border-t border-line">
+        <PortalAccount token={token} profile={data.profile} referralUrl={referralUrl} />
+      </div>
 
       <p className="text-xs text-muted pt-4 border-t border-line">
         Questions? Text (352) 660-1232 or email <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a>.

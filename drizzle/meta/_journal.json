@@ -302,6 +302,20 @@
       "when": 1785434153316,
       "tag": "0042_yielding_dragon_man",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1785435838384,
+      "tag": "0043_great_valkyrie",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1785436235760,
+      "tag": "0044_striped_shadowcat",
+      "breakpoints": true
     }
   ]
 }

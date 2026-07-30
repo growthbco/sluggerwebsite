@@ -242,8 +242,15 @@ export async function POST(req: Request) {
             reference: teamOrders.reference,
             teamName: teamOrders.teamName,
             designRequestId: teamOrders.designRequestId,
+            contactEmail: teamOrders.contactEmail,
           });
         if (row) {
+          // Settle any referral: this coach may have been attributed when they
+          // first landed via a referral link. Reward fires once, on real order.
+          try {
+            const { settleReferral } = await import("@/lib/customers");
+            await settleReferral(row.contactEmail);
+          } catch (e) { console.error("referral settle (team invoice) failed:", e); }
           const { getById } = await import("@/lib/design-requests");
           const design = row.designRequestId ? await getById(row.designRequestId) : null;
           await postTeamOrderPaidToDiscord({
@@ -468,6 +475,14 @@ export async function POST(req: Request) {
             totalCents: session.amount_total ?? 0,
             shipping,
           });
+          // Settle referral: attribute this buyer to the /r/<code> cookie code
+          // (if any) and grant the one-time reward on this real gear order.
+          if (dbEnabled()) {
+            try {
+              const { settleReferral } = await import("@/lib/customers");
+              await settleReferral(buyerEmail, session.metadata?.referralCode);
+            } catch (e) { console.error("referral settle (shop/store) failed:", e); }
+          }
         }
       }
     } catch (e) {
