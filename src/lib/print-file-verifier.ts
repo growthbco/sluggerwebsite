@@ -22,7 +22,7 @@ export type RosterEntry = {
   size: string; // jersey size
 };
 
-export type Extracted = { name: string; number: string; size: string };
+export type Extracted = { name: string; number: string; size: string; frontNumber?: string };
 
 export type Mismatch = {
   kind: "missing" | "extra" | "wrong_size" | "wrong_number" | "name_typo";
@@ -161,16 +161,18 @@ async function extractJerseysFromImage(imageUrl: string): Promise<Extracted[]> {
     "CRITICAL - read each jersey carefully:",
     "- A team LOGO, MONOGRAM, or WORDMARK (small initials/emblem such as 'GA', 'SA', a mascot, or a team name at the top collar or on the chest) is NOT part of the player's name. NEVER prepend or append it. If a jersey shows a monogram above the name, ignore the monogram and return only the actual player name.",
     "- The NUMBER belongs to the SAME jersey as the name directly above it. Do not borrow a number from an adjacent jersey. Two different jerseys may share the same number - that is fine, read each independently.",
-    "- Ignore the FRONT of jerseys (they show only the team name/logo, no player name+number). Only return backs that have BOTH a player name AND a number.",
+    "- Each player usually has TWO panels shown together: the FRONT and the BACK of the same jersey. Read the BACK for the player name + large number, and pair it with its matching FRONT panel.",
+    "- SOME jerseys ALSO have a small player NUMBER on the FRONT (upper chest, usually beside the team logo). When the front panel of a jersey shows a chest number, read it independently and return it as frontNumber. It SHOULD equal that jersey's back number - we compare them, so read each on its own, don't just copy the back number. If the front has no number (only the team name/logo), return frontNumber as an empty string.",
     "- Read digits exactly as printed, including stylized fonts. If a digit is genuinely ambiguous, still give your single best reading.",
     "",
-    "For every player jersey back, return one object with:",
-    "  name   - the player name only, uppercase, WITHOUT any logo/monogram text",
-    "  number - the printed jersey number (digits only)",
-    "  size   - the size label of the group it belongs to. Use only: 2T, 3T, 4T, 5T, 6T, YS, YM, YL, S, M, L, XL, 2XL, 3XL.",
+    "For every player jersey, return one object with:",
+    "  name        - the player name only, uppercase, WITHOUT any logo/monogram text",
+    "  number      - the printed jersey BACK number (digits only)",
+    "  frontNumber - the small chest number on the FRONT of the same jersey (digits only), or \"\" if the front has no number",
+    "  size        - the size label of the group it belongs to. Use only: 2T, 3T, 4T, 5T, 6T, YS, YM, YL, S, M, L, XL, 2XL, 3XL.",
     "          (so 'SMALL' → 'S', 'MEDIUM' → 'M', 'LARGE' → 'L', 'XLARGE' → 'XL', '2XLARGE' → '2XL').",
     "",
-    "Return ONLY valid JSON with shape: { \"jerseys\": [ { \"name\": \"...\", \"number\": \"...\", \"size\": \"...\" }, ... ] }.",
+    "Return ONLY valid JSON with shape: { \"jerseys\": [ { \"name\": \"...\", \"number\": \"...\", \"frontNumber\": \"...\", \"size\": \"...\" }, ... ] }.",
     "No commentary, no markdown fences.",
   ].join("\n");
 
@@ -197,6 +199,7 @@ async function extractJerseysFromImage(imageUrl: string): Promise<Extracted[]> {
               properties: {
                 name: { type: "STRING" },
                 number: { type: "STRING" },
+                frontNumber: { type: "STRING" },
                 size: { type: "STRING" },
               },
               required: ["name", "number", "size"],
@@ -237,6 +240,20 @@ export function diffPrintFileVsRoster(
   roster: RosterEntry[],
 ): { ok: boolean; summary: string; mismatches: Mismatch[] } {
   const mismatches: Mismatch[] = [];
+
+  // Front/back number check: when a jersey has a chest number on the front, it
+  // must match the big number on the back. Flag any that disagree.
+  for (const e of extracted) {
+    const front = normNumber(e.frontNumber ?? "");
+    const back = normNumber(e.number);
+    if (front && back && front !== back) {
+      mismatches.push({
+        kind: "wrong_number",
+        printed: { name: e.name, number: `front ${e.frontNumber} / back ${e.number}`, size: e.size },
+        detail: `${e.name || "Jersey"}: FRONT chest number (${e.frontNumber}) does not match the BACK number (${e.number}).`,
+      });
+    }
+  }
 
   // Track which extracted items got matched so we can flag extras.
   const printedRemaining = extracted.map((e) => ({
