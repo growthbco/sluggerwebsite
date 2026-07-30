@@ -7,7 +7,7 @@ import { designRequests, teamOrders, teams, orders, teamOrderAddons, assistantFa
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
 import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote, estimateOrderWeightOz } from "@/lib/team-order-pricing";
-import { itemLabel, isInHouseItem } from "@/lib/order-items";
+import { sizeBreakdown, ITEM_TYPES } from "@/lib/order-items";
 import { shippingCentsFor } from "@/lib/team-stores";
 import { getLiveTracking, type LiveTracking } from "@/lib/shippo";
 import { AdminLogout } from "@/components/admin-logout";
@@ -233,17 +233,14 @@ export default async function AdminPage() {
         if (weightOz > 0) shipEstimates.set(o.id, shippingCentsFor(weightOz));
       }
       if (!o.shippedAt) {
-        const counts = new Map<string, number>();
-        for (const r of roster) {
-          const qty = Math.max(1, r.quantity ?? 1);
-          for (const [k, v] of Object.entries(r.sizes ?? {})) {
-            if (isInHouseItem(k) && (v ?? "").trim()) counts.set(k, (counts.get(k) ?? 0) + qty);
-          }
-        }
-        if (counts.size) {
+        // In-house items (hats) broken down BY SIZE so staff can order blanks:
+        // e.g. "Fitted Hat: 5 S/M, 2 L/XL, 3 XXL".
+        const inHouseKeys = ITEM_TYPES.filter((t) => t.inHouse).map((t) => t.key);
+        const bd = sizeBreakdown(roster, inHouseKeys);
+        if (bd.length) {
           inHouseWork.set(
             o.id,
-            Array.from(counts.entries()).map(([k, n]) => `${n}× ${itemLabel(k)}`).join(", "),
+            bd.map((b) => `${b.label}: ${b.parts.map((p) => `${p.n} ${p.size}`).join(", ")} (${b.total})`).join(" · "),
           );
         }
       }

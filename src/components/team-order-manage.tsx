@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { itemLabel, sizesFor, JERSEY_MATERIALS } from "@/lib/order-items";
+import { itemLabel, sizesFor, sizeBreakdown, JERSEY_MATERIALS } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 
 type RosterRow = {
@@ -174,6 +174,26 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerse
             {manualError && <p className="mt-2 text-sm text-brand">{manualError}</p>}
           </div>
         )}
+
+        {roster.length > 0 && (() => {
+          const breakdown = sizeBreakdown(roster, items);
+          return breakdown.length > 0 ? (
+            <div className="mt-4 border border-line bg-steel p-4">
+              <p className="display text-sm text-foreground">Size breakdown ({roster.length} players)</p>
+              <div className="mt-2 space-y-1.5">
+                {breakdown.map((b) => (
+                  <div key={b.key} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                    <span className="text-muted min-w-[7rem]">{b.label}:</span>
+                    <span className="text-foreground">
+                      {b.parts.map((p) => `${p.n} ${p.size}`).join(" · ")}
+                    </span>
+                    <span className="text-muted">({b.total})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null;
+        })()}
 
         {roster.length === 0 ? (
           <p className="mt-3 text-muted text-sm">No players yet - share the link above, import, or add them here.</p>

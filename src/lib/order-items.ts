@@ -80,3 +80,25 @@ export function itemLabel(key: string): string {
 export function sizesFor(key: string): string[] {
   return ITEM_TYPES.find((t) => t.key === key)?.sizes ?? APPAREL_SIZES;
 }
+
+/** Tally an ordered roster into a per-item size breakdown (e.g. Fitted Hat:
+ *  5 S/M, 2 L/XL, 3 XXL). Sizes come out in the item's canonical size order,
+ *  with any stray sizes appended. Only items that have at least one size go in. */
+export function sizeBreakdown(
+  roster: { size?: string | null; sizes?: Record<string, string> | null }[],
+  items: string[],
+): { key: string; label: string; parts: { size: string; n: number }[]; total: number }[] {
+  return items
+    .map((k) => {
+      const counts: Record<string, number> = {};
+      for (const r of roster) {
+        const v = r.sizes?.[k] ?? (k === "jersey" ? r.size ?? undefined : undefined);
+        if (v) counts[v] = (counts[v] ?? 0) + 1;
+      }
+      const canonical = sizesFor(k);
+      const parts = canonical.filter((s) => counts[s]).map((s) => ({ size: s, n: counts[s] }));
+      for (const s of Object.keys(counts)) if (!canonical.includes(s)) parts.push({ size: s, n: counts[s] });
+      return { key: k, label: itemLabel(k), parts, total: parts.reduce((a, b) => a + b.n, 0) };
+    })
+    .filter((x) => x.total > 0);
+}
