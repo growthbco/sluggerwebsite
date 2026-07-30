@@ -3,6 +3,7 @@ import Image from "next/image";
 import { dbEnabled } from "@/db";
 import { getByManageToken, getRoster, getLinkedDesignPreview } from "@/lib/team-orders";
 import { itemPriceCents } from "@/lib/team-order-pricing";
+import { EXTRA_ADDON_KEYS } from "@/lib/order-items";
 import { TeamOrderManage } from "@/components/team-order-manage";
 import { TeamOrderAddon } from "@/components/team-order-addon";
 
@@ -26,6 +27,10 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
   ]);
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   const shareUrl = `${SITE}/team-order/join/${order.selfEntryToken}`;
+  // Add-on menu: the order's own items plus the always-available add-on apparel
+  // (hoodies etc.), so a jerseys-only order can still add a hoodie in the same
+  // design. Deduped, order preserved.
+  const addonItems = [...new Set([...(order.items ?? ["jersey"]), ...EXTRA_ADDON_KEYS])];
 
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14 space-y-8">
@@ -90,9 +95,9 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
       {!["draft", "collecting", "cancelled"].includes(order.status) && (
         <TeamOrderAddon
           token={token}
-          items={order.items ?? ["jersey"]}
+          items={addonItems}
           prices={Object.fromEntries(
-            (order.items ?? ["jersey"]).map((k) => [k, itemPriceCents(k, order.jerseyStyle, order.localPricing)]),
+            addonItems.map((k) => [k, itemPriceCents(k, order.jerseyStyle, order.localPricing)]),
           )}
           shipped={order.status === "shipped"}
         />

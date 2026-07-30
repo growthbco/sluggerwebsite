@@ -30,6 +30,12 @@ export const ITEM_TYPES: ItemType[] = [
   { key: "snapback_hat", label: "Snapback Hat", sizes: SNAPBACK_HAT_SIZES, inHouse: true },
 ];
 
+// Apparel a team can add as an add-on in their existing design, even when the
+// original order didn't include that piece (a coach ordering jerseys can still
+// add hoodies later, same design). Kept to same-design-friendly upper-body
+// pieces. Priced via itemPriceCents; must exist in ITEM_TYPES + the price map.
+export const EXTRA_ADDON_KEYS = ["hoodie"];
+
 export function isInHouseItem(key: string): boolean {
   return Boolean(ITEM_TYPES.find((t) => t.key === key)?.inHouse);
 }

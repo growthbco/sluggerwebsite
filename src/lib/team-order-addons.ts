@@ -7,7 +7,7 @@ import { getDb } from "@/db";
 import { teamOrderAddons, teamOrders } from "@/db/schema";
 import { addRosterRow } from "@/lib/team-orders";
 import { itemPriceCents } from "@/lib/team-order-pricing";
-import { itemLabel, sizesFor, isInHouseItem } from "@/lib/order-items";
+import { itemLabel, sizesFor, isInHouseItem, EXTRA_ADDON_KEYS } from "@/lib/order-items";
 
 // Approx shipping weight per piece in ounces - used when an add-on comes in
 // AFTER the main order shipped (it can't ride with the batch anymore).
@@ -50,7 +50,9 @@ export function priceAddonRows(
   order: { jerseyStyle?: string | null; items?: string[] | null; localPricing?: boolean | null; customJerseyCents?: number | null },
   inputs: AddonRowInput[],
 ): { rows: AddonRow[]; totalCents: number } {
-  const allowed = new Set(order.items?.length ? order.items : ["jersey"]);
+  // The order's own items, plus the always-available add-on apparel (hoodies
+  // etc.) any team can add in their design.
+  const allowed = new Set([...(order.items?.length ? order.items : ["jersey"]), ...EXTRA_ADDON_KEYS]);
   const rows: AddonRow[] = [];
   for (const r of inputs.slice(0, 50)) {
     if (!allowed.has(r.key)) continue;
