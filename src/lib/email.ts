@@ -7,6 +7,14 @@ export const emailEnabled = () => Boolean(process.env.BREVO_API_KEY);
 // Where customer-facing form submissions are delivered.
 export const CONTACT_INBOX = process.env.CONTACT_TO_EMAIL || "apparel@sluggerathletics.com";
 
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+
+// Reusable footer snippet pointing customers to the self-serve order portal.
+const portalLinkHtml = `<p style="margin:16px 0 0;font-size:13px;color:#555;">See all your orders, designs, and invoices anytime at <a href="${SITE}/portal" style="color:#b8a36c;font-weight:bold;">your order portal &rarr;</a></p>`;
+
+// Warm first-touch welcome line for a customer's first confirmation email.
+const welcomeHtml = `<p style="margin:16px 0 0;font-size:13px;color:#555;">Welcome to Slugger Athletics - Ocala's custom team shop. Questions anytime? Text us at (352) 660-1232.</p>`;
+
 type SendArgs = {
   to: string;
   subject: string;
@@ -130,6 +138,8 @@ export async function emailDesignRequestConfirmation(args: {
       bodyHtml: `
         <p style="margin:0 0 12px;">Our in-house designer is starting work on your <strong>free mockup</strong>. We'll send you another email the moment it's ready to review.</p>
         <p style="margin:0;">Bookmark your tracking link below so you can check in anytime - it's also where you'll approve the design when it's ready.</p>
+        ${welcomeHtml}
+        ${portalLinkHtml}
       `,
       ctaText: "Track your design",
       ctaUrl: args.statusUrl,
@@ -393,6 +403,7 @@ export async function emailOrderShipped(args: {
         <p style="margin:0 0 6px;"><strong>Happy with your gear?</strong> A quick Google review helps our small shop more than you'd think.</p>
         <p style="margin:0 0 12px;font-size:13px;color:#555;">One sentence about what we made for you (jerseys, embroidered hats, the whole kit) helps other teams find us.</p>
         <p style="margin:0;"><a href="${GOOGLE_REVIEW_URL}" style="color:#b8a36c;font-weight:bold;">Leave a Google review →</a></p>
+        ${portalLinkHtml}
       `,
       ctaText: "Track your package",
       ctaUrl: args.trackingUrl,
@@ -527,6 +538,8 @@ export async function emailOrderConfirmation(args: {
         </table>
         ${args.shipping ? `<p style="margin:0 0 12px;"><strong>Ships to:</strong><br>${esc(args.shipping).replace(/\n/g, "<br>")}</p>` : ""}
         <p style="margin:0;">Custom gear is made to order - standard turnaround is <strong>2-3 weeks</strong>. We'll email you again when your order ships. Questions in the meantime? Just reply to this email.</p>
+        ${welcomeHtml}
+        ${portalLinkHtml}
       `,
       footerNote: "Slugger Athletics · Custom team gear, made to order",
     }),
