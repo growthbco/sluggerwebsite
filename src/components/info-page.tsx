@@ -100,11 +100,13 @@ export function InfoPage(props: InfoPageProps) {
             {examples.map((ex, i) => {
               const cover = props.exampleFit === "cover";
               const inner = (
-                <div className="relative aspect-square">
-                  <Image src={ex.src} alt={ex.alt} fill sizes="25vw" className={`${cover ? "object-cover" : "object-contain p-2"} transition-transform group-hover:scale-105`} unoptimized />
+                <div className={`relative ${cover ? "aspect-[3/4]" : "aspect-square"}`}>
+                  <Image src={ex.src} alt={ex.alt} fill sizes="25vw" className={`${cover ? "object-contain" : "object-contain p-2"} transition-transform group-hover:scale-105`} unoptimized />
                 </div>
               );
-              const cls = cover ? "border border-line group overflow-hidden" : "bg-white p-3 border border-line group";
+              // "cover" tiles hold full-photo examples (no white cutout box); a
+              // dark tile lets the whole chain show without cropping.
+              const cls = cover ? "bg-ink border border-line group overflow-hidden" : "bg-white p-3 border border-line group";
               return ex.href ? (
                 <Link key={i} href={ex.href} className={cls}>{inner}</Link>
               ) : (
