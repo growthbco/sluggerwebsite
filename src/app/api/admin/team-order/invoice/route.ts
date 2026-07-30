@@ -8,6 +8,7 @@ import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 import { emailTeamOrderInvoice } from "@/lib/email";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
 import { isAdmin } from "@/lib/admin-auth";
+import { getCustomer } from "@/lib/customers";
 
 export const runtime = "nodejs";
 
@@ -121,6 +122,15 @@ export async function POST(req: Request) {
     }
   }
 
+  // Referral store credit the coach has banked. Applied to the pay-in-full and
+  // final-balance links (never the partial 50% deposit), reducing the goods and
+  // the tax on them. Capped so at least $1 is still charged, and decremented
+  // from the balance in the webhook when the link is actually paid.
+  const bankedCredit = (await getCustomer(order.contactEmail))?.referralCreditCents ?? 0;
+  const creditFor = (goods: number) => (bankedCredit > 0 ? Math.max(0, Math.min(bankedCredit, goods - 100)) : 0);
+  const creditForFull = stage === "deposit" ? creditFor(totalCents) : 0;
+  const creditForBalance = stage === "balance" ? creditFor(dueCents) : 0;
+
   try {
     const stripe = getStripe();
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
@@ -129,17 +139,20 @@ export async function POST(req: Request) {
     const needsAddress = !order.shippingAddress?.line1;
     const exempt = order.taxExempt;
     // Each link charges the goods + 7% FL sales tax (skipped when tax-exempt).
-    const makeLink = async (name: string, goodsCents: number, linkStage: string, extraMeta: Record<string, string> = {}, shippingCents = 0) => {
+    // creditCents is subtracted from the goods (and the tax base) before the
+    // Stripe prices are built, so the customer pays the discounted amount.
+    const makeLink = async (name: string, goodsCents: number, linkStage: string, extraMeta: Record<string, string> = {}, shippingCents = 0, creditCents = 0) => {
+      const netGoods = Math.max(0, goodsCents - creditCents);
       const goodsPrice = await stripe.prices.create({
         currency: "usd",
-        unit_amount: goodsCents,
-        product_data: { name },
+        unit_amount: netGoods,
+        product_data: { name: creditCents > 0 ? `${name} (incl. $${(creditCents / 100).toFixed(2)} referral credit)` : name },
       });
       const items = [{ price: goodsPrice.id, quantity: 1 }];
-      if (!exempt && taxCents(goodsCents) > 0) {
+      if (!exempt && taxCents(netGoods) > 0) {
         const taxPrice = await stripe.prices.create({
           currency: "usd",
-          unit_amount: taxCents(goodsCents),
+          unit_amount: taxCents(netGoods),
           product_data: { name: SALES_TAX_LABEL },
         });
         items.push({ price: taxPrice.id, quantity: 1 });
@@ -156,7 +169,7 @@ export async function POST(req: Request) {
         line_items: items,
         restrictions: { completed_sessions: { limit: 1 } },
         ...(needsAddress ? { shipping_address_collection: { allowed_countries: ["US"] } } : {}),
-        metadata: { kind: "team_order_invoice", stage: linkStage, teamOrderId: order.id, teamName: order.teamName, ...extraMeta },
+        metadata: { kind: "team_order_invoice", stage: linkStage, teamOrderId: order.id, teamName: order.teamName, ...(creditCents > 0 ? { creditAppliedCents: String(creditCents) } : {}), ...extraMeta },
         after_completion: { type: "redirect", redirect: { url: `${SITE}/checkout/success` } },
       });
     };
@@ -166,11 +179,12 @@ export async function POST(req: Request) {
     if (stage === "deposit") {
       // Deposit + a pay-in-full sibling. Whichever is paid first deactivates
       // the other (via siblingLinkId in the webhook) so nobody double-pays.
+      // Credit rides on the pay-in-full link only (the deposit is partial).
       link = await makeLink(`50% Production Deposit - ${order.teamName} (${order.reference})`, dueCents, "deposit");
-      fullLink = await makeLink(`Pay in Full - ${order.teamName} (${order.reference})`, totalCents, "full", { siblingLinkId: link.id, shipCents: String(fullShipCents) }, fullShipCents);
+      fullLink = await makeLink(`Pay in Full - ${order.teamName} (${order.reference})`, totalCents, "full", { siblingLinkId: link.id, shipCents: String(fullShipCents) }, fullShipCents, creditForFull);
       await stripe.paymentLinks.update(link.id, { metadata: { ...link.metadata, siblingLinkId: fullLink.id } });
     } else {
-      link = await makeLink(`Final Balance - ${order.teamName} (${order.reference})`, dueCents, "balance", {}, shipCents);
+      link = await makeLink(`Final Balance - ${order.teamName} (${order.reference})`, dueCents, "balance", {}, shipCents, creditForBalance);
     }
 
     await db
@@ -193,9 +207,11 @@ export async function POST(req: Request) {
       lines: quoteLines,
       totalCents,
       dueCents,
-      taxDueCents: order.taxExempt ? 0 : taxCents(dueCents),
+      taxDueCents: order.taxExempt ? 0 : taxCents(dueCents - creditForBalance),
       taxExempt: order.taxExempt,
       shipCents,
+      creditAppliedCents: creditForBalance,
+      payFullCreditCents: creditForFull,
       localPickup: order.localPickup,
       roster: roster.map((r) => ({
         name: (r.playerName ?? "").trim(),
@@ -204,10 +220,10 @@ export async function POST(req: Request) {
       })),
       payUrl: link.url,
       payFullUrl: fullLink?.url ?? undefined,
-      payFullCents: fullLink ? totalCents + (order.taxExempt ? 0 : taxCents(totalCents)) + fullShipCents : undefined,
+      payFullCents: fullLink ? (totalCents - creditForFull) + (order.taxExempt ? 0 : taxCents(totalCents - creditForFull)) + fullShipCents : undefined,
     });
 
-    return NextResponse.json({ ok: true, stage, totalCents, dueCents, shipCents, taxDueCents: order.taxExempt ? 0 : taxCents(dueCents), invoiceUrl: link.url, fullInvoiceUrl: fullLink?.url, emailed });
+    return NextResponse.json({ ok: true, stage, totalCents, dueCents, shipCents, creditAppliedCents: creditForBalance || creditForFull, taxDueCents: order.taxExempt ? 0 : taxCents((stage === "balance" ? dueCents - creditForBalance : dueCents)), invoiceUrl: link.url, fullInvoiceUrl: fullLink?.url, emailed });
   } catch (e) {
     console.error("send invoice failed:", e);
     return NextResponse.json({ error: "Could not create the invoice" }, { status: 500 });

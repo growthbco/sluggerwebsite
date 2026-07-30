@@ -158,6 +158,25 @@ export async function creditReferrer(code: string, cents: number): Promise<void>
     .where(eq(customers.referralCode, clean));
 }
 
+/**
+ * Redeem (subtract) store credit from a customer, bounded at zero so we never
+ * go negative even if the balance changed since an invoice was generated.
+ * Returns the amount actually redeemed.
+ */
+export async function redeemCredit(email: string, cents: number): Promise<number> {
+  if (cents <= 0) return 0;
+  const db = getDb();
+  const c = await getCustomer(email);
+  if (!c) return 0;
+  const take = Math.min(cents, c.referralCreditCents);
+  if (take <= 0) return 0;
+  await db
+    .update(customers)
+    .set({ referralCreditCents: sql`${customers.referralCreditCents} - ${take}`, updatedAt: new Date() })
+    .where(eq(customers.id, c.id));
+  return take;
+}
+
 /** Add store credit to a customer by email (creates the profile if needed). */
 export async function creditCustomer(email: string, cents: number): Promise<void> {
   if (cents <= 0) return;

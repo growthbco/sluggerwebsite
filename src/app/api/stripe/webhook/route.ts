@@ -247,9 +247,16 @@ export async function POST(req: Request) {
         if (row) {
           // Settle any referral: this coach may have been attributed when they
           // first landed via a referral link. Reward fires once, on real order.
+          // Also redeem any referral credit that was applied to this link (full
+          // or balance stage only - the deposit carries none). The payment link
+          // can complete once, so this decrements exactly once.
           try {
-            const { settleReferral } = await import("@/lib/customers");
+            const { settleReferral, redeemCredit } = await import("@/lib/customers");
             await settleReferral(row.contactEmail);
+            const applied = Number(session.metadata.creditAppliedCents) || 0;
+            if (applied > 0 && !isDeposit && row.contactEmail) {
+              await redeemCredit(row.contactEmail, applied);
+            }
           } catch (e) { console.error("referral settle (team invoice) failed:", e); }
           const { getById } = await import("@/lib/design-requests");
           const design = row.designRequestId ? await getById(row.designRequestId) : null;

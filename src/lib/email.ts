@@ -188,6 +188,12 @@ export type TeamOrderInvoiceContent = {
   /** The true pay-in-full charge (goods + tax + shipping). Shown on the
    *  "pay in full instead" link so it matches what Stripe actually charges. */
   payFullCents?: number;
+  /** Referral store credit applied to the amount due now (reduces the goods
+   *  and the tax computed on them). */
+  creditAppliedCents?: number;
+  /** Referral credit baked into the "pay in full instead" amount, for the note
+   *  on that link at the deposit stage. */
+  payFullCreditCents?: number;
   /** Order is local pickup in Ocala - no shipping is ever charged. */
   localPickup?: boolean;
 };
@@ -239,9 +245,14 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
                   ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;color:#8a8570;">added to your final invoice</td></tr>`
                   : ""
           }
+          ${
+            args.creditAppliedCents && args.creditAppliedCents > 0
+              ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Referral credit</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;color:#2e7d32;">-${money(args.creditAppliedCents)}</td></tr>`
+              : ""
+          }
           <tr>
             <td style="padding:10px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;"><strong>Due now</strong></td>
-            <td style="padding:10px 14px;background:#f6f4ee;text-align:right;"><strong>${money(args.dueCents + args.taxDueCents + (args.shipCents ?? 0))}</strong></td>
+            <td style="padding:10px 14px;background:#f6f4ee;text-align:right;"><strong>${money(args.dueCents + args.taxDueCents + (args.shipCents ?? 0) - (args.creditAppliedCents ?? 0))}</strong></td>
           </tr>
         </table>
         ${
@@ -278,7 +289,7 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
         }
         ${
           isDeposit && args.payFullUrl
-            ? `<p style="margin:14px 0 0;text-align:center;">Prefer one payment? <a href="${args.payFullUrl}" style="color:#b8a36c;font-weight:bold;">Pay in full (${money(args.payFullCents ?? args.totalCents)}) instead →</a></p>`
+            ? `<p style="margin:14px 0 0;text-align:center;">Prefer one payment? <a href="${args.payFullUrl}" style="color:#b8a36c;font-weight:bold;">Pay in full (${money(args.payFullCents ?? args.totalCents)}) instead →</a>${args.payFullCreditCents && args.payFullCreditCents > 0 ? ` <span style="color:#2e7d32;font-size:13px;">(includes your ${money(args.payFullCreditCents)} referral credit)</span>` : ""}</p>`
             : ""
         }
       `,
