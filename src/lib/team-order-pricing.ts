@@ -10,7 +10,9 @@ const ITEM_PRICES: Record<string, number> = {
   knickers: 4000,
   long_pants: 4000,
   shorts: 2500,
-  hoodie: 4000,
+  hoodie: 4000, // heavyweight
+  lightweight_hoodie: 3500,
+  pullover: 4000, // 1/4-zip
   socks: 1500,
   fitted_hat: 3000,
   snapback_hat: 2500,
@@ -30,6 +32,8 @@ export const ITEM_WEIGHT_OZ: Record<string, number> = {
   long_pants: 16,
   shorts: 10,
   hoodie: 24,
+  lightweight_hoodie: 16,
+  pullover: 20,
   socks: 3,
   fitted_hat: 5,
   snapback_hat: 5,

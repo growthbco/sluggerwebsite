@@ -24,7 +24,9 @@ export const ITEM_TYPES: ItemType[] = [
   { key: "knickers", label: "Knickers", sizes: APPAREL_SIZES },
   { key: "long_pants", label: "Long Pants", sizes: APPAREL_SIZES },
   { key: "shorts", label: "Shorts", sizes: APPAREL_SIZES },
-  { key: "hoodie", label: "Hoodie", sizes: APPAREL_SIZES },
+  { key: "hoodie", label: "Heavyweight Hoodie", sizes: APPAREL_SIZES },
+  { key: "lightweight_hoodie", label: "Lightweight Hoodie", sizes: APPAREL_SIZES },
+  { key: "pullover", label: "1/4-Zip Pullover", sizes: APPAREL_SIZES },
   { key: "socks", label: "Socks", sizes: SOCK_SIZES },
   { key: "fitted_hat", label: "Fitted Hat", sizes: FITTED_HAT_SIZES, inHouse: true },
   { key: "snapback_hat", label: "Snapback Hat", sizes: SNAPBACK_HAT_SIZES, inHouse: true },
@@ -34,7 +36,7 @@ export const ITEM_TYPES: ItemType[] = [
 // original order didn't include that piece (a coach ordering jerseys can still
 // add hoodies later, same design). Kept to same-design-friendly upper-body
 // pieces. Priced via itemPriceCents; must exist in ITEM_TYPES + the price map.
-export const EXTRA_ADDON_KEYS = ["hoodie"];
+export const EXTRA_ADDON_KEYS = ["hoodie", "lightweight_hoodie", "pullover"];
 
 export function isInHouseItem(key: string): boolean {
   return Boolean(ITEM_TYPES.find((t) => t.key === key)?.inHouse);
