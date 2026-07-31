@@ -62,7 +62,19 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
   // Roster history: the original order (non-add-on rows) plus every paid add-on
   // batch with its own verified status, so the full order history is visible.
   const addonBatches = linkedOrder ? await getPaidAddonBatches(linkedOrder.id) : [];
-  const originalCount = printRoster.filter((r) => r.filledBy !== "addon").length;
+  // The original order's pieces (non-add-on rows), listed like the add-on
+  // batches. Item label derived from each row's sized (non-in-house) item.
+  const originalPieces = printRoster
+    .filter((r) => r.filledBy !== "addon")
+    .map((r) => {
+      const sized = Object.entries(r.sizes ?? {}).find(([k, v]) => !isInHouseItem(k) && (v ?? "").trim());
+      return {
+        item: sized ? itemLabel(sized[0]) : "Jersey",
+        name: (r.playerName ?? "").trim(),
+        number: (r.playerNumber ?? "").trim(),
+        size: sized?.[1] ?? r.sizes?.jersey ?? r.size ?? "",
+      };
+    });
 
   // Per-person team store (only offered once the design is approved).
   const storeEligible = request.status === "approved" || request.status === "ordered";
@@ -118,12 +130,20 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
           <h2 className="display text-lg text-foreground">Roster history</h2>
           <p className="text-sm text-muted mt-1">The original order plus every paid add-on batch. Add-ons are printed as their own batch.</p>
           <div className="mt-4 space-y-3">
-            <div className="border border-line/60 rounded p-3">
-              <div className="flex items-center justify-between gap-3">
-                <span className="display text-sm text-foreground">Original order</span>
-                <span className="text-xs text-muted">{originalCount} piece{originalCount === 1 ? "" : "s"}</span>
-              </div>
-            </div>
+            <details className="border border-line/60 rounded p-3 group/orig" open>
+              <summary className="flex items-center justify-between gap-3 cursor-pointer list-none">
+                <span className="display text-sm text-foreground">Original order <span className="text-muted font-normal transition-transform inline-block group-open/orig:rotate-90">›</span></span>
+                <span className="text-xs text-muted">{originalPieces.length} piece{originalPieces.length === 1 ? "" : "s"}</span>
+              </summary>
+              <ul className="mt-2 text-sm text-muted space-y-0.5">
+                {originalPieces.map((p, j) => (
+                  <li key={j}>
+                    {p.item} · {p.size}
+                    {p.name ? ` · ${p.name.toUpperCase()}` : ""}{p.number ? ` #${p.number}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </details>
             {addonBatches.map((b, i) => (
               <div key={b.id} className="border border-line/60 rounded p-3">
                 <div className="flex items-center justify-between gap-3">
