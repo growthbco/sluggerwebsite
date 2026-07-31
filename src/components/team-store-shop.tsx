@@ -59,6 +59,8 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
   const [justAdded, setJustAdded] = useState("");
   // Product-card grid: tapping a card opens the customize modal for that item.
   const [activeKey, setActiveKey] = useState<string | null>(null);
+  // Full-screen zoom of a design image (so buyers can inspect each colorway).
+  const [zoom, setZoom] = useState<string | null>(null);
   // Delivery: a shipping ZIP (live/weight rate) OR explicit local pickup. One
   // is required so nobody checks out with no shipping.
   const [zip, setZip] = useState("");
@@ -129,7 +131,9 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
     setError("");
     setJustAdded(item.key);
     setTimeout(() => setJustAdded((k) => (k === item.key ? "" : k)), 1500);
-    setActiveKey(null);
+    // Keep the modal open and clear just the name/number, so the buyer can keep
+    // adding player after player (size + design stay as sensible defaults).
+    setDraft(item.key, { playerName: "", playerNumber: "" });
   }
 
   const [rush, setRush] = useState(false);
@@ -393,10 +397,11 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
                 </div>
               </div>
               {previewImg && (
-                <div className="bg-white">
+                <button type="button" onClick={() => setZoom(previewImg)} className="relative block w-full bg-white group" title="Tap to enlarge">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={previewImg} alt={item.label} className="w-full max-h-56 object-contain" />
-                </div>
+                  <span className="absolute bottom-1 right-2 text-[11px] bg-ink/80 text-foreground px-1.5 py-0.5 rounded">🔍 tap to enlarge</span>
+                </button>
               )}
               <div className="p-4 space-y-3">
                 {(item.designs?.length ?? 0) > 1 && (
@@ -420,6 +425,15 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
                             aria-pressed={active}
                           >
                             {active && <span className="absolute top-1 right-1 z-10 h-5 w-5 grid place-items-center rounded-full bg-brand text-on-brand text-xs">✓</span>}
+                            {/* Magnify: view this colorway large without toggling selection. */}
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => { e.stopPropagation(); setZoom(dz.image); }}
+                              onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setZoom(dz.image); } }}
+                              className="absolute top-1 left-1 z-10 h-5 w-5 grid place-items-center rounded-full bg-ink/80 text-foreground text-[11px] hover:bg-ink cursor-pointer"
+                              title={`Enlarge ${dz.label}`}
+                            >🔍</span>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={dz.image} alt={dz.label} className="h-16 w-full object-contain bg-white" />
                             <span className={`block px-1.5 py-1 text-[11px] leading-tight ${active ? "text-brand" : "text-muted"}`}>{dz.label}</span>
@@ -487,15 +501,31 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
                 {(() => {
                   const hasDesigns = (item.designs?.length ?? 0) > 0;
                   const count = hasDesigns ? selectedDesigns.length : 1;
+                  const addedOfThis = selections.filter((s) => s.key === item.key).length;
                   return (
-                    <button
-                      type="button"
-                      onClick={() => add(item)}
-                      disabled={hasDesigns && count === 0}
-                      className="w-full clip-slant bg-brand text-on-brand display text-lg px-5 py-3 hover:bg-brand-dark disabled:opacity-50"
-                    >
-                      {count > 1 ? `Add ${count} sets to order - ${money(item.priceCents * count)}` : `Add to order - ${money(item.priceCents)}`}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => add(item)}
+                        disabled={hasDesigns && count === 0}
+                        className="w-full clip-slant bg-brand text-on-brand display text-lg px-5 py-3 hover:bg-brand-dark disabled:opacity-50"
+                      >
+                        {justAdded === item.key ? "Added ✓" : count > 1 ? `Add ${count} sets - ${money(item.priceCents * count)}` : `Add to order - ${money(item.priceCents)}`}
+                      </button>
+                      {/* Keep adding player after player without reopening. */}
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-muted">
+                          {addedOfThis > 0 ? `${addedOfThis} ${item.label}${addedOfThis === 1 ? "" : "s"} added - add another above, or:` : "Add more names/numbers before you're done."}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setActiveKey(null)}
+                          className="text-sm display border border-line text-foreground px-4 py-1.5 hover:border-brand/50 whitespace-nowrap"
+                        >
+                          Done
+                        </button>
+                      </div>
+                    </>
                   );
                 })()}
               </div>
@@ -503,6 +533,15 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
           </div>
         );
       })()}
+
+      {/* Full-screen design zoom. */}
+      {zoom && (
+        <div className="fixed inset-0 z-[90] bg-black/85 grid place-items-center p-4" onClick={() => setZoom(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={zoom} alt="Design" className="max-h-[92vh] max-w-[95vw] object-contain" />
+          <button type="button" className="absolute top-4 right-4 text-white text-3xl" aria-label="Close">×</button>
+        </div>
+      )}
     </div>
   );
 }
