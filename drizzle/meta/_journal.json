@@ -337,6 +337,13 @@
       "when": 1785522205469,
       "tag": "0047_broad_red_shift",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1785524690341,
+      "tag": "0048_curly_nighthawk",
+      "breakpoints": true
     }
   ]
 }

@@ -383,6 +383,9 @@ export const teamOrders = pgTable(
 
     sport: text("sport"),
     jerseyStyle: text("jersey_style"), // crew / v-neck / full button / two button
+    // Staff note for the designer/production about this order (e.g. "light grey,
+    // not the dark one"). Shown in admin + pushed to Discord.
+    designerNote: text("designer_note"),
     // Ocala league-family pricing: standard jerseys at $25 instead of $28.
     // Set by staff for teams that play in our leagues.
     localPricing: boolean("local_pricing").notNull().default(false),

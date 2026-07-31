@@ -15,6 +15,7 @@ import { AdminInvoiceButton } from "@/components/admin-invoice-button";
 import { AdminJerseyStyle } from "@/components/admin-jersey-style";
 import { AdminStatusChips } from "@/components/admin-status-chips";
 import { AdminLinkDesign } from "@/components/admin-link-design";
+import { AdminDesignerNote } from "@/components/admin-designer-note";
 import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
 import { TrackingInfo } from "@/components/tracking-info";
@@ -113,6 +114,7 @@ export default async function AdminPage() {
         localPricing: teamOrders.localPricing,
         taxExempt: teamOrders.taxExempt,
         designRequestId: teamOrders.designRequestId,
+        designerNote: teamOrders.designerNote,
         printFileVerifiedAt: teamOrders.printFileVerifiedAt,
         quotedTotalCents: teamOrders.quotedTotalCents,
         invoiceUrl: teamOrders.invoiceUrl,
@@ -662,6 +664,7 @@ export default async function AdminPage() {
                         )}
                         {/* Secondary actions in a floating dropdown. */}
                         <AdminRowMenu>
+                            <AdminDesignerNote teamOrderId={o.id} current={o.designerNote} />
                             {!o.designRequestId && (
                               <AdminLinkDesign teamOrderId={o.id} designs={linkableDesigns} />
                             )}
