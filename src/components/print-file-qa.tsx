@@ -31,6 +31,7 @@ type Props = {
   rosterCount: number;
   roster?: RosterEntry[];
   addonCount?: number; // roster rows added as paid add-ons (enables add-ons-only mode)
+  addonRoster?: RosterEntry[]; // the new add-on pieces shown when add-ons-only is on
   initialPrintFileUrls?: string[] | null;
   initialResult?: VerifyResult | null;
 };
@@ -43,7 +44,7 @@ const KIND_LABEL: Record<Mismatch["kind"], string> = {
   name_typo: "Name typo",
 };
 
-export function PrintFileQA({ token, basePath, group, rosterCount, roster = [], addonCount = 0, initialPrintFileUrls, initialResult }: Props) {
+export function PrintFileQA({ token, basePath, group, rosterCount, roster = [], addonCount = 0, addonRoster = [], initialPrintFileUrls, initialResult }: Props) {
   const api = basePath ?? `/api/team-order/${token}`;
   const [printFileUrls, setPrintFileUrls] = useState<string[]>(initialPrintFileUrls ?? []);
   // When paid add-ons exist, the designer can verify a sheet of just the added
@@ -135,7 +136,11 @@ export function PrintFileQA({ token, basePath, group, rosterCount, roster = [], 
       {/* Side-by-side compare: what the coach submitted vs what's on the print
           file, so staff can double-check the AI (or catch anything it misses). */}
       <div className="grid sm:grid-cols-2 gap-4">
-        <RosterTable title={`Submitted roster (${roster.length})`} rows={roster} emptyText="No roster on file." />
+        <RosterTable
+          title={addonsOnly ? `New add-on pieces (${addonRoster.length})` : `Submitted roster (${roster.length})`}
+          rows={addonsOnly ? addonRoster : roster}
+          emptyText={addonsOnly ? "No new add-on pieces." : "No roster on file."}
+        />
         <RosterTable
           title={result ? `On the print file (${result.extracted.length})` : "On the print file"}
           rows={result?.extracted ?? []}

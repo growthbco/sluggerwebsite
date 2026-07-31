@@ -53,9 +53,10 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
   const personalized = printRoster.some(
     (r) => (r.playerName ?? "").trim() || (r.playerNumber ?? "").trim(),
   );
-  // New add-on pieces still to verify (paid after shipment) enable the
-  // "verify add-ons only" mode; count drives the checkbox label.
-  const addonCount = linkedOrder ? (await pendingAddonRoster(linkedOrder.id)).length : 0;
+  // New add-on pieces still to verify enable the "verify add-ons only" mode;
+  // shown in place of the full roster when the toggle is on.
+  const pendingAddons = linkedOrder ? await pendingAddonRoster(linkedOrder.id) : [];
+  const addonCount = pendingAddons.length;
 
   // Per-person team store (only offered once the design is approved).
   const storeEligible = request.status === "approved" || request.status === "ordered";
@@ -93,6 +94,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
           token={linkedOrder.manageToken!}
           rosterCount={printRoster.length}
           addonCount={addonCount}
+          addonRoster={pendingAddons}
           roster={printRoster.map((r) => ({
             name: r.playerName ?? "",
             number: r.playerNumber ?? "",
