@@ -59,8 +59,10 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
   const [justAdded, setJustAdded] = useState("");
   // Product-card grid: tapping a card opens the customize modal for that item.
   const [activeKey, setActiveKey] = useState<string | null>(null);
-  // Optional ZIP -> live carrier rate shown before checkout.
+  // Delivery: a shipping ZIP (live/weight rate) OR explicit local pickup. One
+  // is required so nobody checks out with no shipping.
   const [zip, setZip] = useState("");
+  const [pickup, setPickup] = useState(false);
   const [shipQuote, setShipQuote] = useState<{ amountCents: number; live: boolean; place?: string } | null>(null);
   const [quoting, setQuoting] = useState(false);
 
@@ -146,7 +148,7 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
         : await fetch(`/api/store/${token}/checkout`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ items: selections, rush, shipZip: /^\d{5}$/.test(zip) ? zip : undefined }),
+            body: JSON.stringify({ items: selections, rush, pickup, shipZip: /^\d{5}$/.test(zip) ? zip : undefined }),
           });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not start checkout");
@@ -301,24 +303,41 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
           <span className="text-muted">Subtotal</span>
           <span className="display text-foreground">{money(subtotal)}</span>
         </div>
-        <div className="mt-3 flex items-center gap-2">
-          <input
-            value={zip}
-            onChange={(e) => setZip(e.target.value.replace(/[^0-9]/g, "").slice(0, 5))}
-            placeholder="ZIP for shipping quote"
-            inputMode="numeric"
-            className="flex-1 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-          />
-          {selections.length > 0 && /^\d{5}$/.test(zip) && (
-            <span className="text-sm text-foreground shrink-0">
-              {quoting ? "..." : shipQuote ? `+ ${money(shipQuote.amountCents)} ship` : ""}
-            </span>
-          )}
-        </div>
-        {shipQuote?.place && !quoting && (
-          <p className="mt-1 text-xs text-muted">Shipping to {shipQuote.place}</p>
+        {/* Delivery is required (except when adding to an existing order, which
+            ships to that order's address): enter a ZIP to ship, or pick up. */}
+        {!addToRef && (
+          <div className="mt-3">
+            <p className="text-xs display text-muted mb-1">Delivery <span className="text-brand">*</span></p>
+            <div className="flex items-center gap-2">
+              <input
+                value={zip}
+                onChange={(e) => { setZip(e.target.value.replace(/[^0-9]/g, "").slice(0, 5)); if (e.target.value) setPickup(false); }}
+                placeholder="ZIP to ship to"
+                inputMode="numeric"
+                disabled={pickup}
+                className="flex-1 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none disabled:opacity-50"
+              />
+              {selections.length > 0 && !pickup && /^\d{5}$/.test(zip) && (
+                <span className="text-sm text-foreground shrink-0">
+                  {quoting ? "..." : shipQuote ? `+ ${money(shipQuote.amountCents)} ship` : ""}
+                </span>
+              )}
+            </div>
+            {shipQuote?.place && !quoting && !pickup && (
+              <p className="mt-1 text-xs text-muted">Shipping to {shipQuote.place}</p>
+            )}
+            <label className="mt-2 flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={pickup}
+                onChange={(e) => { setPickup(e.target.checked); if (e.target.checked) setZip(""); }}
+                className="accent-[color:var(--brand-gold)]"
+              />
+              <span className="text-foreground">Free local pickup in Ocala, FL <span className="text-muted">(no shipping)</span></span>
+            </label>
+          </div>
         )}
-        {shipQuote && !quoting && selections.length > 0 && (
+        {shipQuote && !quoting && !pickup && selections.length > 0 && !addToRef && (
           <div className="mt-2 flex justify-between text-sm">
             <span className="text-muted">Total before tax</span>
             <span className="display text-foreground">{money(subtotal + shipQuote.amountCents)}</span>
@@ -327,18 +346,23 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
         <p className="mt-2 text-xs text-muted">
           {addToRef
             ? "Ships with your existing order to the same address. You'll pay for the new items plus any shipping increase from the added weight. Plus tax."
-            : shipQuote?.live
-              ? "Live carrier rate to your ZIP - or choose free local pickup in Ocala at checkout. Plus tax."
-              : "Shipping is calculated by weight at checkout, or choose free local pickup in Ocala. Plus tax."}
+            : pickup
+              ? "You'll pick up free at our Ocala shop - no shipping charged. Plus tax."
+              : shipQuote?.live
+                ? "Live carrier rate to your ZIP. Plus tax."
+                : "Shipping is calculated by weight at checkout. Plus tax."}
         </p>
         <button
           type="button"
           onClick={checkout}
-          disabled={busy || selections.length === 0}
+          disabled={busy || selections.length === 0 || (!addToRef && !pickup && !/^\d{5}$/.test(zip))}
           className="mt-4 w-full clip-slant bg-brand text-on-brand display text-lg px-6 py-3 hover:bg-brand-dark disabled:opacity-50"
         >
           {busy ? "Starting checkout..." : addToRef ? "Add to my order & pay" : "Checkout"}
         </button>
+        {!addToRef && selections.length > 0 && !pickup && !/^\d{5}$/.test(zip) && (
+          <p className="mt-2 text-xs text-brand">Enter your shipping ZIP or choose local pickup to continue.</p>
+        )}
         {error && <p className="mt-2 text-sm text-brand">{error}</p>}
         <p className="mt-3 text-xs text-muted">
           Made to order in your team&apos;s design · 2-3 week turnaround after the batch closes

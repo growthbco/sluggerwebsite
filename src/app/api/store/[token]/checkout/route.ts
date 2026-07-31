@@ -16,10 +16,11 @@ type IncomingItem = {
   design?: string;
 };
 
-// Shipping choices for the Stripe page: standard ground (live rate + margin
-// when a ZIP was given, formula otherwise), an expedited option when live
-// rates are available, and free local pickup.
-async function shipOptions(totalOz: number, zip?: string): Promise<{ label: string; amountCents: number }[]> {
+// Shipping choices for the Stripe page. Local pickup is only offered when the
+// buyer explicitly chose it - otherwise we return only paid shipping options so
+// nobody reaches the pay page with $0 shipping by leaving the ZIP blank.
+async function shipOptions(totalOz: number, zip: string | undefined, pickup: boolean): Promise<{ label: string; amountCents: number }[]> {
+  if (pickup) return [{ label: "Free local pickup (Ocala, FL)", amountCents: 0 }];
   const options: { label: string; amountCents: number }[] = [];
   if (zip && /^\d{5}$/.test(zip)) {
     try {
@@ -52,7 +53,6 @@ async function shipOptions(totalOz: number, zip?: string): Promise<{ label: stri
   if (options.length === 0) {
     options.push({ label: "Shipping (by weight)", amountCents: shippingCentsFor(totalOz) });
   }
-  options.push({ label: "Free local pickup (Ocala, FL)", amountCents: 0 });
   return options;
 }
 
@@ -70,16 +70,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   let items: IncomingItem[];
   let shipZip: string | undefined;
   let rush = false;
+  let pickup = false;
   try {
     const body = await req.json();
     items = body.items;
     shipZip = typeof body.shipZip === "string" ? body.shipZip.trim() : undefined;
     rush = body.rush === true;
+    pickup = body.pickup === true;
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
   if (!Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: "Nothing selected" }, { status: 400 });
+  }
+  // Delivery is required: either a valid shipping ZIP (so shipping is charged)
+  // or an explicit local-pickup choice. Prevents reaching Stripe with no
+  // shipping when the ZIP was left blank.
+  if (!pickup && !(shipZip && /^\d{5}$/.test(shipZip))) {
+    return NextResponse.json({ error: "Enter your shipping ZIP or choose local pickup so we can calculate shipping." }, { status: 400 });
   }
 
   const catalog = new Map((store.storeItems ?? []).map((i) => [i.key, i]));
@@ -174,7 +182,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       shipping_address_collection: { allowed_countries: ["US"] },
       phone_number_collection: { enabled: true },
       // Buyer picks: standard ground, expedited (when live-rated), or pickup.
-      shipping_options: (await shipOptions(totalOz, shipZip)).map((o) => ({
+      shipping_options: (await shipOptions(totalOz, shipZip, pickup)).map((o) => ({
         shipping_rate_data: {
           display_name: o.label,
           type: "fixed_amount" as const,
