@@ -97,32 +97,35 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zip, totalOz]);
   // Per-item draft state, keyed by item key.
-  const [drafts, setDrafts] = useState<Record<string, { size: string; playerName: string; playerNumber: string; design?: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, { size: string; playerName: string; playerNumber: string; designs?: string[] }>>({});
 
   const draft = (k: string, sizes: string[]) => drafts[k] ?? { size: sizes[0], playerName: "", playerNumber: "" };
-  const setDraft = (k: string, patch: Partial<{ size: string; playerName: string; playerNumber: string; design: string }>) =>
+  const setDraft = (k: string, patch: Partial<{ size: string; playerName: string; playerNumber: string; designs: string[] }>) =>
     setDrafts((d) => ({ ...d, [k]: { ...draft(k, items.find((i) => i.key === k)?.sizes ?? []), ...patch } }));
 
   function add(item: StoreItem) {
     const d = draft(item.key, item.sizes);
     const number = (item.nameNumber || item.numberAddOnCents) && d.playerNumber.trim() ? d.playerNumber.trim() : undefined;
-    setSelections((s) => [
-      ...s,
-      {
-        key: item.key,
-        label: item.label,
-        // Number-on-hat upcharge shown at add time; the server re-prices from
-        // the store snapshot at checkout regardless.
-        priceCents: item.priceCents + (number && item.numberAddOnCents ? item.numberAddOnCents : 0),
-        size: d.size,
-        design: item.designs?.length ? (d.design ?? item.designs[0].label) : undefined,
-        // On print items the name goes ON the gear; on everything else it's a
-        // tracking-only "whose is this" label.
-        playerName: d.playerName.trim() || undefined,
-        playerNumber: number,
-        quantity: 1,
-      },
-    ]);
+    // One entry can add several colorways at once - a set per selected design,
+    // all sharing the same size/name/number. Defaults to the first design.
+    const chosen = item.designs?.length
+      ? (d.designs && d.designs.length ? d.designs : [item.designs[0].label])
+      : [undefined];
+    const newSels = chosen.map((designLabel) => ({
+      key: item.key,
+      label: item.label,
+      // Number-on-hat upcharge shown at add time; the server re-prices from
+      // the store snapshot at checkout regardless.
+      priceCents: item.priceCents + (number && item.numberAddOnCents ? item.numberAddOnCents : 0),
+      size: d.size,
+      design: designLabel,
+      // On print items the name goes ON the gear; on everything else it's a
+      // tracking-only "whose is this" label.
+      playerName: d.playerName.trim() || undefined,
+      playerNumber: number,
+      quantity: 1,
+    }));
+    setSelections((s) => [...s, ...newSels]);
     setError("");
     setJustAdded(item.key);
     setTimeout(() => setJustAdded((k) => (k === item.key ? "" : k)), 1500);
@@ -208,7 +211,7 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 content-start">
         {items.map((item) => {
           const d = draft(item.key, item.sizes);
-          const cardImg = item.designs?.find((dz) => dz.label === d.design)?.image ?? item.designs?.[0]?.image ?? item.image;
+          const cardImg = item.designs?.find((dz) => dz.label === d.designs?.[0])?.image ?? item.designs?.[0]?.image ?? item.image;
           return (
             <button
               key={item.key}
@@ -374,7 +377,8 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
         const item = items.find((i) => i.key === activeKey);
         if (!item) return null;
         const d = draft(item.key, item.sizes);
-        const previewImg = item.designs?.find((dz) => dz.label === (d.design ?? item.designs?.[0]?.label))?.image ?? item.designs?.[0]?.image ?? item.image;
+        const selectedDesigns = d.designs ?? (item.designs?.[0] ? [item.designs[0].label] : []);
+        const previewImg = item.designs?.find((dz) => dz.label === selectedDesigns[0])?.image ?? item.designs?.[0]?.image ?? item.image;
         return (
           <div className="fixed inset-0 z-[70] bg-black/75 grid place-items-center p-3 sm:p-6" onClick={() => setActiveKey(null)}>
             <div
@@ -397,18 +401,25 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
               <div className="p-4 space-y-3">
                 {(item.designs?.length ?? 0) > 1 && (
                   <div>
-                    <p className="display text-xs text-muted tracking-wide mb-1.5">PICK YOUR DESIGN</p>
+                    <p className="display text-xs text-muted tracking-wide mb-1.5">
+                      PICK YOUR DESIGN{selectedDesigns.length > 1 ? ` (${selectedDesigns.length} selected)` : ""}
+                      <span className="text-muted/70 font-normal"> · tap more than one to get multiple sets</span>
+                    </p>
                     <div className="flex gap-2 overflow-x-auto pb-1">
                       {item.designs!.map((dz) => {
-                        const active = (d.design ?? item.designs![0].label) === dz.label;
+                        const active = selectedDesigns.includes(dz.label);
                         return (
                           <button
                             key={dz.label}
                             type="button"
-                            onClick={() => setDraft(item.key, { design: dz.label })}
-                            className={`shrink-0 w-24 text-left border-2 rounded overflow-hidden ${active ? "border-brand" : "border-line opacity-75 hover:opacity-100"}`}
+                            onClick={() => {
+                              const next = active ? selectedDesigns.filter((x) => x !== dz.label) : [...selectedDesigns, dz.label];
+                              setDraft(item.key, { designs: next });
+                            }}
+                            className={`relative shrink-0 w-24 text-left border-2 rounded overflow-hidden ${active ? "border-brand" : "border-line opacity-75 hover:opacity-100"}`}
                             aria-pressed={active}
                           >
+                            {active && <span className="absolute top-1 right-1 z-10 h-5 w-5 grid place-items-center rounded-full bg-brand text-on-brand text-xs">✓</span>}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={dz.image} alt={dz.label} className="h-16 w-full object-contain bg-white" />
                             <span className={`block px-1.5 py-1 text-[11px] leading-tight ${active ? "text-brand" : "text-muted"}`}>{dz.label}</span>
@@ -473,13 +484,20 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
                     </p>
                   </>
                 )}
-                <button
-                  type="button"
-                  onClick={() => add(item)}
-                  className="w-full clip-slant bg-brand text-on-brand display text-lg px-5 py-3 hover:bg-brand-dark"
-                >
-                  Add to order - {money(item.priceCents)}
-                </button>
+                {(() => {
+                  const hasDesigns = (item.designs?.length ?? 0) > 0;
+                  const count = hasDesigns ? selectedDesigns.length : 1;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => add(item)}
+                      disabled={hasDesigns && count === 0}
+                      className="w-full clip-slant bg-brand text-on-brand display text-lg px-5 py-3 hover:bg-brand-dark disabled:opacity-50"
+                    >
+                      {count > 1 ? `Add ${count} sets to order - ${money(item.priceCents * count)}` : `Add to order - ${money(item.priceCents)}`}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </div>
