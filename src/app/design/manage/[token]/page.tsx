@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
 import { getByManageToken, MAX_REVISIONS, formatProducts } from "@/lib/design-requests";
 import { getByDesignRequestId, getRoster } from "@/lib/team-orders";
-import { pendingAddonRoster, getPaidAddonBatches } from "@/lib/team-order-addons";
+import { latestAddonBatchRoster, getPaidAddonBatches } from "@/lib/team-order-addons";
 import { JERSEY_MATERIALS, itemLabel, isInHouseItem } from "@/lib/order-items";
 import { getStoreByDesignRequestId, STORE_ITEM_PRESETS } from "@/lib/team-stores";
 import { DesignManagePanel } from "@/components/design-manage-panel";
@@ -55,7 +55,9 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
   );
   // New add-on pieces still to verify enable the "verify add-ons only" mode;
   // shown in place of the full roster when the toggle is on.
-  const pendingAddons = linkedOrder ? await pendingAddonRoster(linkedOrder.id) : [];
+  // The current add-on roster (latest paid batch) - shown/checked in add-ons-
+  // only mode. Stays available even after the batch is verified.
+  const pendingAddons = linkedOrder ? await latestAddonBatchRoster(linkedOrder.id) : [];
   const addonCount = pendingAddons.length;
   // Roster history: the original order (non-add-on rows) plus every paid add-on
   // batch with its own verified status, so the full order history is visible.

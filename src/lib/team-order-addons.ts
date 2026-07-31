@@ -83,6 +83,34 @@ export async function getPaidAddonBatches(teamOrderId: string): Promise<
   }));
 }
 
+/**
+ * The MOST RECENT paid add-on batch's pieces (verified or not), expanded per
+ * quantity, using each piece's own size. This is the "current add-on roster"
+ * shown/checked in add-ons-only mode - so the view stays available even after
+ * the batch has been verified. Non-printed in-house items excluded.
+ */
+export async function latestAddonBatchRoster(teamOrderId: string): Promise<{ name: string; number: string; size: string }[]> {
+  const db = getDb();
+  const { desc } = await import("drizzle-orm");
+  const [latest] = await db
+    .select()
+    .from(teamOrderAddons)
+    .where(and(eq(teamOrderAddons.teamOrderId, teamOrderId), eq(teamOrderAddons.status, "paid")))
+    .orderBy(desc(teamOrderAddons.paidAt))
+    .limit(1);
+  if (!latest) return [];
+  return latest.rows
+    .filter((r) => !isInHouseItem(r.key))
+    .flatMap((r) =>
+      Array.from({ length: Math.max(1, r.quantity) }, () => ({
+        name: (r.name ?? "").trim(),
+        number: (r.number ?? "").trim(),
+        size: (r.size ?? "").trim(),
+      })),
+    )
+    .filter((r) => r.name && r.number);
+}
+
 /** Mark every currently-unverified paid add-on batch as print-verified, so a
  *  later add-on's "add-ons only" check won't re-flag these pieces. */
 export async function markAddonsPrintVerified(teamOrderId: string): Promise<void> {

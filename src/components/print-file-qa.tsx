@@ -48,8 +48,10 @@ export function PrintFileQA({ token, basePath, group, rosterCount, roster = [], 
   const api = basePath ?? `/api/team-order/${token}`;
   const [printFileUrls, setPrintFileUrls] = useState<string[]>(initialPrintFileUrls ?? []);
   // When paid add-ons exist, the designer can verify a sheet of just the added
-  // pieces without re-flagging the already-printed originals.
-  const [addonsOnly, setAddonsOnly] = useState(false);
+  // pieces without re-flagging the already-printed originals. Default ON when
+  // there ARE add-ons, so the current add-on roster shows instead of the full
+  // (already-produced) roster.
+  const [addonsOnly, setAddonsOnly] = useState(addonCount > 0);
   const [status, setStatus] = useState<"idle" | "uploading" | "verifying" | "done" | "error">(
     initialResult ? "done" : "idle",
   );

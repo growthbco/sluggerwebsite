@@ -39,8 +39,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const addonsOnly = body.scope === "addons";
   let roster: RosterEntry[];
   if (addonsOnly) {
-    const { pendingAddonRoster } = await import("@/lib/team-order-addons");
-    roster = await pendingAddonRoster(order.id);
+    const { latestAddonBatchRoster } = await import("@/lib/team-order-addons");
+    roster = await latestAddonBatchRoster(order.id);
   } else {
     const rosterRows = await getRoster(order.id);
     roster = rosterRows
