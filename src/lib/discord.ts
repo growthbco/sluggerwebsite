@@ -287,13 +287,20 @@ export async function postTeamOrderToDiscord(
 ): Promise<boolean> {
   const designUrl = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
   const useDesignThread = Boolean(opts.designThreadId && designUrl);
-  const url = useDesignThread
-    ? `${designUrl}?thread_id=${opts.designThreadId}`
-    : process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
+  // Standalone orders (no linked design) go to the dedicated team-orders
+  // channel; if that isn't configured, fall back to the design-requests or
+  // general orders channel so a submitted roster is NEVER silently dropped.
+  const standaloneUrl =
+    process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL || designUrl || process.env.DISCORD_ORDERS_WEBHOOK_URL;
+  const url = useDesignThread ? `${designUrl}?thread_id=${opts.designThreadId}` : standaloneUrl;
   if (!url) {
-    console.warn("DISCORD_TEAM_ORDERS_WEBHOOK_URL not set - skipping team-order Discord post");
+    console.warn("No Discord webhook configured (team-orders/design-requests/orders) - skipping team-order post");
     return false;
   }
+  // A forum channel needs a thread_name; a fallback to a non-forum channel must
+  // not send one. Only treat as a forum post when we're on the team-orders
+  // webhook AND it's flagged as a forum.
+  const isTeamOrdersForum = url === process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL && process.env.DISCORD_TEAM_ORDERS_FORUM === "true";
 
   // In-house items (hats) are embroidered at the shop, not by the factory -
   // the designer never needs to see them, so they're filtered out of this
@@ -337,8 +344,9 @@ export async function postTeamOrderToDiscord(
   };
 
   // Standalone orders in a Forum #team-orders channel get their own thread;
-  // linked orders are already targeting the design thread via ?thread_id.
-  if (!useDesignThread && process.env.DISCORD_TEAM_ORDERS_FORUM === "true") {
+  // linked orders are already targeting the design thread via ?thread_id, and a
+  // non-forum fallback channel must not get a thread_name.
+  if (!useDesignThread && isTeamOrdersForum) {
     body.thread_name = `${order.teamName} (${order.reference})`.slice(0, 100);
   }
 
