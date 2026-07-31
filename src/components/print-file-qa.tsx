@@ -22,7 +22,7 @@ type VerifyResult = {
   model: string;
 };
 
-type RosterEntry = { name: string; number: string; size: string };
+type RosterEntry = { name: string; number: string; size: string; item?: string };
 
 type Props = {
   token: string; // team order manage token (or store token)
@@ -318,6 +318,7 @@ export function PrintFileQA({ token, basePath, group, rosterCount, roster = [], 
 }
 
 function RosterTable({ title, rows, emptyText }: { title: string; rows: RosterEntry[]; emptyText: string }) {
+  const showItem = rows.some((r) => r.item);
   return (
     <div className="border border-line">
       <p className="display text-xs text-foreground bg-ink px-3 py-2 border-b border-line">{title}</p>
@@ -328,6 +329,7 @@ function RosterTable({ title, rows, emptyText }: { title: string; rows: RosterEn
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left text-muted sticky top-0 bg-steel">
+                {showItem && <th className="px-3 py-1.5">Item</th>}
                 <th className="px-3 py-1.5">Name</th>
                 <th className="px-3 py-1.5">#</th>
                 <th className="px-3 py-1.5">Size</th>
@@ -336,6 +338,7 @@ function RosterTable({ title, rows, emptyText }: { title: string; rows: RosterEn
             <tbody>
               {rows.map((r, i) => (
                 <tr key={i} className="border-t border-line/50">
+                  {showItem && <td className="px-3 py-1.5 text-foreground">{r.item || "-"}</td>}
                   <td className="px-3 py-1.5 text-foreground uppercase">{r.name || "-"}</td>
                   <td className="px-3 py-1.5 text-muted">{r.number || "-"}</td>
                   <td className="px-3 py-1.5 text-muted">{r.size || "-"}</td>

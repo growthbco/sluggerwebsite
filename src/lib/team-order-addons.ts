@@ -89,7 +89,7 @@ export async function getPaidAddonBatches(teamOrderId: string): Promise<
  * shown/checked in add-ons-only mode - so the view stays available even after
  * the batch has been verified. Non-printed in-house items excluded.
  */
-export async function latestAddonBatchRoster(teamOrderId: string): Promise<{ name: string; number: string; size: string }[]> {
+export async function latestAddonBatchRoster(teamOrderId: string): Promise<{ name: string; number: string; size: string; item: string }[]> {
   const db = getDb();
   const { desc } = await import("drizzle-orm");
   const [latest] = await db
@@ -106,6 +106,7 @@ export async function latestAddonBatchRoster(teamOrderId: string): Promise<{ nam
         name: (r.name ?? "").trim(),
         number: (r.number ?? "").trim(),
         size: (r.size ?? "").trim(),
+        item: itemLabel(r.key),
       })),
     )
     .filter((r) => r.name && r.number);
