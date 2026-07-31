@@ -507,6 +507,11 @@ export const teamOrderAddons = pgTable(
     status: text("status").notNull().default("pending"), // pending | paid
     stripeCheckoutSessionId: text("stripe_checkout_session_id"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
+    // Set once this batch's pieces have passed print-file QA (or a prior batch
+    // was already produced/shipped). Unverified paid batches are what the
+    // "add-ons only" print-file check verifies; verified ones are archived
+    // history and never re-flagged.
+    printVerifiedAt: timestamp("print_verified_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("team_order_addons_order_idx").on(t.teamOrderId)],

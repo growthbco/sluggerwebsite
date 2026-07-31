@@ -1,0 +1,1 @@
+ALTER TABLE "team_order_addons" ADD COLUMN "print_verified_at" timestamp with time zone;

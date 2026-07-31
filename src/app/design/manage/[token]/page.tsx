@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
 import { getByManageToken, MAX_REVISIONS, formatProducts } from "@/lib/design-requests";
 import { getByDesignRequestId, getRoster } from "@/lib/team-orders";
+import { pendingAddonRoster } from "@/lib/team-order-addons";
 import { JERSEY_MATERIALS, itemLabel, isInHouseItem } from "@/lib/order-items";
 import { getStoreByDesignRequestId, STORE_ITEM_PRESETS } from "@/lib/team-stores";
 import { DesignManagePanel } from "@/components/design-manage-panel";
@@ -52,8 +53,9 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
   const personalized = printRoster.some(
     (r) => (r.playerName ?? "").trim() || (r.playerNumber ?? "").trim(),
   );
-  // Paid add-on pieces (filledBy "addon") enable "verify add-ons only" mode.
-  const addonCount = printRoster.filter((r) => r.filledBy === "addon").length;
+  // New add-on pieces still to verify (paid after shipment) enable the
+  // "verify add-ons only" mode; count drives the checkbox label.
+  const addonCount = linkedOrder ? (await pendingAddonRoster(linkedOrder.id)).length : 0;
 
   // Per-person team store (only offered once the design is approved).
   const storeEligible = request.status === "approved" || request.status === "ordered";

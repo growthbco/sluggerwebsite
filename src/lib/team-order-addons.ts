@@ -2,7 +2,7 @@
 // team order. Rows are held pending until Stripe confirms payment, then
 // appended to the roster so production and print-file QA see them.
 
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrderAddons, teamOrders } from "@/db/schema";
 import { addRosterRow } from "@/lib/team-orders";
@@ -27,6 +27,50 @@ export const ITEM_WEIGHT_OZ: Record<string, number> = {
 
 export function addonWeightOz(rows: { key: string; quantity: number }[]): number {
   return rows.reduce((s, r) => s + (ITEM_WEIGHT_OZ[r.key] ?? 12) * r.quantity, 0);
+}
+
+/** Paid add-on batches that still need print-file verification (printVerifiedAt
+ *  null). Verified/archived batches are excluded. */
+async function unverifiedPaidAddonBatches(teamOrderId: string) {
+  const db = getDb();
+  const { isNull } = await import("drizzle-orm");
+  return db
+    .select()
+    .from(teamOrderAddons)
+    .where(and(eq(teamOrderAddons.teamOrderId, teamOrderId), eq(teamOrderAddons.status, "paid"), isNull(teamOrderAddons.printVerifiedAt)));
+}
+
+/**
+ * The NEW add-on pieces still to verify against a print file, expanded per
+ * quantity, as name/number/size entries. Uses each piece's own size
+ * (hoodie/pullover/etc.), not the jersey size. Scope: paid add-on batches not
+ * yet print-verified (earlier verified/shipped batches are archived history and
+ * never re-checked). Non-printed in-house items (hats) are excluded.
+ */
+export async function pendingAddonRoster(teamOrderId: string): Promise<{ name: string; number: string; size: string }[]> {
+  const batches = await unverifiedPaidAddonBatches(teamOrderId);
+  return batches
+    .flatMap((b) => b.rows)
+    .filter((r) => !isInHouseItem(r.key))
+    .flatMap((r) =>
+      Array.from({ length: Math.max(1, r.quantity) }, () => ({
+        name: (r.name ?? "").trim(),
+        number: (r.number ?? "").trim(),
+        size: (r.size ?? "").trim(),
+      })),
+    )
+    .filter((r) => r.name && r.number);
+}
+
+/** Mark every currently-unverified paid add-on batch as print-verified, so a
+ *  later add-on's "add-ons only" check won't re-flag these pieces. */
+export async function markAddonsPrintVerified(teamOrderId: string): Promise<void> {
+  const db = getDb();
+  const { isNull } = await import("drizzle-orm");
+  await db
+    .update(teamOrderAddons)
+    .set({ printVerifiedAt: new Date() })
+    .where(and(eq(teamOrderAddons.teamOrderId, teamOrderId), eq(teamOrderAddons.status, "paid"), isNull(teamOrderAddons.printVerifiedAt)));
 }
 
 export type AddonRowInput = {

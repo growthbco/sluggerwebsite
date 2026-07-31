@@ -316,6 +316,13 @@
       "when": 1785436235760,
       "tag": "0044_striped_shadowcat",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1785458609341,
+      "tag": "0045_zippy_raza",
+      "breakpoints": true
     }
   ]
 }

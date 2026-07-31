@@ -32,25 +32,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     return NextResponse.json({ error: "Upload a print file first." }, { status: 400 });
   }
 
-  // Roster ground truth - pulled directly from the rows the team submitted via
-  // the join link. Jersey size only (verifier compares per-jersey).
-  const rosterRows = await getRoster(order.id);
-  // "add-ons only": verify just the pieces added after production (filledBy
-  // "addon"), so a sheet for the extras doesn't re-flag the already-printed
-  // originals as missing.
+  // "add-ons only": verify just the NEW add-on pieces (paid after the order
+  // shipped), using each piece's own size - so a sheet for the extras doesn't
+  // re-flag the already-delivered originals as missing. Otherwise: the full
+  // submitted roster (jersey size), the ground truth from the join link.
   const addonsOnly = body.scope === "addons";
-  const scopedRows = addonsOnly ? rosterRows.filter((r) => r.filledBy === "addon") : rosterRows;
-  const roster: RosterEntry[] = scopedRows
-    .map((r) => ({
-      name: (r.playerName ?? "").trim(),
-      number: (r.playerNumber ?? "").trim(),
-      size: (r.sizes?.jersey ?? r.size ?? "").trim(),
-    }))
-    .filter((r) => r.name && r.number);
+  let roster: RosterEntry[];
+  if (addonsOnly) {
+    const { pendingAddonRoster } = await import("@/lib/team-order-addons");
+    roster = await pendingAddonRoster(order.id);
+  } else {
+    const rosterRows = await getRoster(order.id);
+    roster = rosterRows
+      .map((r) => ({
+        name: (r.playerName ?? "").trim(),
+        number: (r.playerNumber ?? "").trim(),
+        size: (r.sizes?.jersey ?? r.size ?? "").trim(),
+      }))
+      .filter((r) => r.name && r.number);
+  }
 
   if (roster.length === 0) {
     return NextResponse.json(
-      { error: addonsOnly ? "No add-on pieces to verify against." : "No roster entries to verify against yet." },
+      { error: addonsOnly ? "No new add-on pieces to verify." : "No roster entries to verify against yet." },
       { status: 400 },
     );
   }
@@ -58,6 +62,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   try {
     const result = await verifyPrintFiles(printFileUrls, roster);
     await savePrintFileVerification(order.id, printFileUrls, result);
+    // A clean add-ons-only pass means the new batch's pieces are on the file:
+    // archive those batches so a future add-on doesn't re-flag them.
+    if (addonsOnly && result.ok) {
+      const { markAddonsPrintVerified } = await import("@/lib/team-order-addons");
+      await markAddonsPrintVerified(order.id);
+    }
 
     // Post to the linked design Discord thread (if any) so the designer/team
     // get an auditable "Print file verified" message.
