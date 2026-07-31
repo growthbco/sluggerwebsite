@@ -47,6 +47,8 @@ type StoreOrderPayload = {
   verifyUrl?: string;
   /** Persistent per-store thread in the design forum; create-once, reuse. */
   existingThreadId?: string | null;
+  /** Optional note the buyer left at checkout. */
+  note?: string;
 };
 
 /** Post a paid team-store order as an "add-on" into the store's own thread in
@@ -68,6 +70,7 @@ export async function postStoreOrderToDiscord(order: StoreOrderPayload): Promise
     { name: "Order", value: `\`${order.reference}\` · add-on for ${order.customerName ?? "a player"}`, inline: true },
     { name: `Make (${order.items.length})`, value: (itemText || "-").slice(0, 1024), inline: false },
   ];
+  if (order.note) fields.push({ name: "📝 Buyer note", value: order.note.slice(0, 1024), inline: false });
   if (order.storeUrl) fields.push({ name: "Team store (design reference)", value: order.storeUrl, inline: false });
   if (order.verifyUrl) fields.push({ name: "🔍 Print-file QA (before printing)", value: order.verifyUrl, inline: false });
   if (order.shipping) fields.push({ name: "Ship to", value: order.shipping.slice(0, 1024), inline: false });

@@ -210,6 +210,10 @@ export const teams = pgTable(
     storeActive: boolean("store_active").notNull().default(false),
     // Tax-exempt org: store buyers pay no sales tax.
     taxExempt: boolean("tax_exempt").notNull().default(false),
+    // Team fundraising: a % markup the organizer adds on top of every store
+    // item. Buyers pay base + this %, and that portion is the team's raised
+    // funds (tracked per order in orders.fundraiseCents).
+    fundraisePercent: integer("fundraise_percent").notNull().default(0),
     storeOpensAt: timestamp("store_opens_at", { withTimezone: true }),
     storeClosesAt: timestamp("store_closes_at", { withTimezone: true }),
 
@@ -322,6 +326,12 @@ export const orders = pgTable(
     // Self-serve "add to my order" top-ups: Stripe session ids already merged
     // into this order, so a webhook retry can't append the same items twice.
     addSessionIds: jsonb("add_session_ids").$type<string[]>().default([]),
+
+    // Optional note the buyer left at checkout (team store).
+    customerNote: text("customer_note"),
+    // The team-fundraising portion of this order (sum of the % markup), for
+    // tracking how much a store has raised for its team.
+    fundraiseCents: integer("fundraise_cents").notNull().default(0),
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

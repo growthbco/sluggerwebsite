@@ -137,6 +137,7 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
   }
 
   const [rush, setRush] = useState(false);
+  const [note, setNote] = useState("");
   const pieces = selections.reduce((sum, s) => sum + s.quantity, 0);
   const rushFeeCents = rush ? pieces * 500 : 0;
   const subtotal = selections.reduce((sum, s) => sum + s.priceCents * s.quantity, 0) + rushFeeCents;
@@ -150,12 +151,12 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
         ? await fetch(`/api/store/${token}/add-checkout`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ items: selections, addToRef }),
+            body: JSON.stringify({ items: selections, addToRef, note: note.trim() || undefined }),
           })
         : await fetch(`/api/store/${token}/checkout`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ items: selections, rush, pickup, shipZip: /^\d{5}$/.test(zip) ? zip : undefined }),
+            body: JSON.stringify({ items: selections, rush, pickup, shipZip: /^\d{5}$/.test(zip) ? zip : undefined, note: note.trim() || undefined }),
           });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not start checkout");
@@ -359,6 +360,15 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
                 ? "Live carrier rate to your ZIP. Plus tax."
                 : "Shipping is calculated by weight at checkout. Plus tax."}
         </p>
+        {selections.length > 0 && (
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value.slice(0, 500))}
+            placeholder="Add a note (optional) - anything we should know about your order"
+            rows={2}
+            className="mt-3 w-full bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none resize-y"
+          />
+        )}
         <button
           type="button"
           onClick={checkout}
@@ -501,7 +511,9 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
                 {(() => {
                   const hasDesigns = (item.designs?.length ?? 0) > 0;
                   const count = hasDesigns ? selectedDesigns.length : 1;
-                  const addedOfThis = selections.filter((s) => s.key === item.key).length;
+                  const mine = selections.filter((s) => s.key === item.key);
+                  const addedOfThis = mine.length;
+                  const addedTotal = mine.reduce((sum, s) => sum + s.priceCents, 0);
                   return (
                     <>
                       <button
@@ -512,10 +524,14 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
                       >
                         {justAdded === item.key ? "Added ✓" : count > 1 ? `Add ${count} sets - ${money(item.priceCents * count)}` : `Add to order - ${money(item.priceCents)}`}
                       </button>
-                      {/* Keep adding player after player without reopening. */}
+                      {/* Running tally as you keep adding player after player. */}
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-xs text-muted">
-                          {addedOfThis > 0 ? `${addedOfThis} ${item.label}${addedOfThis === 1 ? "" : "s"} added - add another above, or:` : "Add more names/numbers before you're done."}
+                        <span className="text-sm text-foreground">
+                          {addedOfThis > 0 ? (
+                            <>Added <strong>{addedOfThis}</strong> {addedOfThis === 1 ? "set" : "sets"} · <strong className="text-brand">{money(addedTotal)}</strong></>
+                          ) : (
+                            <span className="text-muted">Add name after name, then hit Done.</span>
+                          )}
                         </span>
                         <button
                           type="button"

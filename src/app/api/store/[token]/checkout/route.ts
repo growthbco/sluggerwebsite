@@ -71,12 +71,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   let shipZip: string | undefined;
   let rush = false;
   let pickup = false;
+  let note = "";
   try {
     const body = await req.json();
     items = body.items;
     shipZip = typeof body.shipZip === "string" ? body.shipZip.trim() : undefined;
     rush = body.rush === true;
     pickup = body.pickup === true;
+    note = typeof body.note === "string" ? body.note.trim().slice(0, 480) : "";
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
@@ -189,7 +191,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
           fixed_amount: { amount: o.amountCents, currency: "usd" },
         },
       })),
-      metadata: { orderType: "team_store", teamId: store.id, teamName: store.name, ...(rush ? { rush: "true" } : {}), ...(referralCode ? { referralCode } : {}) },
+      metadata: { orderType: "team_store", teamId: store.id, teamName: store.name, ...(rush ? { rush: "true" } : {}), ...(referralCode ? { referralCode } : {}), ...(note ? { orderNote: note } : {}) },
     });
     return NextResponse.json({ url: session.url });
   } catch (e) {

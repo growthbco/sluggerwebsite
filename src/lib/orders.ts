@@ -31,6 +31,8 @@ export async function persistPaidOrder(args: {
   shippingCents: number;
   totalCents: number;
   teamId?: string;
+  customerNote?: string;
+  fundraiseCents?: number;
   lines: PaidOrderLine[];
 }): Promise<{ inserted: boolean }> {
   const db = getDb();
@@ -49,6 +51,8 @@ export async function persistPaidOrder(args: {
       stripeCheckoutSessionId: args.stripeCheckoutSessionId,
       stripePaymentIntentId: args.stripePaymentIntentId,
       teamId: args.teamId,
+      customerNote: args.customerNote,
+      fundraiseCents: args.fundraiseCents ?? 0,
       discordNotifiedAt: new Date(),
     })
     .onConflictDoNothing({ target: orders.stripeCheckoutSessionId })

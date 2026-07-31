@@ -385,6 +385,8 @@ export async function POST(req: Request) {
             shippingCents: session.total_details?.amount_shipping ?? 0,
             totalCents: session.amount_total ?? 0,
             teamId: session.metadata?.teamId || undefined,
+            customerNote: session.metadata?.orderNote || undefined,
+            fundraiseCents: Number(session.metadata?.fundraiseCents) || 0,
             lines: lineItems.data.map((li) => ({
               name: li.description ?? "Item",
               quantity: li.quantity ?? 1,
@@ -418,6 +420,7 @@ export async function POST(req: Request) {
               customerName: session.customer_details?.name ?? undefined,
               customerEmail: session.customer_details?.email ?? undefined,
               shipping,
+              note: session.metadata?.orderNote || undefined,
               items: garmentLines.map((l) => ({ quantity: l.quantity, label: l.name })),
               storeUrl: team?.slug ? `${SITE}/store/${team.slug}` : undefined,
               verifyUrl: team?.token ? `${SITE}/store/${team.token}/verify` : undefined,
