@@ -58,6 +58,11 @@ export function estimateOrderWeightOz(
   return oz > 0 ? oz + 8 : 0; // + packaging
 }
 
+// The jersey styles a team order can use, in the order shown in the form. The
+// price follows the style via jerseyPriceCents (zip $38, full $35, two $32,
+// crew/v-neck $28 / $25 local).
+export const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button", "Quarter-Zip"] as const;
+
 export function jerseyPriceCents(jerseyStyle?: string | null, localPricing?: boolean | null): number {
   const s = (jerseyStyle ?? "").toLowerCase();
   if (s.includes("zip")) return 3800;

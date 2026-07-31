@@ -12,6 +12,7 @@ import { shippingCentsFor } from "@/lib/team-stores";
 import { getLiveTracking, type LiveTracking } from "@/lib/shippo";
 import { AdminLogout } from "@/components/admin-logout";
 import { AdminInvoiceButton } from "@/components/admin-invoice-button";
+import { AdminJerseyStyle } from "@/components/admin-jersey-style";
 import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
 import { TrackingInfo } from "@/components/tracking-info";
@@ -678,6 +679,7 @@ export default async function AdminPage() {
                             )}
                             {!o.invoiceUrl && !paid && (
                               <>
+                                <AdminJerseyStyle teamOrderId={o.id} current={o.jerseyStyle} />
                                 <AdminCustomPrice teamOrderId={o.id} currentCents={o.customJerseyCents} />
                                 <AdminLocalToggle teamOrderId={o.id} local={o.localPricing} />
                                 <AdminTaxToggle teamOrderId={o.id} exempt={o.taxExempt} />
