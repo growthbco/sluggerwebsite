@@ -62,6 +62,27 @@ export async function pendingAddonRoster(teamOrderId: string): Promise<{ name: s
     .filter((r) => r.name && r.number);
 }
 
+/** Paid add-on batches for display as roster history: pieces (with item label
+ *  + size), when it was paid, and whether its print file was verified. Newest
+ *  first. */
+export async function getPaidAddonBatches(teamOrderId: string): Promise<
+  { id: string; paidAt: Date | null; verified: boolean; pieces: { label: string; name: string; number: string; size: string; quantity: number }[] }[]
+> {
+  const db = getDb();
+  const { desc } = await import("drizzle-orm");
+  const batches = await db
+    .select()
+    .from(teamOrderAddons)
+    .where(and(eq(teamOrderAddons.teamOrderId, teamOrderId), eq(teamOrderAddons.status, "paid")))
+    .orderBy(desc(teamOrderAddons.paidAt));
+  return batches.map((b) => ({
+    id: b.id,
+    paidAt: b.paidAt,
+    verified: Boolean(b.printVerifiedAt),
+    pieces: b.rows.map((r) => ({ label: itemLabel(r.key), name: (r.name ?? "").trim(), number: (r.number ?? "").trim(), size: r.size, quantity: r.quantity })),
+  }));
+}
+
 /** Mark every currently-unverified paid add-on batch as print-verified, so a
  *  later add-on's "add-ons only" check won't re-flag these pieces. */
 export async function markAddonsPrintVerified(teamOrderId: string): Promise<void> {

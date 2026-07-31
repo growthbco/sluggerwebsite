@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
 import { getByManageToken, MAX_REVISIONS, formatProducts } from "@/lib/design-requests";
 import { getByDesignRequestId, getRoster } from "@/lib/team-orders";
-import { pendingAddonRoster } from "@/lib/team-order-addons";
+import { pendingAddonRoster, getPaidAddonBatches } from "@/lib/team-order-addons";
 import { JERSEY_MATERIALS, itemLabel, isInHouseItem } from "@/lib/order-items";
 import { getStoreByDesignRequestId, STORE_ITEM_PRESETS } from "@/lib/team-stores";
 import { DesignManagePanel } from "@/components/design-manage-panel";
@@ -57,6 +57,10 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
   // shown in place of the full roster when the toggle is on.
   const pendingAddons = linkedOrder ? await pendingAddonRoster(linkedOrder.id) : [];
   const addonCount = pendingAddons.length;
+  // Roster history: the original order (non-add-on rows) plus every paid add-on
+  // batch with its own verified status, so the full order history is visible.
+  const addonBatches = linkedOrder ? await getPaidAddonBatches(linkedOrder.id) : [];
+  const originalCount = printRoster.filter((r) => r.filledBy !== "addon").length;
 
   // Per-person team store (only offered once the design is approved).
   const storeEligible = request.status === "approved" || request.status === "ordered";
@@ -105,6 +109,42 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
           }
           initialResult={linkedOrder.printFileVerification ?? null}
         />
+      )}
+
+      {linkedOrder && addonBatches.length > 0 && (
+        <section className="bg-steel border border-line p-5">
+          <h2 className="display text-lg text-foreground">Roster history</h2>
+          <p className="text-sm text-muted mt-1">The original order plus every paid add-on batch. Add-ons are printed as their own batch.</p>
+          <div className="mt-4 space-y-3">
+            <div className="border border-line/60 rounded p-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="display text-sm text-foreground">Original order</span>
+                <span className="text-xs text-muted">{originalCount} piece{originalCount === 1 ? "" : "s"}</span>
+              </div>
+            </div>
+            {addonBatches.map((b, i) => (
+              <div key={b.id} className="border border-line/60 rounded p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="display text-sm text-foreground">
+                    Add-on {addonBatches.length - i}
+                    {b.paidAt && <span className="text-muted font-normal"> · {new Date(b.paidAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>}
+                  </span>
+                  <span className={`text-xs display px-2 py-0.5 rounded border ${b.verified ? "text-emerald-400 border-emerald-400/40" : "text-brand border-brand/40"}`}>
+                    {b.verified ? "✓ Verified" : "Needs verify"}
+                  </span>
+                </div>
+                <ul className="mt-2 text-sm text-muted space-y-0.5">
+                  {b.pieces.map((p, j) => (
+                    <li key={j}>
+                      {p.quantity > 1 ? `${p.quantity}× ` : ""}{p.label} · {p.size}
+                      {p.name ? ` · ${p.name.toUpperCase()}` : ""}{p.number ? ` #${p.number}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* Designer-only inbound tracking (factory -> Slugger). Same auth story
