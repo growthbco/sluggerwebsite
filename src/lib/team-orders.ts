@@ -119,6 +119,8 @@ export type LinkedDesignPreview = {
   imageUrl: string | null;
   /** True when the design hasn't been approved yet (we're showing latest proof). */
   pending: boolean;
+  /** Design colors (free-text + hex list), for the order-details summary. */
+  colors: string | null;
 };
 
 /** Pull the design image to show on the join/manage pages so players + coaches
@@ -131,12 +133,14 @@ export async function getLinkedDesignPreview(designRequestId: string | null | un
   if (!d) return null;
   const approved = d.approvedDesignUrl ?? null;
   const latestProof = d.proofImages?.length ? d.proofImages[d.proofImages.length - 1] : null;
+  const colors = [d.colors?.trim(), (d.colorHexes ?? []).join(", ")].filter(Boolean).join(" · ") || null;
   return {
     reference: d.reference,
     status: d.status,
     imageUrl: approved ?? latestProof,
     // "ordered" comes AFTER approval - it's still an approved design.
     pending: d.status !== "approved" && d.status !== "ordered",
+    colors,
   };
 }
 

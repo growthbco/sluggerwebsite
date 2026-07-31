@@ -89,6 +89,11 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
           quantity: r.quantity,
         }))}
         submitted={!["draft", "collecting"].includes(order.status)}
+        contactName={order.contactName}
+        contactEmail={order.contactEmail}
+        contactPhone={order.contactPhone}
+        colors={design?.colors ?? null}
+        placedAt={order.createdAt ? new Date(order.createdAt).toISOString() : null}
       />
 
       {/* Post-submission add-ons: pay for extra pieces on this same order. */}

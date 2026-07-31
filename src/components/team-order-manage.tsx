@@ -25,6 +25,11 @@ type Props = {
   shareUrl: string;
   roster: RosterRow[];
   submitted: boolean;
+  contactName?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  colors?: string | null;
+  placedAt?: string | null; // ISO string of when the order came in
 };
 
 function rowSizes(r: RosterRow, items: string[]): string {
@@ -37,7 +42,7 @@ function rowSizes(r: RosterRow, items: string[]): string {
     .join(" · ");
 }
 
-export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerseyMaterial, items, shareUrl, roster, submitted }: Props) {
+export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerseyMaterial, items, shareUrl, roster, submitted, contactName, contactEmail, contactPhone, colors, placedAt }: Props) {
   const materialLabel = jerseyMaterial
     ? JERSEY_MATERIALS.find((m) => m.key === jerseyMaterial)?.label ?? jerseyMaterial
     : null;
@@ -108,6 +113,32 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerse
         {(jerseyStyle || materialLabel) && (
           <p className="text-muted mt-1">{[jerseyStyle, materialLabel].filter(Boolean).join(" · ")}</p>
         )}
+        <dl className="mt-4 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-[auto_1fr] border-t border-line pt-4">
+          {(contactName || contactEmail || contactPhone) && (
+            <>
+              <dt className="text-muted">Placed by</dt>
+              <dd className="text-foreground">
+                {[contactName, contactEmail, contactPhone].filter(Boolean).join(" · ")}
+              </dd>
+            </>
+          )}
+          {colors && (
+            <>
+              <dt className="text-muted">Colors</dt>
+              <dd className="text-foreground">{colors}</dd>
+            </>
+          )}
+          <dt className="text-muted">Items</dt>
+          <dd className="text-foreground">{items.map((k) => itemLabel(k)).join(" · ") || "Jersey"}</dd>
+          {placedAt && (
+            <>
+              <dt className="text-muted">Order placed</dt>
+              <dd className="text-foreground">
+                {new Date(placedAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
+              </dd>
+            </>
+          )}
+        </dl>
       </header>
 
       {/* Share link */}
