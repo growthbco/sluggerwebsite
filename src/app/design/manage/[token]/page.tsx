@@ -52,6 +52,8 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
   const personalized = printRoster.some(
     (r) => (r.playerName ?? "").trim() || (r.playerNumber ?? "").trim(),
   );
+  // Paid add-on pieces (filledBy "addon") enable "verify add-ons only" mode.
+  const addonCount = printRoster.filter((r) => r.filledBy === "addon").length;
 
   // Per-person team store (only offered once the design is approved).
   const storeEligible = request.status === "approved" || request.status === "ordered";
@@ -88,6 +90,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
           // staff can see), so it's safe to surface the team-order token here.
           token={linkedOrder.manageToken!}
           rosterCount={printRoster.length}
+          addonCount={addonCount}
           roster={printRoster.map((r) => ({
             name: r.playerName ?? "",
             number: r.playerNumber ?? "",

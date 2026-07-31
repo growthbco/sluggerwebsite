@@ -30,6 +30,7 @@ type Props = {
   group?: string; // store design group key (sent to store verify/override APIs)
   rosterCount: number;
   roster?: RosterEntry[];
+  addonCount?: number; // roster rows added as paid add-ons (enables add-ons-only mode)
   initialPrintFileUrls?: string[] | null;
   initialResult?: VerifyResult | null;
 };
@@ -42,9 +43,12 @@ const KIND_LABEL: Record<Mismatch["kind"], string> = {
   name_typo: "Name typo",
 };
 
-export function PrintFileQA({ token, basePath, group, rosterCount, roster = [], initialPrintFileUrls, initialResult }: Props) {
+export function PrintFileQA({ token, basePath, group, rosterCount, roster = [], addonCount = 0, initialPrintFileUrls, initialResult }: Props) {
   const api = basePath ?? `/api/team-order/${token}`;
   const [printFileUrls, setPrintFileUrls] = useState<string[]>(initialPrintFileUrls ?? []);
+  // When paid add-ons exist, the designer can verify a sheet of just the added
+  // pieces without re-flagging the already-printed originals.
+  const [addonsOnly, setAddonsOnly] = useState(false);
   const [status, setStatus] = useState<"idle" | "uploading" | "verifying" | "done" | "error">(
     initialResult ? "done" : "idle",
   );
@@ -103,7 +107,7 @@ export function PrintFileQA({ token, basePath, group, rosterCount, roster = [], 
       const res = await fetch(`${api}/verify-print-file`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ printFileUrls, group }),
+        body: JSON.stringify({ printFileUrls, group, scope: addonsOnly ? "addons" : "full" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Verification failed");
@@ -171,6 +175,21 @@ export function PrintFileQA({ token, basePath, group, rosterCount, roster = [], 
             : `Verify${printFileUrls.length > 1 ? ` ${printFileUrls.length} sheets` : ""}`}
         </button>
       </div>
+
+      {addonCount > 0 && (
+        <label className="flex items-start gap-2 text-sm cursor-pointer -mt-1">
+          <input
+            type="checkbox"
+            checked={addonsOnly}
+            onChange={(e) => setAddonsOnly(e.target.checked)}
+            className="mt-0.5 accent-[color:var(--brand-gold)]"
+          />
+          <span className="text-foreground">
+            This sheet is <strong>add-ons only</strong>
+            <span className="text-muted"> — check just the {addonCount} added piece{addonCount === 1 ? "" : "s"}, not the already-printed roster.</span>
+          </span>
+        </label>
+      )}
 
       {printFileUrls.length > 0 && (
         <div className="grid sm:grid-cols-2 gap-3">

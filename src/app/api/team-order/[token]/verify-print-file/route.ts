@@ -21,7 +21,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const order = await getByManageToken(token);
   if (!order) return NextResponse.json({ error: "Link not found" }, { status: 404 });
 
-  let body: { printFileUrl?: string; printFileUrls?: string[] } = {};
+  let body: { printFileUrl?: string; printFileUrls?: string[]; scope?: string } = {};
   try { body = await req.json(); } catch {}
   // Accept a single URL (legacy) or a list of sheets.
   const printFileUrls = (body.printFileUrls ?? (body.printFileUrl ? [body.printFileUrl] : []))
@@ -35,7 +35,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   // Roster ground truth - pulled directly from the rows the team submitted via
   // the join link. Jersey size only (verifier compares per-jersey).
   const rosterRows = await getRoster(order.id);
-  const roster: RosterEntry[] = rosterRows
+  // "add-ons only": verify just the pieces added after production (filledBy
+  // "addon"), so a sheet for the extras doesn't re-flag the already-printed
+  // originals as missing.
+  const addonsOnly = body.scope === "addons";
+  const scopedRows = addonsOnly ? rosterRows.filter((r) => r.filledBy === "addon") : rosterRows;
+  const roster: RosterEntry[] = scopedRows
     .map((r) => ({
       name: (r.playerName ?? "").trim(),
       number: (r.playerNumber ?? "").trim(),
@@ -45,7 +50,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   if (roster.length === 0) {
     return NextResponse.json(
-      { error: "No roster entries to verify against yet." },
+      { error: addonsOnly ? "No add-on pieces to verify against." : "No roster entries to verify against yet." },
       { status: 400 },
     );
   }
@@ -69,14 +74,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
                 inline: false,
               })),
             ];
+        const scopeNote = addonsOnly ? " [add-ons only]" : "";
+        const against = addonsOnly ? "the added pieces" : "the submitted roster";
         await postDesignThreadUpdate({
           threadId: design.discordThreadId,
           title: result.ok
-            ? `🔍 Print file verified - ${order.teamName} (${order.reference})`
-            : `🔍 Print file QA - ${order.teamName} (${order.reference})`,
+            ? `🔍 Print file verified${scopeNote} - ${order.teamName} (${order.reference})`
+            : `🔍 Print file QA${scopeNote} - ${order.teamName} (${order.reference})`,
           description: result.ok
-            ? `Cross-checked ${printFileUrls.length} print ${printFileUrls.length === 1 ? "file" : "files"} against the submitted roster. Safe to send to production.`
-            : "Found discrepancies between the print file and the submitted roster - fix and re-verify before printing.",
+            ? `Cross-checked ${printFileUrls.length} print ${printFileUrls.length === 1 ? "file" : "files"} against ${against}. Safe to send to production.`
+            : `Found discrepancies between the print file and ${against} - fix and re-verify before printing.`,
           fields,
           imageUrl: printFileUrls[0],
           username: "Slugger Print QA",
