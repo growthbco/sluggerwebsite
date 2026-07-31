@@ -62,11 +62,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   try {
     const result = await verifyPrintFiles(printFileUrls, roster);
     await savePrintFileVerification(order.id, printFileUrls, result);
-    // A clean add-ons-only pass means the new batch's pieces are on the file:
-    // archive those batches so a future add-on doesn't re-flag them.
-    if (addonsOnly && result.ok) {
-      const { markAddonsPrintVerified } = await import("@/lib/team-order-addons");
-      await markAddonsPrintVerified(order.id);
+    // On a clean pass, keep the approved sheet attached where it belongs:
+    // add-ons-only -> the add-on batch(es); full roster -> the original order.
+    if (result.ok) {
+      if (addonsOnly) {
+        const { markAddonsPrintVerified } = await import("@/lib/team-order-addons");
+        await markAddonsPrintVerified(order.id, printFileUrls);
+      } else {
+        const { getDb } = await import("@/db");
+        const { teamOrders } = await import("@/db/schema");
+        const { eq } = await import("drizzle-orm");
+        await getDb().update(teamOrders).set({ originalPrintFileUrls: printFileUrls }).where(eq(teamOrders.id, order.id));
+      }
     }
 
     // Post to the linked design Discord thread (if any) so the designer/team

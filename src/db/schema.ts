@@ -394,6 +394,10 @@ export const teamOrders = pgTable(
     // Print files can span several sheets; all are stored, printFileUrl keeps
     // the first for back-compat.
     printFileUrls: jsonb("print_file_urls").$type<string[]>(),
+    // The approved print-file sheets for the ORIGINAL order (last full-roster
+    // verification), kept even after add-on sheets replace printFileUrls, so
+    // the original's file stays attached in roster history.
+    originalPrintFileUrls: jsonb("original_print_file_urls").$type<string[]>(),
     printFileVerifiedAt: timestamp("print_file_verified_at", { withTimezone: true }),
     printFileVerification: jsonb("print_file_verification").$type<{
       ok: boolean;
@@ -512,6 +516,9 @@ export const teamOrderAddons = pgTable(
     // "add-ons only" print-file check verifies; verified ones are archived
     // history and never re-flagged.
     printVerifiedAt: timestamp("print_verified_at", { withTimezone: true }),
+    // The approved print-file sheet URLs for this batch (kept with the order so
+    // they can be reopened/enlarged later).
+    printFileUrls: jsonb("print_file_urls").$type<string[]>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("team_order_addons_order_idx").on(t.teamOrderId)],

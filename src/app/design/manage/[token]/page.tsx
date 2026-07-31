@@ -9,6 +9,7 @@ import { DesignManagePanel } from "@/components/design-manage-panel";
 import { DesignMessages } from "@/components/design-messages";
 import { AiDesignStudio } from "@/components/ai-design-studio";
 import { DesignProgress } from "@/components/design-progress";
+import { PrintFileThumbs } from "@/components/print-file-thumbs";
 import { TeamStoreTeaser } from "@/components/team-store-teaser";
 import { PrintFileQA } from "@/components/print-file-qa";
 import { InboundTracking } from "@/components/inbound-tracking";
@@ -143,6 +144,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
                   </li>
                 ))}
               </ul>
+              {linkedOrder.originalPrintFileUrls?.length ? <PrintFileThumbs urls={linkedOrder.originalPrintFileUrls} /> : null}
             </details>
             {addonBatches.map((b, i) => (
               <div key={b.id} className="border border-line/60 rounded p-3">
@@ -163,6 +165,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
                     </li>
                   ))}
                 </ul>
+                {b.printFileUrls.length > 0 && <PrintFileThumbs urls={b.printFileUrls} />}
               </div>
             ))}
           </div>

@@ -66,7 +66,7 @@ export async function pendingAddonRoster(teamOrderId: string): Promise<{ name: s
  *  + size), when it was paid, and whether its print file was verified. Newest
  *  first. */
 export async function getPaidAddonBatches(teamOrderId: string): Promise<
-  { id: string; paidAt: Date | null; verified: boolean; pieces: { label: string; name: string; number: string; size: string; quantity: number }[] }[]
+  { id: string; paidAt: Date | null; verified: boolean; printFileUrls: string[]; pieces: { label: string; name: string; number: string; size: string; quantity: number }[] }[]
 > {
   const db = getDb();
   const { desc } = await import("drizzle-orm");
@@ -79,6 +79,7 @@ export async function getPaidAddonBatches(teamOrderId: string): Promise<
     id: b.id,
     paidAt: b.paidAt,
     verified: Boolean(b.printVerifiedAt),
+    printFileUrls: b.printFileUrls ?? [],
     pieces: b.rows.map((r) => ({ label: itemLabel(r.key), name: (r.name ?? "").trim(), number: (r.number ?? "").trim(), size: r.size, quantity: r.quantity })),
   }));
 }
@@ -112,15 +113,25 @@ export async function latestAddonBatchRoster(teamOrderId: string): Promise<{ nam
     .filter((r) => r.name && r.number);
 }
 
-/** Mark every currently-unverified paid add-on batch as print-verified, so a
- *  later add-on's "add-ons only" check won't re-flag these pieces. */
-export async function markAddonsPrintVerified(teamOrderId: string): Promise<void> {
+/** Mark every currently-unverified paid add-on batch as print-verified (so a
+ *  later add-on's check won't re-flag them) and attach the approved sheet URLs
+ *  to the most recent paid batch. */
+export async function markAddonsPrintVerified(teamOrderId: string, printFileUrls?: string[]): Promise<void> {
   const db = getDb();
-  const { isNull } = await import("drizzle-orm");
+  const { isNull, desc } = await import("drizzle-orm");
   await db
     .update(teamOrderAddons)
     .set({ printVerifiedAt: new Date() })
     .where(and(eq(teamOrderAddons.teamOrderId, teamOrderId), eq(teamOrderAddons.status, "paid"), isNull(teamOrderAddons.printVerifiedAt)));
+  if (printFileUrls && printFileUrls.length) {
+    const [latest] = await db
+      .select({ id: teamOrderAddons.id })
+      .from(teamOrderAddons)
+      .where(and(eq(teamOrderAddons.teamOrderId, teamOrderId), eq(teamOrderAddons.status, "paid")))
+      .orderBy(desc(teamOrderAddons.paidAt))
+      .limit(1);
+    if (latest) await db.update(teamOrderAddons).set({ printFileUrls }).where(eq(teamOrderAddons.id, latest.id));
+  }
 }
 
 export type AddonRowInput = {
