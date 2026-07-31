@@ -305,6 +305,7 @@ export async function POST(req: Request) {
             sessionId: session.id,
             newShippingCents: Number(session.metadata.newShippingCents) || 0,
             paidTotalCents: session.amount_total ?? 0,
+            fundraiseCents: Number(session.metadata.fundraiseCents) || 0,
             lines: mergeLines,
           });
           if (res.merged && res.teamId) {

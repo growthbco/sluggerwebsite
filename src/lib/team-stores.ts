@@ -4,9 +4,9 @@
 // live store.
 
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { teams } from "@/db/schema";
+import { teams, orders } from "@/db/schema";
 import { APPAREL_SIZES, SOCK_SIZES } from "@/lib/order-items";
 
 export type StoreItem = {
@@ -120,6 +120,35 @@ export async function createTeamStore(input: {
     })
     .returning();
   return row;
+}
+
+/** Sell price after the store's fundraising % markup (rounded to the cent). */
+export function applyFundraise(baseCents: number, pct?: number | null): number {
+  if (!pct || pct <= 0) return baseCents;
+  return Math.round(baseCents * (1 + pct / 100));
+}
+
+/** The fundraising portion of one item's price (what the team earns on it). */
+export function fundraisePortionCents(baseCents: number, pct?: number | null): number {
+  return applyFundraise(baseCents, pct) - baseCents;
+}
+
+/** Total the store has raised for its team so far (sum of the fundraise portion
+ *  across all its paid orders). */
+export async function teamRaisedCents(teamId: string): Promise<number> {
+  const db = getDb();
+  const [row] = await db
+    .select({ total: sql<number>`coalesce(sum(${orders.fundraiseCents}), 0)` })
+    .from(orders)
+    .where(eq(orders.teamId, teamId));
+  return Number(row?.total ?? 0);
+}
+
+/** Set a store's fundraising percentage (0-100), keyed by its team id. */
+export async function setFundraisePercent(teamId: string, percent: number): Promise<void> {
+  const db = getDb();
+  const pct = Math.max(0, Math.min(100, Math.round(percent)));
+  await db.update(teams).set({ fundraisePercent: pct }).where(eq(teams.id, teamId));
 }
 
 export async function getByStoreToken(tkn: string) {

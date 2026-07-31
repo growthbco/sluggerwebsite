@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
 import { dbEnabled } from "@/db";
-import { getStoreByHandle, shippingCentsFor } from "@/lib/team-stores";
+import { getStoreByHandle, shippingCentsFor, applyFundraise, fundraisePortionCents } from "@/lib/team-stores";
 import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 import { refCodeFromCookie } from "@/lib/referral-cookie";
 
@@ -98,7 +98,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   // Prices and weights come from the store snapshot, never the client. Player
   // details go IN the line-item name so they survive to the webhook, Discord,
   // and the confirmation email (Stripe drops product_data.description there).
+  const fundPct = store.fundraisePercent ?? 0;
   let totalOz = 0;
+  let fundraiseTotal = 0; // team-fundraising portion across the order
   const lineItems = [];
   for (const item of items) {
     const def = catalog.get(item.key);
@@ -111,7 +113,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     const chosenDesign = def.designs?.find((dz: { label: string }) => dz.label === item.design)?.label
       ?? def.designs?.[0]?.label;
     if (chosenDesign) details.unshift(chosenDesign);
-    let unitCents = def.priceCents;
+    // Fundraising markup rides on the garment price (not the number add-on).
+    let unitCents = applyFundraise(def.priceCents, fundPct);
+    fundraiseTotal += fundraisePortionCents(def.priceCents, fundPct) * qty;
     if (def.nameNumber) {
       const nm = (item.playerName ?? "").trim().slice(0, 30);
       const num = (item.playerNumber ?? "").trim().slice(0, 4);
@@ -191,7 +195,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
           fixed_amount: { amount: o.amountCents, currency: "usd" },
         },
       })),
-      metadata: { orderType: "team_store", teamId: store.id, teamName: store.name, ...(rush ? { rush: "true" } : {}), ...(referralCode ? { referralCode } : {}), ...(note ? { orderNote: note } : {}) },
+      metadata: { orderType: "team_store", teamId: store.id, teamName: store.name, ...(rush ? { rush: "true" } : {}), ...(referralCode ? { referralCode } : {}), ...(note ? { orderNote: note } : {}), ...(fundraiseTotal > 0 ? { fundraiseCents: String(fundraiseTotal) } : {}) },
     });
     return NextResponse.json({ url: session.url });
   } catch (e) {

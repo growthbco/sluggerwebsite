@@ -82,6 +82,7 @@ export async function mergeStoreOrderAdd(args: {
   sessionId: string;
   newShippingCents: number;
   paidTotalCents: number;
+  fundraiseCents?: number;
   lines: PaidOrderLine[];
 }): Promise<{ merged: boolean; teamId: string | null; reference: string; addedLines: PaidOrderLine[] }> {
   const db = getDb();
@@ -102,6 +103,7 @@ export async function mergeStoreOrderAdd(args: {
       subtotalCents: (o.subtotalCents ?? 0) + addGoods,
       shippingCents: args.newShippingCents,
       totalCents: (o.totalCents ?? 0) + args.paidTotalCents,
+      fundraiseCents: (o.fundraiseCents ?? 0) + (args.fundraiseCents ?? 0),
       addSessionIds: [...done, args.sessionId],
     })
     .where(eq(orders.id, o.id));

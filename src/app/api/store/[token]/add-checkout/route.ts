@@ -3,7 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
 import { dbEnabled, getDb } from "@/db";
 import { orders, orderItems } from "@/db/schema";
-import { getStoreByHandle, shippingCentsFor } from "@/lib/team-stores";
+import { getStoreByHandle, shippingCentsFor, applyFundraise, fundraisePortionCents } from "@/lib/team-stores";
 import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 
 export const runtime = "nodejs";
@@ -44,7 +44,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   // Price the NEW items exactly like the store checkout does.
+  const fundPct = store.fundraisePercent ?? 0;
   let addOz = 0;
+  let fundraiseTotal = 0;
   const lineItems: { quantity: number; price_data: { currency: string; unit_amount: number; product_data: { name: string } } }[] = [];
   for (const item of items) {
     const def = catalog.get(item.key);
@@ -54,7 +56,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     const details = [size];
     const chosenDesign = def.designs?.find((dz) => dz.label === item.design)?.label ?? def.designs?.[0]?.label;
     if (chosenDesign) details.unshift(chosenDesign);
-    let unitCents = def.priceCents;
+    let unitCents = applyFundraise(def.priceCents, fundPct);
+    fundraiseTotal += fundraisePortionCents(def.priceCents, fundPct) * qty;
     if (def.nameNumber) {
       const nm = (item.playerName ?? "").trim().slice(0, 30);
       const num = (item.playerNumber ?? "").trim().slice(0, 4);
@@ -104,7 +107,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       success_url: `${SITE}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${SITE}/store/${token}?addTo=${addToRef}`,
       // Ships with the existing order to the address already on file - no new address.
-      metadata: { orderType: "store_order_add", addToOrderId: order.id, teamId: store.id, teamName: store.name, newShippingCents: String(newShipping) },
+      metadata: { orderType: "store_order_add", addToOrderId: order.id, teamId: store.id, teamName: store.name, newShippingCents: String(newShipping), ...(fundraiseTotal > 0 ? { fundraiseCents: String(fundraiseTotal) } : {}) },
     });
     return NextResponse.json({ url: session.url });
   } catch (e) {

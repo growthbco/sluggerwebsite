@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { dbEnabled } from "@/db";
 import { getByManageToken, getRoster, getLinkedDesignPreview } from "@/lib/team-orders";
+import { getStoreByDesignRequestId, teamRaisedCents } from "@/lib/team-stores";
+import { TeamFundraiseCard } from "@/components/team-fundraise-card";
 import { itemPriceCents } from "@/lib/team-order-pricing";
 import { EXTRA_ADDON_KEYS } from "@/lib/order-items";
 import { TeamOrderManage } from "@/components/team-order-manage";
@@ -27,6 +29,10 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
   ]);
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   const shareUrl = `${SITE}/team-order/join/${order.selfEntryToken}`;
+  // If this team has a linked store, the coach can run a fundraiser on it.
+  const store = order.designRequestId ? await getStoreByDesignRequestId(order.designRequestId) : null;
+  const raisedCents = store ? await teamRaisedCents(store.id) : 0;
+  const storeUrl = store?.storeToken ? `${SITE}/store/${store.storeToken}` : null;
   // Add-on menu: the order's own items plus the always-available add-on apparel
   // (hoodies etc.), so a jerseys-only order can still add a hoodie in the same
   // design. Deduped, order preserved.
@@ -95,6 +101,10 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
         colors={design?.colors ?? null}
         placedAt={order.createdAt ? new Date(order.createdAt).toISOString() : null}
       />
+
+      {store && (
+        <TeamFundraiseCard token={token} initialPercent={store.fundraisePercent ?? 0} raisedCents={raisedCents} storeUrl={storeUrl} />
+      )}
 
       {/* Post-submission add-ons: pay for extra pieces on this same order. */}
       {!["draft", "collecting", "cancelled"].includes(order.status) && (

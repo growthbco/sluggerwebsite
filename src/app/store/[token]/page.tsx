@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { dbEnabled } from "@/db";
-import { getStoreByHandle } from "@/lib/team-stores";
+import { getStoreByHandle, applyFundraise } from "@/lib/team-stores";
 import { TeamStoreShop } from "@/components/team-store-shop";
 import { ProofGallery } from "@/components/proof-gallery";
 import { AllSizeCharts } from "@/components/size-charts";
@@ -86,6 +86,13 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
         </p>
       </header>
 
+      {(store.fundraisePercent ?? 0) > 0 && (
+        <div className="mt-6 bg-brand/10 border border-brand/40 text-center px-4 py-3">
+          <p className="display text-brand text-sm">🎉 Every order supports {store.name}</p>
+          <p className="text-sm text-muted mt-0.5">A portion of each purchase goes straight to the team as a fundraiser. Thanks for chipping in!</p>
+        </div>
+      )}
+
       {/* How it works - most buyers land here cold from a text message. */}
       <div className="mt-8 grid sm:grid-cols-3 gap-3">
         {[
@@ -110,7 +117,11 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
           <a href="#size-charts" className="text-sm text-brand hover:underline">Not sure on size? Size charts ↓</a>
         </div>
         <div className="mt-4">
-          <TeamStoreShop token={token} items={store.storeItems ?? []} addToRef={addToRef} />
+          <TeamStoreShop
+            token={token}
+            items={(store.storeItems ?? []).map((it) => ({ ...it, priceCents: applyFundraise(it.priceCents, store.fundraisePercent) }))}
+            addToRef={addToRef}
+          />
         </div>
       </section>
 
