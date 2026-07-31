@@ -14,6 +14,7 @@ import { AdminLogout } from "@/components/admin-logout";
 import { AdminInvoiceButton } from "@/components/admin-invoice-button";
 import { AdminJerseyStyle } from "@/components/admin-jersey-style";
 import { AdminStatusChips } from "@/components/admin-status-chips";
+import { AdminLinkDesign } from "@/components/admin-link-design";
 import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
 import { TrackingInfo } from "@/components/tracking-info";
@@ -205,6 +206,8 @@ export default async function AdminPage() {
   }
 
   const activeDesigns = designs.filter((d) => !d.archivedAt);
+  // Designs a standalone order can be manually linked to.
+  const linkableDesigns = activeDesigns.map((d) => ({ id: d.id, teamName: d.teamName, reference: d.reference }));
   const archivedDesigns = designs.filter((d) => d.archivedAt);
   const activeOrders = torders.filter((o) => !o.archivedAt);
   const archivedOrders = torders.filter((o) => o.archivedAt);
@@ -659,6 +662,9 @@ export default async function AdminPage() {
                         )}
                         {/* Secondary actions in a floating dropdown. */}
                         <AdminRowMenu>
+                            {!o.designRequestId && (
+                              <AdminLinkDesign teamOrderId={o.id} designs={linkableDesigns} />
+                            )}
                             {!paid && (
                               <AdminRecordPayment
                                 teamOrderId={o.id}
