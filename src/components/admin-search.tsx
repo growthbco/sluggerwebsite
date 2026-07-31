@@ -1,22 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-
-// One-tap pipeline filters for team orders, in funnel order. Values match
-// the team_orders status enum carried on each row's data-status.
-const STAGE_CHIPS: { label: string; value: string }[] = [
-  { label: "📋 New roster", value: "submitted" },
-  { label: "🧾 Invoiced", value: "quoted" },
-  { label: "💰 Deposit paid", value: "in_production" },
-  { label: "💸 Paid in full", value: "paid" },
-  { label: "🚚 Shipped", value: "shipped" },
-];
+import { STAGE_CHIPS, useStatusFilter } from "@/components/admin-filter-store";
 
 // Filters the dashboard's project rows in place. Rows opt in with a
 // data-search attribute (searchable text) and data-status attribute.
 export function AdminSearch({ statuses }: { statuses: string[] }) {
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useStatusFilter();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

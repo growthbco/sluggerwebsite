@@ -13,6 +13,7 @@ import { getLiveTracking, type LiveTracking } from "@/lib/shippo";
 import { AdminLogout } from "@/components/admin-logout";
 import { AdminInvoiceButton } from "@/components/admin-invoice-button";
 import { AdminJerseyStyle } from "@/components/admin-jersey-style";
+import { AdminStatusChips } from "@/components/admin-status-chips";
 import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
 import { TrackingInfo } from "@/components/tracking-info";
@@ -491,7 +492,10 @@ export default async function AdminPage() {
       )}
 
       <section className="mt-10">
-        <h2 className="display text-xl text-foreground">Team orders ({activeOrders.length})</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="display text-xl text-foreground">Team orders ({activeOrders.length})</h2>
+          <AdminStatusChips />
+        </div>
         <div className="mt-3 overflow-x-auto border border-line">
           <table className="w-full text-sm">
             <thead>
