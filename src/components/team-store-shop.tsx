@@ -14,7 +14,7 @@ type StoreItem = {
   /** Optional product photo for the card. */
   image?: string;
   /** Approved colorways the buyer chooses between (teams with multiple designs). */
-  designs?: { label: string; image: string }[];
+  designs?: { label: string; image: string; sku?: string | null }[];
 };
 
 type Selection = {
@@ -446,7 +446,7 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
                             >🔍</span>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={dz.image} alt={dz.label} className="h-16 w-full object-contain bg-white" />
-                            <span className={`block px-1.5 py-1 text-[11px] leading-tight ${active ? "text-brand" : "text-muted"}`}>{dz.label}</span>
+                            <span className={`block px-1.5 py-1 text-[11px] leading-tight ${active ? "text-brand" : "text-muted"}`}>{dz.label}{dz.sku ? <span className="block font-mono text-[10px] opacity-70">{dz.sku}</span> : null}</span>
                           </button>
                         );
                       })}

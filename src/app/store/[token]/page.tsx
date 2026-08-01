@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { dbEnabled } from "@/db";
 import { getStoreByHandle, applyFundraise } from "@/lib/team-stores";
+import { getById as getDesignById } from "@/lib/design-requests";
 import { TeamStoreShop } from "@/components/team-store-shop";
 import { ProofGallery } from "@/components/proof-gallery";
 import { AllSizeCharts } from "@/components/size-charts";
@@ -70,6 +71,19 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
     new Set([store.approvedDesignUrl, ...storeDesignImages].filter(Boolean)),
   ) as string[];
 
+  // Single source of truth for design names/SKUs: resolve each store design's
+  // name + SKU from the linked design request (by image URL), so renaming a
+  // design in the design panel flows to the store. Falls back to the stored
+  // label. Also applies the fundraising markup to prices.
+  const design = store.designRequestId ? await getDesignById(store.designRequestId) : null;
+  const labelMap = design?.proofLabels ?? {};
+  const skuMap = design?.designSkus ?? {};
+  const resolvedItems = (store.storeItems ?? []).map((it) => ({
+    ...it,
+    priceCents: applyFundraise(it.priceCents, store.fundraisePercent),
+    designs: (it.designs ?? []).map((d) => ({ label: labelMap[d.image] || d.label, image: d.image, sku: skuMap[d.image] ?? null })),
+  }));
+
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 py-14" style={themeVars(store.primaryColor)}>
       <header className="text-center">
@@ -119,7 +133,7 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
         <div className="mt-4">
           <TeamStoreShop
             token={token}
-            items={(store.storeItems ?? []).map((it) => ({ ...it, priceCents: applyFundraise(it.priceCents, store.fundraisePercent) }))}
+            items={resolvedItems}
             addToRef={addToRef}
           />
         </div>
