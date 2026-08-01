@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { dbEnabled } from "@/db";
+import { eq } from "drizzle-orm";
+import { dbEnabled, getDb } from "@/db";
+import { designRequests } from "@/db/schema";
 import { getByManageToken, toggleApprovedDesign } from "@/lib/design-requests";
 import { postDesignThreadUpdate } from "@/lib/discord";
 import { setThreadStageTag } from "@/lib/discord-bot";
@@ -19,7 +21,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const request = await getByManageToken(token);
   if (!request) return NextResponse.json({ error: "Link not found" }, { status: 404 });
 
-  let body: { url?: string; approved?: boolean } = {};
+  let body: { url?: string; approved?: boolean; label?: string } = {};
   try { body = await req.json(); } catch {}
 
   const url = body.url ?? "";
@@ -28,7 +30,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     return NextResponse.json({ error: "Pick one of the sent proofs." }, { status: 400 });
   }
 
+  // Approving requires a name so it's identifiable everywhere (store, roster).
+  const label = (body.label ?? "").trim().slice(0, 60);
+  if (approved && !label && !request.proofLabels?.[url]) {
+    return NextResponse.json({ error: "Name this design before approving it." }, { status: 400 });
+  }
+
   try {
+    // Persist the name + mint a stable SKU on approval.
+    if (approved) {
+      const db = getDb();
+      const proofLabels = { ...(request.proofLabels ?? {}), ...(label ? { [url]: label } : {}) };
+      const designSkus = { ...(request.designSkus ?? {}) };
+      if (!designSkus[url]) {
+        const nums = Object.values(designSkus).map((s) => parseInt(String(s).split("-").pop() || "0", 10)).filter((n) => !Number.isNaN(n));
+        const next = (nums.length ? Math.max(...nums) : 0) + 1;
+        designSkus[url] = `${request.reference}-${String(next).padStart(2, "0")}`;
+      }
+      await db.update(designRequests).set({ proofLabels, designSkus }).where(eq(designRequests.id, request.id));
+    }
     const result = await toggleApprovedDesign(request.id, url, approved);
     if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const n = result.urls.length;

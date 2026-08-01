@@ -17,7 +17,7 @@ export function TeamOrderAddon({
   token: string;
   items: string[];
   prices: Record<string, number>;
-  designs?: { label: string; image: string }[];
+  designs?: { label: string; image: string; sku?: string | null }[];
   shipped?: boolean;
 }) {
   const first = items[0] ?? "jersey";
@@ -88,7 +88,7 @@ export function TeamOrderAddon({
             aria-label="Design"
           >
             <option value="">Design…</option>
-            {designs.map((dz) => <option key={dz.label} value={dz.label}>{dz.label}</option>)}
+            {designs.map((dz) => <option key={dz.label} value={dz.label}>{dz.label}{dz.sku ? ` (${dz.sku})` : ""}</option>)}
           </select>
         )}
         <select

@@ -187,6 +187,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         inspirationImages={request.inspirationImages ?? []}
         proofImages={request.proofImages ?? []}
         proofLabels={request.proofLabels ?? {}}
+        designSkus={request.designSkus ?? {}}
         approvedUrls={request.approvedDesignUrls ?? (request.approvedDesignUrl ? [request.approvedDesignUrl] : [])}
         statusUrl={`${SITE}/design/status/${request.statusToken}`}
         revisionsUsed={request.revisionsUsed ?? 0}

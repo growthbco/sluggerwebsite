@@ -644,6 +644,10 @@ export const designRequests = pgTable(
     // Optional human labels for proofs, keyed by image URL (e.g. "Practice
     // Jersey 1"), shown to staff and the client.
     proofLabels: jsonb("proof_labels").$type<Record<string, string>>().default({}),
+    // Stable SKU / item number per approved design, keyed by image URL. Assigned
+    // when a design is approved (a name is required then), so a team store can
+    // reference exactly which jersey without confusion.
+    designSkus: jsonb("design_skus").$type<Record<string, string>>().default({}),
     // Persistent AI design memory: the iterative concept + every revision, so
     // the designer can "pick up where we left off" when a customer requests
     // changes - survives sessions, browsers, and staff handoffs.

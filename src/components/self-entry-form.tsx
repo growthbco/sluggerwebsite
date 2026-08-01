@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ITEM_TYPES } from "@/lib/order-items";
 
-export function SelfEntryForm({ token, items, designs = [] }: { token: string; items: string[]; designs?: { label: string; image: string }[] }) {
+export function SelfEntryForm({ token, items, designs = [] }: { token: string; items: string[]; designs?: { label: string; image: string; sku?: string | null }[] }) {
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
   const [sizes, setSizes] = useState<Record<string, string>>({});
@@ -77,7 +77,7 @@ export function SelfEntryForm({ token, items, designs = [] }: { token: string; i
                   <button type="button" onClick={() => toggleDesign(d.label)} className="block w-full text-left" aria-pressed={on}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={d.image} alt={d.label} className="h-20 w-full object-contain bg-white" />
-                    <span className={`block px-1.5 py-1 text-[11px] leading-tight ${on ? "text-brand" : "text-muted"}`}>{d.label}</span>
+                    <span className={`block px-1.5 py-1 text-[11px] leading-tight ${on ? "text-brand" : "text-muted"}`}>{d.label}{d.sku ? <span className="block font-mono text-[10px] opacity-70">{d.sku}</span> : null}</span>
                   </button>
                 </div>
               );

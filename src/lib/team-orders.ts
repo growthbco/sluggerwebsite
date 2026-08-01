@@ -170,8 +170,8 @@ export type LinkedDesignPreview = {
   pending: boolean;
   /** Design colors (free-text + hex list), for the order-details summary. */
   colors: string | null;
-  /** All approved designs/colorways players can pick from (label + image). */
-  designs: { label: string; image: string }[];
+  /** All approved designs/colorways players can pick from (label + image + SKU). */
+  designs: { label: string; image: string; sku: string | null }[];
 };
 
 /** Pull the design image to show on the join/manage pages so players + coaches
@@ -189,7 +189,8 @@ export async function getLinkedDesignPreview(designRequestId: string | null | un
   // when set, otherwise "Design 1/2/…".
   const approvedList = d.approvedDesignUrls?.length ? d.approvedDesignUrls : approved ? [approved] : [];
   const labels = d.proofLabels ?? {};
-  const designs = approvedList.map((url, i) => ({ label: (labels[url] || `Design ${i + 1}`).trim(), image: url }));
+  const skuMap = d.designSkus ?? {};
+  const designs = approvedList.map((url, i) => ({ label: (labels[url] || `Design ${i + 1}`).trim(), image: url, sku: skuMap[url] ?? null }));
   return {
     reference: d.reference,
     status: d.status,

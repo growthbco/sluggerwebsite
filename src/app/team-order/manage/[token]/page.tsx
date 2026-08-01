@@ -81,7 +81,7 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
                 {design.designs.map((d) => (
                   <a key={d.image} href={d.image} target="_blank" rel="noopener noreferrer" className="w-24 border border-line rounded overflow-hidden hover:ring-2 hover:ring-brand" title={`View ${d.label}`}>
                     <Image src={d.image} alt={d.label} width={96} height={80} sizes="96px" className="h-20 w-full object-contain bg-white" unoptimized />
-                    <span className="block px-1.5 py-1 text-[11px] text-muted leading-tight">{d.label}</span>
+                    <span className="block px-1.5 py-1 text-[11px] text-muted leading-tight">{d.label}{d.sku ? <span className="block font-mono text-[10px] opacity-70">{d.sku}</span> : null}</span>
                   </a>
                 ))}
               </div>

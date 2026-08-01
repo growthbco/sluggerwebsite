@@ -26,6 +26,7 @@ type Props = {
   inspirationImages: string[];
   proofImages: string[];
   proofLabels?: Record<string, string>;
+  designSkus?: Record<string, string>;
   approvedUrls: string[];
   statusUrl: string;
   revisionsUsed: number;
@@ -49,6 +50,7 @@ export function DesignManagePanel({
   inspirationImages,
   proofImages,
   proofLabels = {},
+  designSkus = {},
   approvedUrls,
   statusUrl,
   revisionsUsed,
@@ -59,6 +61,8 @@ export function DesignManagePanel({
 }: Props) {
   const [proofs, setProofs] = useState<string[]>(proofImages);
   const [labels, setLabels] = useState<Record<string, string>>(proofLabels);
+  const [skus, setSkus] = useState<Record<string, string>>(designSkus);
+  const [savingMeta, setSavingMeta] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [approved, setApproved] = useState<string[]>(approvedUrls);
   const [settingApproved, setSettingApproved] = useState<string | null>(null);
@@ -139,14 +143,31 @@ export function DesignManagePanel({
     }
   }
 
+  async function saveMeta(url: string) {
+    setSavingMeta(url);
+    try {
+      const res = await fetch(`/api/design-request/${token}/design-meta`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, label: labels[url] ?? "", sku: skus[url] ?? "" }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Could not save");
+    } catch (e) {
+      setApprovedMessage((e as Error).message);
+    } finally {
+      setSavingMeta(null);
+    }
+  }
+
   async function toggleApproved(url: string, next: boolean) {
     setSettingApproved(url);
     setApprovedMessage("");
     try {
       const res = await fetch(`/api/design-request/${token}/set-approved`, {
+        // include the current label so the server can enforce naming on approve
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, approved: next }),
+        body: JSON.stringify({ url, approved: next, label: labels[url] ?? "" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not update the approved designs.");
@@ -320,29 +341,51 @@ export function DesignManagePanel({
         <section>
           <h2 className="display text-xl text-green-400">✓ Approved designs ({approved.length})</h2>
           <p className="text-sm text-muted mt-1">
-            Build the print files from these exact versions only. A project can have several -
-            jersey, hat, hoodie, pants each get their own approved mockup.
+            Name each one - the <strong className="text-foreground">name + SKU</strong> is what players see when picking a design and what a team store uses, so there&apos;s no confusion which jersey is which. Edit anytime, like inventory.
           </p>
-          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {approved.map((u, i) => (
-              <div key={u} className="border border-green-500">
-                <a href={u} target="_blank" rel="noopener noreferrer" className="relative aspect-square bg-white overflow-hidden block">
-                  <Image src={u} alt={`Approved design ${i + 1}`} fill sizes="25vw" className="object-contain p-1" unoptimized />
-                  <span className="absolute top-1 left-1 bg-green-600 text-white display text-[10px] px-1.5 py-0.5">
-                    ✓ APPROVED
-                  </span>
+              <div key={u} className="border border-green-500 bg-steel">
+                <a href={u} target="_blank" rel="noopener noreferrer" className="relative aspect-[4/3] bg-white overflow-hidden block">
+                  <Image src={u} alt={labels[u] || `Approved design ${i + 1}`} fill sizes="33vw" className="object-contain p-1" unoptimized />
+                  <span className="absolute top-1 left-1 bg-green-600 text-white display text-[10px] px-1.5 py-0.5">✓ APPROVED</span>
                 </a>
-                <button
-                  type="button"
-                  onClick={() => toggleApproved(u, false)}
-                  disabled={settingApproved !== null}
-                  className="w-full text-[11px] display text-muted border-t border-green-500/50 px-1 py-1.5 hover:text-red-400 hover:bg-steel disabled:opacity-50"
-                >
-                  {settingApproved === u ? "Saving..." : "Remove"}
-                </button>
+                <div className="p-2 space-y-2">
+                  <div>
+                    <label className="text-[10px] display text-muted">Name</label>
+                    <input
+                      value={labels[u] ?? ""}
+                      onChange={(e) => setLabels((l) => ({ ...l, [u]: e.target.value }))}
+                      placeholder={`e.g. Home Black`}
+                      maxLength={60}
+                      className="mt-0.5 w-full bg-ink border border-line px-2 py-1.5 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] display text-muted">SKU / item #</label>
+                    <input
+                      value={skus[u] ?? ""}
+                      onChange={(e) => setSkus((s) => ({ ...s, [u]: e.target.value }))}
+                      placeholder="auto-assigned"
+                      maxLength={40}
+                      className="mt-0.5 w-full bg-ink border border-line px-2 py-1.5 text-sm font-mono text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => saveMeta(u)} disabled={savingMeta !== null}
+                      className="flex-1 text-xs display text-on-brand bg-brand hover:bg-brand-dark px-2 py-1.5 rounded disabled:opacity-50">
+                      {savingMeta === u ? "Saving…" : "Save"}
+                    </button>
+                    <button type="button" onClick={() => toggleApproved(u, false)} disabled={settingApproved !== null}
+                      className="text-xs display text-muted border border-line px-2 py-1.5 hover:text-red-400 disabled:opacity-50">
+                      {settingApproved === u ? "…" : "Unapprove"}
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
+          {approvedMessage && <p className="mt-2 text-sm text-brand">{approvedMessage}</p>}
         </section>
       )}
 
@@ -359,13 +402,20 @@ export function DesignManagePanel({
                 <a href={u} target="_blank" rel="noopener noreferrer" className="relative aspect-square bg-white overflow-hidden block">
                   <Image src={u} alt={labels[u] || `Proof ${i + 1}`} fill sizes="25vw" className="object-contain p-1" unoptimized />
                 </a>
-                {labels[u] && <p className="text-[11px] text-foreground px-2 py-1 border-t border-line truncate" title={labels[u]}>{labels[u]}</p>}
+                <input
+                  value={labels[u] ?? ""}
+                  onChange={(e) => setLabels((l) => ({ ...l, [u]: e.target.value }))}
+                  placeholder="Name this design (required to approve)"
+                  maxLength={60}
+                  className="w-full bg-ink border-t border-line px-2 py-1.5 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                />
                 <div className="flex border-t border-line">
                   <button
                     type="button"
                     onClick={() => toggleApproved(u, true)}
-                    disabled={settingApproved !== null || removing !== null}
+                    disabled={settingApproved !== null || removing !== null || !(labels[u] ?? "").trim()}
                     className="flex-1 text-[11px] display text-muted px-1 py-1.5 hover:text-foreground hover:bg-steel disabled:opacity-50"
+                    title={!(labels[u] ?? "").trim() ? "Name it first" : "Approve this design"}
                   >
                     {settingApproved === u ? "Saving..." : "Mark approved"}
                   </button>
