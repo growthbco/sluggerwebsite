@@ -26,7 +26,10 @@ export function TeamOrderAddon({
   const [draft, setDraft] = useState<Line>({ key: first, size: sizesFor(first)[0], name: "", number: "", design: firstDesign, quantity: 1 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [zoom, setZoom] = useState<string | null>(null);
   const needsDesign = designs.length > 1;
+  // Preview the currently-selected design (or the only one) so they see it.
+  const previewDesign = designs.find((d) => d.label === draft.design) ?? (designs.length === 1 ? designs[0] : undefined);
 
   const money = (c: number) => `$${(c / 100).toFixed(2)}`;
   const total = lines.reduce((s, l) => s + (prices[l.key] ?? 0) * l.quantity, 0);
@@ -126,6 +129,29 @@ export function TeamOrderAddon({
           </button>
         </div>
       </div>
+
+      {previewDesign?.image && (
+        <button
+          type="button"
+          onClick={() => setZoom(previewDesign.image)}
+          className="mt-3 flex items-center gap-3 group text-left"
+          title="Click to enlarge"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={previewDesign.image} alt={previewDesign.label} className="h-16 w-16 object-contain bg-white border border-line rounded group-hover:ring-2 group-hover:ring-brand transition" />
+          <span className="text-sm text-muted">
+            {previewDesign.label}{previewDesign.sku ? <span className="font-mono text-xs opacity-70"> · {previewDesign.sku}</span> : null}
+            <span className="block text-xs text-brand">🔍 tap to preview</span>
+          </span>
+        </button>
+      )}
+
+      {zoom && (
+        <div className="fixed inset-0 z-[90] bg-black/85 grid place-items-center p-4" onClick={() => setZoom(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={zoom} alt="Design" className="max-h-[92vh] max-w-[95vw] object-contain" />
+        </div>
+      )}
 
       {lines.length > 0 && (
         <div className="mt-3">
