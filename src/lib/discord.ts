@@ -49,6 +49,8 @@ type StoreOrderPayload = {
   existingThreadId?: string | null;
   /** Optional note the buyer left at checkout. */
   note?: string;
+  /** Name for the thread when creating one (per-customer: "Aaron - Team Store"). */
+  threadName?: string;
 };
 
 /** Post a paid team-store order as an "add-on" into the store's own thread in
@@ -97,7 +99,7 @@ export async function postStoreOrderToDiscord(order: StoreOrderPayload): Promise
     return { ok, threadId: order.existingThreadId };
   }
   if (order.approvedDesignUrl) embed.image = { url: order.approvedDesignUrl };
-  body.thread_name = `🏪 ${order.teamName} Store`.slice(0, 100);
+  body.thread_name = (order.threadName ?? `🏪 ${order.teamName} Store`).slice(0, 100);
   const msg = await sendAndReturn(url, body);
   return { ok: Boolean(msg), threadId: msg?.channel_id };
 }

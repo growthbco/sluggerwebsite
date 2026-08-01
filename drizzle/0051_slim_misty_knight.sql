@@ -1,0 +1,1 @@
+ALTER TABLE "teams" ADD COLUMN "store_customer_threads" jsonb DEFAULT '{}'::jsonb;

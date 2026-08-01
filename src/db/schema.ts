@@ -223,6 +223,10 @@ export const teams = pgTable(
     // Persistent Discord forum thread for this store: all orders (incl. later
     // family add-ons) post into this one thread instead of scattering.
     storeThreadId: text("store_thread_id"),
+    // One Discord thread PER customer (keyed by lowercased email), so each
+    // buyer's orders + later add-ons stay together in their own thread instead
+    // of all piling into the single store thread.
+    storeCustomerThreads: jsonb("store_customer_threads").$type<Record<string, string>>().default({}),
     // Store add-on print-file QA, keyed by design group (gray/white/practice
     // etc.) since one store has multiple print files, one per design.
     storePrintFileQa: jsonb("store_print_file_qa").$type<Record<string, {
