@@ -139,6 +139,7 @@ export type AddonRowInput = {
   size?: string;
   name?: string;
   number?: string;
+  design?: string;
   quantity?: number;
 };
 
@@ -148,6 +149,7 @@ export type AddonRow = {
   size: string;
   name?: string;
   number?: string;
+  design?: string;
   quantity: number;
   unitPriceCents: number;
 };
@@ -175,6 +177,7 @@ export function priceAddonRows(
       size: sizes.includes(r.size ?? "") ? (r.size as string) : sizes[0],
       name: (r.name ?? "").trim().slice(0, 30) || undefined,
       number: (r.number ?? "").trim().replace(/[^0-9]/g, "").slice(0, 4) || undefined,
+      design: (r.design ?? "").trim().slice(0, 60) || undefined,
       quantity: Math.max(1, Math.min(50, Number(r.quantity) || 1)),
       unitPriceCents: unit,
     });
@@ -216,6 +219,7 @@ export async function markAddonPaid(addonId: string, sessionId: string, paidTota
           playerName: r.name,
           playerNumber: r.number,
           sizes: { [r.key]: r.size },
+          design: r.design,
           notes: "PAID ADD-ON",
         },
         "addon",

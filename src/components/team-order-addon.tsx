@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { itemLabel, sizesFor } from "@/lib/order-items";
 
-type Line = { key: string; size: string; name: string; number: string; quantity: number };
+type Line = { key: string; size: string; name: string; number: string; design: string; quantity: number };
 
 /** Post-submission add-ons: the coach picks a few extra pieces and pays for
  *  them on the spot. They join the roster automatically once paid. */
@@ -11,25 +11,31 @@ export function TeamOrderAddon({
   token,
   items,
   prices,
+  designs = [],
   shipped,
 }: {
   token: string;
   items: string[];
   prices: Record<string, number>;
+  designs?: { label: string; image: string }[];
   shipped?: boolean;
 }) {
   const first = items[0] ?? "jersey";
+  const firstDesign = designs.length === 1 ? designs[0].label : "";
   const [lines, setLines] = useState<Line[]>([]);
-  const [draft, setDraft] = useState<Line>({ key: first, size: sizesFor(first)[0], name: "", number: "", quantity: 1 });
+  const [draft, setDraft] = useState<Line>({ key: first, size: sizesFor(first)[0], name: "", number: "", design: firstDesign, quantity: 1 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const needsDesign = designs.length > 1;
 
   const money = (c: number) => `$${(c / 100).toFixed(2)}`;
   const total = lines.reduce((s, l) => s + (prices[l.key] ?? 0) * l.quantity, 0);
 
   function add() {
+    if (needsDesign && !draft.design) { setError("Pick a design for this piece."); return; }
+    setError("");
     setLines((ls) => [...ls, draft]);
-    setDraft({ key: draft.key, size: draft.size, name: "", number: "", quantity: 1 });
+    setDraft({ key: draft.key, size: draft.size, name: "", number: "", design: draft.design, quantity: 1 });
   }
 
   async function pay() {
@@ -74,6 +80,17 @@ export function TeamOrderAddon({
             </option>
           ))}
         </select>
+        {needsDesign && (
+          <select
+            value={draft.design}
+            onChange={(e) => setDraft((d) => ({ ...d, design: e.target.value }))}
+            className="bg-ink border border-line px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
+            aria-label="Design"
+          >
+            <option value="">Design…</option>
+            {designs.map((dz) => <option key={dz.label} value={dz.label}>{dz.label}</option>)}
+          </select>
+        )}
         <select
           value={draft.size}
           onChange={(e) => setDraft((d) => ({ ...d, size: e.target.value }))}
@@ -113,7 +130,7 @@ export function TeamOrderAddon({
             {lines.map((l, i) => (
               <li key={i} className="flex items-center justify-between gap-3 text-sm">
                 <span className="text-foreground">
-                  {itemLabel(l.key)} · {l.size}
+                  {itemLabel(l.key)}{l.design ? ` · ${l.design}` : ""} · {l.size}
                   {l.name ? ` · ${l.name.toUpperCase()}` : ""}
                   {l.number ? ` · #${l.number}` : ""}
                 </span>

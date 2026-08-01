@@ -54,7 +54,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         currency: "usd" as const,
         unit_amount: r.unitPriceCents,
         product_data: {
-          name: `${r.label} - ${[r.size, r.name?.toUpperCase(), r.number ? `#${r.number}` : null].filter(Boolean).join(" - ")} (add-on ${order.reference})`,
+          name: `${r.label} - ${[r.design, r.size, r.name?.toUpperCase(), r.number ? `#${r.number}` : null].filter(Boolean).join(" - ")} (add-on ${order.reference})`,
         },
       },
     }));

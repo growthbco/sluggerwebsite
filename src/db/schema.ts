@@ -519,7 +519,7 @@ export const teamOrderAddons = pgTable(
       .notNull()
       .references(() => teamOrders.id, { onDelete: "cascade" }),
     rows: jsonb("rows")
-      .$type<Array<{ key: string; label: string; size: string; name?: string; number?: string; quantity: number; unitPriceCents: number }>>()
+      .$type<Array<{ key: string; label: string; size: string; name?: string; number?: string; design?: string; quantity: number; unitPriceCents: number }>>()
       .notNull(),
     totalCents: integer("total_cents").notNull(), // goods only (pre-tax/shipping)
     // What the customer actually paid at checkout (goods + 7% tax + shipping),

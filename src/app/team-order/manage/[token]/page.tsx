@@ -128,6 +128,7 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
           prices={Object.fromEntries(
             addonItems.map((k) => [k, itemPriceCents(k, order.jerseyStyle, order.localPricing)]),
           )}
+          designs={design?.designs ?? []}
           shipped={order.status === "shipped"}
         />
       )}
