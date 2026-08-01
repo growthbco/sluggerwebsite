@@ -193,6 +193,8 @@ type TeamOrderPayload = {
   jerseyMaterial?: string;
   items?: string[];
   roster: RosterRow[];
+  /** Direct link to open this order (design-manage page). */
+  manageUrl?: string;
 };
 
 /** Announce an invoice payment - into the design's thread when linked,
@@ -339,6 +341,7 @@ export async function postTeamOrderToDiscord(
     { name: "Players", value: String(order.roster.filter((r) => r.name || r.number || r.size || (r.sizes && Object.keys(r.sizes).length)).length), inline: true },
     { name: "Roster", value: rows.slice(0, 1024) || "-", inline: false },
   ];
+  if (order.manageUrl) fields.push({ name: "🔗 Open order", value: order.manageUrl, inline: false });
 
   const body: Record<string, unknown> = {
     username: "Slugger Team Orders",

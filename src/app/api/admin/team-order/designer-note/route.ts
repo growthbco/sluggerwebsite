@@ -30,10 +30,14 @@ export async function POST(req: Request) {
   if (notify && note) {
     try {
       const design = order.designRequestId ? await getById(order.designRequestId) : null;
+      const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+      // Direct link to the order so the designer can jump straight to it: the
+      // design-manage page (print QA + roster) when linked, else the team-order.
+      const link = design?.manageToken ? `${SITE}/design/manage/${design.manageToken}` : `${SITE}/team-order/manage/${order.manageToken}`;
       posted = await postDesignThreadUpdate({
         threadId: design?.discordThreadId,
         title: `📝 Designer note - ${order.teamName} (${order.reference})`,
-        description: note,
+        description: `${note}\n\n🔗 [Open this order](${link})`,
         mention: true,
         username: "Slugger Team Orders",
       });

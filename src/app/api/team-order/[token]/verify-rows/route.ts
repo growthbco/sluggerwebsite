@@ -40,14 +40,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     if (order.designRequestId) {
       const design = await getDesignById(order.designRequestId);
       if (design?.discordThreadId) {
+        const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+        const link = design.manageToken ? `\n\n🔗 [Open this order](${SITE}/design/manage/${design.manageToken})` : "";
         await postDesignThreadUpdate({
           threadId: design.discordThreadId,
           title: result.ok
             ? `🔍 ${roster.length} jersey${roster.length === 1 ? "" : "s"} verified - ${order.teamName} (${order.reference})`
             : `🔍 Print file QA - ${order.teamName} (${order.reference})`,
-          description: result.ok
+          description: (result.ok
             ? `Verified ${roster.length} selected ${roster.length === 1 ? "jersey" : "jerseys"} against the uploaded sheet.`
-            : "Found discrepancies between the sheet and the selected jerseys - fix and re-verify.",
+            : "Found discrepancies between the sheet and the selected jerseys - fix and re-verify.") + link,
           fields: result.ok ? undefined : result.mismatches.slice(0, 10).map((m, i) => ({ name: `Issue ${i + 1} - ${m.kind.replace("_", " ")}`, value: m.detail.slice(0, 1024), inline: false })),
           imageUrl: printFileUrls[0],
           username: "Slugger Print QA",

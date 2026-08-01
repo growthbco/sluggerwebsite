@@ -128,6 +128,9 @@ export async function POST(req: Request) {
           sizes: r.sizes,
           notes: r.notes,
         })),
+        manageUrl: design?.manageToken
+          ? `${process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com"}/design/manage/${design.manageToken}`
+          : `${process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com"}/team-order/manage/${created.manageToken}`,
       },
       { designThreadId: design?.discordThreadId },
     );
