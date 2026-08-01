@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
 import { getByManageToken, MAX_REVISIONS, formatProducts } from "@/lib/design-requests";
-import { getByDesignRequestId, getRoster } from "@/lib/team-orders";
-import { latestAddonBatchRoster, getPaidAddonBatches } from "@/lib/team-order-addons";
+import { getByDesignRequestId, getRoster, getPrintableJerseys } from "@/lib/team-orders";
+import { getPaidAddonBatches } from "@/lib/team-order-addons";
 import { JERSEY_MATERIALS, itemLabel, isInHouseItem } from "@/lib/order-items";
 import { getStoreByDesignRequestId, STORE_ITEM_PRESETS } from "@/lib/team-stores";
 import { DesignManagePanel } from "@/components/design-manage-panel";
@@ -11,7 +11,7 @@ import { AiDesignStudio } from "@/components/ai-design-studio";
 import { DesignProgress } from "@/components/design-progress";
 import { PrintFileThumbs } from "@/components/print-file-thumbs";
 import { TeamStoreTeaser } from "@/components/team-store-teaser";
-import { PrintFileQA } from "@/components/print-file-qa";
+import { PrintChecklist } from "@/components/print-checklist";
 import { InboundTracking } from "@/components/inbound-tracking";
 
 export const metadata: Metadata = { title: "Manage Design Request", robots: { index: false } };
@@ -54,12 +54,8 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
   const personalized = printRoster.some(
     (r) => (r.playerName ?? "").trim() || (r.playerNumber ?? "").trim(),
   );
-  // New add-on pieces still to verify enable the "verify add-ons only" mode;
-  // shown in place of the full roster when the toggle is on.
-  // The current add-on roster (latest paid batch) - shown/checked in add-ons-
-  // only mode. Stays available even after the batch is verified.
-  const pendingAddons = linkedOrder ? await latestAddonBatchRoster(linkedOrder.id) : [];
-  const addonCount = pendingAddons.length;
+  // Per-jersey print-file QA: every printable jersey with its own verified state.
+  const printJerseys = linkedOrder ? await getPrintableJerseys(linkedOrder.id) : [];
   // Roster history: the original order (non-add-on rows) plus every paid add-on
   // batch with its own verified status, so the full order history is visible.
   const addonBatches = linkedOrder ? await getPaidAddonBatches(linkedOrder.id) : [];
@@ -105,24 +101,12 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         printFileVerified={Boolean(linkedOrder?.printFileVerifiedAt) || (Boolean(linkedOrder) && printRoster.length > 0 && !personalized)}
       />
 
-      {linkedOrder && printRoster.length > 0 && personalized && (
-        <PrintFileQA
-          // Auth: the verify endpoint accepts the team-order's manage token.
-          // The designer reaches this page from the Discord thread (which only
-          // staff can see), so it's safe to surface the team-order token here.
+      {linkedOrder && printJerseys.length > 0 && (
+        // Per-jersey checklist QA. Auth: the team-order manage token (the
+        // designer reaches this page from the staff-only Discord thread).
+        <PrintChecklist
           token={linkedOrder.manageToken!}
-          rosterCount={printRoster.length}
-          addonCount={addonCount}
-          addonRoster={pendingAddons}
-          roster={printRoster.map((r) => ({
-            name: r.playerName ?? "",
-            number: r.playerNumber ?? "",
-            size: r.sizes?.jersey ?? r.size ?? "",
-          }))}
-          initialPrintFileUrls={
-            linkedOrder.printFileUrls ?? (linkedOrder.printFileUrl ? [linkedOrder.printFileUrl] : [])
-          }
-          initialResult={linkedOrder.printFileVerification ?? null}
+          jerseys={printJerseys.map((j) => ({ ...j, verifiedAt: j.verifiedAt ? new Date(j.verifiedAt).toISOString() : null }))}
         />
       )}
 

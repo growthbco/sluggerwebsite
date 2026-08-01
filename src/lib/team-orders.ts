@@ -1,7 +1,18 @@
 import { randomUUID } from "node:crypto";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrders, teamOrderRoster, designRequests } from "@/db/schema";
+import { isInHouseItem } from "@/lib/order-items";
+
+export type JerseyLine = {
+  id: string;
+  name: string;
+  number: string;
+  size: string;
+  color: string;
+  verifiedAt: Date | null;
+  sheet: string | null;
+};
 
 export type NewTeamOrder = {
   teamName: string;
@@ -89,6 +100,42 @@ export async function getRoster(teamOrderId: string) {
     .from(teamOrderRoster)
     .where(eq(teamOrderRoster.teamOrderId, teamOrderId))
     .orderBy(asc(teamOrderRoster.position), asc(teamOrderRoster.createdAt));
+}
+
+/** Printable jerseys on a team order (one line per roster row) for per-jersey
+ *  print-file QA. Excludes in-house pieces (hats) and blank rows. */
+export async function getPrintableJerseys(teamOrderId: string): Promise<JerseyLine[]> {
+  const rows = await getRoster(teamOrderId);
+  return rows
+    .filter((r) => {
+      const hasPrinted = (r.size ?? "").trim() || Object.entries(r.sizes ?? {}).some(([k, v]) => !isInHouseItem(k) && (v ?? "").trim());
+      const personalized = (r.playerName ?? "").trim() || (r.playerNumber ?? "").trim();
+      return hasPrinted && personalized;
+    })
+    .map((r) => {
+      const sized = Object.entries(r.sizes ?? {}).find(([k, v]) => !isInHouseItem(k) && (v ?? "").trim());
+      return {
+        id: r.id,
+        name: (r.playerName ?? "").trim(),
+        number: (r.playerNumber ?? "").trim(),
+        size: (r.sizes?.jersey ?? sized?.[1] ?? r.size ?? "").trim(),
+        color: (r.notes ?? "").trim(),
+        verifiedAt: r.printVerifiedAt,
+        sheet: r.printVerifiedSheet,
+      };
+    });
+}
+
+/** Mark specific jerseys verified against a sheet, then recompute the order's
+ *  overall print-file gate (all printable jerseys verified => set). */
+export async function markJerseysVerified(teamOrderId: string, rowIds: string[], sheetUrl: string): Promise<void> {
+  const db = getDb();
+  if (rowIds.length) {
+    await db.update(teamOrderRoster).set({ printVerifiedAt: new Date(), printVerifiedSheet: sheetUrl }).where(inArray(teamOrderRoster.id, rowIds));
+  }
+  const all = await getPrintableJerseys(teamOrderId);
+  const allVerified = all.length > 0 && all.every((j) => j.verifiedAt);
+  await db.update(teamOrders).set({ printFileVerifiedAt: allVerified ? new Date() : null, updatedAt: new Date() }).where(eq(teamOrders.id, teamOrderId));
 }
 
 /** A player adds their own row via the self-entry link. */

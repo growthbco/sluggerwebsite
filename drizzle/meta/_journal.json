@@ -344,6 +344,13 @@
       "when": 1785524690341,
       "tag": "0048_curly_nighthawk",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1785553461934,
+      "tag": "0049_happy_wildside",
+      "breakpoints": true
     }
   ]
 }

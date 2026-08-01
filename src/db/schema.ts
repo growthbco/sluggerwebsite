@@ -556,6 +556,12 @@ export const teamOrderRoster = pgTable(
     // How the row was created: "coach" or "self".
     filledBy: text("filled_by").notNull().default("coach"),
     position: integer("position").notNull().default(0),
+    // Per-jersey print-file verification: set when this specific jersey was
+    // checked against a print sheet. printVerifiedSheet holds the sheet URL it
+    // was verified on. Lets QA work jersey-by-jersey (verify new ones without
+    // re-checking already-verified ones).
+    printVerifiedAt: timestamp("print_verified_at", { withTimezone: true }),
+    printVerifiedSheet: text("print_verified_sheet"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("team_order_roster_order_idx").on(t.teamOrderId)],
