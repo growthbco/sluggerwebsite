@@ -31,6 +31,7 @@ export type RosterInput = {
   size?: string;
   sizes?: Record<string, string>;
   notes?: string;
+  design?: string;
   quantity?: number;
 };
 
@@ -119,7 +120,7 @@ export async function getPrintableJerseys(teamOrderId: string): Promise<JerseyLi
         name: (r.playerName ?? "").trim(),
         number: (r.playerNumber ?? "").trim(),
         size: (r.sizes?.jersey ?? sized?.[1] ?? r.size ?? "").trim(),
-        color: (r.notes ?? "").trim(),
+        color: (r.design ?? r.notes ?? "").trim(),
         verifiedAt: r.printVerifiedAt,
         sheet: r.printVerifiedSheet,
       };
@@ -151,6 +152,7 @@ export async function addRosterRow(teamOrderId: string, input: RosterInput, fill
       size: input.sizes?.jersey ?? input.size,
       sizes: input.sizes,
       notes: input.notes,
+      design: input.design,
       quantity: Math.max(1, input.quantity ?? 1),
       filledBy,
       position: existing.length,
@@ -168,6 +170,8 @@ export type LinkedDesignPreview = {
   pending: boolean;
   /** Design colors (free-text + hex list), for the order-details summary. */
   colors: string | null;
+  /** All approved designs/colorways players can pick from (label + image). */
+  designs: { label: string; image: string }[];
 };
 
 /** Pull the design image to show on the join/manage pages so players + coaches
@@ -181,6 +185,11 @@ export async function getLinkedDesignPreview(designRequestId: string | null | un
   const approved = d.approvedDesignUrl ?? null;
   const latestProof = d.proofImages?.length ? d.proofImages[d.proofImages.length - 1] : null;
   const colors = [d.colors?.trim(), (d.colorHexes ?? []).join(", ")].filter(Boolean).join(" · ") || null;
+  // All approved colorways players can pick from - labeled from proofLabels
+  // when set, otherwise "Design 1/2/…".
+  const approvedList = d.approvedDesignUrls?.length ? d.approvedDesignUrls : approved ? [approved] : [];
+  const labels = d.proofLabels ?? {};
+  const designs = approvedList.map((url, i) => ({ label: (labels[url] || `Design ${i + 1}`).trim(), image: url }));
   return {
     reference: d.reference,
     status: d.status,
@@ -188,6 +197,7 @@ export async function getLinkedDesignPreview(designRequestId: string | null | un
     // "ordered" comes AFTER approval - it's still an approved design.
     pending: d.status !== "approved" && d.status !== "ordered",
     colors,
+    designs,
   };
 }
 

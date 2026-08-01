@@ -45,7 +45,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
       </header>
 
       {/* Visual confirmation: this is the uniform you're being added to. */}
-      {design?.imageUrl ? (
+      {design?.imageUrl && (design.designs?.length ?? 0) <= 1 ? (
         <section className="mt-8 rounded-xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
           <div className="aspect-[4/3] relative bg-black/5">
             <Image
@@ -72,7 +72,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
       )}
 
       <div className="mt-6">
-        <SelfEntryForm token={token} items={order.items ?? ["jersey"]} />
+        <SelfEntryForm token={token} items={order.items ?? ["jersey"]} designs={design?.designs ?? []} />
       </div>
 
       <p className="mt-4 text-center text-xs text-muted">

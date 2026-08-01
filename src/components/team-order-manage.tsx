@@ -12,6 +12,7 @@ type RosterRow = {
   size: string | null;
   sizes: Record<string, string> | null;
   notes: string | null;
+  design?: string | null;
   quantity?: number | null;
 };
 
@@ -237,7 +238,7 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerse
                 <span className="text-foreground font-medium uppercase">{r.playerName || "-"}</span>
                 <span className="text-muted">#{r.playerNumber || "-"}</span>
                 <span className="text-muted">{rowSizes(r, items) || "-"}{r.quantity && r.quantity > 1 ? ` ×${r.quantity}` : ""}</span>
-                <span className="text-muted">{r.notes || ""}</span>
+                <span className="text-muted">{[r.design, r.notes].filter(Boolean).join(" · ")}</span>
               </div>
             ))}
           </div>

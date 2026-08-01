@@ -74,6 +74,19 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
               </p>
             </div>
           </div>
+          {(design.designs?.length ?? 0) > 1 && (
+            <div className="border-t border-line/60 px-4 py-3">
+              <p className="text-xs text-muted uppercase tracking-wider mb-2">This team has {design.designs.length} approved designs - players pick which one(s) they want</p>
+              <div className="flex flex-wrap gap-2">
+                {design.designs.map((d) => (
+                  <a key={d.image} href={d.image} target="_blank" rel="noopener noreferrer" className="w-24 border border-line rounded overflow-hidden hover:ring-2 hover:ring-brand" title={`View ${d.label}`}>
+                    <Image src={d.image} alt={d.label} width={96} height={80} sizes="96px" className="h-20 w-full object-contain bg-white" unoptimized />
+                    <span className="block px-1.5 py-1 text-[11px] text-muted leading-tight">{d.label}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -92,6 +105,7 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
           size: r.size,
           sizes: r.sizes,
           notes: r.notes,
+          design: r.design,
           quantity: r.quantity,
         }))}
         submitted={!["draft", "collecting"].includes(order.status)}

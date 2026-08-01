@@ -552,6 +552,9 @@ export const teamOrderRoster = pgTable(
     sizes: jsonb("sizes").$type<Record<string, string>>(),
     style: text("style"), // optional per-player style override (hoodie, shorts...)
     notes: text("notes"),
+    // Which approved design/colorway this jersey is (label, e.g. "Gray" or
+    // "Black Pullover"), when the team has more than one approved design.
+    design: text("design"),
     quantity: integer("quantity").notNull().default(1),
     // How the row was created: "coach" or "self".
     filledBy: text("filled_by").notNull().default("coach"),

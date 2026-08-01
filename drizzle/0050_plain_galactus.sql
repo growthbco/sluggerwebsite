@@ -1,0 +1,1 @@
+ALTER TABLE "team_order_roster" ADD COLUMN "design" text;

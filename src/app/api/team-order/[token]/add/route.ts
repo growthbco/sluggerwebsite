@@ -17,7 +17,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     return NextResponse.json({ error: "This roster is closed - it's already been submitted." }, { status: 409 });
   }
 
-  let body: { playerName?: string; playerNumber?: string; sizes?: Record<string, string>; notes?: string };
+  let body: { playerName?: string; playerNumber?: string; sizes?: Record<string, string>; notes?: string; designs?: string[] };
   try {
     body = await req.json();
   } catch {
@@ -30,13 +30,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     return NextResponse.json({ error: "Pick at least one size." }, { status: 400 });
   }
 
+  // One jersey per selected design (same name/number/size). No design picked
+  // (single-design team) => one row with no design.
+  const designs = Array.isArray(body.designs) ? body.designs.filter((d) => typeof d === "string" && d.trim()).slice(0, 10) : [];
+  const picks = designs.length ? designs : [undefined];
+
   try {
-    await addRosterRow(order.id, {
-      playerName: body.playerName,
-      playerNumber: body.playerNumber,
-      sizes: body.sizes,
-      notes: body.notes,
-    });
+    for (const design of picks) {
+      await addRosterRow(order.id, {
+        playerName: body.playerName,
+        playerNumber: body.playerNumber,
+        sizes: body.sizes,
+        notes: body.notes,
+        design,
+      });
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("addRosterRow failed:", e);
