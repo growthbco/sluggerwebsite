@@ -101,27 +101,30 @@ export function TeamOrderAddon({
             <option key={s}>{s}</option>
           ))}
         </select>
-        <input
-          value={draft.name}
-          onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-          placeholder="Name (optional)"
-          maxLength={30}
-          className="flex-1 min-w-32 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-        />
-        <input
-          value={draft.number}
-          onChange={(e) => setDraft((d) => ({ ...d, number: e.target.value }))}
-          placeholder="#"
-          maxLength={4}
-          className="w-14 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-        />
-        <button
-          type="button"
-          onClick={add}
-          className="clip-slant bg-brand text-on-brand display text-sm px-4 py-2 hover:bg-brand-dark"
-        >
-          Add
-        </button>
+        {/* Keep name + # together so the number never drops to its own line. */}
+        <div className="flex gap-2 items-center flex-1 min-w-48">
+          <input
+            value={draft.name}
+            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+            placeholder="Name (optional)"
+            maxLength={30}
+            className="flex-1 min-w-0 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+          />
+          <input
+            value={draft.number}
+            onChange={(e) => setDraft((d) => ({ ...d, number: e.target.value }))}
+            placeholder="#"
+            maxLength={4}
+            className="w-14 shrink-0 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={add}
+            className="clip-slant bg-brand text-on-brand display text-sm px-4 py-2 hover:bg-brand-dark shrink-0"
+          >
+            Add
+          </button>
+        </div>
       </div>
 
       {lines.length > 0 && (
