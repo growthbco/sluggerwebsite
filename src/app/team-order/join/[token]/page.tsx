@@ -4,8 +4,11 @@ import { dbEnabled } from "@/db";
 import { getBySelfEntryToken, getLinkedDesignPreview } from "@/lib/team-orders";
 import { SelfEntryForm } from "@/components/self-entry-form";
 import { AllSizeCharts } from "@/components/size-charts";
+import { ZoomableImage } from "@/components/zoomable-image";
 
 export const metadata: Metadata = { title: "Add Yourself to the Roster", robots: { index: false } };
+// Always render fresh so a newly-linked design/mockup shows immediately.
+export const dynamic = "force-dynamic";
 
 export default async function JoinPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -48,21 +51,13 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
       {/* Visual confirmation: this is the uniform you're being added to. */}
       {design?.imageUrl && (design.designs?.length ?? 0) <= 1 ? (
         <section className="mt-8 rounded-xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
-          <div className="aspect-[4/3] relative bg-black/5">
-            <Image
-              src={design.imageUrl}
-              alt={`${order.teamName} approved design`}
-              fill
-              sizes="(max-width: 640px) 100vw, 512px"
-              className="object-contain"
-              unoptimized
-            />
-          </div>
-          <div className="px-4 py-3 flex items-center justify-between text-xs">
-            <span className="text-muted">
-              {design.pending ? "Latest proof (pending approval)" : "Approved design"}
-            </span>
-            <span className="font-mono text-muted/80">{design.reference}</span>
+          <ZoomableImage src={design.imageUrl} alt={`${order.teamName} uniform design`} />
+          <div className="px-4 py-3 border-t border-line/60">
+            <div className="flex items-center justify-between text-xs">
+              <span className="display text-brand">This is the design</span>
+              <span className="font-mono text-muted/80">{design.reference}</span>
+            </div>
+            <p className="mt-1 text-xs text-muted">Some details may vary slightly on the final uniform.</p>
           </div>
         </section>
       ) : (
