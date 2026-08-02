@@ -3,6 +3,7 @@ import Image from "next/image";
 import { dbEnabled } from "@/db";
 import { getBySelfEntryToken, getLinkedDesignPreview } from "@/lib/team-orders";
 import { SelfEntryForm } from "@/components/self-entry-form";
+import { AllSizeCharts } from "@/components/size-charts";
 
 export const metadata: Metadata = { title: "Add Yourself to the Roster", robots: { index: false } };
 
@@ -74,6 +75,17 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
       <div className="mt-6">
         <SelfEntryForm token={token} items={order.items ?? ["jersey"]} designs={design?.designs ?? []} />
       </div>
+
+      <details className="mt-6 border border-line bg-steel group">
+        <summary className="flex cursor-pointer items-center justify-between px-4 py-3 list-none">
+          <span className="display text-foreground">📏 Not sure on size? Size charts</span>
+          <span className="text-brand text-xl transition-transform group-open:rotate-45">+</span>
+        </summary>
+        <div className="px-4 pb-5">
+          <p className="text-sm text-muted mb-4">All measurements in inches. Jerseys run slightly large - when in doubt, size down.</p>
+          <AllSizeCharts />
+        </div>
+      </details>
 
       <p className="mt-4 text-center text-xs text-muted">
         Not your team? Close this page - your coach can send you the right link.
