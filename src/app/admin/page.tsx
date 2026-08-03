@@ -13,7 +13,6 @@ import { getLiveTracking, type LiveTracking } from "@/lib/shippo";
 import { AdminLogout } from "@/components/admin-logout";
 import { AdminInvoiceButton } from "@/components/admin-invoice-button";
 import { AdminJerseyStyle } from "@/components/admin-jersey-style";
-import { AdminStatusChips } from "@/components/admin-status-chips";
 import { AdminPipeline } from "@/components/admin-pipeline";
 import { AdminLinkDesign } from "@/components/admin-link-design";
 import { AdminDesignerNote } from "@/components/admin-designer-note";
@@ -404,114 +403,10 @@ export default async function AdminPage() {
         />
       </div>
 
-      {outstanding.length > 0 && (
-        <details className="mt-4 border border-amber-500/40 bg-amber-500/5 group" open>
-          <summary className="flex cursor-pointer items-center justify-between px-4 py-2.5 list-none">
-            <span className="display text-sm text-amber-300">💸 Awaiting payment ({outstanding.length})</span>
-            <span className="text-amber-300 transition-transform group-open:rotate-45">+</span>
-          </summary>
-          <div className="divide-y divide-[color:var(--line)] border-t border-amber-500/20">
-            {outstanding.map((o) => (
-              <div key={o.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
-                <span>
-                  <Link href={`/team-order/manage/${o.token}`} className="font-mono text-xs text-brand hover:underline">{o.ref}</Link>
-                  <span className="ml-2 text-foreground">{o.team}</span>
-                  <span className="ml-2 text-xs text-muted">{o.stage} · sent {daysAgo(o.since)}d ago</span>
-                </span>
-                <span className="display text-foreground">{money(o.due)} due</span>
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
-
-      <AdminSearch
-        statuses={Array.from(new Set([...activeDesigns.map((d) => d.status), ...activeOrders.map((o) => o.status)]))}
-      />
+      <AdminSearch statuses={Array.from(new Set(activeOrders.map((o) => o.status)))} />
 
       <section className="mt-6">
-        <h2 className="display text-xl text-foreground">Design requests ({activeDesigns.length})</h2>
-        <div className="mt-3 overflow-x-auto border border-line">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-steel text-left text-xs text-muted uppercase">
-                <th className="px-3 py-2">Ref</th>
-                <th className="px-3 py-2">Team</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Contact</th>
-                <th className="px-3 py-2">Rev</th>
-                <th className="px-3 py-2">Needed by</th>
-                <th className="px-3 py-2">Last msg</th>
-                <th className="px-3 py-2">Updated</th>
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[color:var(--line)]">
-              {activeDesigns.map((d) => {
-                const lastMsg = d.messages?.[d.messages.length - 1];
-                return (
-                  <tr
-                    key={d.reference}
-                    className="hover:bg-steel/60"
-                    data-section="designs"
-                    data-status={d.status}
-                    data-search={`${d.teamName} ${d.reference} ${d.contactName} ${d.contactEmail}`.toLowerCase()}
-                  >
-                    <td className="px-3 py-2 font-mono text-xs">
-                      <Link href={`/design/manage/${d.manageToken}`} className="text-brand hover:underline">
-                        {d.reference}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2 text-foreground">{d.teamName}</td>
-                    <td className="px-3 py-2"><Badge label={d.status} /></td>
-                    <td className="px-3 py-2 text-muted">{d.contactName}</td>
-                    <td className="px-3 py-2 text-muted">{d.revisionsUsed ?? 0}/5</td>
-                    <td className="px-3 py-2 text-muted">{fmtDate(d.neededBy)}</td>
-                    <td className="px-3 py-2 text-muted">
-                      {lastMsg ? (lastMsg.from === "client" ? "⚠ client waiting" : lastMsg.name ?? "staff") : "-"}
-                    </td>
-                    <td className="px-3 py-2 text-muted">{fmtDate(d.updatedAt)}</td>
-                    <td className="px-3 py-2">
-                      <AdminArchiveButton kind="design_request" id={d.id} archived={false} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {archivedDesigns.length > 0 && (
-        <details className="mt-6 border border-line bg-steel/50 group">
-          <summary className="flex cursor-pointer items-center justify-between px-4 py-3 list-none">
-            <span className="display text-sm text-muted">Archived design requests ({archivedDesigns.length})</span>
-            <span className="text-brand transition-transform group-open:rotate-45">+</span>
-          </summary>
-          <div className="divide-y divide-[color:var(--line)] border-t border-line">
-            {archivedDesigns.map((d) => (
-              <div key={d.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <div>
-                  <Link href={`/design/manage/${d.manageToken}`} className="font-mono text-xs text-brand hover:underline">
-                    {d.reference}
-                  </Link>
-                  <span className="ml-2 text-foreground">{d.teamName}</span>
-                  <span className="ml-2 text-muted">{d.contactName}</span>
-                  {d.archivedNote && <span className="ml-2 text-xs text-amber-400/90">"{d.archivedNote}"</span>}
-                  <span className="ml-2 text-xs text-muted">archived {fmtDate(d.archivedAt)}</span>
-                </div>
-                <AdminArchiveButton kind="design_request" id={d.id} archived={true} />
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
-
-      <section className="mt-10">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="display text-xl text-foreground">Team orders ({activeOrders.length})</h2>
-          <AdminStatusChips />
-        </div>
+        <h2 className="display text-xl text-foreground">Team orders ({activeOrders.length})</h2>
         <div className="mt-3 overflow-x-auto border border-line">
           <table className="w-full text-sm">
             <thead>
@@ -758,6 +653,105 @@ export default async function AdminPage() {
         </div>
       </section>
 
+      {outstanding.length > 0 && (
+        <details className="mt-4 border border-amber-500/40 bg-amber-500/5 group">
+          <summary className="flex cursor-pointer items-center justify-between px-4 py-2.5 list-none">
+            <span className="display text-sm text-amber-300">💸 Awaiting payment ({outstanding.length})</span>
+            <span className="text-amber-300 transition-transform group-open:rotate-45">+</span>
+          </summary>
+          <div className="divide-y divide-[color:var(--line)] border-t border-amber-500/20">
+            {outstanding.map((o) => (
+              <div key={o.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
+                <span>
+                  <Link href={`/team-order/manage/${o.token}`} className="font-mono text-xs text-brand hover:underline">{o.ref}</Link>
+                  <span className="ml-2 text-foreground">{o.team}</span>
+                  <span className="ml-2 text-xs text-muted">{o.stage} · sent {daysAgo(o.since)}d ago</span>
+                </span>
+                <span className="display text-foreground">{money(o.due)} due</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
+      <section className="mt-10">
+        <h2 className="display text-xl text-foreground">Design requests ({activeDesigns.length})</h2>
+        <div className="mt-3 overflow-x-auto border border-line">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-steel text-left text-xs text-muted uppercase">
+                <th className="px-3 py-2">Ref</th>
+                <th className="px-3 py-2">Team</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Contact</th>
+                <th className="px-3 py-2">Rev</th>
+                <th className="px-3 py-2">Needed by</th>
+                <th className="px-3 py-2">Last msg</th>
+                <th className="px-3 py-2">Updated</th>
+                <th className="px-3 py-2"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[color:var(--line)]">
+              {activeDesigns.map((d) => {
+                const lastMsg = d.messages?.[d.messages.length - 1];
+                return (
+                  <tr
+                    key={d.reference}
+                    className="hover:bg-steel/60"
+                    data-section="designs"
+                    data-status={d.status}
+                    data-search={`${d.teamName} ${d.reference} ${d.contactName} ${d.contactEmail}`.toLowerCase()}
+                  >
+                    <td className="px-3 py-2 font-mono text-xs">
+                      <Link href={`/design/manage/${d.manageToken}`} className="text-brand hover:underline">
+                        {d.reference}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2 text-foreground">{d.teamName}</td>
+                    <td className="px-3 py-2"><Badge label={d.status} /></td>
+                    <td className="px-3 py-2 text-muted">{d.contactName}</td>
+                    <td className="px-3 py-2 text-muted">{d.revisionsUsed ?? 0}/5</td>
+                    <td className="px-3 py-2 text-muted">{fmtDate(d.neededBy)}</td>
+                    <td className="px-3 py-2 text-muted">
+                      {lastMsg ? (lastMsg.from === "client" ? "⚠ client waiting" : lastMsg.name ?? "staff") : "-"}
+                    </td>
+                    <td className="px-3 py-2 text-muted">{fmtDate(d.updatedAt)}</td>
+                    <td className="px-3 py-2">
+                      <AdminArchiveButton kind="design_request" id={d.id} archived={false} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {archivedDesigns.length > 0 && (
+        <details className="mt-6 border border-line bg-steel/50 group">
+          <summary className="flex cursor-pointer items-center justify-between px-4 py-3 list-none">
+            <span className="display text-sm text-muted">Archived design requests ({archivedDesigns.length})</span>
+            <span className="text-brand transition-transform group-open:rotate-45">+</span>
+          </summary>
+          <div className="divide-y divide-[color:var(--line)] border-t border-line">
+            {archivedDesigns.map((d) => (
+              <div key={d.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <div>
+                  <Link href={`/design/manage/${d.manageToken}`} className="font-mono text-xs text-brand hover:underline">
+                    {d.reference}
+                  </Link>
+                  <span className="ml-2 text-foreground">{d.teamName}</span>
+                  <span className="ml-2 text-muted">{d.contactName}</span>
+                  {d.archivedNote && <span className="ml-2 text-xs text-amber-400/90">&quot;{d.archivedNote}&quot;</span>}
+                  <span className="ml-2 text-xs text-muted">archived {fmtDate(d.archivedAt)}</span>
+                </div>
+                <AdminArchiveButton kind="design_request" id={d.id} archived={true} />
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
       <div className="mt-6">
         <section>
           <h2 className="display text-xl text-foreground">Shop &amp; store orders</h2>
@@ -770,8 +764,8 @@ export default async function AdminPage() {
             {recentOrders.map((o) => (
               <div key={o.reference} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
                 <div>
-                  <span className="font-mono text-xs text-foreground">{o.reference}</span>
-                  <span className="ml-2 text-muted">{o.customerName ?? "-"}</span>
+                  <Link href={`/admin/order/${o.id}`} className="font-mono text-xs text-brand hover:underline" title="Open the full order detail page">{o.reference}</Link>
+                  <Link href={`/admin/order/${o.id}`} className="ml-2 text-muted hover:text-brand hover:underline">{o.customerName ?? "-"}</Link>
                   <span className="ml-2 text-xs text-muted">({o.type})</span>
                 </div>
                 <span className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">

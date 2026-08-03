@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { STAGE_CHIPS, useStatusFilter } from "@/components/admin-filter-store";
+import { useStatusFilter } from "@/components/admin-filter-store";
 
 // Filters the dashboard's project rows in place. Rows opt in with a
 // data-search attribute (searchable text) and data-status attribute.
@@ -19,7 +19,9 @@ export function AdminSearch({ statuses }: { statuses: string[] }) {
       const text = row.getAttribute("data-search") ?? "";
       const st = row.getAttribute("data-status") ?? "";
       const matchText = !term || text.includes(term);
-      const matchStatus = !status || st === status;
+      // The pipeline/status filter is about ORDER stages - design-request rows
+      // have their own statuses and are only narrowed by the text search.
+      const matchStatus = !status || row.getAttribute("data-section") !== "orders" || st === status;
       const show = matchText && matchStatus;
       row.style.display = show ? "" : "none";
       if (show) {
@@ -37,25 +39,7 @@ export function AdminSearch({ statuses }: { statuses: string[] }) {
   }, [q, status]);
 
   return (
-    <div ref={ref} className="mt-6 space-y-2">
-      {/* Order pipeline chips - one tap to see everyone at that stage. */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {STAGE_CHIPS.map((c) => {
-          const on = status === c.value;
-          return (
-            <button
-              key={c.value}
-              type="button"
-              onClick={() => setStatus(on ? "" : c.value)}
-              className={`text-xs display px-2.5 py-1 border whitespace-nowrap ${
-                on ? "bg-brand text-on-brand border-brand" : "border-line text-muted hover:border-brand/50 hover:text-foreground"
-              }`}
-            >
-              {c.label}
-            </button>
-          );
-        })}
-      </div>
+    <div ref={ref} className="mt-4 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
       <input
         value={q}
