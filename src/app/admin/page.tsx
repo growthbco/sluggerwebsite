@@ -14,6 +14,7 @@ import { AdminLogout } from "@/components/admin-logout";
 import { AdminInvoiceButton } from "@/components/admin-invoice-button";
 import { AdminJerseyStyle } from "@/components/admin-jersey-style";
 import { AdminStatusChips } from "@/components/admin-status-chips";
+import { AdminPipeline } from "@/components/admin-pipeline";
 import { AdminLinkDesign } from "@/components/admin-link-design";
 import { AdminDesignerNote } from "@/components/admin-designer-note";
 import { AdminShipButton } from "@/components/admin-ship-button";
@@ -391,6 +392,17 @@ export default async function AdminPage() {
             <p className="text-xs text-muted mt-0.5">{t.sub}</p>
           </div>
         ))}
+      </div>
+
+      {/* Order pipeline: where every team order sits + what that stage needs.
+          Cards filter the Team Orders table below. */}
+      <div className="mt-4">
+        <AdminPipeline
+          counts={activeOrders.reduce((acc, o) => {
+            acc[o.status] = (acc[o.status] ?? 0) + 1;
+            return acc;
+          }, {} as Record<string, number>)}
+        />
       </div>
 
       {outstanding.length > 0 && (
