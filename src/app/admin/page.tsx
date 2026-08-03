@@ -528,13 +528,13 @@ export default async function AdminPage() {
                     data-search={`${o.teamName} ${o.reference} ${o.contactEmail}`.toLowerCase()}
                   >
                     <td className="px-3 py-2 font-mono text-xs">
-                      <Link href={`/team-order/manage/${o.manageToken}`} className="text-brand hover:underline">
+                      <Link href={`/admin/team-order/${o.id}`} className="text-brand hover:underline" title="Open the full order detail page">
                         {o.reference}
                       </Link>
                     </td>
                     <td className="px-3 py-2 text-foreground">
                       <span className="flex flex-wrap items-center gap-2">
-                        {o.teamName}
+                        <Link href={`/admin/team-order/${o.id}`} className="hover:text-brand hover:underline" title="Open the full order detail page">{o.teamName}</Link>
                         {addonsByOrder.has(o.id) && (
                           <AdminAddonDetails addons={addonsByOrder.get(o.id)!} teamName={o.teamName} />
                         )}
