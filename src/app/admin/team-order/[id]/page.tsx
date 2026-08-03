@@ -25,6 +25,7 @@ import { AdminArchiveButton } from "@/components/admin-archive-button";
 import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
 import { TrackingInfo } from "@/components/tracking-info";
+import { AdminRequote } from "@/components/admin-requote";
 
 export const metadata: Metadata = { title: "Order Detail", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -184,6 +185,11 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
 
       {/* Payment */}
       <Section title="Payment" hint="Two-stage invoicing: 50% deposit starts production, the balance is due before shipping.">
+        {!paid && o.quotedTotalCents != null && quote.totalCents > 0 && quote.totalCents !== o.quotedTotalCents && (
+          <div className="mb-4">
+            <AdminRequote teamOrderId={o.id} lockedCents={o.quotedTotalCents} rosterCents={quote.totalCents} />
+          </div>
+        )}
         <dl className="grid sm:grid-cols-4 gap-4">
           <Field label="Order total">{estimate ? money(estimate) : "-"}{estimate && !o.quotedTotalCents ? <span className="text-xs text-muted"> est.</span> : null}</Field>
           <Field label="Deposit (50%)">{deposit ? money(deposit) : "-"} {o.depositPaidAt ? <span className="text-green-400">✓ paid {fmtDate(o.depositPaidAt)}</span> : <span className="text-muted">not paid</span>}</Field>

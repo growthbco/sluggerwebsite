@@ -559,6 +559,16 @@ export default async function AdminPage() {
                           {estimate ? money(estimate) : "-"}
                           {estimate && !o.quotedTotalCents ? <span className="text-xs text-muted"> est.</span> : null}
                         </span>
+                        {/* Quote drift: roster changed after the quote locked. */}
+                        {!paid && o.quotedTotalCents && orderEstimates.has(o.id) && orderEstimates.get(o.id) !== o.quotedTotalCents ? (
+                          <Link
+                            href={`/admin/team-order/${o.id}`}
+                            className="text-xs text-amber-300 whitespace-nowrap hover:underline"
+                            title={`Roster now prices at ${money(orderEstimates.get(o.id)!)} but the locked quote is ${money(o.quotedTotalCents)} - open to update`}
+                          >
+                            ⚠️ requote
+                          </Link>
+                        ) : null}
                         {/* Shipping rides on the FINAL invoice: show the
                             charged amount once known, else the weight-based
                             estimate so the full number is visible up front. */}
