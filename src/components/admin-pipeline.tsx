@@ -9,6 +9,7 @@ export function AdminPipeline({ counts }: { counts: Record<string, number> }) {
   const [status, setStatus] = useStatusFilter();
 
   const STAGES: { value: string; title: string; action: string; emoji: string; tone: string }[] = [
+    { value: "collecting", title: "Collecting roster", action: "Join link open - players adding themselves", emoji: "📝", tone: "border-line" },
     { value: "submitted", title: "Needs invoice", action: "Roster in - send the 50% deposit", emoji: "📋", tone: "border-amber-300/50" },
     { value: "quoted", title: "Awaiting payment", action: "Invoice sent - waiting on deposit", emoji: "🧾", tone: "border-amber-300/50" },
     { value: "in_production", title: "In production", action: "Deposit paid - send final invoice when ready", emoji: "🏭", tone: "border-sky-400/50" },
@@ -17,7 +18,7 @@ export function AdminPipeline({ counts }: { counts: Record<string, number> }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
       {STAGES.map((s) => {
         const n = counts[s.value] ?? 0;
         const on = status === s.value;
