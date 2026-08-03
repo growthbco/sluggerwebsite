@@ -27,7 +27,6 @@ import { AdminLocalToggle } from "@/components/admin-local-toggle";
 import { AdminTaxToggle } from "@/components/admin-tax-toggle";
 import { AdminSearch } from "@/components/admin-search";
 import { AdminNewStore } from "@/components/admin-new-store";
-import { AdminAssistantFacts } from "@/components/admin-assistant-facts";
 import { AdminRecordPayment } from "@/components/admin-record-payment";
 import { AdminPickupToggle } from "@/components/admin-pickup-toggle";
 import { AdminRowMenu } from "@/components/admin-row-menu";
@@ -929,15 +928,15 @@ export default async function AdminPage() {
       </div>
 
       <section className="mt-10">
-        <h2 className="display text-xl text-foreground">🤖 Train the AI assistant</h2>
-        <p className="text-sm text-muted mt-1">
-          Teach the bot shop facts it should use when answering clients and drafting replies -
-          pricing nuances, policies, product details. It treats these as official and they win
-          over its built-in knowledge. Remove one and it forgets immediately.
-        </p>
-        <div className="mt-3">
-          <AdminAssistantFacts initial={aiFacts.map((f) => ({ id: f.id, fact: f.fact }))} />
-        </div>
+        <Link href="/admin/assistant" className="flex items-center justify-between border border-line bg-steel px-5 py-4 hover:border-brand/60 transition-colors">
+          <span>
+            <span className="display text-lg text-foreground">🤖 Train the AI assistant</span>
+            <span className="block text-sm text-muted mt-0.5">
+              {aiFacts.length} fact{aiFacts.length === 1 ? "" : "s"} taught - add pricing nuances, policies, and product details the bot should treat as official.
+            </span>
+          </span>
+          <span className="display text-brand whitespace-nowrap">Open →</span>
+        </Link>
       </section>
     </div>
   );
