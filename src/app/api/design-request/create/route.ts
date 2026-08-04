@@ -12,6 +12,7 @@ import { postDesignRequestToDiscord } from "@/lib/discord";
 import { emailDesignRequestToDesigner, emailDesignRequestConfirmation } from "@/lib/email";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
 import { refCodeFromCookie } from "@/lib/referral-cookie";
+import { attributionFromCookie } from "@/lib/attribution";
 
 export const runtime = "nodejs";
 
@@ -102,6 +103,18 @@ export async function POST(req: Request) {
       feeWaivedRef,
     });
 
+    // First-touch attribution: where this requester originally came from.
+    let source: string | null = null;
+    try {
+      source = await attributionFromCookie();
+      if (source) {
+        const { getDb } = await import("@/db");
+        const { designRequests } = await import("@/db/schema");
+        const { eq } = await import("drizzle-orm");
+        await getDb().update(designRequests).set({ source }).where(eq(designRequests.id, requestId));
+      }
+    } catch (e) { console.error("attribution stamp failed:", e); }
+
     // If this coach arrived via a referral link, record the attribution now
     // (independent of any fee payment). The reward settles when their team
     // order is actually paid.
@@ -131,6 +144,7 @@ export async function POST(req: Request) {
         neededBy,
         rush,
         estimatedPieces: body.estimatedPieces,
+        source,
       });
       if (discordResult.threadId) {
         try { await setDiscordThreadId(requestId, discordResult.threadId); } catch (e) { console.error("setDiscordThreadId failed:", e); }

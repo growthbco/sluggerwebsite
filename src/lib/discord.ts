@@ -380,6 +380,8 @@ type DesignRequestPayload = {
   rush?: boolean;
   /** Approximate piece count from the intake ("3-9", "25+", ...). */
   estimatedPieces?: string | null;
+  /** First-touch attribution ("Google", "Instagram", "Direct", ...). */
+  source?: string | null;
 };
 
 function fmtNeededBy(v: string | Date | null | undefined): string | null {
@@ -408,6 +410,7 @@ export async function postDesignRequestToDiscord(req: DesignRequestPayload): Pro
     { name: "Request", value: `\`${req.reference}\``, inline: true },
     { name: "Sport", value: req.sport || "-", inline: true },
   ];
+  if (req.source) fields.push({ name: "Source", value: req.source.slice(0, 256), inline: true });
   if (req.estimatedPieces) {
     // Tiny requests get a warning glyph - a full custom design for 1-2 pieces
     // usually isn't worth the work, so staff should weigh in before designing.

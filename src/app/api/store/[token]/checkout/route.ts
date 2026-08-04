@@ -177,6 +177,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   }
 
   const referralCode = await refCodeFromCookie();
+  const { attributionFromCookie } = await import("@/lib/attribution");
+  const attributionSource = await attributionFromCookie();
 
   try {
     const stripe = getStripe();
@@ -195,7 +197,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
           fixed_amount: { amount: o.amountCents, currency: "usd" },
         },
       })),
-      metadata: { orderType: "team_store", teamId: store.id, teamName: store.name, ...(rush ? { rush: "true" } : {}), ...(referralCode ? { referralCode } : {}), ...(note ? { orderNote: note } : {}), ...(fundraiseTotal > 0 ? { fundraiseCents: String(fundraiseTotal) } : {}) },
+      metadata: { orderType: "team_store", teamId: store.id, teamName: store.name, ...(rush ? { rush: "true" } : {}), ...(referralCode ? { referralCode } : {}), ...(note ? { orderNote: note } : {}), ...(fundraiseTotal > 0 ? { fundraiseCents: String(fundraiseTotal) } : {}), ...(attributionSource ? { attributionSource } : {}) },
     });
     return NextResponse.json({ url: session.url });
   } catch (e) {

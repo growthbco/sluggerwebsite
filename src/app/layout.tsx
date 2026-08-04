@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { StaffShortcut } from "@/components/staff-shortcut";
 import { SiteChat } from "@/components/site-chat";
+import { AttributionCapture } from "@/components/attribution-capture";
 
 // Sitewide LocalBusiness schema: ties every page to the Ocala shop and its
 // Central Florida service area for local search.
@@ -77,6 +78,7 @@ export default function RootLayout({
           <SiteFooter />
           <StaffShortcut />
           <SiteChat />
+          <AttributionCapture />
         </CartProvider>
         <Analytics />
       </body>

@@ -138,6 +138,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
           <Field label="Name">{o.contactName}</Field>
           <Field label="Email"><a href={`mailto:${o.contactEmail}`} className="text-brand hover:underline">{o.contactEmail}</a></Field>
           <Field label="Phone">{o.contactPhone ? <a href={`tel:${o.contactPhone}`} className="text-brand hover:underline">{o.contactPhone}</a> : "-"}</Field>
+          <Field label="Source">{o.source ?? "unknown (pre-tracking)"}</Field>
         </dl>
         <div className="mt-4 flex flex-wrap gap-3 text-sm">
           <a href={`/team-order/manage/${o.manageToken}`} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">Coach&apos;s page ↗</a>

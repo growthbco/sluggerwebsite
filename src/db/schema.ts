@@ -333,6 +333,8 @@ export const orders = pgTable(
 
     // Optional note the buyer left at checkout (team store).
     customerNote: text("customer_note"),
+    // First-touch attribution ("Google", "Instagram", "Direct", ...).
+    source: text("source"),
     // The team-fundraising portion of this order (sum of the % markup), for
     // tracking how much a store has raised for its team.
     fundraiseCents: integer("fundraise_cents").notNull().default(0),
@@ -384,6 +386,9 @@ export const teamOrders = pgTable(
     contactEmail: text("contact_email").notNull(),
     contactPhone: text("contact_phone"),
     salesRep: text("sales_rep"),
+    // Where this order came from ("Google (organic) → /custom-softball-uniforms",
+    // "Instagram", "Direct"), captured from the visitor's first-touch cookie.
+    source: text("source"),
 
     sport: text("sport"),
     jerseyStyle: text("jersey_style"), // crew / v-neck / full button / two button
@@ -668,6 +673,8 @@ export const designRequests = pgTable(
 
     // Tokens powering the public client + private staff links.
     statusToken: text("status_token"),
+    // First-touch attribution ("Google", "Instagram", "Direct", ...).
+    source: text("source"),
     manageToken: text("manage_token"),
 
     // Discord thread id of this request's forum post (captured on first send).

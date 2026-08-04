@@ -33,6 +33,7 @@ export async function persistPaidOrder(args: {
   teamId?: string;
   customerNote?: string;
   fundraiseCents?: number;
+  source?: string;
   lines: PaidOrderLine[];
 }): Promise<{ inserted: boolean }> {
   const db = getDb();
@@ -53,6 +54,7 @@ export async function persistPaidOrder(args: {
       teamId: args.teamId,
       customerNote: args.customerNote,
       fundraiseCents: args.fundraiseCents ?? 0,
+      source: args.source,
       discordNotifiedAt: new Date(),
     })
     .onConflictDoNothing({ target: orders.stripeCheckoutSessionId })

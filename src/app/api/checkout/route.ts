@@ -103,6 +103,8 @@ export async function POST(req: Request) {
   }
 
   const referralCode = await refCodeFromCookie();
+  const { attributionFromCookie } = await import("@/lib/attribution");
+  const attributionSource = await attributionFromCookie();
 
   try {
     const stripe = getStripe();
@@ -113,7 +115,7 @@ export async function POST(req: Request) {
       cancel_url: `${SITE}/cart`,
       shipping_address_collection: { allowed_countries: ["US", "CA"] },
       phone_number_collection: { enabled: true },
-      metadata: { orderType: "shop", ...(referralCode ? { referralCode } : {}) },
+      metadata: { orderType: "shop", ...(referralCode ? { referralCode } : {}), ...(attributionSource ? { attributionSource } : {}) },
     });
     return NextResponse.json({ url: session.url });
   } catch (e) {

@@ -101,6 +101,17 @@ export async function POST(req: Request) {
       );
     }
     await submitTeamOrder(created.id);
+    // First-touch attribution: where this coach originally came from.
+    try {
+      const { attributionFromCookie } = await import("@/lib/attribution");
+      const source = await attributionFromCookie();
+      if (source) {
+        const { getDb } = await import("@/db");
+        const { teamOrders } = await import("@/db/schema");
+        const { eq } = await import("drizzle-orm");
+        await getDb().update(teamOrders).set({ source }).where(eq(teamOrders.id, created.id));
+      }
+    } catch (e) { console.error("attribution stamp failed:", e); }
     if (design) {
       try {
         await markOrdered(design.id);

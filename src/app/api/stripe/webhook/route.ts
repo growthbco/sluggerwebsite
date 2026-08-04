@@ -96,6 +96,7 @@ export async function POST(req: Request) {
             neededBy: request.neededBy ?? undefined,
             rush: request.rush,
             estimatedPieces: request.estimatedPieces,
+            source: request.source,
           });
           if (discordResult.threadId) {
             try { await setDiscordThreadId(designRequestId, discordResult.threadId); } catch (e) { console.error("setDiscordThreadId failed:", e); }
@@ -391,6 +392,7 @@ export async function POST(req: Request) {
             teamId: session.metadata?.teamId || undefined,
             customerNote: session.metadata?.orderNote || undefined,
             fundraiseCents: Number(session.metadata?.fundraiseCents) || 0,
+            source: session.metadata?.attributionSource || undefined,
             lines: lineItems.data.map((li) => ({
               name: li.description ?? "Item",
               quantity: li.quantity ?? 1,
