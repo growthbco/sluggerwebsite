@@ -137,9 +137,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         parts.push({
           text:
             "BRANDING (required, appears on every real Slugger jersey): the next two images are brand marks to reproduce exactly. " +
-            "Mark 1 (white size-tag strip with barcode): place SMALL at the bottom-center of the FRONT, just above the hem. " +
-            "Mark 2 ('SA' script logo): place SMALL at the top-center of the BACK, just above the player name. " +
-            "Keep both subtle and to scale, like real garment tags.",
+            "Mark 1 (white size-tag strip with barcode): place SMALL at the bottom-center of the FRONT, just above the hem, subtle like a real garment tag. " +
+            "Mark 2 ('SA' script logo): place at the top-center of the BACK, just above the player name - prominent and clearly readable, about half the height of the player-name lettering. " +
+            "The SA mark may be recolored to match the design's palette so it blends with the overall style.",
         });
         parts.push({ inline_data: tagStrip });
         parts.push({ inline_data: saScript });
