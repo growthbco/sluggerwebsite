@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { INBOUND_CARRIERS, inboundTrackingUrlFor } from "@/lib/tracking";
 
 type Saved = { trackingNumber: string; carrier: string };
+type Candidate = { id: string; reference: string; teamName: string; status: string };
 
 /** Designer-only: log the factory -> Slugger shipment tracking. Rendered on
  *  /design/manage (staff link from Discord). The customer never sees this -
@@ -21,6 +22,23 @@ export function InboundTracking({
   const [num, setNum] = useState(initial?.trackingNumber ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Other open orders that might be riding in the SAME box - checklist so one
+  // tracking number can cover every order it contains.
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [also, setAlso] = useState<Set<string>>(new Set());
+  const [savedCount, setSavedCount] = useState(0);
+
+  useEffect(() => {
+    if (!editing) return;
+    fetch(`/api/team-order/${token}/inbound-tracking`)
+      .then((r) => (r.ok ? r.json() : { candidates: [] }))
+      .then((d) => setCandidates(d.candidates ?? []))
+      .catch(() => {});
+  }, [editing, token]);
+
+  function toggleAlso(id: string) {
+    setAlso((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
 
   async function save() {
     setBusy(true);
@@ -29,11 +47,13 @@ export function InboundTracking({
       const res = await fetch(`/api/team-order/${token}/inbound-tracking`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trackingNumber: num, carrier }),
+        body: JSON.stringify({ trackingNumber: num, carrier, alsoOrderIds: [...also] }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not save tracking.");
       setSaved({ trackingNumber: data.trackingNumber, carrier: data.carrier });
+      setSavedCount(data.applied ?? 1);
+      setAlso(new Set());
       setEditing(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save tracking.");
@@ -98,9 +118,35 @@ export function InboundTracking({
             disabled={busy || !num.trim()}
             className="display text-sm bg-brand text-on-brand px-4 py-2 disabled:opacity-50"
           >
-            {busy ? "Saving..." : "Save + notify shop"}
+            {busy ? "Saving..." : also.size > 0 ? `Save for ${also.size + 1} orders + notify` : "Save + notify shop"}
           </button>
         </div>
+      )}
+
+      {editing && candidates.length > 0 && (
+        <div className="mt-4 border border-line bg-background/40 p-3">
+          <p className="text-sm text-foreground display">📦 More orders in this same box?</p>
+          <p className="text-xs text-muted mt-0.5">Check every order this tracking number covers - it gets applied to all of them and each thread is notified.</p>
+          <ul className="mt-2 space-y-1.5">
+            {candidates.map((c) => (
+              <li key={c.id}>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={also.has(c.id)}
+                    onChange={() => toggleAlso(c.id)}
+                    className="accent-[color:var(--brand-gold)]"
+                  />
+                  <span className="text-foreground">{c.teamName}</span>
+                  <span className="font-mono text-xs text-muted">{c.reference}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {savedCount > 1 && !editing && (
+        <p className="mt-2 text-xs text-green-400">Applied to {savedCount} orders in this box.</p>
       )}
       {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
     </section>
