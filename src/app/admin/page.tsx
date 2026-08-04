@@ -70,6 +70,9 @@ function fmtDate(d: Date | string | null | undefined) {
 }
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+// Compact source for table cells ("Google (ad) → /pricing" -> "Google (ad)");
+// the full string stays in the hover tooltip.
+const srcShort = (s: string | null | undefined) => (s ? s.split(" → ")[0] : "-");
 
 export default async function AdminPage() {
   if (!adminEnabled()) {
@@ -93,6 +96,7 @@ export default async function AdminPage() {
         revisionsUsed: designRequests.revisionsUsed,
         neededBy: designRequests.neededBy,
         messages: designRequests.messages,
+        source: designRequests.source,
         manageToken: designRequests.manageToken,
         archivedAt: designRequests.archivedAt,
         archivedNote: designRequests.archivedNote,
@@ -114,6 +118,7 @@ export default async function AdminPage() {
         taxExempt: teamOrders.taxExempt,
         designRequestId: teamOrders.designRequestId,
         designerNote: teamOrders.designerNote,
+        source: teamOrders.source,
         printFileVerifiedAt: teamOrders.printFileVerifiedAt,
         quotedTotalCents: teamOrders.quotedTotalCents,
         invoiceUrl: teamOrders.invoiceUrl,
@@ -159,6 +164,7 @@ export default async function AdminPage() {
         shippedAt: orders.shippedAt,
         createdAt: orders.createdAt,
         teamId: orders.teamId,
+        source: orders.source,
       })
       .from(orders)
       .where(isNull(orders.archivedAt))
@@ -415,6 +421,7 @@ export default async function AdminPage() {
                 <th className="px-3 py-2">Team</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Contact</th>
+                <th className="px-3 py-2">Source</th>
                 <th className="px-3 py-2">Total</th>
                 <th className="px-3 py-2">Invoice</th>
                 <th className="px-3 py-2">Updated</th>
@@ -448,6 +455,7 @@ export default async function AdminPage() {
                     </td>
                     <td className="px-3 py-2"><Badge label={o.status} /></td>
                     <td className="px-3 py-2 text-muted">{o.contactEmail}</td>
+                    <td className="px-3 py-2 text-muted whitespace-nowrap" title={o.source ?? "unknown (pre-tracking)"}>{srcShort(o.source)}</td>
                     <td className="px-3 py-2 text-foreground">
                       <span className="flex flex-wrap items-center gap-1.5">
                         <span className="whitespace-nowrap">
@@ -684,6 +692,7 @@ export default async function AdminPage() {
                 <th className="px-3 py-2">Team</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Contact</th>
+                <th className="px-3 py-2">Source</th>
                 <th className="px-3 py-2">Rev</th>
                 <th className="px-3 py-2">Needed by</th>
                 <th className="px-3 py-2">Last msg</th>
@@ -710,6 +719,7 @@ export default async function AdminPage() {
                     <td className="px-3 py-2 text-foreground">{d.teamName}</td>
                     <td className="px-3 py-2"><Badge label={d.status} /></td>
                     <td className="px-3 py-2 text-muted">{d.contactName}</td>
+                    <td className="px-3 py-2 text-muted whitespace-nowrap" title={d.source ?? "unknown (pre-tracking)"}>{srcShort(d.source)}</td>
                     <td className="px-3 py-2 text-muted">{d.revisionsUsed ?? 0}/5</td>
                     <td className="px-3 py-2 text-muted">{fmtDate(d.neededBy)}</td>
                     <td className="px-3 py-2 text-muted">
@@ -767,6 +777,7 @@ export default async function AdminPage() {
                   <Link href={`/admin/order/${o.id}`} className="font-mono text-xs text-brand hover:underline" title="Open the full order detail page">{o.reference}</Link>
                   <Link href={`/admin/order/${o.id}`} className="ml-2 text-muted hover:text-brand hover:underline">{o.customerName ?? "-"}</Link>
                   <span className="ml-2 text-xs text-muted">({o.type})</span>
+                  {o.source && <span className="ml-2 text-xs text-muted" title={o.source}>via {srcShort(o.source)}</span>}
                 </div>
                 <span className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
                   <span className="text-foreground whitespace-nowrap">

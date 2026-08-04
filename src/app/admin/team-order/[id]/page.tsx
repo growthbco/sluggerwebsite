@@ -141,9 +141,9 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
           <Field label="Source">{o.source ?? "unknown (pre-tracking)"}</Field>
         </dl>
         <div className="mt-4 flex flex-wrap gap-2">
-          <a href={`/team-order/manage/${o.manageToken}`} target="_blank" rel="noopener noreferrer" className="text-sm display border border-brand/60 text-brand px-4 py-2 hover:bg-brand/10 whitespace-nowrap">Coach&apos;s page ↗</a>
+          <a href={`/team-order/manage/${o.manageToken}`} target="_blank" rel="noopener noreferrer" className="text-sm display border border-brand/60 text-brand px-4 py-2 hover:bg-brand/10 whitespace-nowrap">Coach&apos;s page</a>
           {o.selfEntryToken && (
-            <a href={`/team-order/join/${o.selfEntryToken}`} target="_blank" rel="noopener noreferrer" className="text-sm display border border-brand/60 text-brand px-4 py-2 hover:bg-brand/10 whitespace-nowrap">Player join link ↗</a>
+            <a href={`/team-order/join/${o.selfEntryToken}`} target="_blank" rel="noopener noreferrer" className="text-sm display border border-brand/60 text-brand px-4 py-2 hover:bg-brand/10 whitespace-nowrap">Player join link</a>
           )}
         </div>
       </Section>
