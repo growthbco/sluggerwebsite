@@ -140,10 +140,10 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
           <Field label="Phone">{o.contactPhone ? <a href={`tel:${o.contactPhone}`} className="text-brand hover:underline">{o.contactPhone}</a> : "-"}</Field>
           <Field label="Source">{o.source ?? "unknown (pre-tracking)"}</Field>
         </dl>
-        <div className="mt-4 flex flex-wrap gap-3 text-sm">
-          <a href={`/team-order/manage/${o.manageToken}`} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">Coach&apos;s page ↗</a>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <a href={`/team-order/manage/${o.manageToken}`} target="_blank" rel="noopener noreferrer" className="text-sm display border border-brand/60 text-brand px-4 py-2 hover:bg-brand/10 whitespace-nowrap">Coach&apos;s page ↗</a>
           {o.selfEntryToken && (
-            <a href={`/team-order/join/${o.selfEntryToken}`} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">Player join link ↗</a>
+            <a href={`/team-order/join/${o.selfEntryToken}`} target="_blank" rel="noopener noreferrer" className="text-sm display border border-brand/60 text-brand px-4 py-2 hover:bg-brand/10 whitespace-nowrap">Player join link ↗</a>
           )}
         </div>
       </Section>

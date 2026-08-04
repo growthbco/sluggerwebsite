@@ -13,6 +13,9 @@ const PRODUCTS = [
   { id: "socks", label: "Socks" },
 ];
 
+// Same jersey cuts the customer picks on the order form.
+const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button", "Quarter-Zip"];
+
 type Props = {
   token: string;
   teamName: string;
@@ -39,6 +42,8 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
   // Staff-supplied reference image + colors (optional overrides).
   const [refImage, setRefImage] = useState<string | null>(null);
   const [product, setProduct] = useState<string>("jersey");
+  // Jersey cut - "" = whatever the customer's brief says.
+  const [jerseyStyle, setJerseyStyle] = useState<string>("");
   const [useColors, setUseColors] = useState(false);
   const [primary, setPrimary] = useState("#1f4fd8");
   const [accent, setAccent] = useState("#d81f1f");
@@ -119,6 +124,7 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
           // the image being edited ("look at this and change X").
           refImage: refImage ?? undefined,
           colors: action === "generate" && useColors ? [primary, accent] : undefined,
+          style: action === "generate" && product === "jersey" && jerseyStyle ? jerseyStyle : undefined,
         }),
       });
       const d = await res.json();
@@ -235,6 +241,23 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
                     </button>
                   ))}
                 </div>
+                {product === "jersey" && (
+                  <div className="mt-2">
+                    <label className="display text-xs text-muted tracking-wide">JERSEY CUT</label>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      <button type="button" onClick={() => setJerseyStyle("")}
+                        className={`text-sm px-3 py-1.5 rounded border ${jerseyStyle === "" ? "bg-brand text-on-brand border-brand" : "border-line text-foreground hover:bg-brand/10"}`}>
+                        From the brief
+                      </button>
+                      {JERSEY_STYLES.map((s) => (
+                        <button key={s} type="button" onClick={() => setJerseyStyle(s)}
+                          className={`text-sm px-3 py-1.5 rounded border ${jerseyStyle === s ? "bg-brand text-on-brand border-brand" : "border-line text-foreground hover:bg-brand/10"}`}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="display text-xs text-muted tracking-wide">REFERENCE IMAGE (optional)</label>

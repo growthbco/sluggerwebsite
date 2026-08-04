@@ -10,6 +10,13 @@ import { buildProductPrompt, buildRefinePrompt, buildReferencePrompt, productAsp
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+// Standard Slugger branding baked into every jersey mockup (matches the real
+// garment): the size-tag strip (front hem) and the SA script (top back).
+const BRAND_TAG_STRIP_URL =
+  "https://wnbdipjkyfozqxrj.public.blob.vercel-storage.com/branding/sa-size-tag-strip-2F0JyKbHLiQ9CIDTH1Jtc2bZxm44IT.png";
+const BRAND_SA_SCRIPT_URL =
+  "https://wnbdipjkyfozqxrj.public.blob.vercel-storage.com/branding/sa-script-logo-vSeKOsS5bPnSqEk6n0QFFBuPAjLFqQ.png";
+
 // Staff-only AI design studio for a specific design request. "generate" starts
 // a fresh mockup from the brief; "refine" edits the current version with a
 // change instruction (e.g. from the customer's change request). Every result
@@ -99,7 +106,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       // prompt. Do NOT inject the design request's team name / vision (that's
       // what forced "Orlando Avengers" and the wrong colors onto everything).
       const refColors = staffColors.length ? staffColors.map(colorName).join(", ") : "";
-      parts.push({ text: buildReferencePrompt(product, { instruction, colors: refColors }) });
+      // An explicitly picked jersey cut still applies in reference mode.
+      const styleLine = product === "jersey" && (body.style ?? "").trim() ? `Make it a ${(body.style ?? "").trim()} jersey cut. ` : "";
+      parts.push({ text: buildReferencePrompt(product, { instruction: `${styleLine}${instruction}`.trim(), colors: refColors }) });
       parts.push({ inline_data: refImage });
     } else {
       // Brief-driven: no reference uploaded, so build from the design request
@@ -114,6 +123,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         vision: request.vision, instruction, hasRef: seeds.length > 0,
       }) });
       for (const s of seeds.slice(0, 3)) parts.push({ inline_data: s });
+    }
+
+    // Standard Slugger branding on every jersey mockup: the size-tag strip at
+    // the bottom-center front hem, and the SA script at the top-center back
+    // above the player name (matches what production actually prints).
+    if (product === "jersey") {
+      const [tagStrip, saScript] = await Promise.all([
+        fetchImage(BRAND_TAG_STRIP_URL),
+        fetchImage(BRAND_SA_SCRIPT_URL),
+      ]);
+      if (tagStrip && saScript) {
+        parts.push({
+          text:
+            "BRANDING (required, appears on every real Slugger jersey): the next two images are brand marks to reproduce exactly. " +
+            "Mark 1 (white size-tag strip with barcode): place SMALL at the bottom-center of the FRONT, just above the hem. " +
+            "Mark 2 ('SA' script logo): place SMALL at the top-center of the BACK, just above the player name. " +
+            "Keep both subtle and to scale, like real garment tags.",
+        });
+        parts.push({ inline_data: tagStrip });
+        parts.push({ inline_data: saScript });
+      }
     }
   }
 
