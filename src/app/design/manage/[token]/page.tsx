@@ -206,6 +206,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
           return [cr.generalNote, ...(cr.annotations ?? []).map((a) => a.note)].filter(Boolean).join("; ") || undefined;
         })()}
         initialVersions={request.aiDesignState?.versions ?? []}
+        inspirationImages={request.inspirationImages ?? []}
       />
 
       <div className="pt-6 border-t border-line">

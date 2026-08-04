@@ -18,13 +18,15 @@ type Props = {
   teamName: string;
   latestChangeRequest?: string;
   initialVersions?: Version[];
+  /** The client's inspiration uploads - one tap to use as the reference. */
+  inspirationImages?: string[];
 };
 
 /** Staff-only AI design studio on the designer's manage page. Generate a
  *  mockup from the brief, refine it with change instructions, and every
  *  version is saved to the design request - so anyone on the team can pick up
  *  exactly where the design left off. */
-export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVersions = [] }: Props) {
+export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVersions = [], inspirationImages = [] }: Props) {
   const [versions, setVersions] = useState<Version[]>(initialVersions);
   const [activeIdx, setActiveIdx] = useState(initialVersions.length - 1);
   const [instruction, setInstruction] = useState(latestChangeRequest ?? "");
@@ -45,14 +47,12 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
   const active = versions[activeIdx];
   const downloadUrl = active?.cleanUrl ?? active?.url;
 
-  async function onPickFile(file: File) {
-    // Downscale to keep the request small; reference only needs to convey vibe.
-    const dataUrl: string = await new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(r.result as string);
-      r.onerror = reject;
-      r.readAsDataURL(file);
-    });
+  // Which client-inspiration thumbnail is currently the reference (if any).
+  const [inspoIdx, setInspoIdx] = useState<number | null>(null);
+
+  // Downscale a data URL to keep the request small; a reference only needs to
+  // convey the vibe.
+  function downscale(dataUrl: string, done: (out: string) => void) {
     const img = new Image();
     img.onload = () => {
       const max = 1024;
@@ -62,12 +62,42 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
       const canvas = document.createElement("canvas");
       canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext("2d");
-      if (!ctx) { setRefImage(dataUrl); return; }
+      if (!ctx) { done(dataUrl); return; }
       ctx.drawImage(img, 0, 0, w, h);
-      setRefImage(canvas.toDataURL("image/jpeg", 0.85));
+      done(canvas.toDataURL("image/jpeg", 0.85));
     };
-    img.onerror = () => setRefImage(dataUrl);
+    img.onerror = () => done(dataUrl);
     img.src = dataUrl;
+  }
+
+  async function onPickFile(file: File) {
+    const dataUrl: string = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+    setInspoIdx(null);
+    downscale(dataUrl, setRefImage);
+  }
+
+  /** One tap: use one of the client's inspiration uploads as the reference -
+   *  no download/re-upload round trip. */
+  async function useInspiration(url: string, idx: number) {
+    try {
+      setError(null);
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result as string);
+        r.onerror = reject;
+        r.readAsDataURL(blob);
+      });
+      downscale(dataUrl, (out) => { setRefImage(out); setInspoIdx(idx); });
+    } catch {
+      setError("Couldn't load that inspiration image - try downloading it instead.");
+    }
   }
 
   async function run(action: "generate" | "refine") {
@@ -213,7 +243,7 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
                     <>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={refImage} alt="reference" className="h-14 w-14 object-cover rounded border border-line" />
-                      <button type="button" onClick={() => { setRefImage(null); if (fileRef.current) fileRef.current.value = ""; }} className="text-sm text-brand underline underline-offset-2">Remove</button>
+                      <button type="button" onClick={() => { setRefImage(null); setInspoIdx(null); if (fileRef.current) fileRef.current.value = ""; }} className="text-sm text-brand underline underline-offset-2">Remove</button>
                     </>
                   ) : (
                     <button type="button" onClick={() => fileRef.current?.click()} className="text-sm border border-brand/70 text-foreground hover:bg-brand/10 px-3 py-1.5 rounded">
@@ -223,6 +253,26 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
                   <input ref={fileRef} type="file" accept="image/*" className="hidden"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickFile(f); }} />
                 </div>
+                {inspirationImages.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-muted">…or tap the client&apos;s inspiration to use it directly:</p>
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {inspirationImages.filter((u) => /\.(png|jpe?g|webp|gif)($|\?)/i.test(u)).map((u, i) => (
+                        <button
+                          key={u}
+                          type="button"
+                          onClick={() => useInspiration(u, i)}
+                          title="Use as the reference image"
+                          className={`relative h-14 w-14 rounded overflow-hidden border-2 bg-white ${inspoIdx === i ? "border-brand ring-1 ring-brand" : "border-line hover:border-brand/60"}`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={u} alt={`Client inspiration ${i + 1}`} className="h-full w-full object-cover" />
+                          {inspoIdx === i && <span className="absolute inset-0 grid place-items-center bg-brand/30 text-on-brand text-base">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <p className="mt-1 text-xs text-muted">On a fresh mockup: a jersey/sketch to riff on. On Generate revision: a logo/graphic to add to the current design.</p>
               </div>
               <div>
