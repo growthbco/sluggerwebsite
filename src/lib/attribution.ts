@@ -37,7 +37,7 @@ export async function attributionFromCookie(): Promise<string | null> {
     const src = base ? pretty(base) : "Direct";
     // Ad-click markers and utm medium/campaign add useful nuance.
     const extras = [d.g ? "ad" : d.f ? "ad" : "", d.m?.trim() ?? "", d.c?.trim() ?? ""].filter(Boolean).join(" / ");
-    const landing = d.l && d.l !== "/" ? ` → ${d.l}` : "";
+    const landing = d.l ? ` → ${d.l === "/" ? "homepage" : d.l}` : "";
     return `${src}${extras ? ` (${extras})` : ""}${landing}`.slice(0, 200);
   } catch {
     return null;

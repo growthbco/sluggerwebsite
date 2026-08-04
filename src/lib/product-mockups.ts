@@ -145,6 +145,12 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
     lines.push("A REFERENCE image is provided: use its design language, colors, and vibe as inspiration for a new original design.");
   }
   lines.push(product === "hype-chain" ? FRAME_FULL : FRAME_TIGHT);
+  // One product per mockup: each product the client wants gets its OWN proof.
+  // Without this, inspiration images of other pieces (a hat photo on a jersey
+  // brief) leak into the shot and the model lumps products together.
+  lines.push(
+    `Show ONLY the ${productNoun(product)} - exactly one product in the frame. Do NOT include any other items (no hats, jerseys, hoodies, pants, socks, or chains that aren't the ${productNoun(product)} itself), even if reference or inspiration images show them.`,
+  );
   lines.push(GUARDRAIL);
   return lines.filter(Boolean).join(" ");
 }
@@ -168,6 +174,7 @@ export function buildReferencePrompt(product: ProductType, opts: { instruction?:
     `If the reference is a full ${noun}, recreate its design, layout, and colors faithfully. If the reference is a logo or graphic, design a ${noun} that prominently features that logo.`,
     opts.colors ? `Colors: ${opts.colors}.` : "",
     opts.instruction ? `Make this change: ${opts.instruction}. Change ONLY that; keep everything else identical.` : "",
+    `Show ONLY the ${noun} - exactly one product in the frame; no other garments, hats, or accessories even if the reference shows them.`,
     "Do not add any team name or text that is not in the reference or requested. No MLB/NBA/NFL or other brand logos.",
   ].filter(Boolean).join(" ");
 }
