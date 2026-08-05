@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { desc, sql, eq, isNotNull, isNull } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
-import { designRequests, teamOrders, teams, orders, teamOrderAddons, assistantFacts, customInvoices } from "@/db/schema";
+import { designRequests, teamOrders, teams, orders, teamOrderAddons, assistantFacts, customInvoices, designLabVisitors } from "@/db/schema";
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
 import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote, estimateOrderWeightOz } from "@/lib/team-order-pricing";
@@ -198,6 +198,12 @@ export default async function AdminPage() {
 
   // Facts staff taught the AI assistant (rendered in the training panel).
   const aiFacts = await db.select().from(assistantFacts).orderBy(assistantFacts.createdAt);
+  // Design-lab lead counts for the dashboard card.
+  const labVisitors = await db
+    .select({ id: designLabVisitors.id, email: designLabVisitors.email, paidAt: designLabVisitors.paidAt })
+    .from(designLabVisitors);
+  const labLeads = labVisitors.filter((v) => v.email).length;
+  const labPaid = labVisitors.filter((v) => v.paidAt).length;
 
   // Free-form custom invoices (newest first).
   const invoices = await db.select().from(customInvoices).orderBy(desc(customInvoices.createdAt)).limit(15);
@@ -683,6 +689,18 @@ export default async function AdminPage() {
       )}
 
       <section className="mt-10">
+        <Link href="/admin/design-lab" className="flex items-center justify-between border border-line bg-steel px-5 py-4 hover:border-brand/60 transition-colors">
+          <span>
+            <span className="display text-lg text-foreground">🧪 Design Lab leads</span>
+            <span className="block text-sm text-muted mt-0.5">
+              {labPaid} paid session{labPaid === 1 ? "" : "s"} · {labLeads} lead{labLeads === 1 ? "" : "s"} with contact info - see what each person designed in the AI jersey maker.
+            </span>
+          </span>
+          <span className="display text-brand whitespace-nowrap">Open</span>
+        </Link>
+      </section>
+
+      <section className="mt-6">
         <h2 className="display text-xl text-foreground">Design requests ({activeDesigns.length})</h2>
         <div className="mt-3 overflow-x-auto border border-line">
           <table className="w-full text-sm">
@@ -942,16 +960,7 @@ export default async function AdminPage() {
         </section>
       </div>
 
-      <section className="mt-10 space-y-3">
-        <Link href="/admin/design-lab" className="flex items-center justify-between border border-line bg-steel px-5 py-4 hover:border-brand/60 transition-colors">
-          <span>
-            <span className="display text-lg text-foreground">🧪 Design Lab leads</span>
-            <span className="block text-sm text-muted mt-0.5">
-              Everyone who used the AI jersey maker - contact info, every concept they generated, and who paid the $10 session.
-            </span>
-          </span>
-          <span className="display text-brand whitespace-nowrap">Open</span>
-        </Link>
+      <section className="mt-10">
         <Link href="/admin/assistant" className="flex items-center justify-between border border-line bg-steel px-5 py-4 hover:border-brand/60 transition-colors">
           <span>
             <span className="display text-lg text-foreground">🤖 Train the AI assistant</span>
