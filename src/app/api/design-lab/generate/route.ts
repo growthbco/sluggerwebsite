@@ -171,7 +171,15 @@ export async function POST(req: Request) {
       const note = [sport, style, teamName, refinement ? `refine: ${refinement}` : idea].filter(Boolean).join(" | ").slice(0, 180);
       void put(`design-lab/${stamp}.png`, Buffer.from(payload.data, "base64"), {
         access: "public", contentType: mime, addRandomSuffix: true,
-      }).then((b) => console.log(`design-lab saved: ${b.url} :: ${note}`)).catch(() => {});
+      }).then(async (b) => {
+        console.log(`design-lab saved: ${b.url} :: ${note}`);
+        // Link the render to the visitor so /admin/design-lab shows every
+        // lead's concepts (non-fatal).
+        try {
+          const { designLabRenders } = await import("@/db/schema");
+          await getDb().insert(designLabRenders).values({ visitorId: visitorCtx?.visitor.id ?? null, url: b.url, note });
+        } catch (e) { console.error("design-lab render log failed:", e); }
+      }).catch(() => {});
     } catch {}
     let ladderState: { used: number; free: number } | undefined;
     if (ladderActive && visitorCtx) {

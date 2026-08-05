@@ -876,6 +876,16 @@ export const designLabVisitors = pgTable("design_lab_visitors", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Every design-lab render, linked to the visitor who made it - powers the
+// /admin/design-lab leads page (see what each lead was designing).
+export const designLabRenders = pgTable("design_lab_renders", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  visitorId: uuid("visitor_id").references(() => designLabVisitors.id),
+  url: text("url").notNull(),
+  note: text("note"), // sport | style | team | idea/refinement
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const teamsRelations = relations(teams, ({ many }) => ({
   teamStoreProducts: many(teamStoreProducts),
 }));

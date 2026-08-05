@@ -36,11 +36,26 @@ export async function POST(req: Request) {
     if (session.metadata?.kind === "design_lab" && session.metadata?.visitorId && dbEnabled()) {
       const { designLabVisitors } = await import("@/db/schema");
       const { eq } = await import("drizzle-orm");
-      await getDb()
+      const [v] = await getDb()
         .update(designLabVisitors)
         .set({ paidAt: new Date(), stripeRef: session.id })
-        .where(eq(designLabVisitors.id, session.metadata.visitorId));
+        .where(eq(designLabVisitors.id, session.metadata.visitorId))
+        .returning();
       console.log("design lab session paid:", session.metadata.visitorId);
+      // Paid = hottest lead we have. Ping the design channel with a link to
+      // their concept gallery (best effort).
+      const hook = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
+      if (hook && v) {
+        const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+        void fetch(hook, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: "Slugger AI Design Lab",
+            content: `💰 **Jersey Maker $10 session PAID**: ${v.firstName ?? ""} ${v.lastName ?? ""} · ${v.email ?? "no email"} · ${v.phone ?? "no phone"} (${v.generations} concepts so far)\nGallery: ${SITE}/admin/design-lab`,
+          }),
+        }).catch(() => {});
+      }
       return NextResponse.json({ received: true });
     }
 

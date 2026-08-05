@@ -942,7 +942,16 @@ export default async function AdminPage() {
         </section>
       </div>
 
-      <section className="mt-10">
+      <section className="mt-10 space-y-3">
+        <Link href="/admin/design-lab" className="flex items-center justify-between border border-line bg-steel px-5 py-4 hover:border-brand/60 transition-colors">
+          <span>
+            <span className="display text-lg text-foreground">🧪 Design Lab leads</span>
+            <span className="block text-sm text-muted mt-0.5">
+              Everyone who used the AI jersey maker - contact info, every concept they generated, and who paid the $10 session.
+            </span>
+          </span>
+          <span className="display text-brand whitespace-nowrap">Open</span>
+        </Link>
         <Link href="/admin/assistant" className="flex items-center justify-between border border-line bg-steel px-5 py-4 hover:border-brand/60 transition-colors">
           <span>
             <span className="display text-lg text-foreground">🤖 Train the AI assistant</span>
@@ -950,7 +959,7 @@ export default async function AdminPage() {
               {aiFacts.length} fact{aiFacts.length === 1 ? "" : "s"} taught - add pricing nuances, policies, and product details the bot should treat as official.
             </span>
           </span>
-          <span className="display text-brand whitespace-nowrap">Open →</span>
+          <span className="display text-brand whitespace-nowrap">Open</span>
         </Link>
       </section>
     </div>
