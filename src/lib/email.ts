@@ -93,7 +93,7 @@ export async function emailDesignRequestToDesigner(req: {
   let neededByStr: string | null = null;
   if (req.neededBy) {
     const d = typeof req.neededBy === "string" ? new Date(req.neededBy) : req.neededBy;
-    if (!isNaN(d.getTime())) neededByStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    if (!isNaN(d.getTime())) neededByStr = d.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" });
   }
   const subjectPrefix = req.rush ? "🚨 RUSH " : "";
   const bodyHtml = `
@@ -466,7 +466,7 @@ export async function emailProofFollowUp(args: {
 }): Promise<boolean> {
   const deadline =
     args.neededBy && !isNaN(args.neededBy.getTime())
-      ? args.neededBy.toLocaleDateString("en-US", { month: "long", day: "numeric" })
+      ? args.neededBy.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric" })
       : null;
   const isFinal = args.round >= 2;
   return sendEmail({

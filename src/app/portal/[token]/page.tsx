@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "My Orders", robots: { index: false }
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 const titleCase = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
-const shortDate = (d: Date) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+const shortDate = (d: Date) => new Date(d).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" });
 
 function Receipt({ items, subtotalCents, shippingCents, totalCents }: { items: { name: string; quantity: number; unitPriceCents: number }[]; subtotalCents: number; shippingCents: number; totalCents: number }) {
   if (!items.length) return null;

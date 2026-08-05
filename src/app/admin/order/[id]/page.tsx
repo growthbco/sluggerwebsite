@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 const fmtDate = (d: Date | string | null | undefined) =>
-  d ? new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "-";
+  d ? new Date(d).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "-";
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (

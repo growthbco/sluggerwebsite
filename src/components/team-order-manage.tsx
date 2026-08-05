@@ -135,7 +135,7 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerse
             <>
               <dt className="text-muted">Order placed</dt>
               <dd className="text-foreground">
-                {new Date(placedAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
+                {new Date(placedAt).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
               </dd>
             </>
           )}

@@ -32,7 +32,7 @@ async function lookupOrder(reference: string, email: string): Promise<string> {
         `VERIFIED ORDER STATUS for ${ref} (email on file matches - you may share ALL of the following):`,
         `- Team: ${o.teamName}`,
         o.shippedAt
-          ? `- SHIPPED on ${o.shippedAt.toLocaleDateString("en-US", { month: "long", day: "numeric" })}${o.trackingNumber ? ` - tracking number ${o.trackingNumber}, track it at ${trackingUrlFor(o.trackingNumber)}` : ""}`
+          ? `- SHIPPED on ${o.shippedAt.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric" })}${o.trackingNumber ? ` - tracking number ${o.trackingNumber}, track it at ${trackingUrlFor(o.trackingNumber)}` : ""}`
           : o.invoicePaidAt
             ? "- Paid in full - in production / preparing to ship. Tracking is emailed the moment it ships."
             : o.depositPaidAt

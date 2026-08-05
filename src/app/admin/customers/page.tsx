@@ -156,7 +156,7 @@ export default async function AdminCustomersPage() {
                 <td className="px-3 py-2 text-muted">{c.shopOrders || "-"}</td>
                 <td className="px-3 py-2 display text-foreground">{c.spendCents ? money(c.spendCents) : "-"}</td>
                 <td className="px-3 py-2 text-muted">
-                  {c.lastActivity.getTime() ? c.lastActivity.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "-"}
+                  {c.lastActivity.getTime() ? c.lastActivity.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" }) : "-"}
                 </td>
               </tr>
             ))}

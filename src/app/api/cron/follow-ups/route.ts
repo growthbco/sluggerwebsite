@@ -58,7 +58,7 @@ export async function GET(req: Request) {
         await postDesignThreadUpdate({
           threadId: c.discordThreadId ?? undefined,
           title: `⏰ Auto follow-up ${round}/${MAX_FOLLOW_UPS} emailed - ${c.teamName} (${c.reference})`,
-          description: `Client hasn't reviewed the proof sent ${c.proofSentAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}. Reminder email sent automatically.`,
+          description: `Client hasn't reviewed the proof sent ${c.proofSentAt.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" })}. Reminder email sent automatically.`,
           username: "Slugger Design Requests",
         });
       }
@@ -107,7 +107,7 @@ export async function GET(req: Request) {
     }
     const deadline =
       d.neededBy && !isNaN(d.neededBy.getTime())
-        ? d.neededBy.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+        ? d.neededBy.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" })
         : null;
     const pinged = await postDesignThreadUpdate({
       threadId: d.discordThreadId ?? undefined,

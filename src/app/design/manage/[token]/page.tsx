@@ -135,7 +135,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
                 <div className="flex items-center justify-between gap-3">
                   <span className="display text-sm text-foreground">
                     Add-on {addonBatches.length - i}
-                    {b.paidAt && <span className="text-muted font-normal"> · {new Date(b.paidAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>}
+                    {b.paidAt && <span className="text-muted font-normal"> · {new Date(b.paidAt).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" })}</span>}
                   </span>
                   <span className={`text-xs display px-2 py-0.5 rounded border ${b.verified ? "text-emerald-400 border-emerald-400/40" : "text-brand border-brand/40"}`}>
                     {b.verified ? "✓ Verified" : "Needs verify"}

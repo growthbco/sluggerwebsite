@@ -90,7 +90,7 @@ function buildGrounding(design: DesignContext, order: OrderContext | null, messa
     `Revision rounds used: ${design.revisionsUsed ?? 0} of ${MAX_REVISIONS} included`,
     `Proof images sent so far: ${design.proofCount}`,
     design.neededBy
-      ? `Client needs it by: ${design.neededBy.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}${design.rush ? " (rush)" : ""}`
+      ? `Client needs it by: ${design.neededBy.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" })}${design.rush ? " (rush)" : ""}`
       : null,
   ].filter(Boolean) as string[];
 

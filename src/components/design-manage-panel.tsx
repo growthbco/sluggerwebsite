@@ -198,12 +198,12 @@ export function DesignManagePanel({
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           {rush && (
             <span className="inline-block clip-slant bg-brand text-on-brand display px-3 py-1">
-              🚨 RUSH {neededBy ? `· needed by ${new Date(neededBy).toLocaleDateString()}` : ""}
+              🚨 RUSH {neededBy ? `· needed by ${new Date(neededBy).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" })}` : ""}
             </span>
           )}
           {!rush && neededBy && (
             <span className="inline-block border border-line text-muted display px-3 py-1">
-              Needed by {new Date(neededBy).toLocaleDateString()}
+              Needed by {new Date(neededBy).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" })}
             </span>
           )}
           <span className="inline-block border border-line text-muted display px-3 py-1">
@@ -292,7 +292,7 @@ export function DesignManagePanel({
                 <div key={cr.at + ridx} className="bg-steel border border-line p-4">
                   <div className="flex items-center justify-between mb-3">
                     <span className="display text-foreground text-sm">Round {round}</span>
-                    <span className="text-xs text-muted">{new Date(cr.at).toLocaleString()}</span>
+                    <span className="text-xs text-muted">{new Date(cr.at).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
                   </div>
                   {cr.proofImageUrl && (
                     <div className="relative bg-white border border-line w-full" style={{ aspectRatio: "4 / 3" }}>

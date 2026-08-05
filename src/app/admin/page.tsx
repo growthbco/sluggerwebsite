@@ -66,7 +66,7 @@ function Badge({ label }: { label: string }) {
 function fmtDate(d: Date | string | null | undefined) {
   if (!d) return "-";
   const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return date.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
 }
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;

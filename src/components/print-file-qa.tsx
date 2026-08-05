@@ -269,7 +269,7 @@ export function PrintFileQA({ token, basePath, group, rosterCount, roster = [], 
                   : result.summary}
               </p>
               <p className="text-xs text-muted mt-1">
-                Verified {new Date(result.verifiedAt).toLocaleString()}
+                Verified {new Date(result.verifiedAt).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
               </p>
 
               {result.mismatches.length > 0 && (

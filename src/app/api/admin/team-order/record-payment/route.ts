@@ -52,7 +52,7 @@ export async function POST(req: Request) {
           : quotedTotalCents;
 
   const now = new Date();
-  const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const dateStr = now.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" });
   const noteLine = `${stage} via ${method} - $${(paidCents / 100).toFixed(2)} (${dateStr})`;
   const paymentNote = [order.paymentNote, noteLine].filter(Boolean).join("; ");
 

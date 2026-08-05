@@ -55,7 +55,7 @@ export async function GET(req: Request) {
     const ship = order.shippingChargedCents ?? 0;
     const grand = totalCents + tax + ship;
     const paidInFull = Boolean(order.depositPaidAt && Math.abs(+order.invoicePaidAt - +order.depositPaidAt) < 60000);
-    const paidDate = order.invoicePaidAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+    const paidDate = order.invoicePaidAt.toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short" });
     const itemRows = (quote?.lines ?? [])
       .map((l) => `<tr><td style="padding:6px 14px;">${l.label}${l.quantity > 1 ? ` &times; ${l.quantity}` : ""}</td><td style="padding:6px 14px;text-align:right;">${money(l.totalCents)}</td></tr>`)
       .join("");

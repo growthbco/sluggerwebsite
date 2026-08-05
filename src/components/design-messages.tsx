@@ -238,7 +238,7 @@ export function DesignMessages({
                     : role === "client"
                     ? "You"
                     : "Client"}{" "}
-                  · {new Date(m.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                  · {new Date(m.at).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                 </p>
                 {m.text && <p className="text-foreground whitespace-pre-line">{m.text}</p>}
                 {m.attachments && m.attachments.length > 0 && (

@@ -17,7 +17,7 @@ function arrivalLabel(days: number | null): string {
     const dow = d.getDay();
     if (dow !== 0 && dow !== 6) added += 1;
   }
-  const date = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const date = d.toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric" });
   return `Arrives ~${date} (${days} ${days === 1 ? "day" : "days"})`;
 }
 

@@ -388,7 +388,7 @@ function fmtNeededBy(v: string | Date | null | undefined): string | null {
   if (!v) return null;
   const d = typeof v === "string" ? new Date(v) : v;
   if (isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" });
 }
 
 /** Post a new design intake to the #design-requests channel.
