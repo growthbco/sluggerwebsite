@@ -16,6 +16,7 @@ const nav = [
   { href: "/custom-hats", label: "Custom Hats" },
   { href: "/pricing", label: "Pricing" },
   { href: "/gallery", label: "Gallery" },
+  { href: "/contact", label: "Contact" },
 ];
 
 // "Uniforms" expands into every sport page (plus the hub itself).
