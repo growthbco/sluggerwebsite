@@ -805,6 +805,9 @@ export const invoiceItems = pgTable(
     name: text("name").notNull(),
     nameKey: text("name_key").notNull(), // lowercased for dedupe
     description: text("description"),
+    // Extra search words ("crewneck crew neck" on Round-Neck Jersey) so the
+    // picker finds items by whatever staff actually call them.
+    aliases: text("aliases"),
     unitPriceCents: integer("unit_price_cents").notNull().default(0),
     // Per-piece shipping weight for the auto shipping estimate.
     weightOz: integer("weight_oz").notNull().default(16),

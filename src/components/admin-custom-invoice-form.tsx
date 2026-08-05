@@ -6,7 +6,28 @@ import { STANDARD_INVOICE_TERMS } from "@/lib/invoice-terms";
 
 type Line = { name: string; description: string; quantity: string; price: string };
 type CustomerHit = { name: string; email: string; phone: string | null; creditCents: number; zip: string | null; cityState: string | null };
-type LibraryItem = { id: string; name: string; description: string | null; unitPriceCents: number; weightOz: number };
+type LibraryItem = { id: string; name: string; description: string | null; aliases: string | null; unitPriceCents: number; weightOz: number };
+
+// "Full-Button" -> "full button" (plus a collapsed "fullbutton" check later)
+// so hyphens/slashes and spacing never block a match.
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+/** Every query token must appear in the item's name/aliases/description -
+ *  spacing-insensitive, so "crewneck", "crew neck", and "1/4 zip" all hit.
+ *  Lower score = better: name-start beats name-word beats anywhere. */
+function itemMatchScore(item: LibraryItem, query: string): number | null {
+  const q = norm(query);
+  if (!q) return 0;
+  const name = norm(item.name);
+  const hay = `${name} ${norm(item.aliases ?? "")} ${norm(item.description ?? "")}`;
+  const hayCollapsed = hay.replace(/ /g, "");
+  for (const tok of q.split(" ")) {
+    if (!hay.includes(tok) && !hayCollapsed.includes(tok)) return null;
+  }
+  if (name.startsWith(q)) return 0;
+  if (name.split(" ").some((w) => w.startsWith(q.split(" ")[0]))) return 1;
+  return 2;
+}
 
 const emptyLine = (): Line => ({ name: "", description: "", quantity: "1", price: "" });
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
@@ -84,9 +105,13 @@ export function AdminCustomInvoiceForm() {
   }
 
   function libraryMatches(i: number): LibraryItem[] {
-    const q = lines[i]?.name.trim().toLowerCase() ?? "";
-    const pool = q.length === 0 ? library : library.filter((it) => it.name.toLowerCase().includes(q) || (it.description ?? "").toLowerCase().includes(q));
-    return pool.slice(0, 8);
+    const q = lines[i]?.name ?? "";
+    return library
+      .map((it) => ({ it, score: itemMatchScore(it, q) }))
+      .filter((x): x is { it: LibraryItem; score: number } => x.score !== null)
+      .sort((a, b) => a.score - b.score)
+      .map((x) => x.it)
+      .slice(0, 8);
   }
 
   function pickItem(i: number, it: LibraryItem) {
