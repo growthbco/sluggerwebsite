@@ -1,0 +1,1 @@
+ALTER TABLE "custom_invoices" ADD COLUMN "credit_cents" integer DEFAULT 0 NOT NULL;

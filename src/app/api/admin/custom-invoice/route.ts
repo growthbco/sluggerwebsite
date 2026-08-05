@@ -41,8 +41,18 @@ export async function POST(req: Request) {
   }
 
   const subtotalCents = lines.reduce((s, l) => s + l.unitPriceCents * l.quantity, 0);
-  const taxCents = body.taxExempt ? 0 : calcTax(subtotalCents);
-  const totalCents = subtotalCents + taxCents;
+  // Banked referral credit auto-applies (same rules as team invoices): capped
+  // so at least $1 is still charged, deducted from the goods and the tax base.
+  // Redeemed from their balance in the webhook only when the invoice is paid.
+  let creditCents = 0;
+  try {
+    const { getCustomer } = await import("@/lib/customers");
+    const banked = (await getCustomer(customerEmail))?.referralCreditCents ?? 0;
+    if (banked > 0) creditCents = Math.max(0, Math.min(banked, subtotalCents - 100));
+  } catch (e) { console.error("credit lookup failed:", e); }
+  const netGoodsCents = subtotalCents - creditCents;
+  const taxCents = body.taxExempt ? 0 : calcTax(netGoodsCents);
+  const totalCents = netGoodsCents + taxCents;
   const notes = (body.notes ?? "").trim().slice(0, 2000) || null;
   const reference = "INV-" + randomBytes(4).toString("hex").toUpperCase().slice(0, 6);
 
@@ -50,20 +60,31 @@ export async function POST(req: Request) {
     const db = getDb();
     const [row] = await db
       .insert(customInvoices)
-      .values({ reference, customerName, customerEmail, lines, notes, taxExempt: Boolean(body.taxExempt), subtotalCents, taxCents, totalCents })
+      .values({ reference, customerName, customerEmail, lines, notes, taxExempt: Boolean(body.taxExempt), subtotalCents, creditCents, taxCents, totalCents })
       .returning();
 
     // One-time Stripe payment link: one line item per invoice line + tax.
     const stripe = getStripe();
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
     const items: { price: string; quantity: number }[] = [];
-    for (const l of lines) {
+    if (creditCents > 0) {
+      // Stripe line items can't be negative, so with a credit the goods
+      // collapse into one discounted line. The emailed invoice still itemizes.
       const price = await stripe.prices.create({
         currency: "usd",
-        unit_amount: l.unitPriceCents,
-        product_data: { name: l.name },
+        unit_amount: netGoodsCents,
+        product_data: { name: `Invoice ${reference} (incl. $${(creditCents / 100).toFixed(2)} referral credit)` },
       });
-      items.push({ price: price.id, quantity: l.quantity });
+      items.push({ price: price.id, quantity: 1 });
+    } else {
+      for (const l of lines) {
+        const price = await stripe.prices.create({
+          currency: "usd",
+          unit_amount: l.unitPriceCents,
+          product_data: { name: l.name },
+        });
+        items.push({ price: price.id, quantity: l.quantity });
+      }
     }
     if (taxCents > 0) {
       const taxPrice = await stripe.prices.create({
@@ -87,13 +108,14 @@ export async function POST(req: Request) {
       reference,
       lines,
       subtotalCents,
+      creditCents,
       taxCents,
       totalCents,
       notes,
       payUrl: link.url,
     });
 
-    return NextResponse.json({ ok: true, reference, totalCents, payUrl: link.url, emailed });
+    return NextResponse.json({ ok: true, reference, totalCents, creditCents, payUrl: link.url, emailed });
   } catch (e) {
     console.error("custom invoice failed:", e);
     return NextResponse.json({ error: "Could not create the invoice" }, { status: 500 });

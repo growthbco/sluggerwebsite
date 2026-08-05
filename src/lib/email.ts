@@ -312,6 +312,7 @@ export async function emailCustomInvoice(args: {
   reference: string;
   lines: { name: string; description?: string; quantity: number; unitPriceCents: number }[];
   subtotalCents: number;
+  creditCents?: number;
   taxCents: number;
   totalCents: number;
   notes?: string | null;
@@ -340,6 +341,7 @@ export async function emailCustomInvoice(args: {
       bodyHtml: `
         <table style="width:100%;border-collapse:collapse;margin:0 0 14px;">${rows}
           <tr><td style="padding:10px 0;">Subtotal</td><td style="padding:10px 0;text-align:right;">${money(args.subtotalCents)}</td></tr>
+          ${args.creditCents ? `<tr><td style="padding:4px 0;color:#2e7d32;">Referral credit</td><td style="padding:4px 0;text-align:right;color:#2e7d32;">-${money(args.creditCents)}</td></tr>` : ""}
           ${args.taxCents > 0 ? `<tr><td style="padding:4px 0;">FL sales tax (7%)</td><td style="padding:4px 0;text-align:right;">${money(args.taxCents)}</td></tr>` : ""}
           <tr><td style="padding:10px 0;border-top:1px solid #e6e2d6;"><strong>Total due</strong></td><td style="padding:10px 0;border-top:1px solid #e6e2d6;text-align:right;"><strong>${money(args.totalCents)}</strong></td></tr>
         </table>

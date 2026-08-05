@@ -54,6 +54,13 @@ export async function POST(req: Request) {
           .where(eq(customInvoices.id, session.metadata.customInvoiceId))
           .returning();
         if (inv) {
+          // Settle referrals + burn any credit that was applied to this
+          // invoice - it only leaves their balance once the money is real.
+          try {
+            const { settleReferral, redeemCredit } = await import("@/lib/customers");
+            await settleReferral(inv.customerEmail);
+            if (inv.creditCents > 0) await redeemCredit(inv.customerEmail, inv.creditCents);
+          } catch (e) { console.error("referral settle (custom invoice) failed:", e); }
           await postOrderToDiscord({
             reference: inv.reference,
             orderType: "Custom Invoice",

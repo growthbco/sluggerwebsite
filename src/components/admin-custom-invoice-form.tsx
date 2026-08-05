@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 type Line = { name: string; description: string; quantity: string; price: string };
+type CustomerHit = { name: string; email: string; phone: string | null; creditCents: number };
 
 const emptyLine = (): Line => ({ name: "", description: "", quantity: "1", price: "" });
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
@@ -12,6 +13,12 @@ const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 export function AdminCustomInvoiceForm() {
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
+  // Existing-customer type-ahead: typing a name or email searches everyone
+  // who has ever ordered; picking one fills both fields.
+  const [hits, setHits] = useState<CustomerHit[]>([]);
+  const [hitsOpen, setHitsOpen] = useState(false);
+  const [picked, setPicked] = useState<CustomerHit | null>(null);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [notes, setNotes] = useState("");
   const [taxExempt, setTaxExempt] = useState(false);
@@ -27,6 +34,27 @@ export function AdminCustomInvoiceForm() {
     setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, [key]: value } : l)));
   }
 
+  function searchCustomers(q: string) {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (q.trim().length < 2) { setHits([]); setHitsOpen(false); return; }
+    searchTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(q.trim())}`);
+        const data = await res.json();
+        const results: CustomerHit[] = res.ok ? data.results ?? [] : [];
+        setHits(results);
+        setHitsOpen(results.length > 0);
+      } catch { /* type-ahead only - typing manually still works */ }
+    }, 250);
+  }
+
+  function pickCustomer(h: CustomerHit) {
+    setCustomerName(h.name || customerName);
+    setCustomerEmail(h.email);
+    setPicked(h);
+    setHitsOpen(false);
+  }
+
   const parsedLines = lines
     .map((l) => ({
       name: l.name.trim(),
@@ -36,8 +64,11 @@ export function AdminCustomInvoiceForm() {
     }))
     .filter((l) => l.name && l.unitPriceCents > 0);
   const subtotal = parsedLines.reduce((s, l) => s + l.unitPriceCents * l.quantity, 0);
-  const tax = taxExempt ? 0 : Math.round(subtotal * 0.07);
-  const total = subtotal + tax;
+  // Mirrors the server: banked referral credit auto-applies, capped so at
+  // least $1 is charged, and shrinks the tax base too.
+  const credit = picked && picked.creditCents > 0 ? Math.max(0, Math.min(picked.creditCents, subtotal - 100)) : 0;
+  const tax = taxExempt ? 0 : Math.round((subtotal - credit) * 0.07);
+  const total = subtotal - credit + tax;
 
   async function aiDraft(kind: "description" | "terms", lineIndex?: number) {
     setBusy(kind === "terms" ? "ai-terms" : `ai-${lineIndex!}`);
@@ -104,7 +135,7 @@ export function AdminCustomInvoiceForm() {
         </div>
         <button
           type="button"
-          onClick={() => { setDone(null); setLines([emptyLine()]); setNotes(""); setCustomerName(""); setCustomerEmail(""); }}
+          onClick={() => { setDone(null); setLines([emptyLine()]); setNotes(""); setCustomerName(""); setCustomerEmail(""); setPicked(null); setHits([]); }}
           className="mt-6 text-sm text-muted border border-line px-4 py-2 hover:border-brand/50 hover:text-foreground"
         >
           Create another invoice
@@ -115,15 +146,56 @@ export function AdminCustomInvoiceForm() {
 
   return (
     <div className="space-y-8">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="display text-sm text-foreground">Customer name *</label>
-          <input className={`mt-2 ${inputCls}`} value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="e.g. Derek Hicks" />
+      <div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="relative">
+            <label className="display text-sm text-foreground">Customer name *</label>
+            <input
+              className={`mt-2 ${inputCls}`}
+              value={customerName}
+              onChange={(e) => { setCustomerName(e.target.value); setPicked(null); searchCustomers(e.target.value); }}
+              onBlur={() => setTimeout(() => setHitsOpen(false), 150)}
+              placeholder="Start typing to find an existing customer"
+              autoComplete="off"
+            />
+            {hitsOpen && (
+              <ul className="absolute z-20 left-0 right-0 mt-1 bg-ink border border-line shadow-lg max-h-64 overflow-y-auto">
+                {hits.map((h) => (
+                  <li key={h.email}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); pickCustomer(h); }}
+                      className="w-full text-left px-3 py-2 hover:bg-steel"
+                    >
+                      <span className="text-sm text-foreground">{h.name || h.email}</span>
+                      <span className="block text-xs text-muted">
+                        {h.email}
+                        {h.creditCents > 0 ? ` · ${money(h.creditCents)} referral credit` : ""}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <label className="display text-sm text-foreground">Customer email *</label>
+            <input
+              className={`mt-2 ${inputCls}`}
+              type="email"
+              value={customerEmail}
+              onChange={(e) => { setCustomerEmail(e.target.value); setPicked(null); }}
+              placeholder="name@example.com"
+            />
+          </div>
         </div>
-        <div>
-          <label className="display text-sm text-foreground">Customer email *</label>
-          <input className={`mt-2 ${inputCls}`} type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="name@example.com" />
-        </div>
+        {picked && (
+          <p className="mt-2 text-xs text-green-400">
+            ✓ Existing customer on file
+            {picked.phone ? ` · ${picked.phone}` : ""}
+            {picked.creditCents > 0 ? ` · has ${money(picked.creditCents)} referral credit (auto-applied to this invoice)` : ""}
+          </p>
+        )}
       </div>
 
       <div>
@@ -202,6 +274,9 @@ export function AdminCustomInvoiceForm() {
 
       <div className="bg-steel border border-line p-4 text-sm">
         <div className="flex justify-between"><span className="text-muted">Subtotal</span><span className="text-foreground">{money(subtotal)}</span></div>
+        {credit > 0 && (
+          <div className="flex justify-between mt-1"><span className="text-green-400">Referral credit (auto-applied)</span><span className="text-green-400">-{money(credit)}</span></div>
+        )}
         <div className="flex justify-between mt-1"><span className="text-muted">FL sales tax (7%)</span><span className="text-foreground">{taxExempt ? "Exempt" : money(tax)}</span></div>
         <div className="flex justify-between mt-2 pt-2 border-t border-line display text-foreground"><span>Total</span><span>{money(total)}</span></div>
       </div>

@@ -779,6 +779,10 @@ export const customInvoices = pgTable("custom_invoices", {
   notes: text("notes"),
   taxExempt: boolean("tax_exempt").notNull().default(false),
   subtotalCents: integer("subtotal_cents").notNull(),
+  // Referral store credit applied to this invoice (deducted from the goods
+  // and the tax base at creation; redeemed from the customer's balance in
+  // the webhook when the invoice is actually paid).
+  creditCents: integer("credit_cents").notNull().default(0),
   taxCents: integer("tax_cents").notNull().default(0),
   totalCents: integer("total_cents").notNull(),
   payUrl: text("pay_url"),
