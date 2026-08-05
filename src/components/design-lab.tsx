@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
+import { SmsConsentNote } from "@/components/sms-consent";
 
 const SPORTS = ["Baseball", "Softball", "Basketball", "Soccer", "Flag Football", "Football", "Volleyball", "Hockey", "Pickleball", "Bowling"];
 const STYLES = ["Crew Neck", "Two-Button", "Full-Button", "Quarter-Zip", "Sleeveless / Tank", "Reversible"];
@@ -308,6 +309,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
                   <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Your name" className={input} maxLength={60} />
                   <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} type="email" placeholder="Email" className={input} maxLength={100} />
                   <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="Phone (optional)" className={input} maxLength={20} />
+                  <SmsConsentNote />
                   <select value={estimatedPieces} onChange={(e) => setEstimatedPieces(e.target.value)} className={input}>
                     {["6-9", "10-14", "15-24", "25+"].map((r) => <option key={r} value={r}>{r} pieces</option>)}
                   </select>
@@ -389,6 +391,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
                   <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email" className={`${input} col-span-2`} maxLength={100} />
                   <input value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)} type="tel" placeholder="Phone" className={`${input} col-span-2`} maxLength={20} />
                 </div>
+                <SmsConsentNote />
                 {error && <p className="text-sm text-red-400">{error}</p>}
                 <button
                   type="button"

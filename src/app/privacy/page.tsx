@@ -43,6 +43,29 @@ export default function PrivacyPage() {
           </p>
         </div>
         <div>
+          <h2 className="display text-xl text-foreground">SMS / Text Messaging</h2>
+          <p className="mt-2">
+            When you provide your mobile phone number and agree to receive text
+            messages, Slugger Athletics may send you SMS messages related to your
+            orders and inquiries - for example order confirmations, design proof
+            notifications, invoice and payment updates, shipping and delivery
+            alerts, and replies to your customer-care questions. Message frequency
+            varies based on your order activity. Message and data rates may apply.
+          </p>
+          <p className="mt-2">
+            You can opt out at any time by replying <strong className="text-foreground">STOP</strong> to
+            any message. Reply <strong className="text-foreground">HELP</strong> for help, or contact us
+            at apparel@sluggerathletics.com or 352-660-1232.
+          </p>
+          <p className="mt-2">
+            No mobile information will be shared with third parties or affiliates
+            for marketing or promotional purposes. Text messaging originator opt-in
+            data and consent will not be shared with any third parties, excluding
+            the service providers acting on our behalf solely to deliver those
+            messages.
+          </p>
+        </div>
+        <div>
           <h2 className="display text-xl text-foreground">Contact</h2>
           <p className="mt-2">
             Questions about this policy? Email{" "}

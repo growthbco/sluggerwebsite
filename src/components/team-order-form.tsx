@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SmsConsentNote } from "@/components/sms-consent";
 import { ITEM_TYPES, JERSEY_MATERIALS } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
@@ -214,6 +215,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
           <div>
             <label className="display text-sm text-foreground">Phone</label>
             <input className={`mt-2 ${inputCls}`} value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(000) 000-0000" />
+          <SmsConsentNote />
           </div>
         </div>
       )}

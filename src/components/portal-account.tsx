@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SmsConsentNote } from "@/components/sms-consent";
 
 type Profile = { name: string | null; phone: string | null; referralCode: string; referralCreditCents: number; hasPassword: boolean };
 
@@ -52,6 +53,7 @@ function ContactCard({ token, name, phone }: { token: string; name: string | nul
           <label className="text-xs display text-muted">Phone</label>
           <input value={p} onChange={(e) => setP(e.target.value)} placeholder="(352) 555-0000" inputMode="tel"
             className="mt-1 w-full bg-ink border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none" />
+          <SmsConsentNote />
         </div>
       </div>
       <div className="mt-3 flex items-center gap-3">

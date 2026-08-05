@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SmsConsentNote } from "@/components/sms-consent";
 import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
 
 const SUBJECTS = ["Team order", "Custom design / quote", "Order status", "Returns & exchanges", "Something else"];
@@ -73,6 +74,7 @@ export function ContactForm() {
         <div>
           <label className="display text-sm text-foreground">Phone <span className="text-muted normal-case">(optional)</span></label>
           <input className={`mt-2 ${inputCls}`} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(352) 660-1232" />
+          <SmsConsentNote />
         </div>
         <div>
           <label className="display text-sm text-foreground">What&apos;s this about?</label>

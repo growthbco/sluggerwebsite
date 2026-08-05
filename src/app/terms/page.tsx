@@ -36,6 +36,21 @@ export default function TermsPage() {
           </p>
         </div>
         <div>
+          <h2 className="display text-xl text-foreground">SMS Terms of Service</h2>
+          <p className="mt-2">
+            By providing your mobile number and opting in, you agree to receive
+            order-related and customer-care text messages from Slugger Athletics
+            (for example: order confirmations, design proof alerts, invoices,
+            and shipping updates). Consent is not a condition of purchase.
+            Message frequency varies. Message and data rates may apply. Reply{" "}
+            <strong className="text-foreground">STOP</strong> to cancel at any time or{" "}
+            <strong className="text-foreground">HELP</strong> for help. Carriers are not liable
+            for delayed or undelivered messages. See our{" "}
+            <a href="/privacy" className="text-brand hover:underline">Privacy Policy</a> for
+            how we handle your information.
+          </p>
+        </div>
+        <div>
           <h2 className="display text-xl text-foreground">Turnaround &amp; Shipping</h2>
           <p className="mt-2">
             Standard production is typically 2-3 weeks after proof approval; rush is

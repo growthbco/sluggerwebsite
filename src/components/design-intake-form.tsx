@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SmsConsentNote } from "@/components/sms-consent";
 import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
 import Image from "next/image";
 import { upload } from "@vercel/blob/client";
@@ -202,6 +203,7 @@ export function DesignIntakeForm() {
           <div>
             <label className="display text-sm text-foreground">Phone</label>
             <input className={`mt-2 ${inputCls}`} type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(000) 000-0000" />
+          <SmsConsentNote />
           </div>
         </div>
       </div>
