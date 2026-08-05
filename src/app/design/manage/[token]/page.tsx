@@ -201,12 +201,29 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         token={token}
         teamName={request.teamName}
         latestChangeRequest={(() => {
-          const cr = (request.changeRequests ?? [])[(request.changeRequests ?? []).length - 1];
-          if (!cr) return undefined;
-          return [cr.generalNote, ...(cr.annotations ?? []).map((a) => a.note)].filter(Boolean).join("; ") || undefined;
+          // Latest structured change request + any client messages sent since
+          // (feedback often arrives split across both) - one ready instruction.
+          const crs = request.changeRequests ?? [];
+          const cr = crs[crs.length - 1];
+          const crNotes = cr ? [cr.generalNote, ...(cr.annotations ?? []).map((a) => a.note)].filter(Boolean) : [];
+          // Only post-CR messages WITH attachments join the instruction (their
+          // text explains the image); plain chatter stays out of the prompt.
+          const since = cr ? new Date(cr.at).getTime() : 0;
+          const laterMsgs = (request.messages ?? [])
+            .filter((m) => m.from === "client" && new Date(m.at).getTime() > since && (m.attachments?.length ?? 0) > 0)
+            .map((m) => m.text.trim())
+            .filter(Boolean);
+          return [...crNotes, ...laterMsgs].join("; ") || undefined;
         })()}
         initialVersions={request.aiDesignState?.versions ?? []}
-        inspirationImages={request.inspirationImages ?? []}
+        inspirationImages={(() => {
+          // Everything the client has sent us: original inspiration uploads +
+          // images attached to their messages, deduped, newest last.
+          const fromMessages = (request.messages ?? [])
+            .filter((m) => m.from === "client")
+            .flatMap((m) => m.attachments ?? []);
+          return [...new Set([...(request.inspirationImages ?? []), ...fromMessages])];
+        })()}
       />
 
       <div className="pt-6 border-t border-line">

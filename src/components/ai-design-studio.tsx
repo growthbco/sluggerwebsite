@@ -278,9 +278,9 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
                 </div>
                 {inspirationImages.length > 0 && (
                   <div className="mt-2">
-                    <p className="text-xs text-muted">…or tap the client&apos;s inspiration to use it directly:</p>
+                    <p className="text-xs text-muted">…or tap an image the client sent (inspiration + message attachments) to use it directly:</p>
                     <div className="mt-1.5 flex flex-wrap gap-2">
-                      {inspirationImages.filter((u) => /\.(png|jpe?g|webp|gif)($|\?)/i.test(u)).map((u, i) => (
+                      {inspirationImages.filter((u) => !/\.(pdf|ai|eps|svg|zip|mp4|mov)($|\?)/i.test(u)).map((u, i) => (
                         <button
                           key={u}
                           type="button"
