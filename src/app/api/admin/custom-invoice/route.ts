@@ -19,7 +19,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Database or Stripe not configured" }, { status: 503 });
   }
 
-  let body: { customerName?: string; customerEmail?: string; lines?: LineIn[]; notes?: string; taxExempt?: boolean } = {};
+  let body: {
+    customerName?: string;
+    customerEmail?: string;
+    lines?: LineIn[];
+    notes?: string;
+    taxExempt?: boolean;
+    ship?: { zip?: string; weightOz?: number } | null;
+  } = {};
   try { body = await req.json(); } catch {}
 
   const customerName = (body.customerName ?? "").trim().slice(0, 80);
@@ -52,15 +59,23 @@ export async function POST(req: Request) {
   } catch (e) { console.error("credit lookup failed:", e); }
   const netGoodsCents = subtotalCents - creditCents;
   const taxCents = body.taxExempt ? 0 : calcTax(netGoodsCents);
-  const totalCents = netGoodsCents + taxCents;
-  const notes = (body.notes ?? "").trim().slice(0, 2000) || null;
+  // Shipping: quoted server-side from the ZIP + weight the form sent, so the
+  // charge always matches a real quote (never a client-supplied number).
+  let shippingCents = 0;
+  const shipZip = (body.ship?.zip ?? "").trim();
+  if (/^\d{5}$/.test(shipZip)) {
+    const { quoteShippingCents } = await import("@/lib/ship-quote");
+    shippingCents = (await quoteShippingCents(shipZip, Number(body.ship?.weightOz) || 16)).chargedCents;
+  }
+  const totalCents = netGoodsCents + taxCents + shippingCents;
+  const notes = (body.notes ?? "").trim().slice(0, 4000) || null;
   const reference = "INV-" + randomBytes(4).toString("hex").toUpperCase().slice(0, 6);
 
   try {
     const db = getDb();
     const [row] = await db
       .insert(customInvoices)
-      .values({ reference, customerName, customerEmail, lines, notes, taxExempt: Boolean(body.taxExempt), subtotalCents, creditCents, taxCents, totalCents })
+      .values({ reference, customerName, customerEmail, lines, notes, taxExempt: Boolean(body.taxExempt), subtotalCents, creditCents, shippingCents, taxCents, totalCents })
       .returning();
 
     // One-time Stripe payment link: one line item per invoice line + tax.
@@ -94,9 +109,19 @@ export async function POST(req: Request) {
       });
       items.push({ price: taxPrice.id, quantity: 1 });
     }
+    if (shippingCents > 0) {
+      const shipPrice = await stripe.prices.create({
+        currency: "usd",
+        unit_amount: shippingCents,
+        product_data: { name: "Shipping" },
+      });
+      items.push({ price: shipPrice.id, quantity: 1 });
+    }
     const link = await stripe.paymentLinks.create({
       line_items: items,
       restrictions: { completed_sessions: { limit: 1 } },
+      // Shipping charged -> collect the delivery address on the pay page.
+      ...(shippingCents > 0 ? { shipping_address_collection: { allowed_countries: ["US" as const] } } : {}),
       metadata: { kind: "custom_invoice", customInvoiceId: row.id, reference, customerName },
       after_completion: { type: "redirect", redirect: { url: `${SITE}/checkout/success` } },
     });
@@ -115,13 +140,14 @@ export async function POST(req: Request) {
       lines,
       subtotalCents,
       creditCents,
+      shippingCents,
       taxCents,
       totalCents,
       notes,
       payUrl: link.url,
     });
 
-    return NextResponse.json({ ok: true, reference, totalCents, creditCents, payUrl: link.url, emailed });
+    return NextResponse.json({ ok: true, reference, totalCents, creditCents, shippingCents, payUrl: link.url, emailed });
   } catch (e) {
     console.error("custom invoice failed:", e);
     return NextResponse.json({ error: "Could not create the invoice" }, { status: 500 });

@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { STANDARD_INVOICE_TERMS } from "@/lib/invoice-terms";
+
 type Line = { name: string; description: string; quantity: string; price: string };
-type CustomerHit = { name: string; email: string; phone: string | null; creditCents: number };
-type LibraryItem = { id: string; name: string; description: string | null; unitPriceCents: number };
+type CustomerHit = { name: string; email: string; phone: string | null; creditCents: number; zip: string | null; cityState: string | null };
+type LibraryItem = { id: string; name: string; description: string | null; unitPriceCents: number; weightOz: number };
 
 const emptyLine = (): Line => ({ name: "", description: "", quantity: "1", price: "" });
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
@@ -32,8 +34,16 @@ export function AdminCustomInvoiceForm() {
       .catch(() => {});
   }, []);
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(STANDARD_INVOICE_TERMS);
   const [taxExempt, setTaxExempt] = useState(false);
+  // Shipping: quoted live from ZIP + estimated weight; off = pickup/no charge.
+  const [shipOn, setShipOn] = useState(false);
+  const [shipZip, setShipZip] = useState("");
+  const [weightOverride, setWeightOverride] = useState("");
+  const [shipCents, setShipCents] = useState<number | null>(null);
+  const [shipCarrier, setShipCarrier] = useState<string | null>(null);
+  const [shipError, setShipError] = useState<string | null>(null);
+  const quoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [busy, setBusy] = useState<"" | "sending" | `ai-${number}` | "ai-terms">("");
   const [error, setError] = useState("");
   const [done, setDone] = useState<{ reference: string; totalCents: number; payUrl: string; emailed: boolean } | null>(null);
@@ -65,6 +75,12 @@ export function AdminCustomInvoiceForm() {
     setCustomerEmail(h.email);
     setPicked(h);
     setHitsOpen(false);
+    // Address on file -> shipping turns on with their ZIP prefilled (uncheck
+    // for pickup). No address -> leave shipping off.
+    if (h.zip) {
+      setShipZip(h.zip);
+      setShipOn(true);
+    }
   }
 
   function libraryMatches(i: number): LibraryItem[] {
@@ -95,7 +111,43 @@ export function AdminCustomInvoiceForm() {
   // least $1 is charged, and shrinks the tax base too.
   const credit = picked && picked.creditCents > 0 ? Math.max(0, Math.min(picked.creditCents, subtotal - 100)) : 0;
   const tax = taxExempt ? 0 : Math.round((subtotal - credit) * 0.07);
-  const total = subtotal - credit + tax;
+  // Package weight: per-item weights from the library (16 oz for unknowns),
+  // overridable by hand.
+  const estWeightOz =
+    lines.reduce((s, l) => {
+      const name = l.name.trim().toLowerCase();
+      if (!name) return s;
+      const qty = Math.max(1, Math.round(Number(l.quantity) || 1));
+      const it = library.find((x) => x.name.toLowerCase() === name);
+      return s + (it?.weightOz ?? 16) * qty;
+    }, 0) || 16;
+  const weightOz = Math.max(1, Math.round(Number(weightOverride) || estWeightOz));
+  const zipValid = /^\d{5}$/.test(shipZip.trim());
+  const ship = shipOn && shipCents != null ? shipCents : 0;
+  const total = subtotal - credit + tax + ship;
+
+  // Live shipping quote whenever shipping is on and the inputs settle.
+  useEffect(() => {
+    if (!shipOn || !zipValid) { setShipCents(null); setShipCarrier(null); setShipError(null); return; }
+    if (quoteTimer.current) clearTimeout(quoteTimer.current);
+    quoteTimer.current = setTimeout(async () => {
+      try {
+        setShipError(null);
+        const res = await fetch("/api/admin/ship-quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ zip: shipZip.trim(), weightOz }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Quote failed");
+        setShipCents(data.chargedCents);
+        setShipCarrier(data.carrier ?? null);
+      } catch (e) {
+        setShipCents(null);
+        setShipError(e instanceof Error ? e.message : "Quote failed");
+      }
+    }, 400);
+  }, [shipOn, shipZip, weightOz, zipValid]);
 
   async function aiDraft(kind: "description" | "terms", lineIndex?: number) {
     setBusy(kind === "terms" ? "ai-terms" : `ai-${lineIndex!}`);
@@ -130,7 +182,14 @@ export function AdminCustomInvoiceForm() {
       const res = await fetch("/api/admin/custom-invoice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerName, customerEmail, lines: parsedLines, notes: notes.trim() || undefined, taxExempt }),
+        body: JSON.stringify({
+          customerName,
+          customerEmail,
+          lines: parsedLines,
+          notes: notes.trim() || undefined,
+          taxExempt,
+          ship: shipOn && zipValid ? { zip: shipZip.trim(), weightOz } : null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create the invoice");
@@ -162,7 +221,7 @@ export function AdminCustomInvoiceForm() {
         </div>
         <button
           type="button"
-          onClick={() => { setDone(null); setLines([emptyLine()]); setNotes(""); setCustomerName(""); setCustomerEmail(""); setPicked(null); setHits([]); }}
+          onClick={() => { setDone(null); setLines([emptyLine()]); setNotes(STANDARD_INVOICE_TERMS); setCustomerName(""); setCustomerEmail(""); setPicked(null); setHits([]); setShipOn(false); setShipZip(""); setWeightOverride(""); setShipCents(null); }}
           className="mt-6 text-sm text-muted border border-line px-4 py-2 hover:border-brand/50 hover:text-foreground"
         >
           Create another invoice
@@ -305,7 +364,7 @@ export function AdminCustomInvoiceForm() {
 
       <div>
         <div className="flex items-center justify-between">
-          <label className="display text-sm text-foreground">Notes / terms &amp; conditions (optional)</label>
+          <label className="display text-sm text-foreground">Terms &amp; conditions <span className="text-xs text-muted">(standard terms pre-filled - edit as needed)</span></label>
           <button
             type="button"
             onClick={() => aiDraft("terms")}
@@ -324,12 +383,63 @@ export function AdminCustomInvoiceForm() {
         Tax exempt (skip the 7% FL sales tax)
       </label>
 
+      <div className="bg-steel border border-line p-4">
+        <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+          <input type="checkbox" checked={shipOn} onChange={(e) => setShipOn(e.target.checked)} className="accent-[#b8a36c]" />
+          <span className="display">Charge shipping</span>
+          <span className="text-xs text-muted">(off = local pickup / no shipping)</span>
+        </label>
+        {shipOn && (
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            <div>
+              <label className="text-xs text-muted">Ship-to ZIP</label>
+              <input
+                className={`mt-1 ${inputCls} w-28 font-mono`}
+                inputMode="numeric"
+                value={shipZip}
+                onChange={(e) => setShipZip(e.target.value)}
+                placeholder="34471"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted">Weight (oz)</label>
+              <input
+                className={`mt-1 ${inputCls} w-24`}
+                inputMode="numeric"
+                value={weightOverride}
+                onChange={(e) => setWeightOverride(e.target.value)}
+                placeholder={String(estWeightOz)}
+              />
+            </div>
+            <div className="pb-2.5 text-sm">
+              {!zipValid ? (
+                <span className="text-muted">Enter the 5-digit ZIP to quote</span>
+              ) : shipError ? (
+                <span className="text-red-400">{shipError}</span>
+              ) : shipCents == null ? (
+                <span className="text-muted">Quoting...</span>
+              ) : (
+                <span className="text-foreground">
+                  {money(shipCents)}{shipCarrier ? <span className="text-muted"> · {shipCarrier}</span> : null}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+        {shipOn && picked?.zip && shipZip === picked.zip && (
+          <p className="mt-2 text-xs text-muted">ZIP from the address on file{picked.cityState ? ` (${picked.cityState})` : ""}. Weight is estimated from the items - override it if the box will weigh more.</p>
+        )}
+      </div>
+
       <div className="bg-steel border border-line p-4 text-sm">
         <div className="flex justify-between"><span className="text-muted">Subtotal</span><span className="text-foreground">{money(subtotal)}</span></div>
         {credit > 0 && (
           <div className="flex justify-between mt-1"><span className="text-green-400">Referral credit (auto-applied)</span><span className="text-green-400">-{money(credit)}</span></div>
         )}
         <div className="flex justify-between mt-1"><span className="text-muted">FL sales tax (7%)</span><span className="text-foreground">{taxExempt ? "Exempt" : money(tax)}</span></div>
+        {shipOn && (
+          <div className="flex justify-between mt-1"><span className="text-muted">Shipping</span><span className="text-foreground">{shipCents != null ? money(shipCents) : "..."}</span></div>
+        )}
         <div className="flex justify-between mt-2 pt-2 border-t border-line display text-foreground"><span>Total</span><span>{money(total)}</span></div>
       </div>
 
@@ -338,7 +448,7 @@ export function AdminCustomInvoiceForm() {
       <button
         type="button"
         onClick={send}
-        disabled={busy !== "" || parsedLines.length === 0 || !customerName.trim() || !customerEmail.trim()}
+        disabled={busy !== "" || parsedLines.length === 0 || !customerName.trim() || !customerEmail.trim() || (shipOn && (!zipValid || shipCents == null))}
         className="w-full clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg py-3.5 transition-colors disabled:opacity-60"
       >
         {busy === "sending" ? "Creating & sending..." : `Send invoice (${money(total)})`}

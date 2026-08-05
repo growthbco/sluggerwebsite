@@ -393,6 +393,13 @@
       "when": 1785936494737,
       "tag": "0055_illegal_thena",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1785937099141,
+      "tag": "0056_daffy_beast",
+      "breakpoints": true
     }
   ]
 }

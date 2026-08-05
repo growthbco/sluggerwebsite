@@ -783,6 +783,9 @@ export const customInvoices = pgTable("custom_invoices", {
   // and the tax base at creation; redeemed from the customer's balance in
   // the webhook when the invoice is actually paid).
   creditCents: integer("credit_cents").notNull().default(0),
+  // Shipping charged on the invoice (quoted from the customer's ZIP + the
+  // estimated package weight; 0 = pickup / no shipping).
+  shippingCents: integer("shipping_cents").notNull().default(0),
   taxCents: integer("tax_cents").notNull().default(0),
   totalCents: integer("total_cents").notNull(),
   payUrl: text("pay_url"),
@@ -803,6 +806,8 @@ export const invoiceItems = pgTable(
     nameKey: text("name_key").notNull(), // lowercased for dedupe
     description: text("description"),
     unitPriceCents: integer("unit_price_cents").notNull().default(0),
+    // Per-piece shipping weight for the auto shipping estimate.
+    weightOz: integer("weight_oz").notNull().default(16),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

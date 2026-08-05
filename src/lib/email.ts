@@ -313,6 +313,7 @@ export async function emailCustomInvoice(args: {
   lines: { name: string; description?: string; quantity: number; unitPriceCents: number }[];
   subtotalCents: number;
   creditCents?: number;
+  shippingCents?: number;
   taxCents: number;
   totalCents: number;
   notes?: string | null;
@@ -343,6 +344,7 @@ export async function emailCustomInvoice(args: {
           <tr><td style="padding:10px 0;">Subtotal</td><td style="padding:10px 0;text-align:right;">${money(args.subtotalCents)}</td></tr>
           ${args.creditCents ? `<tr><td style="padding:4px 0;color:#2e7d32;">Referral credit</td><td style="padding:4px 0;text-align:right;color:#2e7d32;">-${money(args.creditCents)}</td></tr>` : ""}
           ${args.taxCents > 0 ? `<tr><td style="padding:4px 0;">FL sales tax (7%)</td><td style="padding:4px 0;text-align:right;">${money(args.taxCents)}</td></tr>` : ""}
+          ${args.shippingCents ? `<tr><td style="padding:4px 0;">Shipping</td><td style="padding:4px 0;text-align:right;">${money(args.shippingCents)}</td></tr>` : ""}
           <tr><td style="padding:10px 0;border-top:1px solid #e6e2d6;"><strong>Total due</strong></td><td style="padding:10px 0;border-top:1px solid #e6e2d6;text-align:right;"><strong>${money(args.totalCents)}</strong></td></tr>
         </table>
         ${args.notes ? `<div style="margin:0 0 14px;padding:12px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;font-size:13px;color:#555;white-space:pre-line;">${esc(args.notes)}</div>` : ""}

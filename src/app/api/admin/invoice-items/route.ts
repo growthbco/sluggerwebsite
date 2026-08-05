@@ -12,7 +12,7 @@ export async function GET() {
   if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   const items = await getDb()
-    .select({ id: invoiceItems.id, name: invoiceItems.name, description: invoiceItems.description, unitPriceCents: invoiceItems.unitPriceCents })
+    .select({ id: invoiceItems.id, name: invoiceItems.name, description: invoiceItems.description, unitPriceCents: invoiceItems.unitPriceCents, weightOz: invoiceItems.weightOz })
     .from(invoiceItems)
     .orderBy(desc(invoiceItems.updatedAt))
     .limit(200);
