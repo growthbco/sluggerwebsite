@@ -102,6 +102,12 @@ export async function POST(req: Request) {
     });
     await db.update(customInvoices).set({ payUrl: link.url }).where(eqId(row.id));
 
+    // Grow the item library from what was just invoiced (non-fatal).
+    try {
+      const { learnInvoiceItems } = await import("@/lib/invoice-items");
+      await learnInvoiceItems(lines);
+    } catch (e) { console.error("invoice item learn failed:", e); }
+
     const emailed = await emailCustomInvoice({
       to: customerEmail,
       customerName,

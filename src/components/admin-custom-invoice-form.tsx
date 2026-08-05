@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Line = { name: string; description: string; quantity: string; price: string };
 type CustomerHit = { name: string; email: string; phone: string | null; creditCents: number };
+type LibraryItem = { id: string; name: string; description: string | null; unitPriceCents: number };
 
 const emptyLine = (): Line => ({ name: "", description: "", quantity: "1", price: "" });
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
@@ -19,6 +20,17 @@ export function AdminCustomInvoiceForm() {
   const [hitsOpen, setHitsOpen] = useState(false);
   const [picked, setPicked] = useState<CustomerHit | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Item library: everything ever invoiced, so items are picked, not retyped.
+  // The library learns automatically - sending an invoice saves its items.
+  const [library, setLibrary] = useState<LibraryItem[]>([]);
+  const [itemDropdown, setItemDropdown] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/invoice-items")
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) => setLibrary(d.items ?? []))
+      .catch(() => {});
+  }, []);
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [notes, setNotes] = useState("");
   const [taxExempt, setTaxExempt] = useState(false);
@@ -53,6 +65,21 @@ export function AdminCustomInvoiceForm() {
     setCustomerEmail(h.email);
     setPicked(h);
     setHitsOpen(false);
+  }
+
+  function libraryMatches(i: number): LibraryItem[] {
+    const q = lines[i]?.name.trim().toLowerCase() ?? "";
+    const pool = q.length === 0 ? library : library.filter((it) => it.name.toLowerCase().includes(q) || (it.description ?? "").toLowerCase().includes(q));
+    return pool.slice(0, 8);
+  }
+
+  function pickItem(i: number, it: LibraryItem) {
+    setLines((ls) =>
+      ls.map((l, idx) =>
+        idx === i ? { ...l, name: it.name, description: it.description ?? "", price: (it.unitPriceCents / 100).toFixed(2) } : l,
+      ),
+    );
+    setItemDropdown(null);
   }
 
   const parsedLines = lines
@@ -204,9 +231,34 @@ export function AdminCustomInvoiceForm() {
           {lines.map((l, i) => (
             <div key={i} className="bg-steel border border-line p-4 space-y-3">
               <div className="grid gap-3 sm:grid-cols-[1fr_5.5rem_7rem_auto] items-end">
-                <div>
+                <div className="relative">
                   <label className="text-xs text-muted">Item name</label>
-                  <input className={`mt-1 ${inputCls}`} value={l.name} onChange={(e) => update(i, "name", e.target.value)} placeholder="e.g. Custom 3D Hype Chain" />
+                  <input
+                    className={`mt-1 ${inputCls}`}
+                    value={l.name}
+                    onChange={(e) => { update(i, "name", e.target.value); setItemDropdown(i); }}
+                    onFocus={() => { if (library.length > 0) setItemDropdown(i); }}
+                    onBlur={() => setTimeout(() => setItemDropdown((d) => (d === i ? null : d)), 150)}
+                    placeholder={library.length > 0 ? "Pick a saved item or type a new one" : "e.g. Custom 3D Hype Chain"}
+                    autoComplete="off"
+                  />
+                  {itemDropdown === i && libraryMatches(i).length > 0 && (
+                    <ul className="absolute z-20 left-0 right-0 mt-1 bg-ink border border-line shadow-lg max-h-64 overflow-y-auto">
+                      {libraryMatches(i).map((it) => (
+                        <li key={it.id}>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => { e.preventDefault(); pickItem(i, it); }}
+                            className="w-full text-left px-3 py-2 hover:bg-steel"
+                          >
+                            <span className="text-sm text-foreground">{it.name}</span>
+                            <span className="text-sm text-muted"> · {money(it.unitPriceCents)}</span>
+                            {it.description && <span className="block text-xs text-muted truncate">{it.description}</span>}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs text-muted">Qty</label>

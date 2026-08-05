@@ -792,6 +792,23 @@ export const customInvoices = pgTable("custom_invoices", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Item library for custom invoices: every line ever sent on an invoice is
+// upserted here (keyed by lowercased name, latest description/price wins),
+// so staff pick items from a dropdown instead of retyping them.
+export const invoiceItems = pgTable(
+  "invoice_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    nameKey: text("name_key").notNull(), // lowercased for dedupe
+    description: text("description"),
+    unitPriceCents: integer("unit_price_cents").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("invoice_items_name_key_idx").on(t.nameKey)],
+);
+
 /* ------------------------------------------------------------------ */
 /* AI assistant knowledge                                              */
 /* ------------------------------------------------------------------ */
