@@ -84,7 +84,7 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-12 pt-6 border-t border-line flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted">
-          <p>© {new Date().getFullYear()} Slugger Athletics. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Slugger Athletics LLC · Ocala, FL. All rights reserved.</p>
           <div className="flex gap-5">
             <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
             <Link href="/terms" className="hover:text-foreground">Terms</Link>

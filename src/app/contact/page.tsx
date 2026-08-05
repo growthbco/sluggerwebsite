@@ -12,8 +12,10 @@ const jsonLd = {
   "@context": "https://schema.org",
   "@type": "Organization",
   name: "Slugger Athletics",
+  legalName: "Slugger Athletics LLC",
   email: "apparel@sluggerathletics.com",
   telephone: "+1-352-660-1232",
+  address: { "@type": "PostalAddress", addressLocality: "Ocala", addressRegion: "FL", addressCountry: "US" },
   contactPoint: {
     "@type": "ContactPoint",
     contactType: "customer service",
@@ -71,6 +73,10 @@ export default function ContactPage() {
               <div>
                 <dt className="text-muted">Hours</dt>
                 <dd className="text-foreground">Mon-Fri, 9am-5pm ET</dd>
+              </div>
+              <div>
+                <dt className="text-muted">Location</dt>
+                <dd className="text-foreground">Slugger Athletics LLC · Ocala, Florida</dd>
               </div>
             </dl>
           </div>
