@@ -18,12 +18,13 @@ export function SmsConsentNote() {
         className="mt-0.5 accent-[#b8a36c]"
       />
       <span className="text-[11px] leading-snug text-muted/80">
-        I agree to receive order-related text messages from Slugger Athletics.
-        Msg frequency varies, msg &amp; data rates may apply. Reply STOP to opt
-        out, HELP for help. See our{" "}
+        I agree to receive SMS/text messages from Slugger Athletics about my
+        order (order confirmations, design proof alerts, invoices, and shipping
+        updates). Msg frequency varies. Msg &amp; data rates may apply. Reply
+        STOP to cancel, HELP for help. SMS consent is optional and not a
+        condition of purchase. See our{" "}
         <a href="/privacy" className="underline hover:text-foreground" onClick={(e) => e.stopPropagation()}>Privacy Policy</a> and{" "}
         <a href="/terms" className="underline hover:text-foreground" onClick={(e) => e.stopPropagation()}>SMS Terms</a>.
-        Consent is not a condition of purchase.
       </span>
     </label>
   );
