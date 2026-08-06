@@ -22,35 +22,47 @@ export function toE164(raw: string | null | undefined): string | null {
   return null;
 }
 
-/** Send one SMS. Non-fatal by design: returns false on any failure so order
- *  flows never break because a text didn't go out. */
-export async function sendSms(to: string, body: string): Promise<boolean> {
-  if (!smsEnabled()) return false;
+/** Send one SMS or WhatsApp message. Non-fatal by design: resolves with
+ *  ok:false on any failure so order flows never break because a text didn't
+ *  go out. Returns the Twilio message SID on success for logging. */
+export async function sendSms(
+  to: string,
+  body: string,
+  channel: "sms" | "whatsapp" = "sms",
+): Promise<{ ok: boolean; sid?: string }> {
+  if (!smsEnabled()) return { ok: false };
   const toNum = toE164(to);
-  if (!toNum) return false;
-  const sid = process.env.TWILIO_ACCOUNT_SID!;
-  const params = new URLSearchParams({ To: toNum, Body: body.slice(0, 1500) });
-  if (process.env.TWILIO_MESSAGING_SERVICE_SID) {
-    params.set("MessagingServiceSid", process.env.TWILIO_MESSAGING_SERVICE_SID);
+  if (!toNum) return { ok: false };
+  const acct = process.env.TWILIO_ACCOUNT_SID!;
+  const params = new URLSearchParams({ Body: body.slice(0, 1500) });
+  if (channel === "whatsapp") {
+    params.set("To", `whatsapp:${toNum}`);
+    params.set("From", `whatsapp:${process.env.TWILIO_FROM}`);
   } else {
-    params.set("From", process.env.TWILIO_FROM!);
+    params.set("To", toNum);
+    if (process.env.TWILIO_MESSAGING_SERVICE_SID) {
+      params.set("MessagingServiceSid", process.env.TWILIO_MESSAGING_SERVICE_SID);
+    } else {
+      params.set("From", process.env.TWILIO_FROM!);
+    }
   }
   try {
-    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${acct}/Messages.json`, {
       method: "POST",
       headers: {
-        Authorization: "Basic " + Buffer.from(`${sid}:${process.env.TWILIO_AUTH_TOKEN}`).toString("base64"),
+        Authorization: "Basic " + Buffer.from(`${acct}:${process.env.TWILIO_AUTH_TOKEN}`).toString("base64"),
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: params,
     });
     if (!res.ok) {
       console.error("Twilio send failed:", res.status, await res.text());
-      return false;
+      return { ok: false };
     }
-    return true;
+    const data = await res.json();
+    return { ok: true, sid: data.sid };
   } catch (e) {
     console.error("Twilio send error:", e);
-    return false;
+    return { ok: false };
   }
 }

@@ -876,6 +876,25 @@ export const designLabVisitors = pgTable("design_lab_visitors", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Every SMS/WhatsApp message in or out of the shop's Twilio number
+// (352) 414-7270 - powers the /admin/texts inbox where staff read and
+// reply to customer texts.
+export const smsMessages = pgTable(
+  "sms_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    phone: text("phone").notNull(), // customer number, E.164 (+13525551234)
+    direction: text("direction").notNull(), // in | out
+    channel: text("channel").notNull().default("sms"), // sms | whatsapp
+    body: text("body").notNull(),
+    mediaCount: integer("media_count").notNull().default(0),
+    staff: text("staff"), // who sent it (outbound only)
+    twilioSid: text("twilio_sid"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("sms_messages_phone_idx").on(t.phone, t.createdAt)],
+);
+
 // Every design-lab render, linked to the visitor who made it - powers the
 // /admin/design-lab leads page (see what each lead was designing).
 export const designLabRenders = pgTable("design_lab_renders", {

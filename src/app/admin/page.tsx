@@ -688,7 +688,16 @@ export default async function AdminPage() {
         </details>
       )}
 
-      <section className="mt-10">
+      <section className="mt-10 space-y-3">
+        <Link href="/admin/texts" className="flex items-center justify-between border border-line bg-steel px-5 py-4 hover:border-brand/60 transition-colors">
+          <span>
+            <span className="display text-lg text-foreground">💬 Texts</span>
+            <span className="block text-sm text-muted mt-0.5">
+              Read and reply to customer texts and WhatsApp messages on (352) 414-7270.
+            </span>
+          </span>
+          <span className="display text-brand whitespace-nowrap">Open</span>
+        </Link>
         <Link href="/admin/design-lab" className="flex items-center justify-between border border-line bg-steel px-5 py-4 hover:border-brand/60 transition-colors">
           <span>
             <span className="display text-lg text-foreground">🧪 Design Lab leads</span>

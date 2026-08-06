@@ -13,16 +13,34 @@ export async function POST(req: Request) {
   if (!validTwilioSignature(`${SITE}/api/sms/inbound`, params, req.headers.get("x-twilio-signature"))) {
     return new Response("Forbidden", { status: 403 });
   }
-  const from = params.From ?? "unknown";
+  const rawFrom = params.From ?? "unknown";
+  const channel = rawFrom.startsWith("whatsapp:") ? "whatsapp" : "sms";
+  const from = rawFrom.replace(/^whatsapp:/, "");
   const body = (params.Body ?? "").slice(0, 1200);
   const media = Number(params.NumMedia ?? 0) > 0 ? ` (+${params.NumMedia} attachment${params.NumMedia === "1" ? "" : "s"})` : "";
+
+  // Log to the admin texts inbox (non-fatal).
+  try {
+    const { dbEnabled, getDb } = await import("@/db");
+    const { smsMessages } = await import("@/db/schema");
+    if (dbEnabled()) {
+      await getDb().insert(smsMessages).values({
+        phone: from,
+        direction: "in",
+        channel,
+        body,
+        mediaCount: Number(params.NumMedia ?? 0) || 0,
+        twilioSid: params.MessageSid ?? params.SmsMessageSid ?? null,
+      });
+    }
+  } catch (e) { console.error("sms inbox log failed:", e); }
 
   const hook = process.env.DISCORD_ORDERS_WEBHOOK_URL || process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
   if (hook) {
     void fetch(hook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: "Slugger SMS", content: `💬 Text from ${from}${media}:\n> ${body}` }),
+      body: JSON.stringify({ username: "Slugger SMS", content: `💬 ${channel === "whatsapp" ? "WhatsApp" : "Text"} from ${from}${media}:\n> ${body}\nReply: https://sluggerathletics.com/admin/texts` }),
     }).catch(() => {});
   }
   void sendEmail({
