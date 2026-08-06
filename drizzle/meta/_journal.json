@@ -421,6 +421,13 @@
       "when": 1785980183130,
       "tag": "0059_neat_mac_gargan",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1785981028873,
+      "tag": "0060_parched_rafael_vega",
+      "breakpoints": true
     }
   ]
 }

@@ -22,9 +22,12 @@ export function AdminTextsInbox() {
   const [draft, setDraft] = useState("");
   const [channel, setChannel] = useState<"sms" | "whatsapp">("sms");
   const [newPhone, setNewPhone] = useState("");
+  const [newName, setNewName] = useState("");
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
 
   const loadConvos = useCallback(async () => {
     try {
@@ -50,8 +53,26 @@ export function AdminTextsInbox() {
     }, 12000);
     return () => clearInterval(t);
   }, [active, loadConvos, loadThread]);
-  useEffect(() => { if (active) loadThread(active); }, [active, loadThread]);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length]);
+  useEffect(() => { if (active) loadThread(active); setEditingName(false); }, [active, loadThread]);
+  // Scroll ONLY the thread container (scrollIntoView would drag the whole
+  // page down every refresh).
+  useEffect(() => {
+    const el = threadRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length, active]);
+
+  async function saveName() {
+    if (!active || !nameDraft.trim()) { setEditingName(false); return; }
+    try {
+      await fetch("/api/admin/sms", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: active, name: nameDraft.trim() }),
+      });
+      setEditingName(false);
+      loadConvos();
+    } catch {}
+  }
 
   async function send() {
     const phone = active ?? newPhone;
@@ -62,12 +83,12 @@ export function AdminTextsInbox() {
       const res = await fetch("/api/admin/sms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, body: draft.trim(), channel }),
+        body: JSON.stringify({ phone, body: draft.trim(), channel, name: !active && newName.trim() ? newName.trim() : undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Send failed");
       setDraft("");
-      if (!active) { setActive(data.message.phone); setNewPhone(""); }
+      if (!active) { setActive(data.message.phone); setNewPhone(""); setNewName(""); }
       else loadThread(active);
       loadConvos();
     } catch (e) {
@@ -112,17 +133,51 @@ export function AdminTextsInbox() {
 
       {/* Thread */}
       <section className="bg-steel border border-line flex flex-col max-h-[40rem]">
-        <div className="px-4 py-3 border-b border-line flex items-center gap-3">
+        <div className="px-4 py-3 border-b border-line flex flex-wrap items-center gap-3">
           {active ? (
-            <span className="display text-foreground">{convos.find((c) => c.phone === active)?.name ?? prettyPhone(active)} <span className="text-muted text-xs font-normal">{prettyPhone(active)}</span></span>
+            editingName ? (
+              <span className="flex items-center gap-2 flex-1 min-w-[14rem]">
+                <input
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") saveName(); }}
+                  placeholder="Contact name"
+                  autoFocus
+                  className="flex-1 bg-background border border-line px-3 py-1.5 text-sm text-foreground focus:border-brand focus:outline-none"
+                />
+                <button type="button" onClick={saveName} className="text-xs display text-brand border border-brand/50 px-2 py-1 hover:bg-brand/10">Save</button>
+                <button type="button" onClick={() => setEditingName(false)} className="text-xs text-muted hover:text-foreground">Cancel</button>
+              </span>
+            ) : (
+              <span className="display text-foreground flex items-center gap-2">
+                {convos.find((c) => c.phone === active)?.name ?? prettyPhone(active)}
+                <span className="text-muted text-xs font-normal">{prettyPhone(active)}</span>
+                <button
+                  type="button"
+                  onClick={() => { setNameDraft(convos.find((c) => c.phone === active)?.name ?? ""); setEditingName(true); }}
+                  className="text-[11px] display text-muted border border-line px-1.5 py-0.5 hover:border-brand/50 hover:text-foreground"
+                  title="Attach a name to this number"
+                >
+                  {convos.find((c) => c.phone === active)?.name ? "Rename" : "+ Name"}
+                </button>
+              </span>
+            )
           ) : (
-            <input
-              value={newPhone}
-              onChange={(e) => setNewPhone(e.target.value)}
-              placeholder="Phone number to text, e.g. (352) 555-0123"
-              className="flex-1 bg-background border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-              inputMode="tel"
-            />
+            <span className="flex flex-1 gap-2 min-w-[16rem]">
+              <input
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value)}
+                placeholder="Phone number, e.g. (352) 555-0123"
+                className="flex-1 bg-background border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                inputMode="tel"
+              />
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Name (optional)"
+                className="flex-1 bg-background border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+              />
+            </span>
           )}
           <select value={channel} onChange={(e) => setChannel(e.target.value as "sms" | "whatsapp")} className="bg-background border border-line text-xs text-foreground px-2 py-1.5">
             <option value="sms">SMS</option>
@@ -130,7 +185,7 @@ export function AdminTextsInbox() {
           </select>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        <div ref={threadRef} className="flex-1 overflow-y-auto p-4 space-y-2">
           {active && messages.length === 0 && <p className="text-sm text-muted">Loading…</p>}
           {!active && <p className="text-sm text-muted">Start a new conversation - enter a number above and type below. It sends from (352) 414-7270.</p>}
           {messages.map((m) => (
@@ -144,7 +199,6 @@ export function AdminTextsInbox() {
               </div>
             </div>
           ))}
-          <div ref={bottomRef} />
         </div>
 
         <div className="p-3 border-t border-line">

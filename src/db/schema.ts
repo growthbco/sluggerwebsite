@@ -895,6 +895,15 @@ export const smsMessages = pgTable(
   (t) => [index("sms_messages_phone_idx").on(t.phone, t.createdAt)],
 );
 
+// Names staff attach to phone numbers in the texts inbox (takes priority
+// over names derived from order records).
+export const smsContacts = pgTable("sms_contacts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  phone: text("phone").notNull(), // E.164
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("sms_contacts_phone_idx").on(t.phone)]);
+
 // Every design-lab render, linked to the visitor who made it - powers the
 // /admin/design-lab leads page (see what each lead was designing).
 export const designLabRenders = pgTable("design_lab_renders", {
