@@ -398,6 +398,9 @@ export const teamOrders = pgTable(
     // Ocala league-family pricing: standard jerseys at $25 instead of $28.
     // Set by staff for teams that play in our leagues.
     localPricing: boolean("local_pricing").notNull().default(false),
+    // One-time $20 hat digitizing fee already paid on a prior order for this
+    // design -> waive it on this order (auto-set at invoicing, staff toggle).
+    embroideryFeeWaived: boolean("embroidery_fee_waived").notNull().default(false),
     // Tax-exempt org/company: no sales tax on this order's invoices.
     taxExempt: boolean("tax_exempt").notNull().default(false),
     jerseyMaterial: text("jersey_material"), // birdseye mesh / pro smooth

@@ -115,6 +115,7 @@ export default async function AdminPage() {
         jerseyStyle: teamOrders.jerseyStyle,
         rushShipping: teamOrders.rushShipping,
         localPricing: teamOrders.localPricing,
+        embroideryFeeWaived: teamOrders.embroideryFeeWaived,
         taxExempt: teamOrders.taxExempt,
         designRequestId: teamOrders.designRequestId,
         designerNote: teamOrders.designerNote,

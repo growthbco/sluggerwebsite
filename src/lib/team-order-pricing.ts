@@ -20,6 +20,12 @@ const ITEM_PRICES: Record<string, number> = {
 
 export const RUSH_FEE_CENTS = 500; // per piece, when rushShipping is set
 
+// One-time hat digitizing charge: converting the design into an embroidery
+// file. Charged once on the FIRST order that includes hats; reorders of the
+// same design never pay it again (embroideryFeeWaived).
+export const EMBROIDERY_FEE_CENTS = 2000;
+const HAT_KEYS = ["fitted_hat", "snapback_hat"];
+
 // Ocala league-family price for standard (crew/v-neck) jerseys.
 export const LOCAL_JERSEY_CENTS = 2500;
 
@@ -103,6 +109,9 @@ export function computeTeamOrderQuote(
     localPricing?: boolean | null;
     /** Owner-negotiated per-jersey price for this order - wins over all defaults. */
     customJerseyCents?: number | null;
+    /** Set when this design's one-time embroidery fee was already paid on a
+     *  previous order (auto-detected at invoicing, or staff toggle). */
+    embroideryFeeWaived?: boolean | null;
   },
   roster: RosterRow[],
 ): TeamOrderQuote {
@@ -132,6 +141,18 @@ export function computeTeamOrderQuote(
       key === "jersey" && order.jerseyStyle ? `${order.jerseyStyle} Jersey` : itemLabel(key);
     lines.push({ label, quantity, unitPriceCents: unit, totalCents: unit * quantity });
     pieces += quantity;
+  }
+
+  // Hats in the order -> one-time embroidery digitizing fee, unless this
+  // design already paid it on an earlier order. Added as a labeled line so
+  // every invoice/estimate/email explains itself.
+  if (!order.embroideryFeeWaived && HAT_KEYS.some((k) => counts.has(k))) {
+    lines.push({
+      label: "Embroidery Setup Fee (one-time, first hat order only)",
+      quantity: 1,
+      unitPriceCents: EMBROIDERY_FEE_CENTS,
+      totalCents: EMBROIDERY_FEE_CENTS,
+    });
   }
 
   const rushFeeCents = order.rushShipping ? pieces * RUSH_FEE_CENTS : 0;

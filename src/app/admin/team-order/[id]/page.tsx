@@ -17,6 +17,7 @@ import { AdminRecordPayment } from "@/components/admin-record-payment";
 import { AdminJerseyStyle } from "@/components/admin-jersey-style";
 import { AdminCustomPrice } from "@/components/admin-custom-price";
 import { AdminLocalToggle } from "@/components/admin-local-toggle";
+import { AdminEmbroideryToggle } from "@/components/admin-embroidery-toggle";
 import { AdminTaxToggle } from "@/components/admin-tax-toggle";
 import { AdminPickupToggle } from "@/components/admin-pickup-toggle";
 import { AdminDesignerNote } from "@/components/admin-designer-note";
@@ -220,6 +221,9 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
             <AdminCustomPrice teamOrderId={o.id} currentCents={o.customJerseyCents} />
             <AdminLocalToggle teamOrderId={o.id} local={o.localPricing} />
             <AdminTaxToggle teamOrderId={o.id} exempt={o.taxExempt} />
+            {roster.some((r) => Object.entries(r.sizes ?? {}).some(([k, v]) => (k === "fitted_hat" || k === "snapback_hat") && (v ?? "").trim())) && (
+              <AdminEmbroideryToggle teamOrderId={o.id} waived={o.embroideryFeeWaived} />
+            )}
           </div>
         )}
         {estimate && !o.taxExempt && !paid && (

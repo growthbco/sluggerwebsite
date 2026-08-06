@@ -47,6 +47,30 @@ export async function POST(req: Request) {
   // what they're paying for.
   const roster = await getRoster(order.id);
 
+  // One-time embroidery fee: if a SIBLING order of the same design already
+  // paid an invoice that included hats, the digitizing was already covered -
+  // auto-waive it here (persisted, so estimates agree afterwards).
+  const hasHats = (rows: { sizes?: Record<string, string> | null }[]) =>
+    rows.some((r) => Object.entries(r.sizes ?? {}).some(([k, v]) => (k === "fitted_hat" || k === "snapback_hat") && (v ?? "").trim()));
+  if (!order.embroideryFeeWaived && order.designRequestId && hasHats(roster)) {
+    const { ne, and, isNotNull, or } = await import("drizzle-orm");
+    const sibs = await db
+      .select({ id: teamOrders.id })
+      .from(teamOrders)
+      .where(and(
+        eq(teamOrders.designRequestId, order.designRequestId),
+        ne(teamOrders.id, order.id),
+        or(isNotNull(teamOrders.depositPaidAt), isNotNull(teamOrders.invoicePaidAt)),
+      ));
+    for (const s of sibs) {
+      if (hasHats(await getRoster(s.id))) {
+        await db.update(teamOrders).set({ embroideryFeeWaived: true }).where(eq(teamOrders.id, order.id));
+        order.embroideryFeeWaived = true;
+        break;
+      }
+    }
+  }
+
   let totalCents = order.quotedTotalCents ?? 0;
   let quoteLines: { label: string; quantity: number; unitPriceCents: number; totalCents: number }[] = [];
   if (stage === "deposit") {

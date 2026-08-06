@@ -1,0 +1,1 @@
+ALTER TABLE "team_orders" ADD COLUMN "embroidery_fee_waived" boolean DEFAULT false NOT NULL;
