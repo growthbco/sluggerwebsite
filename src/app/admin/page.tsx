@@ -418,7 +418,63 @@ export default async function AdminPage() {
 
       <AdminSearch statuses={Array.from(new Set(activeOrders.map((o) => o.status)))} />
 
+
       <section className="mt-6">
+        <h2 className="display text-xl text-foreground">Design requests ({activeDesigns.length})</h2>
+        <div className="mt-3 overflow-x-auto border border-line">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-steel text-left text-xs text-muted uppercase">
+                <th className="px-3 py-2">Ref</th>
+                <th className="px-3 py-2">Team</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Contact</th>
+                <th className="px-3 py-2">Source</th>
+                <th className="px-3 py-2">Rev</th>
+                <th className="px-3 py-2">Needed by</th>
+                <th className="px-3 py-2">Last msg</th>
+                <th className="px-3 py-2">Updated</th>
+                <th className="px-3 py-2"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[color:var(--line)]">
+              {activeDesigns.map((d) => {
+                const lastMsg = d.messages?.[d.messages.length - 1];
+                return (
+                  <tr
+                    key={d.reference}
+                    className="hover:bg-steel/60"
+                    data-section="designs"
+                    data-status={d.status}
+                    data-search={`${d.teamName} ${d.reference} ${d.contactName} ${d.contactEmail}`.toLowerCase()}
+                  >
+                    <td className="px-3 py-2 font-mono text-xs">
+                      <Link href={`/design/manage/${d.manageToken}`} className="text-brand hover:underline">
+                        {d.reference}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2 text-foreground">{d.teamName}</td>
+                    <td className="px-3 py-2"><Badge label={d.status} /></td>
+                    <td className="px-3 py-2 text-muted">{d.contactName}</td>
+                    <td className="px-3 py-2 text-muted whitespace-nowrap" title={d.source ?? "unknown (pre-tracking)"}>{srcShort(d.source)}</td>
+                    <td className="px-3 py-2 text-muted">{d.revisionsUsed ?? 0}/5</td>
+                    <td className="px-3 py-2 text-muted">{fmtDate(d.neededBy)}</td>
+                    <td className="px-3 py-2 text-muted">
+                      {lastMsg ? (lastMsg.from === "client" ? "⚠ client waiting" : lastMsg.name ?? "staff") : "-"}
+                    </td>
+                    <td className="px-3 py-2 text-muted">{fmtDate(d.updatedAt)}</td>
+                    <td className="px-3 py-2">
+                      <AdminArchiveButton kind="design_request" id={d.id} archived={false} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="mt-6" id="team-orders">
         <h2 className="display text-xl text-foreground">Team orders ({activeOrders.length})</h2>
         <div className="mt-3 overflow-x-auto border border-line">
           <table className="w-full text-sm">
@@ -710,60 +766,6 @@ export default async function AdminPage() {
         </Link>
       </section>
 
-      <section className="mt-6">
-        <h2 className="display text-xl text-foreground">Design requests ({activeDesigns.length})</h2>
-        <div className="mt-3 overflow-x-auto border border-line">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-steel text-left text-xs text-muted uppercase">
-                <th className="px-3 py-2">Ref</th>
-                <th className="px-3 py-2">Team</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Contact</th>
-                <th className="px-3 py-2">Source</th>
-                <th className="px-3 py-2">Rev</th>
-                <th className="px-3 py-2">Needed by</th>
-                <th className="px-3 py-2">Last msg</th>
-                <th className="px-3 py-2">Updated</th>
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[color:var(--line)]">
-              {activeDesigns.map((d) => {
-                const lastMsg = d.messages?.[d.messages.length - 1];
-                return (
-                  <tr
-                    key={d.reference}
-                    className="hover:bg-steel/60"
-                    data-section="designs"
-                    data-status={d.status}
-                    data-search={`${d.teamName} ${d.reference} ${d.contactName} ${d.contactEmail}`.toLowerCase()}
-                  >
-                    <td className="px-3 py-2 font-mono text-xs">
-                      <Link href={`/design/manage/${d.manageToken}`} className="text-brand hover:underline">
-                        {d.reference}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2 text-foreground">{d.teamName}</td>
-                    <td className="px-3 py-2"><Badge label={d.status} /></td>
-                    <td className="px-3 py-2 text-muted">{d.contactName}</td>
-                    <td className="px-3 py-2 text-muted whitespace-nowrap" title={d.source ?? "unknown (pre-tracking)"}>{srcShort(d.source)}</td>
-                    <td className="px-3 py-2 text-muted">{d.revisionsUsed ?? 0}/5</td>
-                    <td className="px-3 py-2 text-muted">{fmtDate(d.neededBy)}</td>
-                    <td className="px-3 py-2 text-muted">
-                      {lastMsg ? (lastMsg.from === "client" ? "⚠ client waiting" : lastMsg.name ?? "staff") : "-"}
-                    </td>
-                    <td className="px-3 py-2 text-muted">{fmtDate(d.updatedAt)}</td>
-                    <td className="px-3 py-2">
-                      <AdminArchiveButton kind="design_request" id={d.id} archived={false} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
 
       {archivedDesigns.length > 0 && (
         <details className="mt-6 border border-line bg-steel/50 group">

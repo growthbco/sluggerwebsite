@@ -26,7 +26,12 @@ export function AdminPipeline({ counts }: { counts: Record<string, number> }) {
           <button
             key={s.value}
             type="button"
-            onClick={() => setStatus(on ? "" : s.value)}
+            onClick={() => {
+              setStatus(on ? "" : s.value);
+              // Team orders now sit below Design requests - jump to the table
+              // so the filter's effect is visible.
+              if (!on) document.getElementById("team-orders")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
             title={on ? "Click to clear the filter" : `Show only ${s.title.toLowerCase()} orders`}
             className={`text-left border bg-steel px-3 py-2.5 transition-colors ${on ? "border-brand ring-1 ring-brand" : `${s.tone} hover:border-brand/60`} ${n === 0 && !on ? "opacity-50" : ""}`}
           >
