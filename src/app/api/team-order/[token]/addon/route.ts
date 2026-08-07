@@ -48,50 +48,55 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     const ADDON_SEPARATE_SHIP_MIN = 10;
     const pieceCount = rows.reduce((s, r) => s + r.quantity, 0);
     const shipsSeparately = order.status === "shipped" || pieceCount >= ADDON_SEPARATE_SHIP_MIN;
-    const goodsLineItems = rows.map((r) => ({
-      quantity: r.quantity,
-      price_data: {
-        currency: "usd" as const,
-        unit_amount: r.unitPriceCents,
-        product_data: {
-          name: `${r.label} - ${[r.design, r.size, r.name?.toUpperCase(), r.number ? `#${r.number}` : null].filter(Boolean).join(" - ")} (add-on ${order.reference})`,
-        },
-      },
-    }));
-    const addonTax = taxCents(goodsLineItems.reduce((s, li) => s + li.price_data.unit_amount * li.quantity, 0));
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: addonTax > 0
-        ? [...goodsLineItems, { quantity: 1, price_data: { currency: "usd" as const, unit_amount: addonTax, product_data: { name: SALES_TAX_LABEL } } }]
-        : goodsLineItems,
-      success_url: `${SITE}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${SITE}/team-order/manage/${token}`,
-      phone_number_collection: { enabled: false },
+
+    // A single-use Payment Link, not a Checkout Session: sessions expire after
+    // 24h (a coach who pays the next evening hits a dead link), payment links
+    // never do. The link's metadata is copied onto the session it creates, so
+    // the webhook's addon handling is unchanged.
+    const makePrice = async (name: string, unitAmount: number) =>
+      (await stripe.prices.create({ currency: "usd", unit_amount: unitAmount, product_data: { name } })).id;
+    const lineItems: { price: string; quantity: number }[] = [];
+    for (const r of rows) {
+      lineItems.push({
+        quantity: r.quantity,
+        price: await makePrice(
+          `${r.label} - ${[r.design, r.size, r.name?.toUpperCase(), r.number ? `#${r.number}` : null].filter(Boolean).join(" - ")} (add-on ${order.reference})`,
+          r.unitPriceCents,
+        ),
+      });
+    }
+    const addonTax = taxCents(totalCents);
+    if (addonTax > 0) lineItems.push({ quantity: 1, price: await makePrice(SALES_TAX_LABEL, addonTax) });
+
+    // Payment links only accept saved shipping rates (no inline rate data).
+    let shippingOptions: { shipping_rate: string }[] = [];
+    if (shipsSeparately) {
+      const [byWeight, pickup] = await Promise.all([
+        stripe.shippingRates.create({
+          display_name: "Shipping (by weight)",
+          type: "fixed_amount",
+          fixed_amount: { amount: shippingCentsFor(addonWeightOz(rows)), currency: "usd" },
+        }),
+        stripe.shippingRates.create({
+          display_name: "Free local pickup (Ocala, FL)",
+          type: "fixed_amount",
+          fixed_amount: { amount: 0, currency: "usd" },
+        }),
+      ]);
+      shippingOptions = [{ shipping_rate: byWeight.id }, { shipping_rate: pickup.id }];
+    }
+
+    const link = await stripe.paymentLinks.create({
+      line_items: lineItems,
+      restrictions: { completed_sessions: { limit: 1 } },
       ...(shipsSeparately
-        ? {
-            shipping_address_collection: { allowed_countries: ["US"] as const },
-            shipping_options: [
-              {
-                shipping_rate_data: {
-                  display_name: "Shipping (by weight)",
-                  type: "fixed_amount" as const,
-                  fixed_amount: { amount: shippingCentsFor(addonWeightOz(rows)), currency: "usd" },
-                },
-              },
-              {
-                shipping_rate_data: {
-                  display_name: "Free local pickup (Ocala, FL)",
-                  type: "fixed_amount" as const,
-                  fixed_amount: { amount: 0, currency: "usd" },
-                },
-              },
-            ],
-          }
+        ? { shipping_address_collection: { allowed_countries: ["US"] }, shipping_options: shippingOptions }
         : {}),
       metadata: { kind: "team_order_addon", addonId: addon.id, teamOrderId: order.id, teamName: order.teamName },
+      after_completion: { type: "redirect", redirect: { url: `${SITE}/checkout/success` } },
     });
-    await setAddonSession(addon.id, session.id);
-    return NextResponse.json({ url: session.url });
+    await setAddonSession(addon.id, link.id);
+    return NextResponse.json({ url: link.url });
   } catch (e) {
     console.error("addon checkout failed:", e);
     return NextResponse.json({ error: "Could not start checkout" }, { status: 500 });

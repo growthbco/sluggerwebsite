@@ -9,6 +9,22 @@ export type DesignMessage = { at: string; from: "designer" | "client"; text: str
 const isImageUrl = (u: string) => /\.(png|jpe?g|webp|gif)$/i.test(u);
 const fileLabel = (u: string) => decodeURIComponent(u.split("/").pop() ?? "file").replace(/-[a-zA-Z0-9]{20,}(\.\w+)$/, "$1");
 
+// Pasted URLs (payment links, proof pages) render as clickable links instead
+// of raw text, shortened to their domain so a long Stripe URL can't flood the
+// bubble.
+function linkify(text: string) {
+  const parts = text.split(/(https?:\/\/[^\s]+)/g);
+  return parts.map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-brand underline underline-offset-2 break-all hover:opacity-80">
+        {part.length > 60 ? `${new URL(part).hostname} link ↗` : part}
+      </a>
+    ) : (
+      part
+    ),
+  );
+}
+
 const NAME_KEY = "slugger-sender-name";
 // Staff who reply to clients. Picking one is required so every reply is attributed.
 const STAFF_NAMES = ["Gary", "Justin", "Bonans"];
@@ -240,7 +256,7 @@ export function DesignMessages({
                     : "Client"}{" "}
                   · {new Date(m.at).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                 </p>
-                {m.text && <p className="text-foreground whitespace-pre-line">{m.text}</p>}
+                {m.text && <p className="text-foreground whitespace-pre-line break-words">{linkify(m.text)}</p>}
                 {m.attachments && m.attachments.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {m.attachments.map((url, j) =>
