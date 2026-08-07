@@ -74,13 +74,15 @@ export function ContactForm() {
         <div>
           <label className="display text-sm text-foreground">Phone <span className="text-muted normal-case">(optional)</span></label>
           <input className={`mt-2 ${inputCls}`} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(352) 660-1232" />
-          <SmsConsentNote />
         </div>
         <div>
           <label className="display text-sm text-foreground">What&apos;s this about?</label>
           <select className={`mt-2 ${inputCls}`} value={subject} onChange={(e) => setSubject(e.target.value)}>
             {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
           </select>
+        </div>
+        <div className="sm:col-span-2">
+          <SmsConsentNote />
         </div>
       </div>
 

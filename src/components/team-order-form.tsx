@@ -215,7 +215,9 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
           <div>
             <label className="display text-sm text-foreground">Phone</label>
             <input className={`mt-2 ${inputCls}`} value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(000) 000-0000" />
-          <SmsConsentNote />
+          </div>
+          <div className="sm:col-span-2">
+            <SmsConsentNote />
           </div>
         </div>
       )}

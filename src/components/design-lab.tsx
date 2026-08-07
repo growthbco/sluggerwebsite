@@ -309,11 +309,11 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
                   <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Your name" className={input} maxLength={60} />
                   <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} type="email" placeholder="Email" className={input} maxLength={100} />
                   <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="Phone (optional)" className={input} maxLength={20} />
-                  <SmsConsentNote />
                   <select value={estimatedPieces} onChange={(e) => setEstimatedPieces(e.target.value)} className={input}>
                     {["6-9", "10-14", "15-24", "25+"].map((r) => <option key={r} value={r}>{r} pieces</option>)}
                   </select>
                 </div>
+                <SmsConsentNote />
                 <button
                   type="button"
                   disabled={submitting || !contactName.trim() || !contactEmail.includes("@") || !teamName.trim()}

@@ -203,8 +203,10 @@ export function DesignIntakeForm() {
           <div>
             <label className="display text-sm text-foreground">Phone</label>
             <input className={`mt-2 ${inputCls}`} type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(000) 000-0000" />
-          <SmsConsentNote />
           </div>
+        </div>
+        <div className="sm:col-span-2">
+          <SmsConsentNote />
         </div>
       </div>
 
