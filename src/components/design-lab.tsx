@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
+import { DropZone, firstImageFile } from "@/components/drop-zone";
 import { SmsConsentNote } from "@/components/sms-consent";
 
 const SPORTS = ["Baseball", "Softball", "Basketball", "Soccer", "Flag Football", "Football", "Volleyball", "Hockey", "Pickleball", "Bowling"];
@@ -214,7 +215,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className={label}>TEAM LOGO OR SKETCH (OPTIONAL)</label>
-            <div className="flex items-center gap-2 mt-1">
+            <DropZone onFiles={(fs) => pickImage(firstImageFile(fs), setLogo)} className="flex items-center gap-2 mt-1">
               <button type="button" onClick={() => fileRef.current?.click()} className="border border-line text-foreground display text-sm px-3 py-2.5 hover:border-brand/60">
                 {logo ? "Change" : "Upload logo"}
               </button>
@@ -225,13 +226,13 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
                   <button type="button" onClick={() => setLogo(null)} className="text-xs text-muted underline">remove</button>
                 </>
               )}
-            </div>
+            </DropZone>
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
               onChange={(e) => pickImage(e.target.files?.[0], setLogo)} />
           </div>
           <div>
             <label className={label}>REFERENCE JERSEY (OPTIONAL)</label>
-            <div className="flex items-center gap-2 mt-1">
+            <DropZone onFiles={(fs) => pickImage(firstImageFile(fs), setReference)} className="flex items-center gap-2 mt-1">
               <button type="button" onClick={() => refFileRef.current?.click()} className="border border-line text-foreground display text-sm px-3 py-2.5 hover:border-brand/60">
                 {reference ? "Change" : "Upload reference"}
               </button>
@@ -242,7 +243,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
                   <button type="button" onClick={() => setReference(null)} className="text-xs text-muted underline">remove</button>
                 </>
               )}
-            </div>
+            </DropZone>
             <p className="mt-1 text-[11px] text-muted">A jersey you like - we restyle its look in your colors.</p>
             <input ref={refFileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
               onChange={(e) => pickImage(e.target.files?.[0], setReference)} />

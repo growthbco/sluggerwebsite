@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { DropZone, firstImageFile } from "@/components/drop-zone";
 
 type Version = { url: string; cleanUrl?: string; product?: string; note: string; at: string };
 
@@ -261,7 +262,10 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
               </div>
               <div>
                 <label className="display text-xs text-muted tracking-wide">REFERENCE IMAGE (optional)</label>
-                <div className="mt-1.5 flex items-center gap-3">
+                <DropZone
+                  onFiles={(fs) => { const f = firstImageFile(fs); if (f) onPickFile(f); }}
+                  className="mt-1.5 flex items-center gap-3 rounded"
+                >
                   {refImage ? (
                     <>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -269,13 +273,16 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
                       <button type="button" onClick={() => { setRefImage(null); setInspoIdx(null); if (fileRef.current) fileRef.current.value = ""; }} className="text-sm text-brand underline underline-offset-2">Remove</button>
                     </>
                   ) : (
-                    <button type="button" onClick={() => fileRef.current?.click()} className="text-sm border border-brand/70 text-foreground hover:bg-brand/10 px-3 py-1.5 rounded">
-                      Upload a reference
-                    </button>
+                    <>
+                      <button type="button" onClick={() => fileRef.current?.click()} className="text-sm border border-brand/70 text-foreground hover:bg-brand/10 px-3 py-1.5 rounded">
+                        Upload a reference
+                      </button>
+                      <span className="text-xs text-muted">or drag &amp; drop an image here</span>
+                    </>
                   )}
                   <input ref={fileRef} type="file" accept="image/*" className="hidden"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickFile(f); }} />
-                </div>
+                </DropZone>
                 {inspirationImages.length > 0 && (
                   <div className="mt-2">
                     <p className="text-xs text-muted">…or tap an image the client sent (inspiration + message attachments) to use it directly:</p>

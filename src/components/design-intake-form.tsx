@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DropZone } from "@/components/drop-zone";
 import { SmsConsentNote } from "@/components/sms-consent";
 import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
 import Image from "next/image";
@@ -394,17 +395,19 @@ export function DesignIntakeForm() {
       <div>
         <label className="display text-sm text-foreground">Inspiration images (optional)</label>
         <p className="text-sm text-muted mt-1">Upload anything that inspires the look - other jerseys, logos, color palettes. JPG/PNG/WEBP/PDF up to 15MB each.</p>
-        <label className="mt-3 block cursor-pointer border-2 border-dashed border-line hover:border-brand/50 transition-colors p-6 text-center bg-steel">
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            multiple
-            className="hidden"
-            onChange={(e) => handleFiles(e.target.files)}
-          />
-          <span className="display text-foreground">{uploading ? "Uploading..." : "Click or drop files here"}</span>
-          <p className="text-sm text-muted mt-1">{uploading ? "Hang tight..." : "You can add multiple"}</p>
-        </label>
+        <DropZone onFiles={handleFiles} disabled={uploading} className="mt-3">
+          <label className="block cursor-pointer border-2 border-dashed border-line hover:border-brand/50 transition-colors p-6 text-center bg-steel">
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              className="hidden"
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+            <span className="display text-foreground">{uploading ? "Uploading..." : "Click or drop files here"}</span>
+            <p className="text-sm text-muted mt-1">{uploading ? "Hang tight..." : "You can add multiple"}</p>
+          </label>
+        </DropZone>
         {images.length > 0 && (
           <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2">
             {images.map((img, i) => (

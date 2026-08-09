@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DropZone } from "@/components/drop-zone";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { upload } from "@vercel/blob/client";
@@ -153,23 +154,25 @@ export function PrintFileQA({ token, basePath, group, rosterCount, roster = [], 
       {/* Upload + preview. Multiple sheets allowed - a print file can span
           two, three, or four files. */}
       <div className="flex flex-col sm:flex-row gap-4">
-        <label className="flex-1 cursor-pointer">
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp,application/pdf"
-            multiple
-            className="hidden"
-            disabled={status === "uploading" || status === "verifying"}
-            onChange={(e) => onFilesChange(e.target.files)}
-          />
-          <span className="block bg-ink border border-line px-3 py-2.5 text-sm text-foreground/80 text-center hover:bg-ink/80">
-            {status === "uploading"
-              ? "Uploading…"
-              : printFileUrls.length
-              ? "Add another sheet"
-              : "Upload print file(s)"}
-          </span>
-        </label>
+        <DropZone onFiles={onFilesChange} disabled={status === "uploading" || status === "verifying"} className="flex-1">
+          <label className="block cursor-pointer">
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,application/pdf"
+              multiple
+              className="hidden"
+              disabled={status === "uploading" || status === "verifying"}
+              onChange={(e) => onFilesChange(e.target.files)}
+            />
+            <span className="block bg-ink border border-line px-3 py-2.5 text-sm text-foreground/80 text-center hover:bg-ink/80">
+              {status === "uploading"
+                ? "Uploading…"
+                : printFileUrls.length
+                ? "Add another sheet"
+                : "Upload or drop print file(s)"}
+            </span>
+          </label>
+        </DropZone>
         <button
           onClick={verify}
           disabled={printFileUrls.length === 0 || status === "verifying" || status === "uploading"}

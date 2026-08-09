@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { DropZone } from "@/components/drop-zone";
 import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
 
@@ -106,12 +107,14 @@ export function PrintChecklist({ token, jerseys }: { token: string; jerseys: Jer
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
-        <label className="flex-1 cursor-pointer">
-          <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" multiple className="hidden" disabled={status !== "idle"} onChange={(e) => onFiles(e.target.files)} />
-          <span className="block bg-ink border border-line px-3 py-2.5 text-sm text-foreground/80 text-center hover:bg-ink/80">
-            {status === "uploading" ? "Uploading…" : urls.length ? `${urls.length} sheet${urls.length === 1 ? "" : "s"} ready - add another` : "Upload print sheet(s)"}
-          </span>
-        </label>
+        <DropZone onFiles={onFiles} disabled={status !== "idle"} className="flex-1">
+          <label className="block cursor-pointer">
+            <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" multiple className="hidden" disabled={status !== "idle"} onChange={(e) => onFiles(e.target.files)} />
+            <span className="block bg-ink border border-line px-3 py-2.5 text-sm text-foreground/80 text-center hover:bg-ink/80">
+              {status === "uploading" ? "Uploading…" : urls.length ? `${urls.length} sheet${urls.length === 1 ? "" : "s"} ready - add another` : "Upload or drop print sheet(s)"}
+            </span>
+          </label>
+        </DropZone>
         <button type="button" onClick={verify} disabled={status !== "idle" || urls.length === 0 || selected.size === 0}
           className="clip-slant bg-brand text-on-brand display text-sm px-5 py-2.5 hover:bg-brand-dark disabled:opacity-50 disabled:cursor-not-allowed">
           {status === "verifying" ? "Verifying…" : `Verify ${selected.size || ""} selected`.trim()}

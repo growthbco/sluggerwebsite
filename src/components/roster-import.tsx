@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { DropZone, firstImageFile } from "@/components/drop-zone";
 import { sizesFor, itemLabel } from "@/lib/order-items";
 
 export type ImportedRow = {
@@ -99,14 +100,27 @@ export function RosterImport({
             className="mt-3 w-full bg-ink border border-line px-3 py-2.5 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none min-h-20"
             disabled={busy !== ""}
           />
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <DropZone
+            onFiles={(fs) => {
+              const f = firstImageFile(fs);
+              if (!f || !fileRef.current) return;
+              // Park the dropped file in the hidden input - parse() reads it
+              // from there exactly as if it was browsed to.
+              const dt = new DataTransfer();
+              dt.items.add(f);
+              fileRef.current.files = dt.files;
+              setFileName(f.name);
+            }}
+            disabled={busy !== ""}
+            className="mt-2 flex flex-wrap items-center gap-2"
+          >
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
               className="text-xs display text-foreground border border-line px-3 py-2 hover:border-brand/50"
               disabled={busy !== ""}
             >
-              {fileName ? `📷 ${fileName}` : "📷 Add a photo"}
+              {fileName ? `📷 ${fileName}` : "📷 Add or drop a photo"}
             </button>
             <input
               ref={fileRef}
@@ -123,7 +137,7 @@ export function RosterImport({
             >
               {busy === "parsing" ? "Reading..." : "Read Roster"}
             </button>
-          </div>
+          </DropZone>
         </>
       )}
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { DropZone, firstImageFile } from "@/components/drop-zone";
 import { upload } from "@vercel/blob/client";
 
 type Preset = { key: string; label: string; priceCents: number };
@@ -197,14 +198,27 @@ export function TeamStorePanel({
                   aria-label="Team color"
                 />
               </label>
-              <button
-                type="button"
-                onClick={() => logoRef.current?.click()}
+              <DropZone
+                onFiles={(fs) => {
+                  const f = firstImageFile(fs);
+                  if (!f || !logoRef.current) return;
+                  const dt = new DataTransfer();
+                  dt.items.add(f);
+                  logoRef.current.files = dt.files;
+                  uploadLogo();
+                }}
                 disabled={appearanceBusy}
-                className="text-xs display text-foreground border border-line px-3 py-2 hover:border-brand/50 disabled:opacity-50"
+                className="inline-flex"
               >
-                {store.logoUrl ? "Replace logo" : "Add logo"}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => logoRef.current?.click()}
+                  disabled={appearanceBusy}
+                  className="text-xs display text-foreground border border-line px-3 py-2 hover:border-brand/50 disabled:opacity-50"
+                >
+                  {store.logoUrl ? "Replace logo" : "Add logo"}
+                </button>
+              </DropZone>
               <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={uploadLogo} />
               <button
                 type="button"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DropZone } from "@/components/drop-zone";
 import Image from "next/image";
 import { upload } from "@vercel/blob/client";
 
@@ -352,7 +353,7 @@ export function DesignMessages({
           ))}
         </div>
       )}
-      <div className="mt-3 flex gap-2 items-end">
+      <DropZone onFiles={handleFiles} disabled={uploading || busy === "sending"} className="mt-3 flex gap-2 items-end">
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -388,8 +389,8 @@ export function DesignMessages({
         >
           {busy === "sending" ? "Sending..." : "Send"}
         </button>
-      </div>
-      <p className="mt-1.5 text-xs text-muted">📎 Attach photos or PDFs (up to 25MB each).</p>
+      </DropZone>
+      <p className="mt-1.5 text-xs text-muted">📎 Attach photos or PDFs (up to 25MB each) - or drag &amp; drop them onto the message box.</p>
       {error && <p className="mt-2 text-sm text-brand">{error}</p>}
     </section>
   );
