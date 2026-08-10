@@ -15,7 +15,7 @@ const prettyPhone = (p: string) => {
 /** The shop's texting inbox: conversations on the left, thread + composer on
  *  the right. Sends from (352) 414-7270 via SMS or WhatsApp. Polls so new
  *  inbound texts appear without a refresh. */
-export function AdminTextsInbox() {
+export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: string; initialName?: string } = {}) {
   const [convos, setConvos] = useState<Conversation[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -46,6 +46,29 @@ export function AdminTextsInbox() {
   }, []);
 
   useEffect(() => { loadConvos(); }, [loadConvos]);
+  // Deep link from an order page (?to=&name=): open that customer's thread
+  // immediately, saving the name so the conversation is labeled from the start.
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (deepLinked.current || !initialPhone) return;
+    deepLinked.current = true;
+    const digits = initialPhone.replace(/\D/g, "");
+    const e164 = digits.length === 10 ? `+1${digits}` : digits.length === 11 && digits.startsWith("1") ? `+${digits}` : null;
+    if (!e164) return;
+    (async () => {
+      if (initialName) {
+        try {
+          await fetch("/api/admin/sms", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone: e164, name: initialName }),
+          });
+        } catch {}
+      }
+      setActive(e164);
+      loadConvos();
+    })();
+  }, [initialPhone, initialName, loadConvos]);
   useEffect(() => {
     const t = setInterval(() => {
       loadConvos();

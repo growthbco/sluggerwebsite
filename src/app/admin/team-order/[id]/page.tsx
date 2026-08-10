@@ -144,7 +144,22 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
         <dl className="grid sm:grid-cols-3 gap-4">
           <Field label="Name">{o.contactName}</Field>
           <Field label="Email"><a href={`mailto:${o.contactEmail}`} className="text-brand hover:underline">{o.contactEmail}</a></Field>
-          <Field label="Phone">{o.contactPhone ? <a href={`tel:${o.contactPhone}`} className="text-brand hover:underline">{o.contactPhone}</a> : "-"}</Field>
+          <Field label="Phone">
+            {o.contactPhone ? (
+              <span className="inline-flex items-center gap-2">
+                <a href={`tel:${o.contactPhone}`} className="text-brand hover:underline">{o.contactPhone}</a>
+                <a
+                  href={`/admin/texts?to=${encodeURIComponent(o.contactPhone)}&name=${encodeURIComponent(o.contactName)}`}
+                  className="text-xs display border border-brand/50 text-brand px-2 py-0.5 hover:bg-brand/10 whitespace-nowrap"
+                  title="Open this customer in the Texts inbox"
+                >
+                  💬 Text client
+                </a>
+              </span>
+            ) : (
+              "-"
+            )}
+          </Field>
           <Field label="Source">{o.source ?? "unknown (pre-tracking)"}</Field>
         </dl>
         <div className="mt-4 flex flex-wrap gap-2">

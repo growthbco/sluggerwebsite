@@ -7,9 +7,10 @@ import { AdminTextsInbox } from "@/components/admin-texts-inbox";
 export const metadata: Metadata = { title: "Texts", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
-export default async function AdminTextsPage() {
+export default async function AdminTextsPage({ searchParams }: { searchParams: Promise<{ to?: string; name?: string }> }) {
   if (!adminEnabled()) redirect("/admin");
   if (!(await isAdmin())) redirect("/admin/login");
+  const { to, name } = await searchParams;
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-14">
@@ -20,7 +21,7 @@ export default async function AdminTextsPage() {
         reply directly, or start a new conversation. STOP/HELP opt-outs are handled automatically.
       </p>
       <div className="mt-8">
-        <AdminTextsInbox />
+        <AdminTextsInbox initialPhone={to} initialName={name} />
       </div>
     </div>
   );

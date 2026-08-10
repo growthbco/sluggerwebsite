@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { galleryPhotos, allMedia } from "@/lib/gallery";
-import { ReviewWidget } from "@/components/review-widget";
+import { ReviewsSection } from "@/components/reviews-section";
 import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
 
 /* "Elevate Your Game" - feature section carried over from the current site. */
@@ -124,7 +124,7 @@ export function Reviews() {
           <h2 className="display text-3xl sm:text-4xl text-foreground mt-1">What Teams Are Saying</h2>
         </div>
         <div className="mt-10">
-          <ReviewWidget />
+          <ReviewsSection />
         </div>
       </div>
     </section>
