@@ -13,7 +13,7 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
 const portalLinkHtml = `<p style="margin:16px 0 0;font-size:13px;color:#555;">See all your orders, designs, and invoices anytime at <a href="${SITE}/portal" style="color:#b8a36c;font-weight:bold;">your order portal &rarr;</a></p>`;
 
 // Warm first-touch welcome line for a customer's first confirmation email.
-const welcomeHtml = `<p style="margin:16px 0 0;font-size:13px;color:#555;">Welcome to Slugger Athletics - Ocala's custom team shop. Questions anytime? Text us at (352) 660-1232.</p>`;
+const welcomeHtml = `<p style="margin:16px 0 0;font-size:13px;color:#555;">Welcome to Slugger Athletics - Ocala's custom team shop. Questions anytime? Text us at (352) 414-7270.</p>`;
 
 type SendArgs = {
   to: string;
@@ -348,7 +348,7 @@ export async function emailCustomInvoice(args: {
           <tr><td style="padding:10px 0;border-top:1px solid #e6e2d6;"><strong>Total due</strong></td><td style="padding:10px 0;border-top:1px solid #e6e2d6;text-align:right;"><strong>${money(args.totalCents)}</strong></td></tr>
         </table>
         ${args.notes ? `<div style="margin:0 0 14px;padding:12px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;font-size:13px;color:#555;white-space:pre-line;">${esc(args.notes)}</div>` : ""}
-        <p style="margin:0;">Pay securely online with the button below. Questions? Just reply to this email or text us at (352) 660-1232.</p>
+        <p style="margin:0;">Pay securely online with the button below. Questions? Just reply to this email or text us at (352) 414-7270.</p>
       `,
       ctaText: "Pay this invoice",
       ctaUrl: args.payUrl,

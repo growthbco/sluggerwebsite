@@ -385,6 +385,8 @@ export const teamOrders = pgTable(
     contactName: text("contact_name").notNull(),
     contactEmail: text("contact_email").notNull(),
     contactPhone: text("contact_phone"),
+    // Active SMS opt-in from the order form (A2P compliance).
+    smsOptInAt: timestamp("sms_opt_in_at", { withTimezone: true }),
     salesRep: text("sales_rep"),
     // Where this order came from ("Google (organic) → /custom-softball-uniforms",
     // "Instagram", "Direct"), captured from the visitor's first-touch cookie.
@@ -603,6 +605,9 @@ export const designRequests = pgTable(
     contactName: text("contact_name").notNull(),
     contactEmail: text("contact_email").notNull(),
     contactPhone: text("contact_phone"),
+    // When the customer actively checked the SMS opt-in box on the intake
+    // form (A2P compliance: we only text consented numbers).
+    smsOptInAt: timestamp("sms_opt_in_at", { withTimezone: true }),
 
     // The brief
     vision: text("vision"), // free-form description of desired look

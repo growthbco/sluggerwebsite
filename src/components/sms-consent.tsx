@@ -6,14 +6,17 @@ import { useState } from "react";
 // require an ACTIVELY-checked (never pre-checked) checkbox for web-form
 // opt-in - our registered campaign describes exactly this control, so keep
 // the wording and the STOP/HELP language intact.
-export function SmsConsentNote() {
+export function SmsConsentNote({ onChange }: { onChange?: (agreed: boolean) => void }) {
   const [agreed, setAgreed] = useState(false);
   return (
     <label className="mt-1.5 flex items-start gap-2 cursor-pointer select-none">
       <input
         type="checkbox"
         checked={agreed}
-        onChange={(e) => setAgreed(e.target.checked)}
+        onChange={(e) => {
+          setAgreed(e.target.checked);
+          onChange?.(e.target.checked);
+        }}
         name="smsConsent"
         className="mt-0.5 accent-[#b8a36c]"
       />

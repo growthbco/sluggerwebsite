@@ -159,7 +159,7 @@ export function InfoPage(props: InfoPageProps) {
         <h2 className="display text-3xl sm:text-4xl text-foreground">{props.localTitle}</h2>
         <p className="mt-4 text-muted max-w-2xl mx-auto">{props.localBody}</p>
         <p className="mt-6 text-muted">
-          Call <a href="tel:+13526601232" className="text-brand hover:underline">352-660-1232</a> or
+          Call <a href="tel:+13524147270" className="text-brand hover:underline">352-414-7270</a> or
           email <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a>
         </p>
         <Link href="/team-order" className="inline-block mt-8 clip-slant bg-brand text-on-brand display text-lg px-8 py-4 hover:bg-brand-dark transition-colors">

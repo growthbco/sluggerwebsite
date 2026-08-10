@@ -66,3 +66,12 @@ export async function sendSms(
     return { ok: false };
   }
 }
+
+/** Text a customer an order update ONLY if they actively opted in on a form
+ *  (smsOptInAt) and left a phone. Fire-and-forget: failures just log, they
+ *  never break the flow that triggered them. */
+export async function smsIfConsented(opts: { phone?: string | null; optInAt?: Date | null; body: string }): Promise<boolean> {
+  if (!opts.optInAt || !opts.phone) return false;
+  const r = await sendSms(opts.phone, opts.body);
+  return r.ok;
+}

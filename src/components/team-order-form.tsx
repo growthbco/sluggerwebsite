@@ -55,6 +55,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [links, setLinks] = useState<{ shareUrl: string; manageUrl: string } | null>(null);
   const [copied, setCopied] = useState("");
   const [manageUrl, setManageUrl] = useState<string | null>(null);
+  const [smsOptIn, setSmsOptIn] = useState(false);
 
   // Returning visitor prefill (browser-local). Skipped when the identity is
   // already locked from an approved design.
@@ -107,7 +108,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
@@ -124,7 +125,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, designToken: prefill?.designToken }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, designToken: prefill?.designToken, smsConsent: smsOptIn }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create link");
@@ -217,7 +218,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
             <input className={`mt-2 ${inputCls}`} value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(000) 000-0000" />
           </div>
           <div className="sm:col-span-2">
-            <SmsConsentNote />
+            <SmsConsentNote onChange={setSmsOptIn} />
           </div>
         </div>
       )}

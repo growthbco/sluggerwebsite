@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 // never confirm whether the reference exists.
 async function lookupOrder(reference: string, email: string): Promise<string> {
   const FAILED =
-    "ORDER VERIFICATION FAILED: the reference + email pair did not match our records. Do NOT say whether the order exists. Ask them to double-check both (the reference is in every email from us), or text (352) 660-1232.";
+    "ORDER VERIFICATION FAILED: the reference + email pair did not match our records. Do NOT say whether the order exists. Ask them to double-check both (the reference is in every email from us), or text (352) 414-7270.";
   try {
     const { dbEnabled, getDb } = await import("@/db");
     if (!dbEnabled()) return FAILED;
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
   const reply = await answerPublicChat(messages, extraContext);
   if (!reply) {
     return NextResponse.json({
-      reply: "I'm having trouble right now - the fastest way to reach us is a text to (352) 660-1232, or email apparel@sluggerathletics.com.",
+      reply: "I'm having trouble right now - the fastest way to reach us is a text to (352) 414-7270, or email apparel@sluggerathletics.com.",
     });
   }
   return NextResponse.json({ reply });

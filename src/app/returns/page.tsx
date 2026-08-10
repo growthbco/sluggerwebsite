@@ -66,7 +66,7 @@ export default function ReturnsPage() {
         <p className="mt-2 text-muted text-sm">
           Send us a photo and your order reference and we&apos;ll sort it out fast. Email{" "}
           <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a> or call{" "}
-          <a href="tel:+13526601232" className="text-brand hover:underline">352-660-1232</a>.
+          <a href="tel:+13524147270" className="text-brand hover:underline">352-414-7270</a>.
         </p>
         <Link href="/contact" className="inline-block mt-5 clip-slant bg-brand text-on-brand display px-6 py-3 hover:bg-brand-dark transition-colors">
           Contact Us

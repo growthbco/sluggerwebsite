@@ -57,7 +57,7 @@ export function brandedEmail(opts: {
           <td style="background:${COLORS.surface};padding:20px 28px;border-top:1px solid ${COLORS.line};font-size:12px;color:${COLORS.muted};line-height:1.5;text-align:center;">
             ${footerNote ? `<p style="margin:0 0 8px;">${footerNote}</p>` : ""}
             <p style="margin:0;">
-              Slugger Athletics · <a href="mailto:apparel@sluggerathletics.com" style="color:${COLORS.brandDark};text-decoration:none;">apparel@sluggerathletics.com</a> · <a href="tel:+13526601232" style="color:${COLORS.brandDark};text-decoration:none;">352-660-1232</a>
+              Slugger Athletics · <a href="mailto:apparel@sluggerathletics.com" style="color:${COLORS.brandDark};text-decoration:none;">apparel@sluggerathletics.com</a> · <a href="tel:+13524147270" style="color:${COLORS.brandDark};text-decoration:none;">352-414-7270</a>
             </p>
             <p style="margin:8px 0 0;">
               <a href="https://sluggerathletics.com" style="color:${COLORS.brandDark};text-decoration:none;">sluggerathletics.com</a>

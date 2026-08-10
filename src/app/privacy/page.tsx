@@ -55,7 +55,7 @@ export default function PrivacyPage() {
           <p className="mt-2">
             You can opt out at any time by replying <strong className="text-foreground">STOP</strong> to
             any message. Reply <strong className="text-foreground">HELP</strong> for help, or contact us
-            at apparel@sluggerathletics.com or 352-660-1232.
+            at apparel@sluggerathletics.com or 352-414-7270.
           </p>
           <p className="mt-2">
             No mobile information will be shared with third parties or affiliates
@@ -70,7 +70,7 @@ export default function PrivacyPage() {
           <p className="mt-2">
             Questions about this policy? Email{" "}
             <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a>{" "}
-            or call <a href="tel:+13526601232" className="text-brand hover:underline">352-660-1232</a>.
+            or call <a href="tel:+13524147270" className="text-brand hover:underline">352-414-7270</a>.
           </p>
         </div>
       </div>

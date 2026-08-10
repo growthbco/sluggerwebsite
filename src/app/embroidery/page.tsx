@@ -47,7 +47,7 @@ export default function EmbroideryPage() {
       "@type": "LocalBusiness",
       name: "Slugger Athletics",
       email: "apparel@sluggerathletics.com",
-      telephone: "+1-352-660-1232",
+      telephone: "+1-352-414-7270",
       areaServed: { "@type": "City", name: "Ocala, Florida" },
     },
     areaServed: "Ocala, FL and Central Florida",
@@ -152,7 +152,7 @@ export default function EmbroideryPage() {
           we ship <Link href="/custom-hats" className="text-brand hover:underline">custom embroidered hats</Link> nationwide.
         </p>
         <p className="mt-6 text-muted">
-          Call <a href="tel:+13526601232" className="text-brand hover:underline">352-660-1232</a> or
+          Call <a href="tel:+13524147270" className="text-brand hover:underline">352-414-7270</a> or
           email <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a>
         </p>
         <Link href="/team-order" className="inline-block mt-8 clip-slant bg-brand text-on-brand display text-lg px-8 py-4 hover:bg-brand-dark transition-colors">

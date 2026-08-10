@@ -27,7 +27,7 @@ function fromAddress() {
     state: process.env.SHIP_FROM_STATE || "FL",
     zip: process.env.SHIP_FROM_ZIP || "34470",
     country: "US",
-    phone: process.env.SHIP_FROM_PHONE || "3526601232",
+    phone: process.env.SHIP_FROM_PHONE || "3524147270",
     email: "apparel@sluggerathletics.com",
   };
 }

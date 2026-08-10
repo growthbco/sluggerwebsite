@@ -49,7 +49,7 @@ export default function SublimatedJerseysPage() {
           "@type": "LocalBusiness",
           name: "Slugger Athletics",
           email: "apparel@sluggerathletics.com",
-          telephone: "+1-352-660-1232",
+          telephone: "+1-352-414-7270",
           address: { "@type": "PostalAddress", addressLocality: "Ocala", addressRegion: "FL", addressCountry: "US" },
         },
         areaServed: [{ "@type": "City", name: "Ocala, Florida" }, { "@type": "Country", name: "United States" }],

@@ -9,6 +9,7 @@ import { emailTeamOrderInvoice } from "@/lib/email";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
 import { isAdmin } from "@/lib/admin-auth";
 import { getCustomer } from "@/lib/customers";
+import { smsIfConsented } from "@/lib/sms";
 
 export const runtime = "nodejs";
 
@@ -223,6 +224,14 @@ export async function POST(req: Request) {
       })
       .where(eq(teamOrders.id, order.id));
 
+    await smsIfConsented({
+      phone: order.contactPhone,
+      optInAt: order.smsOptInAt,
+      body:
+        stage === "deposit"
+          ? `Slugger Athletics: your ${order.teamName} invoice is ready. Pay the 50% deposit to start production: ${link.url}`
+          : `Slugger Athletics: final balance for ${order.teamName} (${order.reference}) is ready. Pay here: ${link.url}`,
+    });
     const emailed = await emailTeamOrderInvoice({
       to: order.contactEmail,
       teamName: order.teamName,

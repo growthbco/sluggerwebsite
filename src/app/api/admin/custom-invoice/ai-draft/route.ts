@@ -41,7 +41,7 @@ export async function POST(req: Request) {
           'Return ONLY JSON: { "text": string }',
         ].join("\n\n")
       : [
-          "Write a brief notes/terms block for the bottom of an invoice from Slugger Athletics. 3-6 short lines covering only what applies: payment due on receipt via the included link; custom/personalized items are made to order and non-refundable once production starts; turnaround starts after payment; contact apparel@sluggerathletics.com or text (352) 660-1232 with questions.",
+          "Write a brief notes/terms block for the bottom of an invoice from Slugger Athletics. 3-6 short lines covering only what applies: payment due on receipt via the included link; custom/personalized items are made to order and non-refundable once production starts; turnaround starts after payment; contact apparel@sluggerathletics.com or text (352) 414-7270 with questions.",
           context,
           "Plain text, one point per line, no markdown, no em dashes (use hyphens), friendly but professional. Do not invent prices, dates, or policies beyond the ones above unless the staff notes ask for them.",
           'Return ONLY JSON: { "text": string }',

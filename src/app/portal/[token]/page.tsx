@@ -153,7 +153,7 @@ export default async function PortalTokenPage({ params }: { params: Promise<{ to
       </div>
 
       <p className="text-xs text-muted pt-4 border-t border-line">
-        Questions? Text (352) 660-1232 or email <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a>.
+        Questions? Text (352) 414-7270 or email <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a>.
       </p>
     </div>
   );

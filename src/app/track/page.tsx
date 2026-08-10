@@ -23,7 +23,7 @@ export default function TrackPage() {
       </div>
       <p className="mt-8 text-sm text-muted">
         Can&apos;t find your order number? Text us at{" "}
-        <a href="sms:+13526601232" className="text-brand hover:underline">(352) 660-1232</a> or email{" "}
+        <a href="sms:+13524147270" className="text-brand hover:underline">(352) 414-7270</a> or email{" "}
         <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">
           apparel@sluggerathletics.com
         </a>

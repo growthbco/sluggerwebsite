@@ -131,7 +131,7 @@ export default function HypeChainsPage() {
           "@type": "LocalBusiness",
           name: "Slugger Athletics",
           email: "apparel@sluggerathletics.com",
-          telephone: "+1-352-660-1232",
+          telephone: "+1-352-414-7270",
           areaServed: { "@type": "City", name: "Ocala, Florida" },
         },
         description: "Custom 3D-printed hype chains and team accessories made in Ocala, FL.",

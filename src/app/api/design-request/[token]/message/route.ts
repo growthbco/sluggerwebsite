@@ -7,6 +7,7 @@ import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
 import { assistDesignThread } from "@/lib/design-assistant";
 import { emailDesignerMessage } from "@/lib/email";
 import { postDesignThreadUpdate } from "@/lib/discord";
+import { smsIfConsented } from "@/lib/sms";
 
 export const runtime = "nodejs";
 // Headroom for the human-like reply pause below (client's own message still
@@ -69,6 +70,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     const firstImage = attachments.find((u) => /\.(png|jpe?g|webp|gif)$/i.test(u));
     if (from === "designer") {
       await Promise.allSettled([
+        smsIfConsented({
+          phone: request.contactPhone,
+          optInAt: request.smsOptInAt,
+          body: `Slugger Athletics: new reply on your ${request.teamName} design (${request.reference}). Read + reply: ${SITE}/design/status/${request.statusToken}`,
+        }),
         emailDesignerMessage({
           to: request.contactEmail,
           teamName: request.teamName,
@@ -152,6 +158,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
                 fromName: "Support",
                 statusUrl: `${SITE}/design/status/${request.statusToken}`,
               }).catch((e) => console.error("AI reply email failed:", e));
+              await smsIfConsented({
+                phone: request.contactPhone,
+                optInAt: request.smsOptInAt,
+                body: `Slugger Athletics: new reply on your ${request.teamName} design (${request.reference}). Read + reply: ${SITE}/design/status/${request.statusToken}`,
+              });
               // Log the exchange to Discord so staff can correct a bad answer.
               // flagStaff (discount asks): the AI sent the holding reply per
               // policy, but the real number needs a human - ping for follow-up.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { SmsConsentNote } from "@/components/sms-consent";
 
 type Turn = { role: "user" | "bot"; text: string };
 
@@ -40,7 +41,36 @@ export function SiteChat() {
   const [turns, setTurns] = useState<Turn[]>([WELCOME]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [textMode, setTextMode] = useState(false);
+  const [tmName, setTmName] = useState("");
+  const [tmPhone, setTmPhone] = useState("");
+  const [tmConsent, setTmConsent] = useState(false);
+  const [tmBusy, setTmBusy] = useState(false);
+  const [tmError, setTmError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Hand the conversation off to SMS: we text them first, staff continue from
+  // the admin Texts inbox.
+  async function requestText() {
+    setTmBusy(true);
+    setTmError("");
+    try {
+      const lastUserMsg = [...turns].reverse().find((t) => t.role === "user")?.text ?? "";
+      const res = await fetch("/api/chat/text-me", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: tmName, phone: tmPhone, consent: tmConsent, question: lastUserMsg }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not set that up");
+      setTextMode(false);
+      setTurns((t) => [...t, { role: "bot", text: `Done! We just texted you at ${tmPhone} - reply there and a real person will take it from here. 📱` }]);
+    } catch (e) {
+      setTmError((e as Error).message);
+    } finally {
+      setTmBusy(false);
+    }
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -59,7 +89,7 @@ export function SiteChat() {
     // ready the moment the pause ends.
     const started = Date.now();
     const humanDelay = 30000 + Math.floor(Math.random() * 30000);
-    let reply = "Text us at (352) 660-1232 and we'll help right away.";
+    let reply = "Text us at (352) 414-7270 and we'll help right away.";
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -69,7 +99,7 @@ export function SiteChat() {
       const data = await res.json();
       if (data.reply) reply = data.reply;
     } catch {
-      reply = "I'm having trouble connecting - text us at (352) 660-1232 and we'll help right away.";
+      reply = "I'm having trouble connecting - text us at (352) 414-7270 and we'll help right away.";
     }
     const remaining = humanDelay - (Date.now() - started);
     if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
@@ -98,7 +128,7 @@ export function SiteChat() {
         <div className="fixed bottom-20 left-3 right-3 sm:left-auto sm:right-4 z-50 sm:w-96 bg-ink border border-line rounded-lg overflow-hidden shadow-2xl flex flex-col" style={{ height: "min(560px, 70dvh)" }}>
           <div className="px-4 py-3 border-b border-line bg-steel">
             <p className="display text-foreground">Slugger Athletics</p>
-            <p className="text-xs text-muted">Usually replies in a minute · or text (352) 660-1232</p>
+            <p className="text-xs text-muted">Usually replies in a minute · or text (352) 414-7270</p>
           </div>
 
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2.5">
@@ -121,18 +151,44 @@ export function SiteChat() {
             )}
           </div>
 
-          <div className="p-3 border-t border-line flex gap-2">
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") send(draft); }}
-              placeholder="Ask about pricing, turnaround…"
-              className="flex-1 min-w-0 bg-steel border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-            />
-            <button type="button" onClick={() => send(draft)} disabled={busy || !draft.trim()} className="rounded bg-brand text-on-brand display text-sm px-4 disabled:opacity-50">
-              Send
-            </button>
-          </div>
+          {textMode ? (
+            <div className="p-3 border-t border-line space-y-2">
+              <p className="text-sm text-foreground display">📱 Get a text back</p>
+              <div className="flex gap-2">
+                <input value={tmName} onChange={(e) => setTmName(e.target.value)} placeholder="Name" maxLength={60}
+                  className="flex-1 min-w-0 bg-steel border border-line px-3 py-2 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none" />
+                <input value={tmPhone} onChange={(e) => setTmPhone(e.target.value)} type="tel" placeholder="(000) 000-0000" maxLength={20}
+                  className="flex-1 min-w-0 bg-steel border border-line px-3 py-2 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none" />
+              </div>
+              <SmsConsentNote onChange={setTmConsent} />
+              {tmError && <p className="text-xs text-red-400">{tmError}</p>}
+              <div className="flex gap-2">
+                <button type="button" onClick={requestText} disabled={tmBusy || !tmConsent || !tmName.trim() || tmPhone.replace(/\D/g, "").length < 10}
+                  className="flex-1 rounded bg-brand text-on-brand display text-sm py-2 disabled:opacity-50">
+                  {tmBusy ? "Sending…" : "Text me"}
+                </button>
+                <button type="button" onClick={() => setTextMode(false)} className="rounded border border-line text-muted text-sm px-3">Back</button>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 border-t border-line">
+              <div className="flex gap-2">
+                <input
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") send(draft); }}
+                  placeholder="Ask about pricing, turnaround…"
+                  className="flex-1 min-w-0 bg-steel border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                />
+                <button type="button" onClick={() => send(draft)} disabled={busy || !draft.trim()} className="rounded bg-brand text-on-brand display text-sm px-4 disabled:opacity-50">
+                  Send
+                </button>
+              </div>
+              <button type="button" onClick={() => setTextMode(true)} className="mt-2 w-full text-center text-xs text-brand underline underline-offset-2">
+                📱 Prefer texting? Get a text back from a real person
+              </button>
+            </div>
+          )}
         </div>
       )}
     </>

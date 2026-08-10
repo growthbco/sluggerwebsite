@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { getByManageToken, addProofImages, removeProofImage } from "@/lib/design-requests";
 import { emailProofReady } from "@/lib/email";
+import { smsIfConsented } from "@/lib/sms";
 import { postDesignThreadUpdate } from "@/lib/discord";
 import { setThreadStageTag } from "@/lib/discord-bot";
 
@@ -36,6 +37,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       teamName: request.teamName,
       reference: request.reference,
       statusUrl: `${SITE}/design/status/${request.statusToken}`,
+    });
+    await smsIfConsented({
+      phone: request.contactPhone,
+      optInAt: request.smsOptInAt,
+      body: `Slugger Athletics: your ${request.teamName} design proof is ready! 🎨 Review + approve: ${SITE}/design/status/${request.statusToken}`,
     });
     // Log into the Discord thread so the team has a single timeline.
     await postDesignThreadUpdate({

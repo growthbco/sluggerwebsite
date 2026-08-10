@@ -70,7 +70,7 @@ export default function TermsPage() {
           <p className="mt-2">
             Questions? Email{" "}
             <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a>{" "}
-            or call <a href="tel:+13526601232" className="text-brand hover:underline">352-660-1232</a>.
+            or call <a href="tel:+13524147270" className="text-brand hover:underline">352-414-7270</a>.
           </p>
         </div>
       </div>

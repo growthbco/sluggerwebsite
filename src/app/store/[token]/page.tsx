@@ -157,7 +157,7 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
         <div className="px-5 pb-6">
           <p className="text-sm text-muted mb-5">
             All measurements in inches. Jerseys have a relaxed fit and run slightly large -
-            when in doubt, size down or text us at (352) 660-1232.
+            when in doubt, size down or text us at (352) 414-7270.
           </p>
           <AllSizeCharts />
         </div>
@@ -165,7 +165,7 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
 
       <p className="mt-8 text-center text-sm text-muted">
         Questions about your order? Text us at{" "}
-        <a href="sms:+13526601232" className="text-brand hover:underline">(352) 660-1232</a>{" "}
+        <a href="sms:+13524147270" className="text-brand hover:underline">(352) 414-7270</a>{" "}
         or email{" "}
         <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a>
         . You&apos;ll get an email confirmation the moment you order.

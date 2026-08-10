@@ -234,10 +234,10 @@ export function SiteHeader() {
 
             <div className="px-5 pb-6">
               <a
-                href="sms:+13526601232"
+                href="sms:+13524147270"
                 className="block text-center display text-sm bg-foreground/5 hover:bg-foreground/10 text-foreground border border-line px-4 py-3"
               >
-                💬 Text us: (352) 660-1232
+                💬 Text us: (352) 414-7270
               </a>
               <p className="mt-2 text-[11px] text-muted text-center">
                 Fastest way to reach us. Or <a href="mailto:apparel@sluggerathletics.com" className="underline">email</a>.

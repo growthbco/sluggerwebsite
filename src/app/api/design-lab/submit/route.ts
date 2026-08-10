@@ -55,6 +55,7 @@ export async function POST(req: Request) {
     contactName?: string;
     contactEmail?: string;
     contactPhone?: string;
+    smsConsent?: boolean;
     teamName?: string;
     sport?: string;
     style?: string;
@@ -143,6 +144,7 @@ export async function POST(req: Request) {
       contactName: body.contactName.trim().slice(0, 80),
       contactEmail: body.contactEmail.trim().slice(0, 120),
       contactPhone: (body.contactPhone ?? "").trim().slice(0, 30) || undefined,
+      smsConsent: body.smsConsent === true,
       vision,
       notes: (body.notes ?? "").trim().slice(0, 500) || undefined,
       colorHexes: (body.colorHexes ?? []).slice(0, 6),

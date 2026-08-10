@@ -17,6 +17,7 @@ export async function POST(req: Request) {
     contactName?: string;
     contactEmail?: string;
     contactPhone?: string;
+    smsConsent?: boolean;
     jerseyStyle?: string;
     jerseyMaterial?: string;
     items?: string[];
@@ -86,6 +87,7 @@ export async function POST(req: Request) {
       items,
       designRequestId: design?.id,
       rushShipping: design?.rush ?? false,
+      smsOptIn: (body.smsConsent === true && Boolean(contactPhone)) || Boolean(design?.smsOptInAt),
     });
     for (const r of roster.slice(0, 200)) {
       await addRosterRow(
@@ -159,7 +161,7 @@ export async function POST(req: Request) {
   } catch (e) {
     console.error("team order create failed:", e);
     return NextResponse.json(
-      { error: "Could not save your order - please try again or text us at (352) 660-1232." },
+      { error: "Could not save your order - please try again or text us at (352) 414-7270." },
       { status: 500 },
     );
   }

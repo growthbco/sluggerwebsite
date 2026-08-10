@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrders, orders, designRequests } from "@/db/schema";
 import { emailOrderShipped } from "@/lib/email";
+import { smsIfConsented } from "@/lib/sms";
 import { archiveDiscordThread } from "@/lib/discord-bot";
 import { trackingUrlFor } from "@/lib/tracking";
 
@@ -65,9 +66,16 @@ export async function markShipped(
         reference: teamOrders.reference,
         email: teamOrders.contactEmail,
         name: teamOrders.contactName,
+        phone: teamOrders.contactPhone,
+        smsOptInAt: teamOrders.smsOptInAt,
         designRequestId: teamOrders.designRequestId,
       });
     if (!row) return null;
+    await smsIfConsented({
+      phone: row.phone,
+      optInAt: row.smsOptInAt,
+      body: `Slugger Athletics: your ${row.reference} order shipped! Track it: ${trackingUrlFor(tracking)}`,
+    });
     const emailed = await emailOrderShipped({
       to: row.email,
       name: row.name,

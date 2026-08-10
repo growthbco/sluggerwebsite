@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { teamName?: string; contactName?: string; contactEmail?: string; contactPhone?: string; jerseyStyle?: string; jerseyMaterial?: string; items?: string[]; designToken?: string };
+  let body: { teamName?: string; contactName?: string; contactEmail?: string; contactPhone?: string; smsConsent?: boolean; jerseyStyle?: string; jerseyMaterial?: string; items?: string[]; designToken?: string };
   try {
     body = await req.json();
   } catch {
@@ -67,6 +67,7 @@ export async function POST(req: Request) {
       items: body.items,
       designRequestId,
       rushShipping: rushFromDesign,
+      smsOptIn: body.smsConsent === true && Boolean(contactPhone),
     });
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     return NextResponse.json({

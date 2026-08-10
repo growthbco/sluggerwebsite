@@ -14,13 +14,13 @@ const jsonLd = {
   name: "Slugger Athletics",
   legalName: "Slugger Athletics LLC",
   email: "apparel@sluggerathletics.com",
-  telephone: "+1-352-660-1232",
+  telephone: "+1-352-414-7270",
   address: { "@type": "PostalAddress", addressLocality: "Ocala", addressRegion: "FL", addressCountry: "US" },
   contactPoint: {
     "@type": "ContactPoint",
     contactType: "customer service",
     email: "apparel@sluggerathletics.com",
-    telephone: "+1-352-660-1232",
+    telephone: "+1-352-414-7270",
   },
 };
 
@@ -47,10 +47,10 @@ export default function ContactPage() {
           <div className="bg-steel border border-line p-6">
             <h2 className="display text-lg text-foreground">Fastest way to reach us</h2>
             <a
-              href="sms:+13526601232"
+              href="sms:+13524147270"
               className="mt-4 flex items-center justify-center gap-2 clip-slant bg-brand text-on-brand display text-base px-5 py-3 hover:bg-brand-dark transition-colors"
             >
-              💬 Text us: (352) 660-1232
+              💬 Text us: (352) 414-7270
             </a>
             <p className="mt-3 text-xs text-muted text-center">
               Text gets you a same-day reply during business hours.
@@ -67,7 +67,7 @@ export default function ContactPage() {
               <div>
                 <dt className="text-muted">Call</dt>
                 <dd>
-                  <a href="tel:+13526601232" className="text-brand hover:underline">(352) 660-1232</a>
+                  <a href="tel:+13524147270" className="text-brand hover:underline">(352) 414-7270</a>
                 </dd>
               </div>
               <div>

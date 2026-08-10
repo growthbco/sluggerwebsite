@@ -25,6 +25,8 @@ export type NewTeamOrder = {
   designRequestId?: string;
   // Inherited from a rush design request: flags the flat $100 rush order fee.
   rushShipping?: boolean;
+  // Active SMS opt-in checked on the order form.
+  smsOptIn?: boolean;
 };
 
 export type RosterInput = {
@@ -62,6 +64,7 @@ export async function createTeamOrder(input: NewTeamOrder) {
       items: input.items?.length ? input.items : ["jersey"],
       designRequestId: input.designRequestId,
       rushShipping: input.rushShipping ?? false,
+      smsOptInAt: input.smsOptIn ? new Date() : undefined,
       selfEntryToken,
       manageToken,
       selfEntryOpen: true,

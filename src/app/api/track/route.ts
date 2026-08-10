@@ -47,7 +47,7 @@ export async function POST(req: Request) {
 
   const db = getDb();
   const notFound = NextResponse.json(
-    { error: "No order matches that number and email. Double-check both, or text us at (352) 660-1232." },
+    { error: "No order matches that number and email. Double-check both, or text us at (352) 414-7270." },
     { status: 404 },
   );
 

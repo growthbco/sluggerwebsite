@@ -12,6 +12,7 @@ import {
   recordDesignerReminder,
 } from "@/lib/follow-ups";
 import { emailProofFollowUp, emailInvoiceReminder } from "@/lib/email";
+import { smsIfConsented } from "@/lib/sms";
 import { postDesignThreadUpdate } from "@/lib/discord";
 import { getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
@@ -55,6 +56,11 @@ export async function GET(req: Request) {
       });
       if (sent) {
         await recordFollowUp(c.id);
+        await smsIfConsented({
+          phone: c.contactPhone,
+          optInAt: c.smsOptInAt,
+          body: `Slugger Athletics: your ${c.teamName} design proof is waiting for review. Approve or request changes: ${SITE}/design/status/${c.statusToken}`,
+        });
         await postDesignThreadUpdate({
           threadId: c.discordThreadId ?? undefined,
           title: `⏰ Auto follow-up ${round}/${MAX_FOLLOW_UPS} emailed - ${c.teamName} (${c.reference})`,
@@ -88,7 +94,14 @@ export async function GET(req: Request) {
         payUrl: c.payUrl,
         isFinal: round >= MAX_INVOICE_REMINDERS,
       });
-      if (sent) await recordInvoiceReminder(c.id);
+      if (sent) {
+        await recordInvoiceReminder(c.id);
+        await smsIfConsented({
+          phone: c.contactPhone,
+          optInAt: c.smsOptInAt,
+          body: `Slugger Athletics reminder: the ${c.stage === "deposit" ? "50% deposit" : "final balance"} for ${c.teamName} (${c.reference}) is still unpaid. Pay here: ${c.payUrl}`,
+        });
+      }
       invoiceResults.push({ reference: c.reference, team: c.teamName, stage: c.stage, round, sent });
     } catch (e) {
       console.error(`Invoice reminder failed for ${c.reference}:`, e);

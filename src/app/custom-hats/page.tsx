@@ -281,7 +281,7 @@ export default function CustomHatsPage() {
         </div>
         <div className="mt-10 text-center">
           <p className="text-muted">
-            Call <a href="tel:+13526601232" className="text-brand hover:underline">352-660-1232</a> or
+            Call <a href="tel:+13524147270" className="text-brand hover:underline">352-414-7270</a> or
             email <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a>
           </p>
           <Link href="/team-order" className="inline-block mt-6 clip-slant bg-brand text-on-brand display text-lg px-8 py-4 hover:bg-brand-dark transition-colors">

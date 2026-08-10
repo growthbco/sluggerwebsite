@@ -31,6 +31,7 @@ export function DesignIntakeForm() {
   const [message, setMessage] = useState("");
   const [statusUrl, setStatusUrl] = useState<string | null>(null);
   const [welcomeBack, setWelcomeBack] = useState(false);
+  const [smsOptIn, setSmsOptIn] = useState(false);
 
   // Returning customer on the same device: prefill contact info so they don't
   // retype it. Saved (locally only) after each successful submit.
@@ -120,6 +121,7 @@ export function DesignIntakeForm() {
           inspirationImages: images.map((i) => i.url),
           neededBy: neededBy || undefined,
           estimatedPieces: estimatedPieces || undefined,
+          smsConsent: smsOptIn,
         }),
       });
       const data = await res.json();
@@ -207,7 +209,7 @@ export function DesignIntakeForm() {
           </div>
         </div>
         <div className="sm:col-span-2">
-          <SmsConsentNote />
+          <SmsConsentNote onChange={setSmsOptIn} />
         </div>
       </div>
 

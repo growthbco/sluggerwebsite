@@ -18,6 +18,8 @@ export type FollowUpCandidate = {
   reference: string;
   teamName: string;
   contactEmail: string;
+  contactPhone: string | null;
+  smsOptInAt: Date | null;
   statusToken: string | null;
   discordThreadId: string | null;
   followUpsSent: number;
@@ -64,6 +66,8 @@ export async function findProofFollowUpCandidates(now = new Date()): Promise<Fol
       reference: r.reference,
       teamName: r.teamName,
       contactEmail: r.contactEmail,
+      contactPhone: r.contactPhone,
+      smsOptInAt: r.smsOptInAt,
       statusToken: r.statusToken,
       discordThreadId: r.discordThreadId,
       followUpsSent: sent,
@@ -88,6 +92,8 @@ export type InvoiceReminderCandidate = {
   teamName: string;
   contactEmail: string;
   stage: "deposit" | "balance";
+  contactPhone: string | null;
+  smsOptInAt: Date | null;
   payUrl: string;
   dueCents: number;
   remindersSent: number;
@@ -133,6 +139,8 @@ export async function findInvoiceReminderCandidates(now = new Date()): Promise<I
       teamName: o.teamName,
       contactEmail: o.contactEmail,
       stage,
+      contactPhone: o.contactPhone,
+      smsOptInAt: o.smsOptInAt,
       payUrl,
       dueCents,
       remindersSent: sent,

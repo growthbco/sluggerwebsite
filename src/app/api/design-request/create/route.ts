@@ -30,6 +30,7 @@ export async function POST(req: Request) {
     contactName?: string;
     contactEmail?: string;
     contactPhone?: string;
+    smsConsent?: boolean;
     vision?: string;
     colors?: string;
     colorHexes?: string[];
@@ -102,6 +103,16 @@ export async function POST(req: Request) {
       feeWaivedReason,
       feeWaivedRef,
     });
+
+    // Active SMS opt-in from the form: stamped so order updates can be texted.
+    if (body.smsConsent === true && body.contactPhone) {
+      try {
+        const { getDb } = await import("@/db");
+        const { designRequests } = await import("@/db/schema");
+        const { eq } = await import("drizzle-orm");
+        await getDb().update(designRequests).set({ smsOptInAt: new Date() }).where(eq(designRequests.id, requestId));
+      } catch (e) { console.error("sms opt-in stamp failed:", e); }
+    }
 
     // First-touch attribution: where this requester originally came from.
     let source: string | null = null;

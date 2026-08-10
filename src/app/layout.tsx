@@ -16,7 +16,7 @@ const LOCAL_BUSINESS_JSONLD = {
   name: "Slugger Athletics",
   url: "https://sluggerathletics.com",
   email: "apparel@sluggerathletics.com",
-  telephone: "+1-352-660-1232",
+  telephone: "+1-352-414-7270",
   address: { "@type": "PostalAddress", addressLocality: "Ocala", addressRegion: "FL", addressCountry: "US" },
   description: "Custom team uniforms, sublimated jerseys, embroidered hats, and 3D hype chains - designed and produced in Ocala, Florida.",
   areaServed: [

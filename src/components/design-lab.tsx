@@ -41,6 +41,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
   const [leadPhone, setLeadPhone] = useState("");
   const [unlocking, setUnlocking] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [smsOptIn, setSmsOptIn] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Persist the whole working session to localStorage so an accidental reload
@@ -325,7 +326,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
                     {["6-9", "10-14", "15-24", "25+"].map((r) => <option key={r} value={r}>{r} pieces</option>)}
                   </select>
                 </div>
-                <SmsConsentNote />
+                <SmsConsentNote onChange={setSmsOptIn} />
                 <button
                   type="button"
                   disabled={submitting || !contactName.trim() || !contactEmail.includes("@") || !teamName.trim()}
@@ -337,7 +338,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                          key: testKey, contactName, contactEmail, contactPhone,
+                          key: testKey, contactName, contactEmail, contactPhone, smsConsent: smsOptIn,
                           teamName, sport, style, backNumber, idea, estimatedPieces,
                           colorHexes: [primaryColor, secondaryColor, ...extraColors],
                           concept: image, cleanToken, logo: logo ?? undefined, reference: reference ?? undefined,

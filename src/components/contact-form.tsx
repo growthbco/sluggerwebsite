@@ -73,7 +73,7 @@ export function ContactForm() {
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
           <label className="display text-sm text-foreground">Phone <span className="text-muted normal-case">(optional)</span></label>
-          <input className={`mt-2 ${inputCls}`} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(352) 660-1232" />
+          <input className={`mt-2 ${inputCls}`} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(352) 414-7270" />
         </div>
         <div>
           <label className="display text-sm text-foreground">What&apos;s this about?</label>

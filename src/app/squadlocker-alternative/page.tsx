@@ -172,7 +172,7 @@ export default function SquadLockerAlternativePage() {
           Tell us your team name, logo, and colors and we&apos;ll set up your branded store with free custom
           mockups. Email{" "}
           <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a>{" "}
-          or call <a href="tel:+13526601232" className="text-brand hover:underline">352-660-1232</a>.
+          or call <a href="tel:+13524147270" className="text-brand hover:underline">352-414-7270</a>.
         </p>
         <Link href="/contact" className="inline-block mt-8 clip-slant bg-brand text-on-brand display text-lg px-8 py-4 hover:bg-brand-dark transition-colors">
           Get Started

@@ -51,7 +51,7 @@ export default function FaqPage() {
 
       <div className="mt-10 bg-steel border border-line p-6 text-center">
         <h2 className="display text-xl text-foreground">Still have a question?</h2>
-        <p className="mt-2 text-muted text-sm">Email apparel@sluggerathletics.com or call 352-660-1232.</p>
+        <p className="mt-2 text-muted text-sm">Email apparel@sluggerathletics.com or call 352-414-7270.</p>
         <Link href="/team-order" className="inline-block mt-5 clip-slant bg-brand text-on-brand display px-6 py-3 hover:bg-brand-dark transition-colors">
           Start a Team Order
         </Link>
