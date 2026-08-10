@@ -419,7 +419,7 @@ export default async function AdminPage() {
       <AdminSearch statuses={Array.from(new Set(activeOrders.map((o) => o.status)))} />
 
 
-      <section className="mt-6">
+      <section className="mt-6 scroll-mt-16" id="design-requests">
         <h2 className="display text-xl text-foreground">Design requests ({activeDesigns.length})</h2>
         <div className="mt-3 overflow-x-auto border border-line">
           <table className="w-full text-sm">
@@ -474,7 +474,7 @@ export default async function AdminPage() {
         </div>
       </section>
 
-      <section className="mt-6" id="team-orders">
+      <section className="mt-6 scroll-mt-16" id="team-orders">
         <h2 className="display text-xl text-foreground">Team orders ({activeOrders.length})</h2>
         <div className="mt-3 overflow-x-auto border border-line">
           <table className="w-full text-sm">
@@ -725,7 +725,7 @@ export default async function AdminPage() {
       </section>
 
       {outstanding.length > 0 && (
-        <details className="mt-4 border border-amber-500/40 bg-amber-500/5 group">
+        <details className="mt-4 border border-amber-500/40 bg-amber-500/5 group" id="awaiting-payment">
           <summary className="flex cursor-pointer items-center justify-between px-4 py-2.5 list-none">
             <span className="display text-sm text-amber-300">💸 Awaiting payment ({outstanding.length})</span>
             <span className="text-amber-300 transition-transform group-open:rotate-45">+</span>
@@ -802,7 +802,7 @@ export default async function AdminPage() {
       )}
 
       <div className="mt-6">
-        <section>
+        <section className="scroll-mt-16" id="shop-orders">
           <h2 className="display text-xl text-foreground">Shop &amp; store orders</h2>
           <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
             {recentOrders.length === 0 && (
@@ -869,7 +869,7 @@ export default async function AdminPage() {
       )}
 
       <div className="mt-10 grid gap-10 lg:grid-cols-2">
-        <section>
+        <section className="scroll-mt-16" id="stores">
           <div className="flex items-center justify-between">
             <h2 className="display text-xl text-foreground">Team stores ({stores.length})</h2>
           </div>
@@ -931,7 +931,7 @@ export default async function AdminPage() {
           </div>
         </section>
 
-        <section>
+        <section className="scroll-mt-16" id="payments">
           <h2 className="display text-xl text-foreground">Recent payments</h2>
           <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
             {recentPayments.length === 0 && <p className="px-3 py-3 text-sm text-muted">No payments yet.</p>}
