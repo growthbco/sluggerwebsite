@@ -68,10 +68,18 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
   const [shipQuote, setShipQuote] = useState<{ amountCents: number; live: boolean; place?: string } | null>(null);
   const [quoting, setQuoting] = useState(false);
 
-  const totalOz = selections.reduce((s, sel) => {
-    const w = items.find((i) => i.key === sel.key)?.weightOz ?? 12;
-    return s + w * sel.quantity;
-  }, 0);
+  // Hats ship in their own box, so the quote is per-parcel (apparel + hats).
+  const { apparelOz, hatOz } = selections.reduce(
+    (acc, sel) => {
+      const item = items.find((i) => i.key === sel.key);
+      const w = (item?.weightOz ?? 12) * sel.quantity;
+      if (sel.key === "fitted_hat" || sel.key === "snapback_hat") acc.hatOz += w;
+      else acc.apparelOz += w;
+      return acc;
+    },
+    { apparelOz: 0, hatOz: 0 },
+  );
+  const totalOz = apparelOz + hatOz;
 
   // Re-quote automatically whenever the cart or the ZIP changes, so the
   // number shown always matches what checkout will actually charge.
@@ -86,7 +94,7 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
         const res = await fetch("/api/shipping/quote", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ zip, weightOz: Math.max(1, totalOz) }),
+          body: JSON.stringify({ zip, parcelsOz: [apparelOz, hatOz].filter((w) => w > 0) }),
         });
         const data = await res.json();
         if (res.ok) setShipQuote({ amountCents: data.amountCents, live: data.live, place: data.place });

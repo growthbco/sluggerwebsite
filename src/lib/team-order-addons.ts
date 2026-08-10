@@ -29,6 +29,19 @@ export function addonWeightOz(rows: { key: string; quantity: number }[]): number
   return rows.reduce((s, r) => s + (ITEM_WEIGHT_OZ[r.key] ?? 12) * r.quantity, 0);
 }
 
+/** Per-box weights for an add-on that ships on its own: hats go in their own
+ *  box, so a mixed add-on is two parcels (and two shipping charges). */
+export function addonParcelsOz(rows: { key: string; quantity: number }[]): number[] {
+  let apparel = 0;
+  let hat = 0;
+  for (const r of rows) {
+    const oz = (ITEM_WEIGHT_OZ[r.key] ?? 12) * r.quantity;
+    if (r.key === "fitted_hat" || r.key === "snapback_hat") hat += oz;
+    else apparel += oz;
+  }
+  return [apparel, hat].filter((w) => w > 0);
+}
+
 /** Paid add-on batches that still need print-file verification (printVerifiedAt
  *  null). Verified/archived batches are excluded. */
 async function unverifiedPaidAddonBatches(teamOrderId: string) {

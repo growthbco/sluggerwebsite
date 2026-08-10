@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { getByManageToken } from "@/lib/team-orders";
-import { priceAddonRows, createAddon, setAddonSession, addonWeightOz, type AddonRowInput } from "@/lib/team-order-addons";
+import { priceAddonRows, createAddon, setAddonSession, addonParcelsOz, type AddonRowInput } from "@/lib/team-order-addons";
 import { shippingCentsFor } from "@/lib/team-stores";
 import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
@@ -71,11 +71,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     // Payment links only accept saved shipping rates (no inline rate data).
     let shippingOptions: { shipping_rate: string }[] = [];
     if (shipsSeparately) {
+      // Hats ship in their own box: a mixed add-on is charged as two parcels.
+      const boxes = addonParcelsOz(rows);
       const [byWeight, pickup] = await Promise.all([
         stripe.shippingRates.create({
-          display_name: "Shipping (by weight)",
+          display_name: boxes.length > 1 ? "Shipping (2 boxes - hats ship separately)" : "Shipping (by weight)",
           type: "fixed_amount",
-          fixed_amount: { amount: shippingCentsFor(addonWeightOz(rows)), currency: "usd" },
+          fixed_amount: { amount: boxes.reduce((s, w) => s + shippingCentsFor(w), 0), currency: "usd" },
         }),
         stripe.shippingRates.create({
           display_name: "Free local pickup (Ocala, FL)",

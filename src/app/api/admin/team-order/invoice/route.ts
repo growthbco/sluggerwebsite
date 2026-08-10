@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
 import { getRoster } from "@/lib/team-orders";
-import { computeTeamOrderQuote, estimateOrderWeightOz } from "@/lib/team-order-pricing";
+import { computeTeamOrderQuote, estimateOrderParcelsOz } from "@/lib/team-order-pricing";
 import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 import { emailTeamOrderInvoice } from "@/lib/email";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
@@ -96,26 +96,25 @@ export async function POST(req: Request) {
   let shipCents = 0;
   // Explicit choice from the modal wins; otherwise a local-pickup order
   // defaults to no shipping.
+  // Hats ship in their own box, so a mixed hats+apparel order is TWO parcels
+  // - each quoted (and charged) separately. A manual shipWeightOz override is
+  // trusted as a single staff-decided parcel.
+  const parcelsFor = (): number[] => {
+    if (body.shipWeightOz && body.shipWeightOz > 0) return [Math.round(body.shipWeightOz)];
+    const p = estimateOrderParcelsOz(roster);
+    return [p.apparelOz, p.hatOz].filter((w) => w > 0);
+  };
   const wantShip = stage === "balance" && (body.ship ? body.ship !== "pickup" : !order.localPickup);
   if (wantShip) {
-    const weightOz = body.shipWeightOz && body.shipWeightOz > 0 ? Math.round(body.shipWeightOz) : estimateOrderWeightOz(roster);
-    if (weightOz > 0) {
+    const parcels = parcelsFor();
+    if (parcels.length > 0) {
       const zip = order.shippingAddress?.postalCode;
       if (!zip) {
         return NextResponse.json({ error: "No shipping address on file - collect one or use local pickup." }, { status: 409 });
       }
-      try {
-        const { quoteChargedShipping, shippoEnabled } = await import("@/lib/shippo");
-        if (shippoEnabled()) {
-          const q = await quoteChargedShipping(zip, Math.min(1120, weightOz));
-          if (q) shipCents = q.chargedCents;
-        }
-      } catch (e) {
-        console.error("invoice shipping quote failed:", e);
-      }
-      if (shipCents === 0) {
-        const { shippingCentsFor } = await import("@/lib/team-stores");
-        shipCents = shippingCentsFor(weightOz); // formula fallback
+      const { quoteShippingCents } = await import("@/lib/ship-quote");
+      for (const w of parcels) {
+        shipCents += (await quoteShippingCents(zip, w)).chargedCents;
       }
     }
   }
@@ -126,24 +125,12 @@ export async function POST(req: Request) {
   // quote if an address happens to be on file); local-pickup orders stay $0.
   let fullShipCents = 0;
   if (stage === "deposit" && !(body.ship ? body.ship === "pickup" : order.localPickup)) {
-    const weightOz = body.shipWeightOz && body.shipWeightOz > 0 ? Math.round(body.shipWeightOz) : estimateOrderWeightOz(roster);
-    if (weightOz > 0) {
-      const zip = order.shippingAddress?.postalCode;
-      if (zip) {
-        try {
-          const { quoteChargedShipping, shippoEnabled } = await import("@/lib/shippo");
-          if (shippoEnabled()) {
-            const q = await quoteChargedShipping(zip, Math.min(1120, weightOz));
-            if (q) fullShipCents = q.chargedCents;
-          }
-        } catch (e) {
-          console.error("pay-in-full shipping quote failed:", e);
-        }
-      }
-      if (fullShipCents === 0) {
-        const { shippingCentsFor } = await import("@/lib/team-stores");
-        fullShipCents = shippingCentsFor(weightOz);
-      }
+    // quoteShippingCents falls back to the weight formula when there's no zip
+    // on file yet - same per-parcel math either way.
+    const zip = order.shippingAddress?.postalCode ?? "";
+    const { quoteShippingCents } = await import("@/lib/ship-quote");
+    for (const w of parcelsFor()) {
+      fullShipCents += (await quoteShippingCents(zip, w)).chargedCents;
     }
   }
 

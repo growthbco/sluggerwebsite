@@ -7,12 +7,16 @@ export const runtime = "nodejs";
 // Public: quote the shipping CHARGE (carrier rate + margin) for a weight and
 // destination ZIP. Falls back to the weight formula if Shippo is down.
 export async function POST(req: Request) {
-  let body: { zip?: string; weightOz?: number } = {};
+  let body: { zip?: string; weightOz?: number; parcelsOz?: number[] } = {};
   try {
     body = await req.json();
   } catch {}
   const zip = (body.zip ?? "").trim().slice(0, 10);
-  const weightOz = Math.max(1, Math.min(1120, Number(body.weightOz) || 16));
+  // Hats ship in their own box, so mixed carts quote as multiple parcels
+  // (summed). A plain weightOz stays a single parcel.
+  const clamp = (n: number) => Math.max(1, Math.min(1120, Math.round(n)));
+  const parcels = (Array.isArray(body.parcelsOz) ? body.parcelsOz.filter((w) => Number(w) > 0).map((w) => clamp(Number(w))) : []).slice(0, 4);
+  if (parcels.length === 0) parcels.push(clamp(Number(body.weightOz) || 16));
   if (!/^\d{5}(-\d{4})?$/.test(zip)) {
     return NextResponse.json({ error: "Enter a 5-digit ZIP code." }, { status: 400 });
   }
@@ -30,20 +34,23 @@ export async function POST(req: Request) {
 
   if (shippoEnabled()) {
     try {
-      const best = await quoteChargedShipping(zip, weightOz);
-      if (best) {
-        return NextResponse.json({
-          ok: true,
-          live: true,
-          amountCents: best.chargedCents,
-          carrier: best.carrier,
-          service: best.service,
-          place,
-        });
+      let total = 0;
+      let carrier: string | undefined;
+      let service: string | undefined;
+      let allLive = true;
+      for (const oz of parcels) {
+        const best = await quoteChargedShipping(zip, oz);
+        if (!best) { allLive = false; break; }
+        total += best.chargedCents;
+        carrier = best.carrier;
+        service = best.service;
+      }
+      if (allLive) {
+        return NextResponse.json({ ok: true, live: true, amountCents: total, carrier, service, boxes: parcels.length, place });
       }
     } catch (e) {
       console.error("live rate failed, falling back:", e);
     }
   }
-  return NextResponse.json({ ok: true, live: false, amountCents: shippingCentsFor(weightOz), place });
+  return NextResponse.json({ ok: true, live: false, amountCents: parcels.reduce((s, w) => s + shippingCentsFor(w), 0), boxes: parcels.length, place });
 }

@@ -7,7 +7,7 @@ import { dbEnabled, getDb } from "@/db";
 import { teamOrders, designRequests, teamOrderAddons } from "@/db/schema";
 import { isAdmin } from "@/lib/admin-auth";
 import { getRoster, getPrintableJerseys } from "@/lib/team-orders";
-import { computeTeamOrderQuote, estimateOrderWeightOz } from "@/lib/team-order-pricing";
+import { computeTeamOrderQuote, estimateOrderParcelsOz } from "@/lib/team-order-pricing";
 import { itemLabel, sizeBreakdown } from "@/lib/order-items";
 import { shippingCentsFor } from "@/lib/team-stores";
 import { taxCents } from "@/lib/pricing";
@@ -87,8 +87,13 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
   const estimate = o.quotedTotalCents ?? (quote.totalCents > 0 ? quote.totalCents : null);
   const deposit = o.depositCents ?? (estimate ? Math.round(estimate / 2) : 0);
   const paid = Boolean(o.invoicePaidAt) || o.status === "paid" || o.status === "shipped";
-  const weightOz = estimateOrderWeightOz(roster);
-  const shipEstimate = o.localPickup ? 0 : weightOz > 0 ? shippingCentsFor(weightOz) : 0;
+  const parcels = estimateOrderParcelsOz(roster);
+  const weightOz = parcels.apparelOz + parcels.hatOz;
+  const twoBoxes = parcels.apparelOz > 0 && parcels.hatOz > 0;
+  // Hats ship in their own box: a mixed order is two parcels, charged twice.
+  const shipEstimate = o.localPickup
+    ? 0
+    : (parcels.apparelOz > 0 ? shippingCentsFor(parcels.apparelOz) : 0) + (parcels.hatOz > 0 ? shippingCentsFor(parcels.hatOz) : 0);
   const verified = jerseys.filter((j) => j.verifiedAt).length;
   const breakdown = sizeBreakdown(roster, o.items ?? ["jersey"]);
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
@@ -298,7 +303,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
               "No address yet (collected at payment)"
             )}
           </Field>
-          <Field label="Est. weight">{weightOz > 0 ? `${(weightOz / 16).toFixed(1)} lb` : "-"}</Field>
+          <Field label="Est. weight">{weightOz > 0 ? `${(weightOz / 16).toFixed(1)} lb${twoBoxes ? " · 2 boxes (hats ship separately)" : ""}` : "-"}</Field>
           <Field label="Shipped">{o.shippedAt ? `✓ ${fmtDate(o.shippedAt)}` : "not yet"}</Field>
         </dl>
         <div className="mt-4 flex flex-wrap items-center gap-2">

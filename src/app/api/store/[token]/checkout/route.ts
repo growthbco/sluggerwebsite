@@ -19,30 +19,44 @@ type IncomingItem = {
 // Shipping choices for the Stripe page. Local pickup is only offered when the
 // buyer explicitly chose it - otherwise we return only paid shipping options so
 // nobody reaches the pay page with $0 shipping by leaving the ZIP blank.
-async function shipOptions(totalOz: number, zip: string | undefined, pickup: boolean): Promise<{ label: string; amountCents: number }[]> {
+async function shipOptions(parcelsOz: number[], zip: string | undefined, pickup: boolean): Promise<{ label: string; amountCents: number }[]> {
   if (pickup) return [{ label: "Free local pickup (Ocala, FL)", amountCents: 0 }];
+  const boxes = parcelsOz.filter((w) => w > 0);
+  // Hats ship in their own box - a mixed hats+apparel cart is charged as two
+  // shipments (there's no carton that fits both without crushing the hats).
+  const suffix = boxes.length > 1 ? " (2 boxes - hats ship separately)" : "";
   const options: { label: string; amountCents: number }[] = [];
   if (zip && /^\d{5}$/.test(zip)) {
     try {
       const { getRates, quoteChargedShipping, shippoEnabled } = await import("@/lib/shippo");
       if (shippoEnabled()) {
         // Same monotonic-guarded charge as the on-page quote, so the Stripe
-        // page matches what the buyer was shown.
-        const best = await quoteChargedShipping(zip, totalOz);
-        if (best) {
-          options.push({ label: `Standard shipping to ${zip}`, amountCents: best.chargedCents });
-          // Expedited: cheapest 1-3 day service across BOTH carriers.
-          const rates = await getRates({ zip }, totalOz);
+        // page matches what the buyer was shown. Summed per box.
+        let standard = 0;
+        let faster = 0;
+        let fasterBeatsStandard = false;
+        let allQuoted = true;
+        for (const oz of boxes) {
+          const best = await quoteChargedShipping(zip, oz);
+          if (!best) { allQuoted = false; break; }
+          standard += best.chargedCents;
+          const rates = await getRates({ zip }, oz);
           const expedited = rates
             .filter((r) =>
               /priority mail(?! express)|3 day select|2nd day air(?!.*a\.m)/i.test(r.service),
             )
             .sort((a, b) => a.chargedCents - b.chargedCents)[0];
           if (expedited && expedited.chargedCents > best.chargedCents) {
-            options.push({
-              label: `Faster shipping (${expedited.provider} ${expedited.service}, 1-3 days)`,
-              amountCents: expedited.chargedCents,
-            });
+            faster += expedited.chargedCents;
+            fasterBeatsStandard = true;
+          } else {
+            faster += best.chargedCents;
+          }
+        }
+        if (allQuoted && standard > 0) {
+          options.push({ label: `Standard shipping to ${zip}${suffix}`, amountCents: standard });
+          if (fasterBeatsStandard && faster > standard) {
+            options.push({ label: `Faster shipping (1-3 days)${suffix}`, amountCents: faster });
           }
         }
       }
@@ -51,7 +65,10 @@ async function shipOptions(totalOz: number, zip: string | undefined, pickup: boo
     }
   }
   if (options.length === 0) {
-    options.push({ label: "Shipping (by weight)", amountCents: shippingCentsFor(totalOz) });
+    options.push({
+      label: `Shipping (by weight)${suffix}`,
+      amountCents: boxes.reduce((s, w) => s + shippingCentsFor(w), 0),
+    });
   }
   return options;
 }
@@ -99,7 +116,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   // details go IN the line-item name so they survive to the webhook, Discord,
   // and the confirmation email (Stripe drops product_data.description there).
   const fundPct = store.fundraisePercent ?? 0;
-  let totalOz = 0;
+  let apparelOz = 0;
+  let hatOz = 0;
   let fundraiseTotal = 0; // team-fundraising portion across the order
   const lineItems = [];
   for (const item of items) {
@@ -136,7 +154,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       const nm = (item.playerName ?? "").trim().slice(0, 30);
       if (nm) details.push(`(for ${nm} - not printed)`);
     }
-    totalOz += def.weightOz * qty;
+    if (def.key === "fitted_hat" || def.key === "snapback_hat") hatOz += def.weightOz * qty;
+    else apparelOz += def.weightOz * qty;
     lineItems.push({
       quantity: qty,
       price_data: {
@@ -190,7 +209,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       shipping_address_collection: { allowed_countries: ["US"] },
       phone_number_collection: { enabled: true },
       // Buyer picks: standard ground, expedited (when live-rated), or pickup.
-      shipping_options: (await shipOptions(totalOz, shipZip, pickup)).map((o) => ({
+      shipping_options: (await shipOptions([apparelOz, hatOz], shipZip, pickup)).map((o) => ({
         shipping_rate_data: {
           display_name: o.label,
           type: "fixed_amount" as const,

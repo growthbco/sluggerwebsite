@@ -48,23 +48,37 @@ export const ITEM_WEIGHT_OZ: Record<string, number> = {
   snapback_hat: 5,
 };
 
-/** Total estimated package weight (oz) for an order's roster. Each player's
- *  sized items count; a legacy row with only a jersey size counts as 1 jersey.
- *  Adds ~8oz packaging. */
-export function estimateOrderWeightOz(
+/** Per-parcel weights (oz) for an order's roster. Hats ship in their OWN box
+ *  (a structured hat can't be packed with folded apparel without crushing),
+ *  so a mixed order is two parcels - and two shipping charges. Each non-empty
+ *  parcel gets ~8oz packaging. */
+export function estimateOrderParcelsOz(
   roster: { size?: string | null; sizes?: Record<string, string> | null; quantity?: number | null }[],
-): number {
-  let oz = 0;
+): { apparelOz: number; hatOz: number } {
+  let apparel = 0;
+  let hat = 0;
   for (const r of roster) {
     const qty = Math.max(1, r.quantity ?? 1);
     const sized = Object.entries(r.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
     if (sized.length) {
-      for (const [key] of sized) oz += (ITEM_WEIGHT_OZ[key] ?? 12) * qty;
+      for (const [key] of sized) {
+        const oz = (ITEM_WEIGHT_OZ[key] ?? 12) * qty;
+        if (HAT_KEYS.includes(key)) hat += oz;
+        else apparel += oz;
+      }
     } else if ((r.size ?? "").trim()) {
-      oz += ITEM_WEIGHT_OZ.jersey * qty;
+      apparel += ITEM_WEIGHT_OZ.jersey * qty;
     }
   }
-  return oz > 0 ? oz + 8 : 0; // + packaging
+  return { apparelOz: apparel > 0 ? apparel + 8 : 0, hatOz: hat > 0 ? hat + 8 : 0 };
+}
+
+/** Total estimated shipping weight (oz) across all parcels. */
+export function estimateOrderWeightOz(
+  roster: { size?: string | null; sizes?: Record<string, string> | null; quantity?: number | null }[],
+): number {
+  const { apparelOz, hatOz } = estimateOrderParcelsOz(roster);
+  return apparelOz + hatOz;
 }
 
 // The jersey styles a team order can use, in the order shown in the form. The
