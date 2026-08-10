@@ -801,47 +801,6 @@ export default async function AdminPage() {
         </details>
       )}
 
-      <div className="mt-6">
-        <section className="scroll-mt-16" id="shop-orders">
-          <h2 className="display text-xl text-foreground">Shop &amp; store orders</h2>
-          <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
-            {recentOrders.length === 0 && (
-              <p className="px-3 py-3 text-sm text-muted">
-                No shop or team-store purchases yet. Team order payments show above.
-              </p>
-            )}
-            {recentOrders.map((o) => (
-              <div key={o.reference} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
-                <div>
-                  <Link href={`/admin/order/${o.id}`} className="font-mono text-xs text-brand hover:underline" title="Open the full order detail page">{o.reference}</Link>
-                  <Link href={`/admin/order/${o.id}`} className="ml-2 text-muted hover:text-brand hover:underline">{o.customerName ?? "-"}</Link>
-                  <span className="ml-2 text-xs text-muted">({o.type})</span>
-                  {o.source && <span className="ml-2 text-xs text-muted" title={o.source}>via {srcShort(o.source)}</span>}
-                </div>
-                <span className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
-                  <span className="text-foreground whitespace-nowrap">
-                    {money(o.totalCents)} <span className="text-muted text-xs">{fmtDate(o.createdAt)}</span>
-                  </span>
-                  {o.shippedAt && <span className="text-xs display text-green-400">🚚</span>}
-                  {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
-                  {!o.shippedAt && o.status === "paid" && !o.trackingNumber && (
-                    <AdminLabelButton kind="order" id={o.id} who={o.customerName ?? o.reference} />
-                  )}
-                  <AdminRowMenu>
-                    <a href={`/api/admin/order-view?id=${o.id}`} target="_blank" rel="noopener noreferrer">View order</a>
-                    {!o.shippedAt && o.status === "paid" && (
-                      o.trackingNumber
-                        ? <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} existingTracking={o.trackingNumber} label="Mark shipped + email" />
-                        : <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} label="Add tracking" />
-                    )}
-                    <AdminArchiveButton kind="order" id={o.id} archived={false} />
-                  </AdminRowMenu>
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
 
       {archivedOrders.length > 0 && (
         <details className="mt-6 border border-line bg-steel/50 group">
@@ -868,69 +827,7 @@ export default async function AdminPage() {
         </details>
       )}
 
-      <div className="mt-10 grid gap-10 lg:grid-cols-2">
-        <section className="scroll-mt-16" id="stores">
-          <div className="flex items-center justify-between">
-            <h2 className="display text-xl text-foreground">Team stores ({stores.length})</h2>
-          </div>
-          <details className="mt-3 group">
-            <summary className="cursor-pointer text-xs display text-brand hover:underline list-none">
-              ➕ Open a standalone store (no design needed)
-            </summary>
-            <AdminNewStore
-              presets={STORE_ITEM_PRESETS.map((p) => ({ key: p.key, label: p.label, priceCents: p.priceCents }))}
-            />
-          </details>
-          <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
-            {stores.length === 0 && <p className="px-3 py-3 text-sm text-muted">No stores yet.</p>}
-            {stores.map((s) => {
-              const storeOrders = recentOrders.filter((o) => o.teamId === s.id);
-              return (
-              <details key={s.id} className="group">
-                <summary className="flex items-center justify-between gap-3 px-3 py-2 text-sm cursor-pointer list-none">
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted text-xs transition-transform group-open:rotate-90">▶</span>
-                    <Link href={`/store/${s.storeToken}`} className="text-brand hover:underline">
-                      {s.name}
-                    </Link>
-                    <span className={`text-xs display ${s.storeActive ? "text-green-400" : "text-muted"}`}>
-                      {s.storeActive ? "OPEN" : "CLOSED"}
-                    </span>
-                  </div>
-                  <p className="text-muted shrink-0">
-                    {storeAggMap.get(s.id)?.n ?? 0} orders · {money(Number(storeAggMap.get(s.id)?.sum ?? 0))}
-                  </p>
-                </summary>
-                <div className="bg-ink/40 border-t border-line/50 px-3 py-2 space-y-2">
-                  <div className="flex flex-wrap gap-3 text-xs">
-                    <Link href={`/store/${s.storeToken}/verify`} className="text-brand hover:underline">🔍 Print-file QA</Link>
-                    <Link href={`/store/${s.storeToken}`} className="text-muted hover:text-foreground hover:underline">View store</Link>
-                  </div>
-                  {storeOrders.length === 0 ? (
-                    <p className="text-xs text-muted">No orders yet. Share the store link so families can order.</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {storeOrders.map((o) => (
-                        <li key={o.reference} className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                          <span>
-                            <span className="font-mono text-foreground">{o.reference}</span>
-                            <span className="ml-2 text-muted">{o.customerName ?? "-"}</span>
-                          </span>
-                          <span className="text-foreground whitespace-nowrap">
-                            {money(o.totalCents)} <span className="text-muted">{fmtDate(o.createdAt)}</span>
-                            {o.shippedAt ? <span className="ml-1 text-green-400">🚚</span> : null}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </details>
-              );
-            })}
-          </div>
-        </section>
-
+      <div className="mt-10">
         <section className="scroll-mt-16" id="payments">
           <h2 className="display text-xl text-foreground">Recent payments</h2>
           <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">

@@ -21,8 +21,8 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
       { href: "/admin#design-requests", label: "Design Requests", icon: "🎨" },
       { href: "/admin#team-orders", label: "Team Orders", icon: "📦" },
       { href: "/admin/design-lab", label: "Design Lab Leads", icon: "🧪" },
-      { href: "/admin#stores", label: "Team Stores", icon: "🏪" },
-      { href: "/admin#shop-orders", label: "Shop Orders", icon: "🛒" },
+      { href: "/admin/stores", label: "Team Stores", icon: "🏪" },
+      { href: "/admin/shop-orders", label: "Shop Orders", icon: "🛒" },
     ],
   },
   {
@@ -48,9 +48,10 @@ export function AdminSidebar() {
 
   return (
     <>
-      {/* Desktop: fixed left rail */}
-      <nav className="hidden lg:block w-52 shrink-0 border-r border-line bg-steel/50">
-        <div className="sticky top-0 max-h-screen overflow-y-auto px-3 py-6">
+      {/* Desktop: truly fixed left rail - pinned to the viewport so it never
+          scrolls with the page. The outer nav is just a width spacer. */}
+      <nav className="hidden lg:block w-52 shrink-0">
+        <div className="fixed inset-y-0 left-0 z-30 w-52 overflow-y-auto border-r border-line bg-steel/95 px-3 py-6">
           {GROUPS.map((g) => (
             <div key={g.title} className="mb-5">
               <p className="px-2 text-[10px] display uppercase tracking-[0.14em] text-muted">{g.title}</p>
