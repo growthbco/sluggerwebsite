@@ -58,8 +58,32 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [drafting, setDrafting] = useState(false);
   const [error, setError] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
+
+  // AI draft: reads the whole thread + the customer's real orders and puts a
+  // suggested reply in the box. Anything already typed is treated as the
+  // staff member's own direction and gets finished, not replaced.
+  async function draftReply() {
+    if (!active || drafting) return;
+    setDrafting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/sms/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: active, direction: draft.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Draft failed");
+      setDraft(data.draft);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Draft failed");
+    } finally {
+      setDrafting(false);
+    }
+  }
 
   const loadConvos = useCallback(async () => {
     try {
@@ -380,6 +404,17 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
               </button>
             ))}
             {mode === "note" && <span className="text-muted">saved to the thread - the customer never sees it</span>}
+            {active && mode !== "note" && (
+              <button
+                type="button"
+                onClick={draftReply}
+                disabled={drafting}
+                title="AI reads this conversation and the customer's orders, then drafts a reply for you to edit"
+                className="ml-auto display px-2.5 py-1 border border-brand/50 text-brand hover:bg-brand/10 disabled:opacity-50"
+              >
+                {drafting ? "Drafting…" : "✨ Draft reply"}
+              </button>
+            )}
           </div>
           <div className="flex gap-2">
             <textarea

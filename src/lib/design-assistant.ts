@@ -393,3 +393,84 @@ export async function answerPublicChat(history: ChatTurn[], extraContext?: strin
   const reply = (out?.reply ?? "").trim();
   return reply ? reply.slice(0, 1200) : null;
 }
+
+
+/* ------------------------------------------------------------------ */
+/* Texts inbox: draft an SMS reply grounded in the customer's history  */
+/* ------------------------------------------------------------------ */
+
+export type SmsThreadMsg = { direction: string; body: string; at: string };
+export type SmsCustomerContext = {
+  emails: string[];
+  spendCents: number;
+  orders: { reference: string; teamName: string; status: string; totalCents: number | null; paid: boolean; depositPaid: boolean }[];
+  designs: { reference: string; teamName: string; status: string }[];
+};
+
+const ORDER_STATUS_MEANING: Record<string, string> = {
+  collecting: "the roster link is open and players are still adding themselves",
+  submitted: "the roster is in and we owe them the deposit invoice",
+  quoted: "the invoice went out and we're waiting on the 50% deposit",
+  in_production: "the deposit is paid and their gear is being made now",
+  paid: "it's paid in full and about to ship",
+  shipped: "it already shipped",
+};
+
+/** Draft an SMS reply for the Texts inbox: grounded in the whole conversation
+ *  plus the customer's real orders and design projects, so questions like
+ *  "where's my order?" get answered with their actual status. A human edits
+ *  and sends - this never auto-replies. */
+export async function draftSmsReply(input: {
+  contactName: string | null;
+  thread: SmsThreadMsg[];
+  context: SmsCustomerContext;
+  direction?: string;
+}): Promise<string | null> {
+  const taughtFacts = await loadTaughtFacts();
+  const thread = input.thread.slice(-40);
+  const convo = thread
+    .map((m) => `${m.direction === "in" ? "CUSTOMER" : m.direction === "note" ? "INTERNAL STAFF NOTE (customer never saw this)" : "SLUGGER"}: ${m.body}`)
+    .join("\n");
+  const orderLines = input.context.orders.map((o) => {
+    const meaning = ORDER_STATUS_MEANING[o.status] ?? o.status;
+    return `- Order ${o.reference} (${o.teamName}): status "${o.status}" - ${meaning}.${o.totalCents ? ` Total ${money(o.totalCents)}.` : ""}${o.paid ? " Paid in full." : o.depositPaid ? " Deposit paid, balance still due." : ""}`;
+  });
+  const designLines = input.context.designs.map((d) => `- Design ${d.reference} (${d.teamName}): ${statusMeaning(d.status)}.`);
+
+  const prompt = [
+    `You are drafting a TEXT MESSAGE for Slugger Athletics staff to send${input.contactName ? ` to ${input.contactName}` : ""} from the shop's texting line. The draft goes into the staff member's box to edit before sending - it is a suggestion, never an auto-reply.`,
+    "",
+    "THIS CUSTOMER'S REAL RECORDS (authoritative - use these to answer status questions):",
+    ...(orderLines.length ? ["Orders:", ...orderLines] : ["Orders: none on file for this phone number."]),
+    ...(designLines.length ? ["Design projects:", ...designLines] : []),
+    "",
+    "TAUGHT FACTS (official policies and pricing):",
+    taughtFacts.length ? taughtFacts.map((f) => `- ${f}`).join("\n") : "(none)",
+    "",
+    "THE CONVERSATION SO FAR (oldest to newest):",
+    convo || "(no messages yet - this is an outreach text)",
+    "",
+    ...(input.direction
+      ? [
+          "THE STAFF MEMBER STARTED THE REPLY THEMSELVES - finish it, do not replace it. Their words are authoritative:",
+          `"""${input.direction}"""`,
+        ]
+      : [
+          "Draft the most helpful next text: usually answering the customer's most recent unanswered question using their REAL order/design records above.",
+        ]),
+    "- This is SMS: 1-3 short sentences, plain text, no markdown, no links unless one genuinely helps.",
+    "- NEVER invent a status, date, price, or tracking number that is not in the records above. If the records do not answer it, draft a message that says you will check and follow up.",
+    "- Do not sign a name.",
+    ...TONE_RULES,
+    "- Write in the language the customer writes in.",
+    'Return ONLY JSON: { "draft": string }',
+  ].join("\n");
+
+  const out = await generateJson(prompt, {
+    type: "OBJECT",
+    properties: { draft: { type: "STRING" } },
+    required: ["draft"],
+  });
+  const draft = (out?.draft ?? "").trim();
+  return draft ? draft.slice(0, 1000) : null;
+}
