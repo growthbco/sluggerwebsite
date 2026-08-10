@@ -142,6 +142,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
               // Clients see "Support · Slugger Athletics" - never an AI label.
               // Staff can tell it was the bot from the Discord log.
               await addDesignMessage(request.id, "designer", result.reply, "Support");
+              // Tell the client a reply is waiting - without this, anyone who
+              // closed the page never learns they got an answer.
+              await emailDesignerMessage({
+                to: request.contactEmail,
+                teamName: request.teamName,
+                reference: request.reference,
+                text: result.reply,
+                fromName: "Support",
+                statusUrl: `${SITE}/design/status/${request.statusToken}`,
+              }).catch((e) => console.error("AI reply email failed:", e));
               // Log the exchange to Discord so staff can correct a bad answer.
               // flagStaff (discount asks): the AI sent the holding reply per
               // policy, but the real number needs a human - ping for follow-up.

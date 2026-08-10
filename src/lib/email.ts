@@ -501,16 +501,16 @@ export async function emailDesignerMessage(args: {
 }): Promise<boolean> {
   return sendEmail({
     to: args.to,
-    subject: `💬 A question about your ${args.teamName} design (${args.reference})`,
+    subject: `💬 New message about your ${args.teamName} design (${args.reference})`,
     html: brandedEmail({
-      preheader: `Your designer needs a quick answer to keep your design moving.`,
-      heading: args.fromName ? `Quick question from ${esc(args.fromName)} at Slugger` : `Quick question from your designer`,
+      preheader: `There's a new reply on your design thread.`,
+      heading: args.fromName ? `New message from ${esc(args.fromName)} at Slugger` : `New message from your designer`,
       intro: `Reference: <strong>${esc(args.reference)}</strong>`,
       bodyHtml: `
         <p style="margin:0;background:#f6f4ee;padding:12px 14px;border-left:3px solid #b8a36c;">${esc(args.text).replace(/\n/g, "<br>")}</p>
-        <p style="margin:14px 0 0;">Answering on your design page keeps everything in one place - and the faster we hear back, the faster your design moves.</p>
+        <p style="margin:14px 0 0;">Replying on your design page keeps everything in one place - and the faster we hear back, the faster your design moves.</p>
       `,
-      ctaText: "Reply on your design page",
+      ctaText: "Open your design page",
       ctaUrl: args.statusUrl,
     }),
   });
