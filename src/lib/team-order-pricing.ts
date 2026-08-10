@@ -100,6 +100,9 @@ type RosterRow = {
   size?: string | null;
   sizes?: Record<string, string> | null;
   quantity?: number | null;
+  /** "coach" | "self" | "addon". Paid add-on rows were bought through their
+   *  own Stripe checkout, so quotes/invoices must never price them again. */
+  filledBy?: string | null;
 };
 
 /** Count what each player actually ordered (their per-item sizes) and price
@@ -118,8 +121,12 @@ export function computeTeamOrderQuote(
   },
   roster: RosterRow[],
 ): TeamOrderQuote {
+  // Exclude already-paid add-on pieces: they joined the roster via their own
+  // paid checkout. Without this, the quote-drift warning tells staff to
+  // "update" the locked quote to a total that double-bills the add-ons.
+  const billable = roster.filter((r) => r.filledBy !== "addon");
   const counts = new Map<string, number>();
-  for (const row of roster) {
+  for (const row of billable) {
     const qty = Math.max(1, row.quantity ?? 1);
     const sized = Object.entries(row.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
     if (sized.length) {

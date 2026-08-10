@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { dbEnabled } from "@/db";
-import { getByManageToken, getByStatusToken, addDesignMessage } from "@/lib/design-requests";
+import { getByManageToken, getByStatusToken, getById, addDesignMessage } from "@/lib/design-requests";
 import { getByDesignRequestId, getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
 import { assistDesignThread } from "@/lib/design-assistant";
@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 // Headroom for the human-like reply pause below (client's own message still
 // returns instantly - the AI answer is posted after the delay in the
 // background via waitUntil).
-export const maxDuration = 90;
+export const maxDuration = 300;
 
 const MAX_MESSAGE_LENGTH = 2000;
 
@@ -102,7 +102,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       if (text) {
         waitUntil((async () => {
           try {
-            await new Promise((r) => setTimeout(r, 30000 + Math.floor(Math.random() * 30000)));
+            // 2-3 minute pause: clients often send thoughts in bursts, and
+            // staff deserve first crack at answering personally.
+            await new Promise((r) => setTimeout(r, 120000 + Math.floor(Math.random() * 60000)));
+            // Stand down if the thread moved on during the pause - staff
+            // already answered, or the client added another message (whose own
+            // run will reply with the full picture). Without this the bot
+            // answers message 1 of 3 while the client is still typing.
+            const fresh = await getById(request.id);
+            if ((fresh?.messages ?? []).length !== messages.length) return;
             const order = await getByDesignRequestId(request.id);
             const roster = order ? await getRoster(order.id) : [];
             const result = await assistDesignThread({

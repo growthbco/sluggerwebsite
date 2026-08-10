@@ -42,12 +42,20 @@ export async function findProofFollowUpCandidates(now = new Date()): Promise<Fol
     const ageDays = (now.getTime() - r.proofSentAt.getTime()) / DAY_MS;
     if (ageDays > STALE_AFTER_DAYS) continue;
 
-    // A client message after the proof counts as a reply - a human should
-    // answer it, not a robot.
-    const lastClientMsg = [...(r.messages ?? [])].reverse().find((m) => m.from === "client");
-    if (lastClientMsg && new Date(lastClientMsg.at) > r.proofSentAt) continue;
+    // If the thread ends on an unanswered client message, a human should
+    // answer it - no robot nudges. But once we've replied (staff or the AI
+    // assistant) and the client goes quiet AGAIN, follow-ups resume, timed
+    // from their last activity. (The old rule - any client message after the
+    // proof disables nudges forever - silently killed all follow-ups once the
+    // AI chat launched, because nearly every client now sends messages.)
+    const msgs = r.messages ?? [];
+    const lastMsg = msgs[msgs.length - 1];
+    if (lastMsg && lastMsg.from === "client") continue;
+    const lastClientMsg = [...msgs].reverse().find((m) => m.from === "client");
 
-    const since = sent === 0 ? r.proofSentAt : r.lastFollowUpAt ?? r.proofSentAt;
+    const base = sent === 0 ? r.proofSentAt : r.lastFollowUpAt ?? r.proofSentAt;
+    const clientAt = lastClientMsg ? new Date(lastClientMsg.at) : null;
+    const since = clientAt && clientAt > base ? clientAt : base;
     const waitDays = sent === 0 ? FIRST_AFTER_DAYS : NEXT_AFTER_DAYS;
     if (now.getTime() - since.getTime() < waitDays * DAY_MS) continue;
 
