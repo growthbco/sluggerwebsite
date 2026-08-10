@@ -423,6 +423,10 @@ export const teamOrders = pgTable(
     // verification), kept even after add-on sheets replace printFileUrls, so
     // the original's file stays attached in roster history.
     originalPrintFileUrls: jsonb("original_print_file_urls").$type<string[]>(),
+    // In-house hat production progress, checked off on the /hat-sheet page.
+    // Keyed per physical hat ("rosterRowId:itemKey:unitIndex") with per-stage
+    // flags: s = stitched, c = cleaned, b = bagged.
+    hatChecklist: jsonb("hat_checklist").$type<Record<string, { s?: boolean; c?: boolean; b?: boolean }>>(),
     printFileVerifiedAt: timestamp("print_file_verified_at", { withTimezone: true }),
     printFileVerification: jsonb("print_file_verification").$type<{
       ok: boolean;

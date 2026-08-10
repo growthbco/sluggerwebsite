@@ -213,6 +213,11 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
               {paid ? "View receipt" : "View invoice"}
             </a>
           )}
+          {roster.some((r) => Object.entries(r.sizes ?? {}).some(([k, v]) => (k === "fitted_hat" || k === "snapback_hat") && (v ?? "").trim())) && (
+            <a href={`/admin/team-order/${o.id}/hat-sheet`} target="_blank" rel="noopener noreferrer" className="text-sm display text-muted border border-line px-3 py-1.5 hover:border-brand/50 hover:text-foreground">
+              🧢 Hat sheet
+            </a>
+          )}
         </div>
         {/* Pricing settings, locked once an invoice is out. */}
         {!o.invoiceUrl && !paid && (
