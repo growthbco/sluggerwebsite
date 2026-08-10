@@ -918,6 +918,12 @@ export const smsContacts = pgTable("sms_contacts", {
   id: uuid("id").primaryKey().defaultRandom(),
   phone: text("phone").notNull(), // E.164
   name: text("name").notNull(),
+  // Mini-CRM conversation state for the Texts inbox: pin important threads,
+  // park finished ones, and track what's been read (unread = an inbound
+  // message newer than lastReadAt).
+  starredAt: timestamp("starred_at", { withTimezone: true }),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  lastReadAt: timestamp("last_read_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("sms_contacts_phone_idx").on(t.phone)]);
 

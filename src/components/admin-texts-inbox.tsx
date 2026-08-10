@@ -1,9 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 
-type Conversation = { phone: string; name: string | null; lastAt: string; count: number; last: { body: string; direction: string; channel: string } | null };
-type Message = { id: string; phone: string; direction: string; channel: string; body: string; mediaCount: number; createdAt: string };
+type Conversation = {
+  phone: string;
+  name: string | null;
+  lastAt: string;
+  count: number;
+  last: { body: string; direction: string; channel: string } | null;
+  starred: boolean;
+  archived: boolean;
+  unread: boolean;
+};
+type Message = { id: string; phone: string; direction: string; channel: string; body: string; mediaCount: number; staff: string | null; createdAt: string };
+type Context = {
+  emails: string[];
+  spendCents: number;
+  orders: { id: string; reference: string; teamName: string; status: string; totalCents: number | null; paid: boolean; depositPaid: boolean }[];
+  designs: { id: string; reference: string; teamName: string; status: string; manageToken: string | null }[];
+};
+type Filter = "all" | "unread" | "starred" | "archived";
 
 const fmt = (d: string) =>
   new Date(d).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -11,16 +28,31 @@ const prettyPhone = (p: string) => {
   const d = p.replace(/\D/g, "").slice(-10);
   return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : p;
 };
+const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+const initials = (name: string | null, phone: string) =>
+  name
+    ? name
+        .split(/\s+/)
+        .map((w) => w[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : phone.replace(/\D/g, "").slice(-2);
 
-/** The shop's texting inbox: conversations on the left, thread + composer on
- *  the right. Sends from (352) 414-7270 via SMS or WhatsApp. Polls so new
- *  inbound texts appear without a refresh. */
+/** The shop's mini-CRM texting hub: conversations (searchable, with unread /
+ *  starred / archived states) on the left, the thread + composer in the
+ *  middle, and everything we know about the customer - orders, designs,
+ *  lifetime spend - on the right. Sends from (352) 414-7270 via SMS or
+ *  WhatsApp; internal notes stay in the thread without texting anyone. */
 export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: string; initialName?: string } = {}) {
   const [convos, setConvos] = useState<Conversation[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [context, setContext] = useState<Context | null>(null);
   const [draft, setDraft] = useState("");
-  const [channel, setChannel] = useState<"sms" | "whatsapp">("sms");
+  const [mode, setMode] = useState<"sms" | "whatsapp" | "note">("sms");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [search, setSearch] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newName, setNewName] = useState("");
   const [editingName, setEditingName] = useState(false);
@@ -45,6 +77,29 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
     } catch {}
   }, []);
 
+  const loadContext = useCallback(async (phone: string) => {
+    setContext(null);
+    try {
+      const res = await fetch(`/api/admin/sms?phone=${encodeURIComponent(phone)}&context=1`);
+      const data = await res.json();
+      if (res.ok) setContext(data);
+    } catch {}
+  }, []);
+
+  const setState = useCallback(
+    async (phone: string, patch: { star?: boolean; archive?: boolean; markRead?: boolean; name?: string }) => {
+      try {
+        await fetch("/api/admin/sms", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone, ...patch }),
+        });
+        loadConvos();
+      } catch {}
+    },
+    [loadConvos],
+  );
+
   useEffect(() => { loadConvos(); }, [loadConvos]);
   // Deep link from an order page (?to=&name=): open that customer's thread
   // immediately, saving the name so the conversation is labeled from the start.
@@ -56,19 +111,11 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
     const e164 = digits.length === 10 ? `+1${digits}` : digits.length === 11 && digits.startsWith("1") ? `+${digits}` : null;
     if (!e164) return;
     (async () => {
-      if (initialName) {
-        try {
-          await fetch("/api/admin/sms", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone: e164, name: initialName }),
-          });
-        } catch {}
-      }
+      if (initialName) await setState(e164, { name: initialName });
       setActive(e164);
-      loadConvos();
     })();
-  }, [initialPhone, initialName, loadConvos]);
+  }, [initialPhone, initialName, setState]);
+
   useEffect(() => {
     const t = setInterval(() => {
       loadConvos();
@@ -76,9 +123,17 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
     }, 12000);
     return () => clearInterval(t);
   }, [active, loadConvos, loadThread]);
-  useEffect(() => { if (active) loadThread(active); setEditingName(false); }, [active, loadThread]);
-  // Scroll ONLY the thread container (scrollIntoView would drag the whole
-  // page down every refresh).
+
+  useEffect(() => {
+    if (!active) return;
+    loadThread(active);
+    loadContext(active);
+    setEditingName(false);
+    setState(active, { markRead: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
+  // Scroll ONLY the thread container (scrollIntoView would drag the page).
   useEffect(() => {
     const el = threadRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -86,15 +141,8 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
 
   async function saveName() {
     if (!active || !nameDraft.trim()) { setEditingName(false); return; }
-    try {
-      await fetch("/api/admin/sms", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: active, name: nameDraft.trim() }),
-      });
-      setEditingName(false);
-      loadConvos();
-    } catch {}
+    await setState(active, { name: nameDraft.trim() });
+    setEditingName(false);
   }
 
   async function send() {
@@ -106,7 +154,13 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
       const res = await fetch("/api/admin/sms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, body: draft.trim(), channel, name: !active && newName.trim() ? newName.trim() : undefined }),
+        body: JSON.stringify({
+          phone,
+          body: draft.trim(),
+          channel: mode === "whatsapp" ? "whatsapp" : "sms",
+          note: mode === "note" ? true : undefined,
+          name: !active && newName.trim() ? newName.trim() : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Send failed");
@@ -121,41 +175,104 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
     }
   }
 
+  const q = search.trim().toLowerCase();
+  const visible = convos.filter((c) => {
+    if (filter === "archived") { if (!c.archived) return false; }
+    else if (c.archived) return false;
+    if (filter === "unread" && !c.unread) return false;
+    if (filter === "starred" && !c.starred) return false;
+    if (q && !(`${c.name ?? ""} ${c.phone} ${c.last?.body ?? ""}`.toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const activeConvo = convos.find((c) => c.phone === active);
+  const unreadCount = convos.filter((c) => c.unread && !c.archived).length;
+
+  const chip = (f: Filter, label: string) => (
+    <button
+      key={f}
+      type="button"
+      onClick={() => setFilter(f)}
+      className={`text-xs display px-2.5 py-1 border ${filter === f ? "bg-brand text-on-brand border-brand" : "border-line text-muted hover:text-foreground hover:border-brand/40"}`}
+    >
+      {label}
+    </button>
+  );
+
+  const STATUS_LABEL: Record<string, string> = {
+    collecting: "Collecting roster", submitted: "Needs invoice", quoted: "Awaiting payment",
+    in_production: "In production", paid: "Ready to ship", shipped: "Shipped",
+    proof_sent: "Proof sent", changes_requested: "Changes requested", approved: "Approved",
+    ordered: "Ordered", in_design: "In design", pending_payment: "Awaiting design fee",
+  };
+
   return (
-    <div className="grid md:grid-cols-[18rem_1fr] gap-4 min-h-[32rem]">
-      {/* Conversations */}
-      <aside className="bg-steel border border-line overflow-y-auto max-h-[40rem]">
-        <button
-          type="button"
-          onClick={() => { setActive(null); setMessages([]); }}
-          className={`w-full text-left px-4 py-3 border-b border-line display text-sm ${active === null ? "bg-brand/10 text-brand" : "text-muted hover:text-foreground"}`}
-        >
-          ✏️ New text
-        </button>
-        {convos.length === 0 && <p className="px-4 py-6 text-sm text-muted">No conversations yet. Texts to (352) 414-7270 land here.</p>}
-        {convos.map((c) => (
-          <button
-            key={c.phone}
-            type="button"
-            onClick={() => setActive(c.phone)}
-            className={`w-full text-left px-4 py-3 border-b border-line ${active === c.phone ? "bg-brand/10" : "hover:bg-background/40"}`}
-          >
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm text-foreground truncate">{c.name ?? prettyPhone(c.phone)}</span>
-              <span className="text-[10px] text-muted whitespace-nowrap">{fmt(c.lastAt)}</span>
+    <div className="grid lg:grid-cols-[19rem_1fr] xl:grid-cols-[19rem_1fr_17rem] gap-4 min-h-[34rem]">
+      {/* ── Conversations ─────────────────────────────────────────── */}
+      <aside className="bg-steel border border-line flex flex-col max-h-[42rem]">
+        <div className="p-3 border-b border-line space-y-2">
+          <div className="flex gap-2">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search threads…"
+              className="flex-1 min-w-0 bg-background border border-line px-3 py-1.5 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => { setActive(null); setMessages([]); setContext(null); }}
+              title="New text"
+              className={`display text-lg leading-none px-3 border ${active === null ? "bg-brand text-on-brand border-brand" : "border-line text-muted hover:text-foreground"}`}
+            >
+              +
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {chip("all", "All")}
+            {chip("unread", unreadCount ? `Unread · ${unreadCount}` : "Unread")}
+            {chip("starred", "Starred")}
+            {chip("archived", "Archived")}
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {visible.length === 0 && (
+            <p className="px-4 py-6 text-sm text-muted">
+              {convos.length === 0 ? "No conversations yet. Texts to (352) 414-7270 land here." : "Nothing matches this view."}
+            </p>
+          )}
+          {visible.map((c) => (
+            <div key={c.phone} className={`flex items-stretch border-b border-line ${active === c.phone ? "bg-brand/10" : "hover:bg-background/40"}`}>
+              <button type="button" onClick={() => setActive(c.phone)} className="flex-1 min-w-0 text-left px-3 py-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className={`text-sm truncate ${c.unread ? "text-foreground font-bold" : "text-foreground"}`}>
+                    {c.unread && <span className="inline-block h-2 w-2 rounded-full bg-brand mr-1.5 align-middle" />}
+                    {c.name ?? prettyPhone(c.phone)}
+                  </span>
+                  <span className="text-[10px] text-muted whitespace-nowrap">{fmt(c.lastAt)}</span>
+                </div>
+                {c.name && <div className="text-xs text-muted">{prettyPhone(c.phone)}</div>}
+                {c.last && (
+                  <div className={`mt-0.5 text-xs truncate ${c.unread ? "text-foreground/90" : "text-muted"}`}>
+                    {c.last.direction === "out" ? "You: " : c.last.direction === "note" ? "📝 " : ""}
+                    {c.last.channel === "whatsapp" ? "🟢 " : ""}
+                    {c.last.body}
+                  </div>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setState(c.phone, { star: !c.starred })}
+                title={c.starred ? "Unstar" : "Star"}
+                className={`px-2 text-sm ${c.starred ? "text-brand" : "text-line hover:text-muted"}`}
+              >
+                ★
+              </button>
             </div>
-            {c.name && <div className="text-xs text-muted">{prettyPhone(c.phone)}</div>}
-            {c.last && (
-              <div className="mt-0.5 text-xs text-muted truncate">
-                {c.last.direction === "out" ? "You: " : ""}{c.last.channel === "whatsapp" ? "🟢 " : ""}{c.last.body}
-              </div>
-            )}
-          </button>
-        ))}
+          ))}
+        </div>
       </aside>
 
-      {/* Thread */}
-      <section className="bg-steel border border-line flex flex-col max-h-[40rem]">
+      {/* ── Thread ────────────────────────────────────────────────── */}
+      <section className="bg-steel border border-line flex flex-col max-h-[42rem]">
         <div className="px-4 py-3 border-b border-line flex flex-wrap items-center gap-3">
           {active ? (
             editingName ? (
@@ -172,16 +289,15 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
                 <button type="button" onClick={() => setEditingName(false)} className="text-xs text-muted hover:text-foreground">Cancel</button>
               </span>
             ) : (
-              <span className="display text-foreground flex items-center gap-2">
-                {convos.find((c) => c.phone === active)?.name ?? prettyPhone(active)}
-                <span className="text-muted text-xs font-normal">{prettyPhone(active)}</span>
+              <span className="display text-foreground flex items-center gap-2 flex-1 min-w-0">
+                <span className="truncate">{activeConvo?.name ?? prettyPhone(active)}</span>
+                <span className="text-muted text-xs font-normal whitespace-nowrap">{prettyPhone(active)}</span>
                 <button
                   type="button"
-                  onClick={() => { setNameDraft(convos.find((c) => c.phone === active)?.name ?? ""); setEditingName(true); }}
+                  onClick={() => { setNameDraft(activeConvo?.name ?? ""); setEditingName(true); }}
                   className="text-[11px] display text-muted border border-line px-1.5 py-0.5 hover:border-brand/50 hover:text-foreground"
-                  title="Attach a name to this number"
                 >
-                  {convos.find((c) => c.phone === active)?.name ? "Rename" : "+ Name"}
+                  {activeConvo?.name ? "Rename" : "+ Name"}
                 </button>
               </span>
             )
@@ -202,37 +318,76 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
               />
             </span>
           )}
-          <select value={channel} onChange={(e) => setChannel(e.target.value as "sms" | "whatsapp")} className="bg-background border border-line text-xs text-foreground px-2 py-1.5">
-            <option value="sms">SMS</option>
-            <option value="whatsapp">WhatsApp</option>
-          </select>
+          {active && activeConvo && (
+            <span className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setState(active, { star: !activeConvo.starred })}
+                title={activeConvo.starred ? "Unstar" : "Star"}
+                className={`text-base px-1.5 ${activeConvo.starred ? "text-brand" : "text-muted hover:text-foreground"}`}
+              >
+                ★
+              </button>
+              <button
+                type="button"
+                onClick={() => { setState(active, { archive: !activeConvo.archived }); if (!activeConvo.archived) setActive(null); }}
+                title={activeConvo.archived ? "Unarchive" : "Archive"}
+                className="text-xs display text-muted border border-line px-2 py-1 hover:border-brand/40 hover:text-foreground"
+              >
+                {activeConvo.archived ? "Unarchive" : "🗄 Archive"}
+              </button>
+            </span>
+          )}
         </div>
 
         <div ref={threadRef} className="flex-1 overflow-y-auto p-4 space-y-2">
           {active && messages.length === 0 && <p className="text-sm text-muted">Loading…</p>}
           {!active && <p className="text-sm text-muted">Start a new conversation - enter a number above and type below. It sends from (352) 414-7270.</p>}
-          {messages.map((m) => (
-            <div key={m.id} className={`max-w-[80%] ${m.direction === "out" ? "ml-auto" : ""}`}>
-              <div className={`px-3 py-2 text-sm whitespace-pre-wrap break-words rounded ${m.direction === "out" ? "bg-brand text-on-brand" : "bg-background text-foreground border border-line"}`}>
-                {m.body}
-                {m.mediaCount > 0 && <div className="text-xs opacity-70 mt-1">📎 {m.mediaCount} attachment{m.mediaCount === 1 ? "" : "s"} (view in Twilio)</div>}
+          {messages.map((m) =>
+            m.direction === "note" ? (
+              <div key={m.id} className="mx-auto max-w-[90%] text-center">
+                <div className="inline-block px-3 py-1.5 text-xs text-amber-200/90 bg-amber-500/10 border border-amber-500/30 rounded whitespace-pre-wrap break-words">
+                  📝 {m.body}
+                </div>
+                <div className="mt-0.5 text-[10px] text-muted">Internal note · {fmt(m.createdAt)}</div>
               </div>
-              <div className={`mt-0.5 text-[10px] text-muted ${m.direction === "out" ? "text-right" : ""}`}>
-                {m.channel === "whatsapp" ? "WhatsApp · " : ""}{fmt(m.createdAt)}
+            ) : (
+              <div key={m.id} className={`max-w-[80%] ${m.direction === "out" ? "ml-auto" : ""}`}>
+                <div className={`px-3 py-2 text-sm whitespace-pre-wrap break-words rounded ${m.direction === "out" ? "bg-brand text-on-brand" : "bg-background text-foreground border border-line"}`}>
+                  {m.body}
+                  {m.mediaCount > 0 && <div className="text-xs opacity-70 mt-1">📎 {m.mediaCount} attachment{m.mediaCount === 1 ? "" : "s"} (view in Twilio)</div>}
+                </div>
+                <div className={`mt-0.5 text-[10px] text-muted ${m.direction === "out" ? "text-right" : ""}`}>
+                  {m.channel === "whatsapp" ? "WhatsApp · " : ""}{fmt(m.createdAt)}
+                </div>
               </div>
-            </div>
-          ))}
+            ),
+          )}
         </div>
 
         <div className="p-3 border-t border-line">
           {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
+          <div className="mb-2 flex items-center gap-1.5 text-xs">
+            <span className="text-muted display mr-1">Send via:</span>
+            {([["sms", "SMS"], ["whatsapp", "WhatsApp"], ["note", "📝 Note"]] as const).map(([m, label]) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                className={`display px-2.5 py-1 border ${mode === m ? (m === "note" ? "bg-amber-500/20 border-amber-500/50 text-amber-200" : "bg-brand text-on-brand border-brand") : "border-line text-muted hover:text-foreground"}`}
+              >
+                {label}
+              </button>
+            ))}
+            {mode === "note" && <span className="text-muted">saved to the thread - the customer never sees it</span>}
+          </div>
           <div className="flex gap-2">
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
               rows={2}
-              placeholder="Type a message… (Enter to send)"
+              placeholder={mode === "note" ? "Internal note… (Enter to save)" : "Type a message… (Enter to send)"}
               className="flex-1 bg-background border border-line px-3 py-2 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none resize-none"
             />
             <button
@@ -241,11 +396,86 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
               disabled={busy || !draft.trim() || (!active && !newPhone.trim())}
               className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-5 disabled:opacity-50"
             >
-              {busy ? "…" : "Send"}
+              {busy ? "…" : mode === "note" ? "Save" : "Send"}
             </button>
           </div>
         </div>
       </section>
+
+      {/* ── Customer panel ────────────────────────────────────────── */}
+      <aside className="hidden xl:flex bg-steel border border-line flex-col max-h-[42rem] overflow-y-auto">
+        {!active ? (
+          <p className="p-4 text-sm text-muted">Pick a conversation to see the customer&apos;s orders and history here.</p>
+        ) : (
+          <div className="p-4 space-y-4">
+            <div className="text-center">
+              <div className="mx-auto h-14 w-14 grid place-items-center rounded-full bg-brand/15 border border-brand/40 display text-lg text-brand">
+                {initials(activeConvo?.name ?? null, active)}
+              </div>
+              <p className="mt-2 display text-foreground">{activeConvo?.name ?? prettyPhone(active)}</p>
+              <p className="text-xs text-muted">{prettyPhone(active)}</p>
+              {context?.emails.map((e) => (
+                <p key={e} className="text-xs text-muted truncate"><a href={`mailto:${e}`} className="hover:text-foreground">{e}</a></p>
+              ))}
+            </div>
+
+            {context === null ? (
+              <p className="text-xs text-muted text-center">Loading customer info…</p>
+            ) : (
+              <>
+                <div className="border border-line bg-background px-3 py-2 flex items-baseline justify-between">
+                  <span className="text-xs text-muted display uppercase tracking-wide">Lifetime spend</span>
+                  <span className="display text-lg text-brand">{money(context.spendCents)}</span>
+                </div>
+
+                {context.orders.length > 0 && (
+                  <div>
+                    <p className="text-xs display uppercase tracking-wide text-muted">Orders ({context.orders.length})</p>
+                    <div className="mt-1.5 space-y-1.5">
+                      {context.orders.map((o) => (
+                        <Link key={o.id} href={`/admin/team-order/${o.id}`} className="block border border-line bg-background px-3 py-2 hover:border-brand/50">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-sm text-foreground truncate">{o.teamName}</span>
+                            {o.totalCents ? <span className="text-xs text-muted">{money(o.totalCents)}</span> : null}
+                          </div>
+                          <div className="text-[11px] text-muted">
+                            {o.reference} · {STATUS_LABEL[o.status] ?? o.status}
+                            {o.paid ? " · paid ✓" : o.depositPaid ? " · deposit ✓" : ""}
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {context.designs.length > 0 && (
+                  <div>
+                    <p className="text-xs display uppercase tracking-wide text-muted">Design projects ({context.designs.length})</p>
+                    <div className="mt-1.5 space-y-1.5">
+                      {context.designs.map((d) => (
+                        <a
+                          key={d.id}
+                          href={d.manageToken ? `/design/manage/${d.manageToken}` : "#"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block border border-line bg-background px-3 py-2 hover:border-brand/50"
+                        >
+                          <div className="text-sm text-foreground truncate">{d.teamName}</div>
+                          <div className="text-[11px] text-muted">{d.reference} · {STATUS_LABEL[d.status] ?? d.status}</div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {context.orders.length === 0 && context.designs.length === 0 && (
+                  <p className="text-xs text-muted text-center">No orders or designs matched to this number yet.</p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </aside>
     </div>
   );
 }
