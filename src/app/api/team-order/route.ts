@@ -85,6 +85,7 @@ export async function POST(req: Request) {
       jerseyMaterial: body.jerseyMaterial,
       items,
       designRequestId: design?.id,
+      rushShipping: design?.rush ?? false,
     });
     for (const r of roster.slice(0, 200)) {
       await addRosterRow(

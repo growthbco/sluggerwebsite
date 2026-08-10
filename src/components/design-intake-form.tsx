@@ -385,7 +385,8 @@ export function DesignIntakeForm() {
           if (days < 0) return <p className="mt-2 text-sm text-brand">That date is in the past - please pick a future date.</p>;
           return (
             <p className="mt-2 text-sm bg-brand/10 border border-brand/40 text-foreground p-3">
-              ⚡ Heads up - that&apos;s within 2 weeks. A <strong>$5 per item rush fee</strong> applies to make this deadline.
+              🚨 Heads up - that&apos;s within 2 weeks, so this is a <strong>rush order</strong>: a flat <strong>$100 rush order fee</strong> applies,
+              your order gets priority production and ships direct. We&apos;ll confirm we can meet your date before design work starts.
             </p>
           );
         })()}

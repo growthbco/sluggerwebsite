@@ -195,6 +195,8 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         changeRequests={request.changeRequests ?? []}
         rush={request.rush}
         neededBy={request.neededBy ? request.neededBy.toISOString() : null}
+        rushApprovedAt={request.rushApprovedAt ? request.rushApprovedAt.toISOString() : null}
+        rushApprovedBy={request.rushApprovedBy ?? null}
       />
 
       <AiDesignStudio

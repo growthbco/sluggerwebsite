@@ -97,7 +97,7 @@ export async function emailDesignRequestToDesigner(req: {
   }
   const subjectPrefix = req.rush ? "🚨 RUSH " : "";
   const bodyHtml = `
-    ${req.rush ? `<p style="background:#fff3cd;padding:10px 14px;border-left:4px solid #b8a36c;margin:0 0 16px;"><strong style="color:#13160b;">🚨 RUSH request:</strong> needed within 2 weeks. A $5/item rush fee applies.</p>` : ""}
+    ${req.rush ? `<p style="background:#fff3cd;padding:10px 14px;border-left:4px solid #b8a36c;margin:0 0 16px;"><strong style="color:#13160b;">🚨 RUSH request:</strong> needed within 2 weeks. Flat $100 rush order fee applies (ships direct). Approve the timeline on the manage page BEFORE promising the date.</p>` : ""}
     <p style="margin:0 0 10px;"><strong>Team:</strong> ${esc(req.teamName)} ${req.sport ? `(${esc(req.sport)})` : ""}</p>
     ${neededByStr ? `<p style="margin:0 0 10px;"><strong>Needed by:</strong> ${neededByStr}</p>` : ""}
     <p style="margin:0 0 10px;"><strong>Contact:</strong> ${esc(req.contactName)} · ${esc(req.contactEmail)}${req.contactPhone ? ` · ${esc(req.contactPhone)}` : ""}</p>
@@ -511,6 +511,36 @@ export async function emailDesignerMessage(args: {
         <p style="margin:14px 0 0;">Answering on your design page keeps everything in one place - and the faster we hear back, the faster your design moves.</p>
       `,
       ctaText: "Reply on your design page",
+      ctaUrl: args.statusUrl,
+    }),
+  });
+}
+
+/** Rush timeline approved by staff: confirm the date + the $100 fee terms. */
+export async function emailRushConfirmed(args: {
+  to: string;
+  teamName: string;
+  reference: string;
+  neededBy: Date | null;
+  approvedBy?: string;
+  statusUrl: string;
+}): Promise<boolean> {
+  const date = args.neededBy
+    ? args.neededBy.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" })
+    : "your requested date";
+  return sendEmail({
+    to: args.to,
+    subject: `🚨 Rush confirmed - ${args.teamName} (${args.reference})`,
+    html: brandedEmail({
+      preheader: `We can meet your date. Here's how your rush order works.`,
+      heading: `Your rush timeline is confirmed`,
+      intro: `Reference: <strong>${esc(args.reference)}</strong>`,
+      bodyHtml: `
+        <p style="margin:0 0 12px;">${args.approvedBy ? `${esc(args.approvedBy)} at Slugger` : "Our team"} reviewed your deadline and we can have your order in hand by <strong>${esc(date)}</strong>.</p>
+        <p style="margin:0 0 12px;">Rush orders get priority production and ship direct to you. A flat <strong>$100 rush order fee</strong> will appear on your invoice.</p>
+        <p style="margin:0;">To keep the timeline, please approve your design and pay the deposit as soon as they're ready - the clock starts there.</p>
+      `,
+      ctaText: "View your design",
       ctaUrl: args.statusUrl,
     }),
   });

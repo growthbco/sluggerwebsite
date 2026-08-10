@@ -27,10 +27,12 @@ export async function POST(req: Request) {
   let contactEmail = body.contactEmail;
   let contactPhone = body.contactPhone;
   let designRequestId: string | undefined;
+  let rushFromDesign = false;
   if (body.designToken) {
     const design = await getByStatusToken(body.designToken);
     if (design && design.status !== "cancelled") {
       designRequestId = design.id;
+      rushFromDesign = Boolean(design.rush);
       if (design.status === "approved" || design.status === "ordered") {
         teamName = design.teamName;
         contactName = design.contactName;
@@ -44,7 +46,10 @@ export async function POST(req: Request) {
   // design's Discord thread instead of spawning a disconnected one.
   if (!designRequestId && !body.designToken && body.contactEmail) {
     const design = await findActiveDesignByEmail(body.contactEmail);
-    if (design) designRequestId = design.id;
+    if (design) {
+      designRequestId = design.id;
+      rushFromDesign = Boolean(design.rush);
+    }
   }
 
   if (!teamName || !contactName || !contactEmail) {
@@ -61,6 +66,7 @@ export async function POST(req: Request) {
       jerseyMaterial: body.jerseyMaterial,
       items: body.items,
       designRequestId,
+      rushShipping: rushFromDesign,
     });
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     return NextResponse.json({

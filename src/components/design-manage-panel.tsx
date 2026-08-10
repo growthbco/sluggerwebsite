@@ -34,6 +34,8 @@ type Props = {
   changeRequests: ChangeRequest[];
   rush: boolean;
   neededBy: string | null;
+  rushApprovedAt: string | null;
+  rushApprovedBy: string | null;
 };
 
 export function DesignManagePanel({
@@ -58,6 +60,8 @@ export function DesignManagePanel({
   changeRequests,
   rush,
   neededBy,
+  rushApprovedAt,
+  rushApprovedBy,
 }: Props) {
   const [proofs, setProofs] = useState<string[]>(proofImages);
   const [labels, setLabels] = useState<Record<string, string>>(proofLabels);
@@ -73,6 +77,29 @@ export function DesignManagePanel({
   const [pendingLabels, setPendingLabels] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
+  const [rushOk, setRushOk] = useState<{ by: string } | null>(rushApprovedAt ? { by: rushApprovedBy ?? "staff" } : null);
+  const [rushName, setRushName] = useState("");
+  const [rushBusy, setRushBusy] = useState(false);
+  const [rushError, setRushError] = useState("");
+
+  async function approveRush() {
+    setRushBusy(true);
+    setRushError("");
+    try {
+      const res = await fetch(`/api/design-request/${token}/rush`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: rushName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not approve");
+      setRushOk({ by: data.rushApprovedBy });
+    } catch (e) {
+      setRushError((e as Error).message);
+    } finally {
+      setRushBusy(false);
+    }
+  }
   const [dragOver, setDragOver] = useState(false);
 
   async function handleFiles(files: FileList | null) {
@@ -190,8 +217,44 @@ export function DesignManagePanel({
     setTimeout(() => setCopied(false), 2000);
   }
 
+  const neededStr = neededBy
+    ? new Date(neededBy).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" })
+    : null;
+
   return (
     <div className="space-y-8">
+      {rush && (
+        <div className="border-2 border-red-500 bg-red-500/10 p-5">
+          <p className="display text-2xl sm:text-3xl text-red-400">🚨 RUSH ORDER{neededStr ? ` - NEEDED BY ${neededStr.toUpperCase()}` : ""}</p>
+          <p className="mt-2 text-sm text-foreground">
+            $100 rush order fee is on the quote and the order ships direct.{" "}
+            {rushOk ? "Timeline is confirmed - this design is priority." : <strong>Do NOT promise this date to the client until it&apos;s approved below.</strong>}
+          </p>
+          {rushOk ? (
+            <p className="mt-3 display text-green-400">✅ Timeline approved by {rushOk.by}</p>
+          ) : (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <select
+                value={rushName}
+                onChange={(e) => setRushName(e.target.value)}
+                className="bg-ink border border-line px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
+              >
+                <option value="">Who&apos;s approving?</option>
+                {["Gary", "Justin", "Bonans"].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <button
+                type="button"
+                onClick={approveRush}
+                disabled={!rushName || rushBusy}
+                className="clip-slant bg-red-500 hover:bg-red-600 text-white display text-sm px-5 py-2 disabled:opacity-50"
+              >
+                {rushBusy ? "Approving..." : "We can meet this date - approve rush"}
+              </button>
+              {rushError && <span className="text-sm text-red-400">{rushError}</span>}
+            </div>
+          )}
+        </div>
+      )}
       <header>
         <span className="display text-brand text-sm">{reference} · {status.replace(/_/g, " ")}</span>
         <h1 className="display text-3xl sm:text-4xl text-foreground mt-1">{teamName}</h1>

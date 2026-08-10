@@ -90,7 +90,7 @@ export async function GET(req: Request) {
   // Mirror the send route: line items appear on the deposit invoice only.
   let lines = stage === "deposit" && quote ? [...quote.lines] : [];
   if (stage === "deposit" && quote && quote.rushFeeCents > 0) {
-    lines.push({ label: "Rush production ($5/item)", quantity: 1, unitPriceCents: quote.rushFeeCents, totalCents: quote.rushFeeCents });
+    lines.push({ label: "Rush Order Fee (priority production + direct shipping)", quantity: 1, unitPriceCents: quote.rushFeeCents, totalCents: quote.rushFeeCents });
   }
 
   const sentUrl = stage === "deposit" ? order.invoiceUrl : order.balanceInvoiceUrl;

@@ -421,7 +421,7 @@ export async function postDesignRequestToDiscord(req: DesignRequestPayload): Pro
   if (needed) {
     fields.push({
       name: req.rush ? "Needed by 🚨 RUSH" : "Needed by",
-      value: req.rush ? `${needed} - within 2 weeks (rush fee applies)` : needed,
+      value: req.rush ? `${needed} - within 2 weeks ($100 rush order fee)` : needed,
       inline: true,
     });
   }
@@ -437,12 +437,21 @@ export async function postDesignRequestToDiscord(req: DesignRequestPayload): Pro
   }
   if (req.manageUrl) fields.push({ name: "Manage", value: req.manageUrl, inline: false });
 
+  const RED = 0xe74c3c;
   const body: Record<string, unknown> = {
     username: "Slugger Design Requests",
+    // Rush requests get an unmissable @here banner above the embed: staff must
+    // confirm the timeline is doable (and the $100 fee) before design starts.
+    ...(req.rush
+      ? {
+          content: `@here # 🚨🚨 RUSH ORDER 🚨🚨\n**Needed by ${fmtNeededBy(req.neededBy ?? null) ?? "ASAP"}. $100 rush order fee + ships direct. DO NOT promise the date until staff approves it on the manage page.**`,
+          allowed_mentions: { parse: ["everyone"] },
+        }
+      : {}),
     embeds: [
       {
-        title: `🎨 ${req.teamName}`,
-        color: GOLD,
+        title: req.rush ? `🚨 RUSH - ${req.teamName}` : `🎨 ${req.teamName}`,
+        color: req.rush ? RED : GOLD,
         fields,
         // First inspiration image as the embed image so it's visible at a glance.
         ...(req.inspirationImages?.[0] ? { image: { url: req.inspirationImages[0] } } : {}),
@@ -452,7 +461,7 @@ export async function postDesignRequestToDiscord(req: DesignRequestPayload): Pro
   };
 
   if (process.env.DISCORD_DESIGN_REQUESTS_FORUM === "true") {
-    body.thread_name = `${req.teamName} (${req.reference})`.slice(0, 100);
+    body.thread_name = `${req.rush ? "🚨 RUSH - " : ""}${req.teamName} (${req.reference})`.slice(0, 100);
   }
 
   // Use wait=true so Discord returns the created Message; for forum posts the

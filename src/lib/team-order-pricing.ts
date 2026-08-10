@@ -1,5 +1,5 @@
 // Auto-pricing for quote-first team orders: roster rows x the public price
-// list. Jersey price follows the order's jersey style; rush adds $5/piece.
+// list. Jersey price follows the order's jersey style; rush adds a flat $100.
 
 import { itemLabel } from "@/lib/order-items";
 
@@ -18,7 +18,10 @@ const ITEM_PRICES: Record<string, number> = {
   snapback_hat: 2500,
 };
 
-export const RUSH_FEE_CENTS = 500; // per piece, when rushShipping is set
+// Flat rush order fee: priority production + direct shipping. Charged once
+// per order (not per piece) when rushShipping is set; staff approve the
+// timeline before it's promised.
+export const RUSH_FEE_CENTS = 10000;
 
 // One-time hat digitizing charge: converting the design into an embroidery
 // file. Charged once on the FIRST order that includes hats; reorders of the
@@ -155,7 +158,7 @@ export function computeTeamOrderQuote(
     });
   }
 
-  const rushFeeCents = order.rushShipping ? pieces * RUSH_FEE_CENTS : 0;
+  const rushFeeCents = order.rushShipping ? RUSH_FEE_CENTS : 0;
   const totalCents = lines.reduce((s, l) => s + l.totalCents, 0) + rushFeeCents;
   return { lines, pieces, rushFeeCents, totalCents };
 }

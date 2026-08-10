@@ -23,6 +23,8 @@ export type NewTeamOrder = {
   jerseyMaterial?: string;
   items?: string[];
   designRequestId?: string;
+  // Inherited from a rush design request: flags the flat $100 rush order fee.
+  rushShipping?: boolean;
 };
 
 export type RosterInput = {
@@ -59,6 +61,7 @@ export async function createTeamOrder(input: NewTeamOrder) {
       jerseyMaterial: input.jerseyMaterial,
       items: input.items?.length ? input.items : ["jersey"],
       designRequestId: input.designRequestId,
+      rushShipping: input.rushShipping ?? false,
       selfEntryToken,
       manageToken,
       selfEntryOpen: true,

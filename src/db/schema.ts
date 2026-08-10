@@ -619,9 +619,14 @@ export const designRequests = pgTable(
     colorHexes: jsonb("color_hexes").$type<string[]>().default([]),
 
     // When the customer needs the uniforms in hand. Anything < 14 days triggers
-    // the rush flag and surfaces a $5/item rush fee to both customer + team.
+    // the rush flag: a flat $100 rush order fee (order ships direct), and staff
+    // must confirm the timeline is doable before design work starts.
     neededBy: timestamp("needed_by", { withTimezone: true }),
     rush: boolean("rush").notNull().default(false),
+    // Staff sign-off that we can actually hit the rush date (who + when).
+    // Unapproved rush requests show "confirming your date" to the client.
+    rushApprovedAt: timestamp("rush_approved_at", { withTimezone: true }),
+    rushApprovedBy: text("rush_approved_by"),
 
     // Revision tracking. We cap at MAX_REVISIONS so clients can't loop forever.
     // changeRequests stores the structured feedback from each round (annotations

@@ -80,7 +80,7 @@ export async function POST(req: Request) {
     totalCents = quote.totalCents;
     quoteLines = quote.lines;
     if (quote.rushFeeCents > 0) {
-      quoteLines = [...quote.lines, { label: "Rush production ($5/item)", quantity: 1, unitPriceCents: quote.rushFeeCents, totalCents: quote.rushFeeCents }];
+      quoteLines = [...quote.lines, { label: "Rush Order Fee (priority production + direct shipping)", quantity: 1, unitPriceCents: quote.rushFeeCents, totalCents: quote.rushFeeCents }];
     }
   }
   if (totalCents <= 0) return NextResponse.json({ error: "No quoted total on file." }, { status: 400 });

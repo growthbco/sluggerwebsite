@@ -49,6 +49,28 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
       >
         {feeState.label}
       </div>
+      {request.rush && (
+        <div className={`text-sm px-4 py-3 border ${request.rushApprovedAt ? "border-brand/40 bg-brand/5" : "border-amber-500/40 bg-amber-500/5"} text-foreground`}>
+          {request.rushApprovedAt ? (
+            <>
+              <strong>🚨 Rush confirmed</strong>
+              {request.neededBy
+                ? ` - we'll have your order in hand by ${request.neededBy.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" })}.`
+                : "."}{" "}
+              A flat $100 rush order fee will be on your invoice and your order ships direct.
+            </>
+          ) : (
+            <>
+              <strong>🚨 Rush requested</strong>
+              {request.neededBy
+                ? ` - needed by ${request.neededBy.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" })}.`
+                : "."}{" "}
+              We&apos;re confirming we can meet your date and will let you know shortly. Rush orders carry a flat
+              $100 rush order fee and ship direct.
+            </>
+          )}
+        </div>
+      )}
       <DesignStatusPanel
         token={token}
         reference={request.reference}
