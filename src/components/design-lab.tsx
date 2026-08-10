@@ -40,6 +40,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
   const [leadLast, setLeadLast] = useState("");
   const [leadPhone, setLeadPhone] = useState("");
   const [unlocking, setUnlocking] = useState(false);
+  const [zoomOpen, setZoomOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Persist the whole working session to localStorage so an accidental reload
@@ -260,8 +261,11 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
       <div>
         <div className={`relative aspect-[4/3] border border-line rounded overflow-hidden grid place-items-center ${image ? "bg-white" : "bg-steel"}`}>
           {image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={image} alt="AI jersey concept" className="h-full w-full object-contain" />
+            <button type="button" onClick={() => setZoomOpen(true)} className="h-full w-full cursor-zoom-in" title="Tap to zoom">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={image} alt="AI jersey concept" className="h-full w-full object-contain" />
+              <span className="absolute bottom-1.5 right-2 text-[11px] bg-ink/80 text-foreground px-1.5 py-0.5 rounded">🔍 tap to zoom</span>
+            </button>
           ) : (
             <div className="text-center px-8">
               <svg className="mx-auto mb-3 opacity-30" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M16 3l5 3-2 4-2-1v11H7V9L5 10 3 6l5-3c0 1.1 1.8 2 4 2s4-.9 4-2z" strokeLinejoin="round"/></svg>
@@ -270,6 +274,13 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
           )}
           {busy && <div className="absolute inset-0 bg-black/40 grid place-items-center"><p className="display text-white">Designing…</p></div>}
         </div>
+        {zoomOpen && image && (
+          <div className="fixed inset-0 z-[90] bg-black/85 grid place-items-center p-3 cursor-zoom-out" onClick={() => setZoomOpen(false)}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={image} alt="AI jersey concept - full size" className="max-h-[95vh] max-w-[98vw] object-contain bg-white rounded" />
+            <button type="button" className="absolute top-4 right-4 text-white text-3xl" aria-label="Close">×</button>
+          </div>
+        )}
         {image && (
           <div className="mt-3 space-y-2">
             <div className="flex gap-2">
