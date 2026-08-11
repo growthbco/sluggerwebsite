@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { designRequests, teamOrders, teams, orders, assistantFacts, designLabVisitors, teamOrderAddons, customInvoices } from "@/db/schema";
-import { isAdmin, adminEnabled } from "@/lib/admin-auth";
+import { adminEnabled, getAdminSession, canAccess } from "@/lib/admin-auth";
 import { AdminLogout } from "@/components/admin-logout";
 import { AdminPipeline } from "@/components/admin-pipeline";
 import { MarkStaffDevice } from "@/components/mark-staff-device";
@@ -21,7 +21,8 @@ export default async function AdminPage() {
   if (!adminEnabled()) {
     return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Set ADMIN_PASSWORD to enable the dashboard.</div>;
   }
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
   if (!dbEnabled()) {
     return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Database not configured.</div>;
   }
@@ -113,7 +114,7 @@ export default async function AdminPage() {
   const labLeads = labVisitors.filter((v) => v.email).length;
   const labPaid = labVisitors.filter((v) => v.paidAt).length;
 
-  const cards = [
+  const allCards = [
     { href: "/admin/design-requests", icon: "🎨", title: `Design Requests (${activeDesigns.length})`, sub: needsAction.length ? `${needsAction.length} waiting on us` : "All caught up" },
     { href: "/admin/team-orders", icon: "📦", title: `Team Orders (${activeOrders.length})`, sub: `${inProduction} in production` },
     { href: "/admin/awaiting-payment", icon: "💸", title: `Awaiting Payment (${outstanding.length})`, sub: `${money(outstandingTotal)} due` },
@@ -124,6 +125,10 @@ export default async function AdminPage() {
     { href: "/admin/payments", icon: "💳", title: "Payments", sub: "Every dollar in, newest first" },
     { href: "/admin/assistant", icon: "🤖", title: "AI Assistant", sub: `${aiFacts.length} fact${aiFacts.length === 1 ? "" : "s"} taught` },
   ];
+  // Designers see design work only - money tiles and customer/store cards
+  // are filtered out of their overview entirely.
+  const showMoney = session.role !== "designer";
+  const cards = allCards.filter((c) => canAccess(session.role, c.href.split("?")[0]));
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
@@ -149,6 +154,7 @@ export default async function AdminPage() {
       )}
 
       {/* Money snapshot */}
+      {showMoney && (
       <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Paid this month", value: money(paidThisMonthCents), sub: `${paidThisMonthCount} payment${paidThisMonthCount === 1 ? "" : "s"}`, href: "/admin/payments" },
@@ -163,6 +169,7 @@ export default async function AdminPage() {
           </Link>
         ))}
       </div>
+      )}
 
       {/* Pipeline: clicking a stage opens Team Orders pre-filtered to it. */}
       <div className="mt-4">

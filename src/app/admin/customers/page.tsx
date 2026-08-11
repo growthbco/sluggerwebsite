@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { dbEnabled, getDb } from "@/db";
 import { customers, teamOrders, designRequests, teamOrderAddons } from "@/db/schema";
-import { isAdmin, adminEnabled } from "@/lib/admin-auth";
+import { adminEnabled, getAdminSession, canAccess } from "@/lib/admin-auth";
 import { AdminCustomersList, type CustomerRow } from "@/components/admin-customers-list";
 
 export const metadata: Metadata = { title: "Customers", robots: { index: false } };
@@ -14,7 +14,9 @@ export const dynamic = "force-dynamic";
 // approximate lifetime spend and a one-tap jump into texting them.
 export default async function AdminCustomersPage() {
   if (!adminEnabled()) redirect("/admin");
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!canAccess(session.role, "/admin/customers")) redirect("/admin");
   if (!dbEnabled()) redirect("/admin");
 
   const db = getDb();

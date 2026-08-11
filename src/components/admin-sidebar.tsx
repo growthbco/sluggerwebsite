@@ -36,14 +36,34 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
   },
   {
     title: "Settings",
-    items: [{ href: "/admin/assistant", label: "AI Assistant", icon: "🤖" }],
+    items: [
+      { href: "/admin/assistant", label: "AI Assistant", icon: "🤖" },
+      { href: "/admin/settings", label: "Users & Settings", icon: "⚙️" },
+    ],
   },
 ];
 
-export function AdminSidebar() {
+// What a designer's sidebar shows: design work + conversations only.
+const DESIGNER_HREFS = new Set([
+  "/admin",
+  "/admin/texts",
+  "/admin/design-requests",
+  "/admin/team-orders",
+  "/admin/design-lab",
+]);
+const OWNER_ONLY_HREFS = new Set(["/admin/settings"]);
+
+export function AdminSidebar({ role = "staff", userName }: { role?: "owner" | "staff" | "designer"; userName?: string }) {
   const pathname = usePathname();
   // The login page gets no chrome; everything else under /admin does.
   if (pathname === "/admin/login") return null;
+
+  const visible = (href: string) => {
+    if (OWNER_ONLY_HREFS.has(href)) return role === "owner";
+    if (role === "designer") return DESIGNER_HREFS.has(href);
+    return true;
+  };
+  const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((it) => visible(it.href)) })).filter((g) => g.items.length > 0);
 
   const isActive = (href: string) => !href.includes("#") && pathname === href;
 
@@ -53,10 +73,15 @@ export function AdminSidebar() {
           scrolls with the page. The outer nav is just a width spacer. */}
       <nav className="hidden lg:block w-52 shrink-0">
         <div className="fixed inset-y-0 left-0 z-30 w-52 overflow-y-auto border-r border-line bg-steel/95 px-3 py-5">
-          <Link href="/admin" className="block px-2 pb-5">
+          <Link href="/admin" className="block px-2 pb-4">
             <Image src="/slugger-logo.png" alt="Slugger Athletics" width={120} height={72} className="h-14 w-auto" />
           </Link>
-          {GROUPS.map((g) => (
+          {userName && (
+            <p className="px-2 pb-4 text-xs text-muted">
+              👋 {userName} <span className="uppercase tracking-wide text-[10px] text-brand">· {role}</span>
+            </p>
+          )}
+          {groups.map((g) => (
             <div key={g.title} className="mb-5">
               <p className="px-2 text-[10px] display uppercase tracking-[0.14em] text-muted">{g.title}</p>
               <div className="mt-1.5 space-y-0.5">
@@ -83,7 +108,7 @@ export function AdminSidebar() {
       {/* Mobile: horizontal scroll bar under the site header */}
       <nav className="lg:hidden sticky top-0 z-40 border-b border-line bg-steel/95 backdrop-blur px-2 py-2 overflow-x-auto">
         <div className="flex gap-1.5 w-max">
-          {GROUPS.flatMap((g) => g.items).map((it) => (
+          {groups.flatMap((g) => g.items).map((it) => (
             <Link
               key={it.href}
               href={it.href}

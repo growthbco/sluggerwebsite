@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { isAdmin, adminEnabled } from "@/lib/admin-auth";
+import { adminEnabled, getAdminSession, canAccess } from "@/lib/admin-auth";
 import { AdminCustomInvoiceForm } from "@/components/admin-custom-invoice-form";
 
 export const metadata: Metadata = { title: "New Custom Invoice", robots: { index: false } };
@@ -9,7 +9,9 @@ export const dynamic = "force-dynamic";
 
 export default async function NewCustomInvoicePage() {
   if (!adminEnabled()) redirect("/admin");
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!canAccess(session.role, "/admin/invoice/new")) redirect("/admin");
 
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14">

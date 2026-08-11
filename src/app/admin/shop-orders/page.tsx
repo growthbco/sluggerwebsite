@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { desc, isNull, isNotNull } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { orders } from "@/db/schema";
-import { isAdmin, adminEnabled } from "@/lib/admin-auth";
+import { adminEnabled, getAdminSession, canAccess } from "@/lib/admin-auth";
 import { AdminLabelButton } from "@/components/admin-label-button";
 import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminArchiveButton } from "@/components/admin-archive-button";
@@ -22,7 +22,9 @@ const srcShort = (s: string | null | undefined) => (s ? s.split(" → ")[0] : "-
 // Quote-first team orders live on the dashboard pipeline instead.
 export default async function AdminShopOrdersPage() {
   if (!adminEnabled()) redirect("/admin");
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!canAccess(session.role, "/admin/shop-orders")) redirect("/admin");
   if (!dbEnabled()) redirect("/admin");
 
   const db = getDb();

@@ -463,6 +463,13 @@
       "when": 1786396481652,
       "tag": "0065_stiff_mariko_yashida",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1786407208597,
+      "tag": "0066_sticky_kitty_pryde",
+      "breakpoints": true
     }
   ]
 }

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { dbEnabled, getDb } from "@/db";
 import { assistantFacts } from "@/db/schema";
-import { isAdmin } from "@/lib/admin-auth";
+import { getAdminSession, canAccess } from "@/lib/admin-auth";
 import { AdminAssistantFacts } from "@/components/admin-assistant-facts";
 
 export const metadata: Metadata = { title: "Train the AI Assistant", robots: { index: false } };
@@ -11,7 +11,8 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminAssistantPage() {
   if (!dbEnabled()) notFound();
-  if (!(await isAdmin())) redirect("/admin");
+  const session = await getAdminSession();
+  if (!session || !canAccess(session.role, "/admin/assistant")) redirect("/admin");
 
   const aiFacts = await getDb().select().from(assistantFacts).orderBy(assistantFacts.createdAt);
 

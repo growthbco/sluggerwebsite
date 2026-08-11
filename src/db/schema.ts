@@ -912,6 +912,22 @@ export const smsMessages = pgTable(
   (t) => [index("sms_messages_phone_idx").on(t.phone, t.createdAt)],
 );
 
+// Back-office logins with roles. Each person has their OWN password (no
+// usernames - the password identifies them at login). Roles gate what the
+// sidebar shows and which pages load:
+//   owner    - everything, including user management
+//   staff    - everything except user management
+//   designer - design work only (no money, customers, or store pages)
+// The ADMIN_PASSWORD env var remains the built-in owner login.
+export const adminUsers = pgTable("admin_users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  role: text("role").notNull().default("staff"), // owner | staff | designer
+  passwordHash: text("password_hash").notNull(), // scrypt "salt:hex"
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Names staff attach to phone numbers in the texts inbox (takes priority
 // over names derived from order records).
 export const smsContacts = pgTable("sms_contacts", {

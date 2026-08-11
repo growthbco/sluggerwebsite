@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { desc, sql, eq, isNotNull, isNull } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { designRequests, teamOrders, teams, orders, teamOrderAddons, assistantFacts, customInvoices, designLabVisitors } from "@/db/schema";
-import { isAdmin, adminEnabled } from "@/lib/admin-auth";
+import { adminEnabled, getAdminSession, canAccess } from "@/lib/admin-auth";
 import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote, estimateOrderWeightOz } from "@/lib/team-order-pricing";
 import { sizeBreakdown, ITEM_TYPES } from "@/lib/order-items";
@@ -78,7 +78,9 @@ export default async function AdminPaymentsPage() {
   if (!adminEnabled()) {
     return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Set ADMIN_PASSWORD to enable the dashboard.</div>;
   }
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!canAccess(session.role, "/admin/payments")) redirect("/admin");
   if (!dbEnabled()) {
     return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Database not configured.</div>;
   }

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { desc, isNotNull, sql } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { orders, teams } from "@/db/schema";
-import { isAdmin, adminEnabled } from "@/lib/admin-auth";
+import { adminEnabled, getAdminSession, canAccess } from "@/lib/admin-auth";
 import { AdminNewStore } from "@/components/admin-new-store";
 import { STORE_ITEM_PRESETS } from "@/lib/team-stores";
 
@@ -18,7 +18,9 @@ const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { timeZone: "America/
 // order history, and the standalone-store creator.
 export default async function AdminStoresPage() {
   if (!adminEnabled()) redirect("/admin");
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!canAccess(session.role, "/admin/stores")) redirect("/admin");
   if (!dbEnabled()) redirect("/admin");
 
   const db = getDb();
