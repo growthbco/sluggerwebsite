@@ -470,6 +470,13 @@
       "when": 1786407208597,
       "tag": "0066_sticky_kitty_pryde",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1786452457838,
+      "tag": "0067_kind_nemesis",
+      "breakpoints": true
     }
   ]
 }

@@ -8,7 +8,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrders, orders, designRequests } from "@/db/schema";
-import { emailOrderShipped } from "@/lib/email";
+import { emailOrderShipped, emailAdditionalShipment } from "@/lib/email";
 import { smsIfConsented } from "@/lib/sms";
 import { archiveDiscordThread } from "@/lib/discord-bot";
 import { trackingUrlFor } from "@/lib/tracking";
@@ -39,6 +39,43 @@ export async function saveLabelPurchase(
     .where(eq(orders.id, id))
     .returning({ id: orders.id });
   return Boolean(row);
+}
+
+/** Append an ADDITIONAL parcel (second box, reship, hats going separately) to
+ *  an order that already has a primary label, and email the customer this
+ *  tracking immediately - this box is going out now. Returns whether the
+ *  email sent. */
+export async function appendAdditionalShipment(
+  kind: "team_order" | "order",
+  id: string,
+  trackingNumber: string,
+  labelUrl: string,
+  note?: string,
+): Promise<boolean> {
+  const db = getDb();
+  const entry = { trackingNumber, labelUrl, at: new Date().toISOString() };
+  let email: string | null = null;
+  let name: string | null = null;
+  let reference = "";
+  if (kind === "team_order") {
+    const [row] = await db.select().from(teamOrders).where(eq(teamOrders.id, id)).limit(1);
+    if (!row) return false;
+    await db
+      .update(teamOrders)
+      .set({ additionalShipments: [...(row.additionalShipments ?? []), entry], updatedAt: new Date() })
+      .where(eq(teamOrders.id, id));
+    email = row.contactEmail; name = row.contactName; reference = row.reference;
+  } else {
+    const [row] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+    if (!row) return false;
+    await db
+      .update(orders)
+      .set({ additionalShipments: [...(row.additionalShipments ?? []), entry] })
+      .where(eq(orders.id, id));
+    email = row.customerEmail; name = row.customerName; reference = row.reference;
+  }
+  if (!email) return false;
+  return emailAdditionalShipment({ to: email, name, reference, trackingNumber, trackingUrl: trackingUrlFor(trackingNumber), note });
 }
 
 export async function markShipped(

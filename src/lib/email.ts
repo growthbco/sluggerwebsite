@@ -427,6 +427,37 @@ export async function emailOrderShipped(args: {
   });
 }
 
+/** An ADDITIONAL package on an order that already shipped (a second box, a
+ *  reship, or hats going out separately). Same look as the first, worded so
+ *  the customer knows more is on the way. */
+export async function emailAdditionalShipment(args: {
+  to: string;
+  name?: string | null;
+  reference: string;
+  trackingNumber: string;
+  trackingUrl: string;
+  note?: string;
+}): Promise<boolean> {
+  return sendEmail({
+    to: args.to,
+    subject: `🚚 Another Slugger Athletics package is on the way! (${args.reference})`,
+    html: brandedEmail({
+      preheader: `Additional shipment - tracking ${args.trackingNumber}`,
+      heading: `More gear headed your way${args.name ? `, ${esc(args.name.split(" ")[0])}` : ""}!`,
+      intro: `Order reference: <strong>${esc(args.reference)}</strong>`,
+      bodyHtml: `
+        <p style="margin:0 0 12px;">A second package for your order just shipped${args.note ? ` (${esc(args.note)})` : ""}. Track this one here:</p>
+        <p style="margin:0 0 16px;background:#f6f4ee;padding:12px 14px;border-left:3px solid #b8a36c;font-family:monospace;">${esc(args.trackingNumber)}</p>
+        <p style="margin:0;">Questions? Just reply or text us at (352) 414-7270.</p>
+        ${portalLinkHtml}
+      `,
+      ctaText: "Track this package",
+      ctaUrl: args.trackingUrl,
+    }),
+    replyTo: CONTACT_INBOX,
+  });
+}
+
 /** Internal heads-up: the designer logged the factory -> Slugger tracking
  *  number, so the order is on its way to the Florida shop. Never sent to the
  *  customer. */

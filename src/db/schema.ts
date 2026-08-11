@@ -319,6 +319,11 @@ export const orders = pgTable(
     // Shippo PDF for reprints).
     trackingNumber: text("tracking_number"),
     labelUrl: text("label_url"),
+    // Extra parcels beyond the first (a second box, a reship, hats shipping
+    // on their own). Each carries its own tracking + label + emailed flag.
+    additionalShipments: jsonb("additional_shipments").$type<
+      { trackingNumber: string; labelUrl?: string; carrier?: string; service?: string; at: string }[]
+    >(),
     shippedAt: timestamp("shipped_at", { withTimezone: true }),
     // Admin can hide a fulfilled/void shop or store order from the active list.
     archivedAt: timestamp("archived_at", { withTimezone: true }),
@@ -493,6 +498,11 @@ export const teamOrders = pgTable(
     // Fulfillment (labelUrl = Shippo PDF for reprints)
     trackingNumber: text("tracking_number"),
     labelUrl: text("label_url"),
+    // Extra parcels beyond the first (a second box, a reship, hats shipping
+    // on their own). Each carries its own tracking + label + emailed flag.
+    additionalShipments: jsonb("additional_shipments").$type<
+      { trackingNumber: string; labelUrl?: string; carrier?: string; service?: string; at: string }[]
+    >(),
     shippedAt: timestamp("shipped_at", { withTimezone: true }),
 
     // Inbound production shipment (factory -> Slugger in Florida). Entered by

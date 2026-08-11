@@ -330,7 +330,27 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
             <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email customer" />
           )}
           {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
+          {/* Once a primary label exists, allow buying MORE parcels - a second
+              box, a reship, or the hats going out separately. Each one emails
+              the customer its tracking right away. */}
+          {paid && o.trackingNumber && (
+            <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} additional label="🏷 Buy another label + email" />
+          )}
         </div>
+        {(o.additionalShipments?.length ?? 0) > 0 && (
+          <div className="mt-3 border-t border-line/60 pt-3">
+            <p className="text-xs display uppercase tracking-wide text-muted">Additional shipments</p>
+            <ul className="mt-1.5 space-y-1">
+              {o.additionalShipments!.map((s, i) => (
+                <li key={i} className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-muted">#{i + 2}</span>
+                  <TrackingInfo trackingNumber={s.trackingNumber} labelUrl={s.labelUrl ?? null} />
+                  <span className="text-xs text-muted">{fmtDate(s.at)} · customer emailed ✓</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Section>
 
       <p className="text-xs text-muted">

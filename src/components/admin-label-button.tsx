@@ -28,11 +28,18 @@ export function AdminLabelButton({
   id,
   who,
   suggestedLb,
+  additional = false,
+  label,
 }: {
   kind: "team_order" | "order";
   id: string;
   who: string;
   suggestedLb?: number;
+  /** Buy a SECOND parcel on an already-labeled order and email the customer
+   *  this tracking immediately (vs the primary label, which waits for
+   *  "Mark shipped"). */
+  additional?: boolean;
+  label?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -83,7 +90,7 @@ export function AdminLabelButton({
       const res = await fetch("/api/admin/label", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "buy", kind, id, rateId: rate.rateId }),
+        body: JSON.stringify({ action: "buy", kind, id, rateId: rate.rateId, additional }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Purchase failed");
@@ -103,7 +110,7 @@ export function AdminLabelButton({
         onClick={() => setOpen(true)}
         className="text-xs display text-foreground border border-brand/50 px-2.5 py-1 hover:bg-brand/10 whitespace-nowrap"
       >
-        Buy label
+        {label ?? "Buy label"}
       </button>
 
       {open && (
@@ -113,7 +120,7 @@ export function AdminLabelButton({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-line sticky top-0 bg-ink">
-              <p className="display text-foreground">🏷 Buy label - {who}</p>
+              <p className="display text-foreground">🏷 {additional ? "Buy another label" : "Buy label"} - {who}</p>
               <button type="button" onClick={reset} disabled={busy} className="text-muted hover:text-foreground text-xl leading-none">✕</button>
             </div>
 
@@ -177,7 +184,7 @@ export function AdminLabelButton({
                     <p className="display text-foreground">{confirming.provider} {confirming.service}</p>
                     <p className="text-xs text-muted mt-0.5">{arrivalLabel(confirming.estimatedDays)}</p>
                     <p className="display text-2xl text-foreground mt-2">{money(confirming.costCents)}</p>
-                    <p className="text-xs text-muted mt-1">Charges your Shippo account and saves the label + tracking. The customer isn&apos;t emailed until you hit &ldquo;Mark shipped.&rdquo;</p>
+                    <p className="text-xs text-muted mt-1">{additional ? "Charges your Shippo account and emails the customer this tracking right away as a second package." : "Charges your Shippo account and saves the label + tracking. The customer isn\u2019t emailed until you hit \u201cMark shipped.\u201d"}</p>
                   </div>
                   <button
                     type="button"
