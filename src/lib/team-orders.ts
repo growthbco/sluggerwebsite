@@ -261,13 +261,16 @@ import { itemLabel as _itemLabel } from "@/lib/order-items";
  *  each sized item becomes its own recap line. Falls back to the legacy
  *  single `size` field / a plain jersey line. */
 export function invoiceRosterEntries(
-  roster: { playerName?: string | null; playerNumber?: string | null; size?: string | null; sizes?: Record<string, string> | null; design?: string | null; quantity?: number | null }[],
+  roster: { playerName?: string | null; playerNumber?: string | null; size?: string | null; sizes?: Record<string, string> | null; design?: string | null; notes?: string | null; quantity?: number | null }[],
 ): { name: string; number: string; item: string; size: string; color: string }[] {
   const out: { name: string; number: string; item: string; size: string; color: string }[] = [];
   for (const r of roster) {
     const name = (r.playerName ?? "").trim();
     const number = (r.playerNumber ?? "").trim();
-    const color = (r.design ?? "").trim();
+    // Colorway: the structured `design` label when a team has multiple
+    // approved colorways, otherwise the per-player note (coaches often type
+    // the color there, e.g. "TEAL" / "BLACK").
+    const color = (r.design ?? "").trim() || (r.notes ?? "").trim();
     const sized = Object.entries(r.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
     if (sized.length) {
       for (const [key, size] of sized) out.push({ name, number, item: _itemLabel(key), size: (size as string).trim(), color });
