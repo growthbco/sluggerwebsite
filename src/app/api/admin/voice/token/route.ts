@@ -24,7 +24,9 @@ export async function GET() {
   }
 
   const now = Math.floor(Date.now() / 1000);
-  const identity = session.name.replace(/[^\w.-]/g, "_").slice(0, 40) || "staff";
+  // Shared identity: every staff browser registers as "slugger" so the
+  // inbound <Client>slugger</Client> leg reaches whoever is online.
+  const identity = "slugger";
   const header = { typ: "JWT", alg: "HS256", cty: "twilio-fpa;v=1" };
   const payload = {
     jti: `${keySid}-${now}`,
@@ -32,7 +34,7 @@ export async function GET() {
     sub: acct,
     iat: now,
     exp: now + 3600,
-    grants: { identity, voice: { outgoing: { application_sid: appSid } } },
+    grants: { identity, voice: { outgoing: { application_sid: appSid }, incoming: { allow: true } } },
   };
   const unsigned = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
   const sig = b64url(createHmac("sha256", secret).update(unsigned).digest());

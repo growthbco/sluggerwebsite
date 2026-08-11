@@ -9,7 +9,8 @@ const FORWARD_TO = process.env.TWILIO_VOICE_FORWARD_TO || "+12152816117";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-// Inbound call -> recorded-call disclosure -> forward to the shop phone.
+// Inbound call -> recorded-call disclosure -> ring the admin browser
+// dialer(s) AND the forward phone simultaneously; first to answer wins.
 export async function POST(req: Request) {
   const params = await formParams(req);
   if (!validTwilioSignature(`${SITE}/api/voice/inbound`, params, req.headers.get("x-twilio-signature"))) {
@@ -19,6 +20,7 @@ export async function POST(req: Request) {
 <Response>
   <Say voice="Polly.Matthew">Thanks for calling Slugger Athletics. This call may be recorded for quality purposes.</Say>
   <Dial record="record-from-answer-dual" recordingStatusCallback="${esc(`${SITE}/api/voice/recording`)}" answerOnBridge="true" callerId="${esc(params.To ?? "")}">
+    <Client>slugger</Client>
     <Number>${esc(FORWARD_TO)}</Number>
   </Dial>
 </Response>`;

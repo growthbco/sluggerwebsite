@@ -38,6 +38,8 @@ export function AdminDialer() {
   const [seconds, setSeconds] = useState(0);
   const [recents, setRecents] = useState<Recent[] | null>(null);
   const [showPadInCall, setShowPadInCall] = useState(false);
+  const [incoming, setIncoming] = useState<Call | null>(null);
+  const [incomingFrom, setIncomingFrom] = useState("");
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -56,6 +58,22 @@ export function AdminDialer() {
   }, []);
 
   useEffect(() => () => { deviceRef.current?.destroy(); if (timerRef.current) clearInterval(timerRef.current); }, []);
+
+  // Register on load so INCOMING calls to (352) 414-7270 ring here too -
+  // the browser and the forward phone ring together; first answer wins.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const device = await getDevice();
+        if (!cancelled) await device.register();
+      } catch {
+        // No session / softphone off - stay quiet, calls still hit the cell.
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load call history when the Recents tab opens.
   useEffect(() => {
@@ -80,6 +98,16 @@ export function AdminDialer() {
         const d = await r.json();
         if (r.ok) device.updateToken(d.token);
       } catch {}
+    });
+    device.on("incoming", (call: Call) => {
+      setIncoming(call);
+      setIncomingFrom(call.parameters.From ?? "");
+      setOpen(true);
+      const clear = () => { setIncoming(null); setIncomingFrom(""); };
+      call.on("cancel", clear); // caller hung up, or the cell answered first
+      call.on("reject", clear);
+      call.on("disconnect", () => { clear(); resetCallState(); });
+      call.on("accept", () => { clear(); setStatus("in-call"); startTimer(); });
     });
     deviceRef.current = device;
     return device;
@@ -139,6 +167,19 @@ export function AdminDialer() {
     }
   }
 
+  function answerIncoming() {
+    if (!incoming) return;
+    callRef.current = incoming;
+    setNumber(prettyPhone(incomingFrom));
+    setTab("keypad");
+    incoming.accept();
+  }
+  function declineIncoming() {
+    incoming?.reject(); // browser declines; the cell keeps ringing
+    setIncoming(null);
+    setIncomingFrom("");
+  }
+
   const mmss = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
   const inCall = status === "in-call" || status === "ringing" || status === "connecting";
   const fmtAgo = (iso: string) =>
@@ -157,7 +198,22 @@ export function AdminDialer() {
             </span>
           </div>
 
-          {!inCall && (
+          {incoming && (
+            <div className="px-4 py-4 bg-green-500/10 border-b border-green-500/40 text-center space-y-3">
+              <p className="display text-foreground animate-pulse">📳 Incoming call</p>
+              <p className="text-lg text-foreground tracking-wide">{prettyPhone(incomingFrom) || "Unknown"}</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={answerIncoming} className="flex-1 display text-sm py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-white">
+                  📞 Answer
+                </button>
+                <button type="button" onClick={declineIncoming} className="flex-1 display text-sm py-2.5 rounded-lg bg-red-500/80 hover:bg-red-600 text-white">
+                  Decline
+                </button>
+              </div>
+              <p className="text-[11px] text-muted">Your cell is ringing too - first answer wins.</p>
+            </div>
+          )}
+          {!inCall && !incoming && (
             <div className="flex border-b border-line">
               {(["keypad", "recents"] as const).map((t) => (
                 <button

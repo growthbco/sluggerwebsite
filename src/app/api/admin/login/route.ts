@@ -31,7 +31,11 @@ export async function POST(req: Request) {
       }
     }
   }
-  if (!session) return NextResponse.json({ error: "Wrong password" }, { status: 401 });
+  if (!session) {
+    // Throttle brute-force guessing: every wrong attempt eats a second.
+    await new Promise((r) => setTimeout(r, 1000));
+    return NextResponse.json({ error: "Wrong password" }, { status: 401 });
+  }
 
   const res = NextResponse.json({ ok: true, name: session.name, role: session.role });
   res.cookies.set(ADMIN_COOKIE, makeSessionValue(session.role, session.name), {
