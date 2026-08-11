@@ -1,37 +1,14 @@
 import { NextResponse } from "next/server";
 import { desc, eq, sql } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
-import { smsMessages, smsContacts, customers, teamOrders, designRequests } from "@/db/schema";
+import { smsMessages, smsContacts } from "@/db/schema";
 import { isAdmin } from "@/lib/admin-auth";
 import { sendSms, toE164 } from "@/lib/sms";
-import { customerContext } from "@/lib/sms-crm";
+import { customerContext, namesByPhone } from "@/lib/sms-crm";
 
 export const runtime = "nodejs";
 
 const last10 = (p: string | null | undefined) => (p ?? "").replace(/\D/g, "").slice(-10);
-
-// Best-effort name lookup: match the last 10 digits of the customer's number
-// against every place we store phones.
-async function namesByPhone(): Promise<Map<string, string>> {
-  const db = getDb();
-  const map = new Map<string, string>();
-  const [cs, ts, ds, sc] = await Promise.all([
-    db.select({ phone: customers.phone, name: customers.name }).from(customers),
-    db.select({ phone: teamOrders.contactPhone, name: teamOrders.contactName }).from(teamOrders),
-    db.select({ phone: designRequests.contactPhone, name: designRequests.contactName }).from(designRequests),
-    db.select({ phone: smsContacts.phone, name: smsContacts.name }).from(smsContacts),
-  ]);
-  // Record-derived names first, then staff-saved contacts OVERRIDE them.
-  for (const r of [...cs, ...ts, ...ds]) {
-    const k = last10(r.phone);
-    if (k.length === 10 && r.name && !map.has(k)) map.set(k, r.name);
-  }
-  for (const r of sc) {
-    const k = last10(r.phone);
-    if (k.length === 10 && r.name) map.set(k, r.name);
-  }
-  return map;
-}
 
 // GET -> conversation list; ?phone= -> full thread; ?phone=&context=1 -> CRM panel.
 export async function GET(req: Request) {

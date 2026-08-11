@@ -82,7 +82,7 @@ export function AdminInvoiceButton({
             <div className="p-4 space-y-4">
               {warnPrintFile && (
                 <div className="border border-brand/50 bg-brand/10 p-3 text-xs text-foreground">
-                  ⚠️ Heads up: the print file for {teamName} hasn&apos;t passed AI verification yet. The normal order is print-file QA first, then the invoice.
+                  📋 FYI: {teamName}&apos;s print file hasn&apos;t passed AI verification yet - that&apos;s expected. The flow is deposit first; the print file gets verified before anything prints.
                 </div>
               )}
 

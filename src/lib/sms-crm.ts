@@ -2,7 +2,7 @@
 
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { customers, teamOrders, designRequests, teamOrderAddons } from "@/db/schema";
+import { customers, teamOrders, designRequests, teamOrderAddons, smsContacts } from "@/db/schema";
 
 const last10 = (p: string | null | undefined) => (p ?? "").replace(/\D/g, "").slice(-10);
 
@@ -62,3 +62,28 @@ export async function customerContext(phone: string) {
       })),
   };
 }
+
+// Best-effort name lookup: match the last 10 digits of the customer's number
+// against every place we store phones.
+export async function namesByPhone(): Promise<Map<string, string>> {
+  const db = getDb();
+  const map = new Map<string, string>();
+  const [cs, ts, ds, sc] = await Promise.all([
+    db.select({ phone: customers.phone, name: customers.name }).from(customers),
+    db.select({ phone: teamOrders.contactPhone, name: teamOrders.contactName }).from(teamOrders),
+    db.select({ phone: designRequests.contactPhone, name: designRequests.contactName }).from(designRequests),
+    db.select({ phone: smsContacts.phone, name: smsContacts.name }).from(smsContacts),
+  ]);
+  // Record-derived names first, then staff-saved contacts OVERRIDE them.
+  for (const r of [...cs, ...ts, ...ds]) {
+    const k = last10(r.phone);
+    if (k.length === 10 && r.name && !map.has(k)) map.set(k, r.name);
+  }
+  for (const r of sc) {
+    const k = last10(r.phone);
+    if (k.length === 10 && r.name) map.set(k, r.name);
+  }
+  return map;
+}
+
+
