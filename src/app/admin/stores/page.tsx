@@ -6,6 +6,7 @@ import { dbEnabled, getDb } from "@/db";
 import { orders, teams } from "@/db/schema";
 import { adminEnabled, getAdminSession, canAccess } from "@/lib/admin-auth";
 import { AdminNewStore } from "@/components/admin-new-store";
+import { AdminStoreDesigns } from "@/components/admin-store-designs";
 import { STORE_ITEM_PRESETS } from "@/lib/team-stores";
 
 export const metadata: Metadata = { title: "Team Stores", robots: { index: false } };
@@ -26,7 +27,7 @@ export default async function AdminStoresPage() {
   const db = getDb();
   const [stores, storeAgg, storeOrders] = await Promise.all([
     db
-      .select({ id: teams.id, name: teams.name, storeActive: teams.storeActive, storeToken: teams.storeToken })
+      .select({ id: teams.id, name: teams.name, storeActive: teams.storeActive, storeToken: teams.storeToken, storeItems: teams.storeItems })
       .from(teams)
       .orderBy(desc(teams.createdAt)),
     db
@@ -94,6 +95,17 @@ export default async function AdminStoresPage() {
                   <Link href={`/store/${s.storeToken}/verify`} className="text-brand hover:underline">🔍 Print-file QA</Link>
                   <Link href={`/store/${s.storeToken}`} className="text-muted hover:text-foreground hover:underline">View store</Link>
                 </div>
+                {(s.storeItems?.length ?? 0) > 0 && (
+                  <details className="group/designs">
+                    <summary className="cursor-pointer text-xs display text-brand hover:underline list-none">🎨 Manage colors &amp; photos</summary>
+                    <div className="mt-2">
+                      <AdminStoreDesigns
+                        teamId={s.id}
+                        items={(s.storeItems ?? []).map((it) => ({ key: it.key, label: it.label, image: it.image ?? null, designs: it.designs ?? [] }))}
+                      />
+                    </div>
+                  </details>
+                )}
                 {myOrders.length === 0 ? (
                   <p className="text-xs text-muted">No orders yet. Share the store link so families can order.</p>
                 ) : (

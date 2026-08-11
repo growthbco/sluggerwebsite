@@ -206,3 +206,27 @@ export async function setStoreActive(id: string, active: boolean) {
   const db = getDb();
   await db.update(teams).set({ storeActive: active }).where(eq(teams.id, id));
 }
+
+// Replace the colorway list (and optional default image) of one store item.
+// Lets staff add/rename/remove the design photos parents pick from, so a new
+// colorway (e.g. a second Halloween jersey) goes live without a code change.
+export async function updateStoreItemDesigns(
+  teamId: string,
+  itemKey: string,
+  designs: { label: string; image: string }[],
+  itemImage?: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  const db = getDb();
+  const [row] = await db.select({ storeItems: teams.storeItems }).from(teams).where(eq(teams.id, teamId)).limit(1);
+  if (!row) return { ok: false, error: "Store not found" };
+  const items = row.storeItems ?? [];
+  const idx = items.findIndex((i) => i.key === itemKey);
+  if (idx === -1) return { ok: false, error: "Item not found in this store" };
+  const next = items.map((it, i) =>
+    i === idx
+      ? { ...it, designs: designs.length ? designs : undefined, ...(itemImage !== undefined ? { image: itemImage || undefined } : {}) }
+      : it,
+  );
+  await db.update(teams).set({ storeItems: next }).where(eq(teams.id, teamId));
+  return { ok: true };
+}
