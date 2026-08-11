@@ -79,3 +79,31 @@ export async function smsIfConsented(opts: { phone?: string | null; optInAt?: Da
   const r = await sendSms(opts.phone, opts.body);
   return r.ok;
 }
+
+
+/** Twilio MMS media URLs require account auth, so a browser <img> can't load
+ *  them. Download each with auth and re-host to public Vercel Blob; return the
+ *  public URLs (skips any that fail). Used on inbound to make customer images
+ *  viewable in the Texts inbox. */
+export async function rehostTwilioMedia(urls: string[]): Promise<string[]> {
+  const acct = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!acct || !token || urls.length === 0) return [];
+  const { put } = await import("@vercel/blob");
+  const auth = "Basic " + Buffer.from(`${acct}:${token}`).toString("base64");
+  const out: string[] = [];
+  for (const url of urls.slice(0, 10)) {
+    try {
+      const res = await fetch(url, { headers: { Authorization: auth }, signal: AbortSignal.timeout(12000) });
+      if (!res.ok) { console.error("twilio media fetch failed:", res.status, url); continue; }
+      const type = res.headers.get("content-type") || "image/jpeg";
+      const ext = type.includes("png") ? "png" : type.includes("gif") ? "gif" : type.includes("webp") ? "webp" : "jpg";
+      const bytes = Buffer.from(await res.arrayBuffer());
+      const blob = await put(`sms-inbound/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`, bytes, { access: "public", contentType: type });
+      out.push(blob.url);
+    } catch (e) {
+      console.error("rehostTwilioMedia error:", e);
+    }
+  }
+  return out;
+}

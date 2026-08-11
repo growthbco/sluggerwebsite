@@ -1,4 +1,5 @@
 import { validTwilioSignature, formParams } from "@/lib/twilio-webhook";
+import { rehostTwilioMedia } from "@/lib/sms";
 import { sendEmail, CONTACT_INBOX } from "@/lib/email";
 
 export const runtime = "nodejs";
@@ -25,6 +26,10 @@ export async function POST(req: Request) {
   }
   const media = numMedia > 0 ? ` (+${numMedia} attachment${numMedia === 1 ? "" : "s"})` : "";
 
+  // Twilio media URLs need auth - re-host to public Blob so the inbox can show
+  // the images. Falls back to none if the fetch fails.
+  const publicMedia = mediaUrls.length ? await rehostTwilioMedia(mediaUrls) : [];
+
   // Log to the admin texts inbox (non-fatal).
   try {
     const { dbEnabled, getDb } = await import("@/db");
@@ -36,7 +41,7 @@ export async function POST(req: Request) {
         channel,
         body,
         mediaCount: numMedia,
-        mediaUrls: mediaUrls.length ? mediaUrls : null,
+        mediaUrls: publicMedia.length ? publicMedia : null,
         twilioSid: params.MessageSid ?? params.SmsMessageSid ?? null,
       });
     }
