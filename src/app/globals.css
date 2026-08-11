@@ -130,3 +130,22 @@ body {
 .admin-row-menu > div {
   padding: 0.45rem 1rem;
 }
+
+/* ── Admin app polish ─────────────────────────────────────────────
+   The marketing site keeps its sharp, slanted brand edges; the back
+   office reads cleaner with soft corners on every bordered surface
+   (cards, tables, chips, inputs). Print sheets opt back out. */
+.admin-shell :where([class~="border"], [class~="border-2"]) {
+  border-radius: 0.625rem;
+}
+.admin-shell :where(input[class~="border"], select[class~="border"], textarea[class~="border"], button[class~="border"]) {
+  border-radius: 0.5rem;
+}
+.admin-shell :where(table) {
+  border-radius: 0;
+}
+@media print {
+  .admin-shell * {
+    border-radius: 0 !important;
+  }
+}

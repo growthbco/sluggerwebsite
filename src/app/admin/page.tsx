@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
-import { designRequests, teamOrders, teams, orders, assistantFacts, designLabVisitors } from "@/db/schema";
+import { designRequests, teamOrders, teams, orders, assistantFacts, designLabVisitors, teamOrderAddons, customInvoices } from "@/db/schema";
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
 import { AdminLogout } from "@/components/admin-logout";
 import { AdminPipeline } from "@/components/admin-pipeline";
@@ -27,7 +27,7 @@ export default async function AdminPage() {
   }
 
   const db = getDb();
-  const [designs, torders, stores, recentOrders, labVisitors, aiFacts] = await Promise.all([
+  const [designs, torders, stores, recentOrders, labVisitors, aiFacts, paidAddons, cInvoices] = await Promise.all([
     db
       .select({
         teamName: designRequests.teamName,
@@ -45,6 +45,7 @@ export default async function AdminPage() {
         depositPaidAt: teamOrders.depositPaidAt,
         invoiceUrl: teamOrders.invoiceUrl,
         invoicePaidAt: teamOrders.invoicePaidAt,
+        paymentNote: teamOrders.paymentNote,
         taxExempt: teamOrders.taxExempt,
         archivedAt: teamOrders.archivedAt,
       })
@@ -57,6 +58,11 @@ export default async function AdminPage() {
       .limit(200),
     db.select({ id: designLabVisitors.id, email: designLabVisitors.email, paidAt: designLabVisitors.paidAt }).from(designLabVisitors),
     db.select().from(assistantFacts),
+    db
+      .select({ paidAt: teamOrderAddons.paidAt, totalCents: teamOrderAddons.totalCents, paidTotalCents: teamOrderAddons.paidTotalCents })
+      .from(teamOrderAddons)
+      .where(eq(teamOrderAddons.status, "paid")),
+    db.select({ status: customInvoices.status, paidAt: customInvoices.paidAt, totalCents: customInvoices.totalCents }).from(customInvoices),
   ]);
 
   const activeDesigns = designs.filter((d) => !d.archivedAt);
@@ -71,7 +77,28 @@ export default async function AdminPage() {
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const paidThisMonth = recentOrders.filter((o) => o.createdAt >= monthStart && (o.status === "paid" || o.status === "fulfilled"));
+  // "Paid this month" counts EVERY dollar in: team-order deposits and
+  // balances (by their actual paid date), paid add-ons, paid custom invoices,
+  // and shop/store purchases - the old version only saw shop orders, so team
+  // payments were invisible here.
+  let paidThisMonthCents = 0;
+  let paidThisMonthCount = 0;
+  const countPay = (at: Date | null | undefined, cents: number) => {
+    if (at && at >= monthStart && cents > 0) {
+      paidThisMonthCents += cents;
+      paidThisMonthCount += 1;
+    }
+  };
+  for (const t of torders) {
+    const total = t.quotedTotalCents ?? 0;
+    const dep = t.depositCents ?? Math.round(total / 2);
+    const paidInFull = Boolean(t.invoicePaidAt && t.depositPaidAt && Math.abs(+t.invoicePaidAt - +t.depositPaidAt) < 60000);
+    if (t.depositPaidAt && !paidInFull) countPay(t.depositPaidAt, dep);
+    if (t.invoicePaidAt) countPay(t.invoicePaidAt, paidInFull ? total : Math.max(0, total - dep));
+  }
+  for (const a of paidAddons) countPay(a.paidAt, a.paidTotalCents ?? a.totalCents);
+  for (const inv of cInvoices) if (inv.status === "paid") countPay(inv.paidAt, inv.totalCents);
+  for (const o of recentOrders) if (o.status === "paid" || o.status === "fulfilled") countPay(o.createdAt, o.totalCents);
   const outstanding = activeOrders
     .filter((o) => o.invoiceUrl && !o.invoicePaidAt)
     .map((o) => {
@@ -124,7 +151,7 @@ export default async function AdminPage() {
       {/* Money snapshot */}
       <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Paid this month", value: money(paidThisMonth.reduce((s, o) => s + o.totalCents, 0)), sub: `${paidThisMonth.length} order${paidThisMonth.length === 1 ? "" : "s"}`, href: "/admin/payments" },
+          { label: "Paid this month", value: money(paidThisMonthCents), sub: `${paidThisMonthCount} payment${paidThisMonthCount === 1 ? "" : "s"}`, href: "/admin/payments" },
           { label: "Outstanding invoices", value: money(outstandingTotal), sub: `${outstanding.length} awaiting payment`, warn: outstanding.length > 0, href: "/admin/awaiting-payment" },
           { label: "In production", value: String(inProduction), sub: "team orders", href: "/admin/team-orders?status=in_production" },
           { label: "Team stores", value: String(stores.filter((s) => s.storeActive).length), sub: "open now", href: "/admin/stores" },

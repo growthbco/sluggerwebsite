@@ -55,6 +55,8 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
   const [search, setSearch] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newName, setNewName] = useState("");
+  const [pickerQ, setPickerQ] = useState("");
+  const [pickerHits, setPickerHits] = useState<{ name: string; team: string | null; phone: string | null; email: string }[]>([]);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -125,6 +127,35 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
   );
 
   useEffect(() => { loadConvos(); }, [loadConvos]);
+
+  // New-conversation customer search: type a name, team, or email and pick
+  // the person - no phone number hunting. Debounced type-ahead against the
+  // same search the invoice form uses (now team-aware).
+  useEffect(() => {
+    const q = pickerQ.trim();
+    if (q.length < 2 || /^[\d\s()+-]+$/.test(q)) { setPickerHits([]); return; }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        if (res.ok) setPickerHits((data.results ?? []).filter((r: { phone: string | null }) => r.phone));
+      } catch {}
+    }, 250);
+    return () => clearTimeout(t);
+  }, [pickerQ]);
+
+  function pickCustomer(hit: { name: string; phone: string | null }) {
+    if (!hit.phone) return;
+    const digits = hit.phone.replace(/\D/g, "");
+    const e164 = digits.length === 10 ? `+1${digits}` : digits.length === 11 && digits.startsWith("1") ? `+${digits}` : null;
+    if (!e164) return;
+    setPickerQ("");
+    setPickerHits([]);
+    // Opening the thread picks up any existing conversation with this number;
+    // saving the name labels a brand-new one from the start.
+    if (hit.name) setState(e164, { name: hit.name });
+    setActive(e164);
+  }
   // Deep link from an order page (?to=&name=): open that customer's thread
   // immediately, saving the name so the conversation is labeled from the start.
   const deepLinked = useRef(false);
@@ -326,20 +357,47 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
               </span>
             )
           ) : (
-            <span className="flex flex-1 gap-2 min-w-[16rem]">
-              <input
-                value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value)}
-                placeholder="Phone number, e.g. (352) 555-0123"
-                className="flex-1 bg-background border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-                inputMode="tel"
-              />
-              <input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Name (optional)"
-                className="flex-1 bg-background border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-              />
+            <span className="flex-1 min-w-[16rem]">
+              <span className="relative block">
+                <input
+                  value={pickerQ}
+                  onChange={(e) => setPickerQ(e.target.value)}
+                  placeholder="Search a customer by name, team, or email…"
+                  autoFocus
+                  className="w-full bg-background border border-brand/40 px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                />
+                {pickerHits.length > 0 && (
+                  <span className="absolute left-0 right-0 top-full z-20 mt-1 block border border-line bg-steel shadow-xl max-h-64 overflow-y-auto">
+                    {pickerHits.map((h) => (
+                      <button
+                        key={h.email}
+                        type="button"
+                        onClick={() => pickCustomer(h)}
+                        className="block w-full text-left px-3 py-2 hover:bg-brand/10 border-b border-line/60 last:border-b-0"
+                      >
+                        <span className="text-sm text-foreground">{h.name || h.email}</span>
+                        {h.team && <span className="ml-2 text-xs text-brand">{h.team}</span>}
+                        <span className="block text-xs text-muted">{h.phone ? prettyPhone(h.phone) : ""} · {h.email}</span>
+                      </button>
+                    ))}
+                  </span>
+                )}
+              </span>
+              <span className="mt-2 flex gap-2">
+                <input
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  placeholder="…or a raw phone number"
+                  className="flex-1 bg-background border border-line px-3 py-1.5 text-xs text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                  inputMode="tel"
+                />
+                <input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Name (optional)"
+                  className="flex-1 bg-background border border-line px-3 py-1.5 text-xs text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                />
+              </span>
             </span>
           )}
           {active && activeConvo && (
