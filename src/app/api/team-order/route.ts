@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { postTeamOrderToDiscord } from "@/lib/discord";
 import { setThreadStageTag } from "@/lib/discord-bot";
 import { dbEnabled } from "@/db";
 import { getByStatusToken, findActiveDesignByEmail, markOrdered } from "@/lib/design-requests";
 import { createTeamOrder, addRosterRow, submitTeamOrder } from "@/lib/team-orders";
+import { autoInvoiceOnSubmit } from "@/lib/team-order-invoicing";
 
 export const runtime = "nodejs";
 
@@ -104,6 +106,8 @@ export async function POST(req: Request) {
       );
     }
     await submitTeamOrder(created.id);
+    // Deposit invoice goes out automatically once the roster is in.
+    waitUntil(autoInvoiceOnSubmit(created.id));
     // First-touch attribution: where this coach originally came from.
     try {
       const { attributionFromCookie } = await import("@/lib/attribution");

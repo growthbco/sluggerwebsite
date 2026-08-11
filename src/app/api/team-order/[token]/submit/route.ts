@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
+import { autoInvoiceOnSubmit } from "@/lib/team-order-invoicing";
 import { dbEnabled } from "@/db";
 import { getByManageToken, getRoster, submitTeamOrder } from "@/lib/team-orders";
 import { postTeamOrderToDiscord } from "@/lib/discord";
@@ -58,6 +60,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ token:
     }
 
     await setThreadStageTag(design?.discordThreadId, "📋 Roster In");
+    // Roster in → deposit invoice goes out by itself (print-file QA comes
+    // after; production only starts once the deposit is paid).
+    waitUntil(autoInvoiceOnSubmit(order.id));
     return NextResponse.json({ ok: true, reference: order.reference });
   } catch (e) {
     console.error("submitTeamOrder failed:", e);
