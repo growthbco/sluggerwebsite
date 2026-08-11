@@ -906,6 +906,11 @@ export const designLabVisitors = pgTable("design_lab_visitors", {
   generations: integer("generations").notNull().default(0),
   paidAt: timestamp("paid_at", { withTimezone: true }),
   stripeRef: text("stripe_ref"),
+  // "Can we help?" re-engagement texts sent to a lead who designed but never
+  // ordered (max 2, a day then a few days later). Twilio blocks opted-out
+  // numbers automatically, so we only track how many we've sent + when.
+  smsFollowUpsSent: integer("sms_follow_ups_sent").notNull().default(0),
+  lastFollowUpAt: timestamp("last_follow_up_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

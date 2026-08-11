@@ -4,7 +4,8 @@
 
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { designRequests, teamOrders } from "@/db/schema";
+import { designRequests, teamOrders, designLabVisitors, smsMessages } from "@/db/schema";
+import { toE164 } from "@/lib/sms";
 
 export const MAX_FOLLOW_UPS = 2;
 const FIRST_AFTER_DAYS = 2; // proof sent -> first nudge
@@ -226,4 +227,64 @@ export async function recordFollowUp(id: string, now = new Date()) {
     .update(designRequests)
     .set({ followUpsSent: (row?.followUpsSent ?? 0) + 1, lastFollowUpAt: now })
     .where(eq(designRequests.id, id));
+}
+
+/* ── AI Jersey Maker lead follow-ups ────────────────────────────────
+ * Someone used the AI design tool, gave a phone to unlock their design, but
+ * never ordered. A gentle 2-step "can we help?" text (day ~1, then day ~4 if
+ * they never replied). Skips leads who already became a real design request. */
+export const MAX_AI_LEAD_FOLLOW_UPS = 2;
+const AI_FIRST_AFTER_HOURS = 20;
+const AI_NEXT_AFTER_DAYS = 3;
+const AI_STALE_AFTER_DAYS = 30; // older than this: don't cold-text, needs a human
+
+export type AiLeadCandidate = {
+  id: string;
+  firstName: string | null;
+  phone: string;
+  round: number; // 1 or 2
+};
+
+export async function findAiLeadFollowUpCandidates(now = new Date()): Promise<AiLeadCandidate[]> {
+  const db = getDb();
+  const visitors = await db.select().from(designLabVisitors);
+  // Emails that already turned into a real design request = converted, skip.
+  const drRows = await db.select({ email: designRequests.contactEmail }).from(designRequests);
+  const converted = new Set(drRows.map((r) => (r.email ?? "").trim().toLowerCase()).filter(Boolean));
+
+  const out: AiLeadCandidate[] = [];
+  for (const v of visitors) {
+    if (v.paidAt) continue; // already paid/converted in the lab
+    if ((v.generations ?? 0) < 1) continue; // never actually designed
+    const phone = toE164(v.phone);
+    if (!phone) continue;
+    if ((v.smsFollowUpsSent ?? 0) >= MAX_AI_LEAD_FOLLOW_UPS) continue;
+    if (v.email && converted.has(v.email.trim().toLowerCase())) continue;
+    const ageDays = (now.getTime() - +v.createdAt) / DAY_MS;
+    if (ageDays > AI_STALE_AFTER_DAYS) continue;
+
+    const sent = v.smsFollowUpsSent ?? 0;
+    if (sent === 0) {
+      if (now.getTime() - +v.createdAt < AI_FIRST_AFTER_HOURS * 60 * 60 * 1000) continue;
+      out.push({ id: v.id, firstName: v.firstName, phone, round: 1 });
+    } else {
+      // Round 2: wait a few days, and skip if they've replied since round 1
+      // (a human is now handling that conversation).
+      if (!v.lastFollowUpAt || now.getTime() - +v.lastFollowUpAt < AI_NEXT_AFTER_DAYS * DAY_MS) continue;
+      const msgs = await db.select({ direction: smsMessages.direction, createdAt: smsMessages.createdAt }).from(smsMessages).where(eq(smsMessages.phone, phone));
+      const repliedSince = msgs.some((m) => m.direction === "in" && +m.createdAt > +v.lastFollowUpAt!);
+      if (repliedSince) continue;
+      out.push({ id: v.id, firstName: v.firstName, phone, round: 2 });
+    }
+  }
+  return out;
+}
+
+export async function recordAiLeadFollowUp(id: string, now = new Date()) {
+  const db = getDb();
+  const [row] = await db.select({ n: designLabVisitors.smsFollowUpsSent }).from(designLabVisitors).where(eq(designLabVisitors.id, id)).limit(1);
+  await db
+    .update(designLabVisitors)
+    .set({ smsFollowUpsSent: (row?.n ?? 0) + 1, lastFollowUpAt: now })
+    .where(eq(designLabVisitors.id, id));
 }

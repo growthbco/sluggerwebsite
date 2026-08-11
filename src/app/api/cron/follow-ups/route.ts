@@ -10,9 +10,11 @@ import {
   MAX_INVOICE_REMINDERS,
   findStaleDesigns,
   recordDesignerReminder,
+  findAiLeadFollowUpCandidates,
+  recordAiLeadFollowUp,
 } from "@/lib/follow-ups";
 import { emailProofFollowUp, emailInvoiceReminder } from "@/lib/email";
-import { smsIfConsented } from "@/lib/sms";
+import { sendFollowUpSms } from "@/lib/sms";
 import { postDesignThreadUpdate } from "@/lib/discord";
 import { getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
@@ -56,10 +58,9 @@ export async function GET(req: Request) {
       });
       if (sent) {
         await recordFollowUp(c.id);
-        await smsIfConsented({
+        await sendFollowUpSms({
           phone: c.contactPhone,
-          optInAt: c.smsOptInAt,
-          body: `Slugger Athletics: your ${c.teamName} design proof is waiting for review. Approve or request changes: ${SITE}/design/status/${c.statusToken}`,
+          body: `Slugger Athletics: your ${c.teamName} design proof is waiting for review. Approve or request changes here: ${SITE}/design/status/${c.statusToken}\nReply STOP to opt out.`,
         });
         await postDesignThreadUpdate({
           threadId: c.discordThreadId ?? undefined,
@@ -96,10 +97,9 @@ export async function GET(req: Request) {
       });
       if (sent) {
         await recordInvoiceReminder(c.id);
-        await smsIfConsented({
+        await sendFollowUpSms({
           phone: c.contactPhone,
-          optInAt: c.smsOptInAt,
-          body: `Slugger Athletics reminder: the ${c.stage === "deposit" ? "50% deposit" : "final balance"} for ${c.teamName} (${c.reference}) is still unpaid. Pay here: ${c.payUrl}`,
+          body: `Slugger Athletics reminder: the ${c.stage === "deposit" ? "50% deposit" : "final balance"} for ${c.teamName} (${c.reference}) is still unpaid. Pay here: ${c.payUrl}\nReply STOP to opt out.`,
         });
       }
       invoiceResults.push({ reference: c.reference, team: c.teamName, stage: c.stage, round, sent });
@@ -191,6 +191,29 @@ export async function GET(req: Request) {
     }
   }
 
+  // ── AI Jersey Maker leads: "can we help?" re-engagement texts ──────────
+  const aiLeads = await findAiLeadFollowUpCandidates();
+  const aiLeadResults: { name: string; round: number; sent?: boolean }[] = [];
+  for (const lead of aiLeads) {
+    const name = lead.firstName?.trim() || "there";
+    if (dryRun) {
+      aiLeadResults.push({ name, round: lead.round });
+      continue;
+    }
+    const body =
+      lead.round === 1
+        ? `Hi ${name}, it's Slugger Athletics 🐆 We saw you were creating a jersey design with our Jersey Maker - want a hand finishing it or a quick quote for your team? Just reply here and we'll take care of you. No minimums.\nReply STOP to opt out.`
+        : `Hi ${name}, following up from Slugger Athletics - still happy to turn that jersey design into real uniforms whenever you're ready. Reply here anytime and we'll help.\nReply STOP to opt out.`;
+    let sent = false;
+    try {
+      sent = await sendFollowUpSms({ phone: lead.phone, body });
+      if (sent) await recordAiLeadFollowUp(lead.id);
+    } catch (e) {
+      console.error("AI lead follow-up failed:", e);
+    }
+    aiLeadResults.push({ name, round: lead.round, sent });
+  }
+
   // ── 5. Heal AI-lab submissions whose asset sheets failed to extract ────
   let healedSheets: { reference: string; added: string[] }[] = [];
   if (!dryRun) {
@@ -199,11 +222,12 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     dryRun,
-    count: results.length + invoiceResults.length + staleResults.length + inboundResults.length + healedSheets.length,
+    count: results.length + invoiceResults.length + staleResults.length + inboundResults.length + aiLeadResults.length + healedSheets.length,
     results,
     invoiceReminders: invoiceResults,
     designerReminders: staleResults,
     inboundStalls: inboundResults,
+    aiLeadFollowUps: aiLeadResults,
     healedSheets,
   });
 }

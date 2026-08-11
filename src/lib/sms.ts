@@ -80,6 +80,17 @@ export async function smsIfConsented(opts: { phone?: string | null; optInAt?: Da
   return r.ok;
 }
 
+/** Re-engagement / follow-up text to anyone who gave us a phone (AI leads,
+ *  design-request clients, unpaid invoices) - no explicit opt-in required.
+ *  Twilio's Advanced Opt-Out on the Messaging Service refuses to deliver to a
+ *  number that texted STOP, so opt-outs are honored automatically. Bodies
+ *  should still end with "Reply STOP to opt out." Fire-and-forget. */
+export async function sendFollowUpSms(opts: { phone?: string | null; body: string }): Promise<boolean> {
+  if (!opts.phone) return false;
+  const r = await sendSms(opts.phone, opts.body);
+  return r.ok;
+}
+
 
 /** Twilio MMS media URLs require account auth, so a browser <img> can't load
  *  them. Download each with auth and re-host to public Vercel Blob; return the
