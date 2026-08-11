@@ -1,4 +1,5 @@
 import { AdminSidebar } from "@/components/admin-sidebar";
+import { AdminDialer } from "@/components/admin-dialer";
 import { getAdminSession } from "@/lib/admin-auth";
 
 // Every /admin page shares the persistent sidebar (desktop) / pill bar
@@ -10,6 +11,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="admin-shell flex flex-col lg:flex-row min-h-screen">
       <AdminSidebar role={session?.role ?? "staff"} userName={session?.name} />
       <div className="flex-1 min-w-0">{children}</div>
+      {session && session.role !== "designer" && <AdminDialer />}
     </div>
   );
 }

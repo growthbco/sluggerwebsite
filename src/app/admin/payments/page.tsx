@@ -1,301 +1,92 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { desc, sql, eq, isNotNull, isNull } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
-import { designRequests, teamOrders, teams, orders, teamOrderAddons, assistantFacts, customInvoices, designLabVisitors } from "@/db/schema";
+import { teamOrders, teamOrderAddons, customInvoices, orders, teams } from "@/db/schema";
 import { adminEnabled, getAdminSession, canAccess } from "@/lib/admin-auth";
-import { getRoster } from "@/lib/team-orders";
-import { computeTeamOrderQuote, estimateOrderWeightOz } from "@/lib/team-order-pricing";
-import { sizeBreakdown, ITEM_TYPES } from "@/lib/order-items";
-import { shippingCentsFor } from "@/lib/team-stores";
-import { getLiveTracking, type LiveTracking } from "@/lib/shippo";
-import { AdminLogout } from "@/components/admin-logout";
-import { AdminInvoiceButton } from "@/components/admin-invoice-button";
-import { AdminJerseyStyle } from "@/components/admin-jersey-style";
-import { AdminPipeline } from "@/components/admin-pipeline";
-import { AdminLinkDesign } from "@/components/admin-link-design";
-import { AdminDesignerNote } from "@/components/admin-designer-note";
-import { AdminShipButton } from "@/components/admin-ship-button";
-import { AdminLabelButton } from "@/components/admin-label-button";
-import { TrackingInfo } from "@/components/tracking-info";
-import { inboundTrackingUrlFor } from "@/lib/tracking";
-import { AdminAddonDetails } from "@/components/admin-addon-details";
-import { AdminArchiveButton } from "@/components/admin-archive-button";
-import { AdminLocalToggle } from "@/components/admin-local-toggle";
-import { AdminTaxToggle } from "@/components/admin-tax-toggle";
-import { AdminSearch } from "@/components/admin-search";
-import { AdminNewStore } from "@/components/admin-new-store";
-import { AdminRecordPayment } from "@/components/admin-record-payment";
-import { AdminPickupToggle } from "@/components/admin-pickup-toggle";
-import { AdminRowMenu } from "@/components/admin-row-menu";
-import { AdminCustomPrice } from "@/components/admin-custom-price";
-import { AdminInboundTracking } from "@/components/admin-inbound-tracking";
-import { MarkStaffDevice } from "@/components/mark-staff-device";
-import { STORE_ITEM_PRESETS } from "@/lib/team-stores";
+import { AdminTransactions, type Txn } from "@/components/admin-transactions";
 
-export const metadata: Metadata = { title: "Payments", robots: { index: false } };
+export const metadata: Metadata = { title: "Transactions", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
-const STATUS_TONE: Record<string, string> = {
-  pending_payment: "border-amber-500/50 text-amber-400",
-  submitted: "border-brand/50 text-brand",
-  in_design: "border-brand/50 text-brand",
-  proof_sent: "border-sky-500/50 text-sky-400",
-  changes_requested: "border-amber-500/50 text-amber-400",
-  approved: "border-green-500/50 text-green-400",
-  ordered: "border-green-500/50 text-green-400",
-  cancelled: "border-line text-muted",
-  // team orders
-  draft: "border-line text-muted",
-  collecting: "border-brand/50 text-brand",
-  quoted: "border-amber-500/50 text-amber-400",
-  in_production: "border-sky-500/50 text-sky-400",
-  paid: "border-green-500/50 text-green-400",
-  shipped: "border-green-500/50 text-green-400",
-};
-
-function Badge({ label }: { label: string }) {
-  return (
-    <span className={`inline-block border px-2 py-0.5 text-xs display ${STATUS_TONE[label] ?? "border-line text-muted"}`}>
-      {label.replace(/_/g, " ")}
-    </span>
-  );
-}
-
-function fmtDate(d: Date | string | null | undefined) {
-  if (!d) return "-";
-  const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
-}
-
-const money = (c: number) => `$${(c / 100).toFixed(2)}`;
-// Compact source for table cells ("Google (ad) → /pricing" -> "Google (ad)");
-// the full string stays in the hover tooltip.
-const srcShort = (s: string | null | undefined) => (s ? s.split(" → ")[0] : "-");
-
-export default async function AdminPaymentsPage() {
-  if (!adminEnabled()) {
-    return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Set ADMIN_PASSWORD to enable the dashboard.</div>;
-  }
+// Every dollar in, as a single filterable ledger: team-order deposits and
+// balances, paid add-ons, custom invoices, and store/shop purchases.
+export default async function AdminTransactionsPage() {
+  if (!adminEnabled()) redirect("/admin");
   const session = await getAdminSession();
   if (!session) redirect("/admin/login");
   if (!canAccess(session.role, "/admin/payments")) redirect("/admin");
-  if (!dbEnabled()) {
-    return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Database not configured.</div>;
-  }
+  if (!dbEnabled()) redirect("/admin");
 
   const db = getDb();
-  const [designs, torders, stores, recentOrders, paidAddons] = await Promise.all([
-    db
-      .select({
-        id: designRequests.id,
-        reference: designRequests.reference,
-        teamName: designRequests.teamName,
-        status: designRequests.status,
-        contactName: designRequests.contactName,
-        contactEmail: designRequests.contactEmail,
-        revisionsUsed: designRequests.revisionsUsed,
-        neededBy: designRequests.neededBy,
-        messages: designRequests.messages,
-        source: designRequests.source,
-        manageToken: designRequests.manageToken,
-        archivedAt: designRequests.archivedAt,
-        archivedNote: designRequests.archivedNote,
-        updatedAt: designRequests.updatedAt,
-      })
-      .from(designRequests)
-      .orderBy(desc(designRequests.updatedAt)),
+  const [torders, addons, invoices, shopOrders, stores] = await Promise.all([
     db
       .select({
         id: teamOrders.id,
         reference: teamOrders.reference,
         teamName: teamOrders.teamName,
-        status: teamOrders.status,
-        contactEmail: teamOrders.contactEmail,
-        manageToken: teamOrders.manageToken,
-        jerseyStyle: teamOrders.jerseyStyle,
-        rushShipping: teamOrders.rushShipping,
-        localPricing: teamOrders.localPricing,
-        embroideryFeeWaived: teamOrders.embroideryFeeWaived,
-        taxExempt: teamOrders.taxExempt,
-        designRequestId: teamOrders.designRequestId,
-        designerNote: teamOrders.designerNote,
-        source: teamOrders.source,
-        printFileVerifiedAt: teamOrders.printFileVerifiedAt,
+        contactName: teamOrders.contactName,
         quotedTotalCents: teamOrders.quotedTotalCents,
-        invoiceUrl: teamOrders.invoiceUrl,
         depositCents: teamOrders.depositCents,
         depositPaidAt: teamOrders.depositPaidAt,
-        balanceInvoiceUrl: teamOrders.balanceInvoiceUrl,
         invoicePaidAt: teamOrders.invoicePaidAt,
-        trackingNumber: teamOrders.trackingNumber,
-        labelUrl: teamOrders.labelUrl,
-        shippedAt: teamOrders.shippedAt,
-        shippingChargedCents: teamOrders.shippingChargedCents,
         paymentNote: teamOrders.paymentNote,
-        localPickup: teamOrders.localPickup,
-        customJerseyCents: teamOrders.customJerseyCents,
-        inboundCarrier: teamOrders.inboundCarrier,
-        inboundTrackingNumber: teamOrders.inboundTrackingNumber,
-        inboundTrackingAddedAt: teamOrders.inboundTrackingAddedAt,
-        archivedAt: teamOrders.archivedAt,
-        archivedNote: teamOrders.archivedNote,
-        updatedAt: teamOrders.updatedAt,
       })
-      .from(teamOrders)
-      .orderBy(desc(teamOrders.updatedAt)),
+      .from(teamOrders),
     db
-      .select({
-        id: teams.id,
-        name: teams.name,
-        storeActive: teams.storeActive,
-        storeToken: teams.storeToken,
-      })
-      .from(teams)
-      .orderBy(desc(teams.createdAt)),
-    db
-      .select({
-        id: orders.id,
-        reference: orders.reference,
-        type: orders.type,
-        status: orders.status,
-        customerName: orders.customerName,
-        totalCents: orders.totalCents,
-        trackingNumber: orders.trackingNumber,
-        labelUrl: orders.labelUrl,
-        shippedAt: orders.shippedAt,
-        createdAt: orders.createdAt,
-        teamId: orders.teamId,
-        source: orders.source,
-      })
-      .from(orders)
-      .where(isNull(orders.archivedAt))
-      .orderBy(desc(orders.createdAt))
-      .limit(60),
-    db
-      .select({
-        teamOrderId: teamOrderAddons.teamOrderId,
-        rows: teamOrderAddons.rows,
-        totalCents: teamOrderAddons.totalCents,
-        paidTotalCents: teamOrderAddons.paidTotalCents,
-        paidAt: teamOrderAddons.paidAt,
-      })
+      .select({ teamOrderId: teamOrderAddons.teamOrderId, paidAt: teamOrderAddons.paidAt, totalCents: teamOrderAddons.totalCents, paidTotalCents: teamOrderAddons.paidTotalCents })
       .from(teamOrderAddons)
-      .where(eq(teamOrderAddons.status, "paid"))
-      .orderBy(desc(teamOrderAddons.paidAt)),
+      .where(eq(teamOrderAddons.status, "paid")),
+    db.select().from(customInvoices).orderBy(desc(customInvoices.createdAt)).limit(200),
+    db
+      .select({ reference: orders.reference, type: orders.type, status: orders.status, customerName: orders.customerName, totalCents: orders.totalCents, createdAt: orders.createdAt, teamId: orders.teamId })
+      .from(orders)
+      .orderBy(desc(orders.createdAt))
+      .limit(400),
+    db.select({ id: teams.id, name: teams.name }).from(teams),
   ]);
 
-  const invoices = await db.select().from(customInvoices).orderBy(desc(customInvoices.createdAt)).limit(30);
-
-  // Unified recent-payments feed: team-order deposits/balances (Stripe or
-  // recorded offline) and paid add-ons. The old "Recent paid orders" list
-  // only read the shop-orders table, so it said "no orders yet" while team
-  // invoices were getting paid.
-  type PaymentEvent = { at: Date; label: string; sub: string; amountCents: number };
-  const paymentEvents: PaymentEvent[] = [];
   const orderById = new Map(torders.map((t) => [t.id, t]));
+  const storeNameById = new Map(stores.map((s) => [s.id, s.name]));
+  const txns: Txn[] = [];
+
   for (const t of torders) {
-    const offline = t.paymentNote ? " · 💵 offline" : "";
+    const offline = Boolean(t.paymentNote);
     const total = t.quotedTotalCents ?? 0;
     const dep = t.depositCents ?? Math.round(total / 2);
-    const paidInFull = Boolean(
-      t.invoicePaidAt && t.depositPaidAt && Math.abs(+t.invoicePaidAt - +t.depositPaidAt) < 60000,
-    );
-    if (t.depositPaidAt && !paidInFull) {
-      paymentEvents.push({ at: t.depositPaidAt, label: t.teamName, sub: `50% deposit · ${t.reference}${offline}`, amountCents: dep });
+    const paidInFull = Boolean(t.invoicePaidAt && t.depositPaidAt && Math.abs(+t.invoicePaidAt - +t.depositPaidAt) < 60000);
+    if (t.depositPaidAt && !paidInFull && dep > 0) {
+      txns.push({ at: t.depositPaidAt.toISOString(), customer: t.teamName.trim() || t.contactName, ref: t.reference, kind: "Deposit", amountCents: dep, method: offline ? "Offline" : "Stripe" });
     }
-    if (t.invoicePaidAt) {
-      paymentEvents.push({
-        at: t.invoicePaidAt,
-        label: t.teamName,
-        sub: `${paidInFull ? "paid in full" : "final balance"} · ${t.reference}${offline}`,
-        amountCents: paidInFull ? total : Math.max(0, total - dep),
-      });
+    if (t.invoicePaidAt && (paidInFull ? total : total - dep) > 0) {
+      txns.push({ at: t.invoicePaidAt.toISOString(), customer: t.teamName.trim() || t.contactName, ref: t.reference, kind: paidInFull ? "Paid in full" : "Final balance", amountCents: paidInFull ? total : Math.max(0, total - dep), method: offline ? "Offline" : "Stripe" });
     }
   }
-  for (const a of paidAddons) {
+  for (const a of addons) {
     if (!a.paidAt) continue;
     const t = orderById.get(a.teamOrderId);
-    paymentEvents.push({
-      at: a.paidAt,
-      label: t?.teamName ?? "Add-on",
-      sub: `paid add-on${t ? ` · ${t.reference}` : ""}`,
-      amountCents: a.paidTotalCents ?? a.totalCents,
-    });
+    txns.push({ at: a.paidAt.toISOString(), customer: t?.teamName.trim() ?? "Add-on", ref: t?.reference ?? "-", kind: "Add-on", amountCents: a.paidTotalCents ?? a.totalCents, method: "Stripe" });
   }
   for (const inv of invoices) {
     if (inv.status === "paid" && inv.paidAt) {
-      paymentEvents.push({ at: inv.paidAt, label: inv.customerName, sub: `custom invoice · ${inv.reference}`, amountCents: inv.totalCents });
+      txns.push({ at: inv.paidAt.toISOString(), customer: inv.customerName, ref: inv.reference, kind: "Custom invoice", amountCents: inv.totalCents, method: "Stripe" });
     }
   }
-  // Shop / team-store / buy-in orders (from the orders table) also count as
-  // money moments - they were previously invisible in this feed.
-  const storeNameById = new Map(stores.map((s) => [s.id, s.name]));
-  for (const o of recentOrders) {
+  for (const o of shopOrders) {
     if (o.status !== "paid" && o.status !== "fulfilled") continue;
-    const who = o.teamId ? (storeNameById.get(o.teamId) ?? o.customerName ?? "Store order") : (o.customerName ?? "Order");
-    const kind = o.type === "team_store" ? "team store" : o.type === "buy_in" ? "buy-in" : "shop";
-    paymentEvents.push({ at: o.createdAt, label: who, sub: `${kind} · ${o.reference}`, amountCents: o.totalCents });
+    const customer = o.teamId ? `${storeNameById.get(o.teamId) ?? "Store"}${o.customerName ? ` · ${o.customerName}` : ""}` : (o.customerName ?? "Shop order");
+    txns.push({ at: o.createdAt.toISOString(), customer, ref: o.reference, kind: o.type === "team_store" ? "Team store" : o.type === "buy_in" ? "Buy-in" : "Shop", amountCents: o.totalCents, method: "Stripe" });
   }
-  paymentEvents.sort((a, b) => +b.at - +a.at);
-  const recentPayments = paymentEvents.slice(0, 40);
-
+  txns.sort((a, b) => +new Date(b.at) - +new Date(a.at));
 
   return (
-    <div className="mx-auto max-w-4xl px-4 sm:px-6 py-10">
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
       <Link href="/admin" className="text-sm text-muted hover:text-foreground">← Dashboard</Link>
-      <h1 className="display text-4xl text-foreground mt-3">💳 Payments</h1>
-      <p className="mt-2 text-muted">Every dollar in: deposits, balances, add-ons, custom invoices, and store purchases.</p>
+      <h1 className="display text-4xl text-foreground mt-3">💳 Transactions</h1>
+      <p className="mt-2 text-muted">Every dollar in - deposits, balances, add-ons, invoices, and store purchases · {txns.length} total</p>
       <div className="mt-6">
-        <section className="scroll-mt-16" id="payments">
-          <h2 className="display text-xl text-foreground">Recent payments</h2>
-          <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
-            {recentPayments.length === 0 && <p className="px-3 py-3 text-sm text-muted">No payments yet.</p>}
-            {recentPayments.map((p, i) => (
-              <div key={i} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
-                <div>
-                  <span className="text-foreground">{p.label}</span>
-                  <span className="ml-2 text-xs text-muted">{p.sub}</span>
-                </div>
-                <span className="text-foreground whitespace-nowrap">
-                  {money(p.amountCents)} <span className="text-muted text-xs">{fmtDate(p.at)}</span>
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {invoices.length > 0 && (
-            <>
-              <div className="flex items-center justify-between mt-8">
-                <h2 className="display text-xl text-foreground">Custom invoices</h2>
-                <Link href="/admin/invoice/new" className="text-xs display text-brand hover:underline">+ New invoice</Link>
-              </div>
-              <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
-                {invoices.map((inv) => (
-                  <div key={inv.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
-                    <div>
-                      <span className="font-mono text-xs text-foreground">{inv.reference}</span>
-                      <span className="ml-2 text-foreground">{inv.customerName}</span>
-                      <span className={`ml-2 text-xs display ${inv.status === "paid" ? "text-green-400" : "text-amber-400"}`}>
-                        {inv.status === "paid" ? "PAID" : "SENT"}
-                      </span>
-                    </div>
-                    <span className="flex items-center gap-2 whitespace-nowrap">
-                      <span className="text-foreground">{money(inv.totalCents)}</span>
-                      {inv.status !== "paid" && inv.payUrl && (
-                        <a href={inv.payUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-muted hover:text-foreground">
-                          payment link
-                        </a>
-                      )}
-                      <span className="text-muted text-xs">{fmtDate(inv.createdAt)}</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </section>
+        <AdminTransactions txns={txns} />
       </div>
     </div>
   );

@@ -507,6 +507,13 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
               </div>
               <p className="mt-2 display text-foreground">{activeConvo?.name ?? prettyPhone(active)}</p>
               <p className="text-xs text-muted">{prettyPhone(active)}</p>
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("slugger-dial", { detail: { phone: active } }))}
+                className="mt-2 text-xs display border border-brand/50 text-brand px-3 py-1 hover:bg-brand/10"
+              >
+                📞 Call
+              </button>
               {context?.emails.map((e) => (
                 <p key={e} className="text-xs text-muted truncate"><a href={`mailto:${e}`} className="hover:text-foreground">{e}</a></p>
               ))}

@@ -122,7 +122,7 @@ export default async function AdminPage() {
     { href: "/admin/customers", icon: "👥", title: "Customers", sub: "Directory with spend + one-tap text" },
     { href: "/admin/design-lab", icon: "🧪", title: "Design Lab Leads", sub: `${labPaid} paid · ${labLeads} leads` },
     { href: "/admin/stores", icon: "🏪", title: `Team Stores (${stores.filter((s) => s.storeActive).length} open)`, sub: "Storefronts + sales" },
-    { href: "/admin/payments", icon: "💳", title: "Payments", sub: "Every dollar in, newest first" },
+    { href: "/admin/payments", icon: "💳", title: "Transactions", sub: "Every dollar in, newest first" },
     { href: "/admin/assistant", icon: "🤖", title: "AI Assistant", sub: `${aiFacts.length} fact${aiFacts.length === 1 ? "" : "s"} taught` },
   ];
   // Designers see design work only - money tiles and customer/store cards

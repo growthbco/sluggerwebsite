@@ -31,7 +31,7 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
     items: [
       { href: "/admin/invoice/new", label: "New Invoice", icon: "🧾" },
       { href: "/admin/awaiting-payment", label: "Awaiting Payment", icon: "💸" },
-      { href: "/admin/payments", label: "Payments", icon: "💳" },
+      { href: "/admin/payments", label: "Transactions", icon: "💳" },
     ],
   },
   {
