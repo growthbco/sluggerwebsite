@@ -1,28 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders, teamOrderAddons, customInvoices } from "@/db/schema";
 import { adminEnabled, getAdminSession, canAccess } from "@/lib/admin-auth";
+import { AdminAwaitingList, type Unpaid } from "@/components/admin-awaiting-list";
 
 export const metadata: Metadata = { title: "Awaiting Payment", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
-const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
-
-type Unpaid = {
-  key: string;
-  kind: "Deposit" | "Final balance" | "Add-on" | "Custom invoice";
-  customer: string;
-  ref: string;
-  amountCents: number;
-  since: Date;
-  detail?: string;
-  payUrl: string | null;
-  orderId?: string;
-};
 
 // One place for every invoice that's out the door but not yet paid: team-order
 // deposits/balances, pending add-on invoices, and unpaid custom invoices.
@@ -37,7 +25,11 @@ export default async function AdminAwaitingPaymentPage() {
   const [torders, pendingAddons, invoices] = await Promise.all([
     db.select().from(teamOrders),
     db.select().from(teamOrderAddons).where(eq(teamOrderAddons.status, "pending")),
-    db.select().from(customInvoices).where(eq(customInvoices.status, "sent")).orderBy(desc(customInvoices.createdAt)),
+    db
+      .select()
+      .from(customInvoices)
+      .where(and(ne(customInvoices.status, "paid"), ne(customInvoices.status, "void")))
+      .orderBy(desc(customInvoices.createdAt)),
   ]);
   const orderById = new Map(torders.map((t) => [t.id, t]));
 
@@ -56,11 +48,12 @@ export default async function AdminAwaitingPaymentPage() {
       key: `to-${o.id}`,
       kind: stage,
       customer: o.teamName.trim() || o.contactName,
+      email: o.contactEmail ?? null,
       ref: o.reference,
       amountCents: due,
-      since: o.updatedAt,
+      sinceISO: o.updatedAt.toISOString(),
       payUrl: (stage === "Final balance" ? o.balanceInvoiceUrl : o.invoiceUrl) ?? null,
-      orderId: o.id,
+      href: `/admin/team-order/${o.id}`,
     });
   }
 
@@ -80,72 +73,50 @@ export default async function AdminAwaitingPaymentPage() {
     items.push({
       key: `addon-${a.id}`,
       kind: "Add-on",
-      customer: t?.teamName.trim() ?? "Add-on",
+      customer: t?.teamName.trim() || t?.contactName || "Add-on",
+      email: t?.contactEmail ?? null,
       ref: t?.reference ?? "-",
       amountCents: goods + Math.round(goods * 0.07),
-      since: a.createdAt,
+      sinceISO: a.createdAt.toISOString(),
       detail: a.rows.map((r) => `${r.quantity}× ${r.label}${r.design ? ` (${r.design})` : ""}`).join(", "),
       payUrl,
-      orderId: t?.id,
+      href: t ? `/admin/team-order/${t.id}` : null,
     });
   }
 
-  // Custom invoices sent but unpaid.
+  // Custom invoices sent but unpaid (voided ones already filtered out above).
   for (const inv of invoices) {
     items.push({
       key: `inv-${inv.id}`,
       kind: "Custom invoice",
       customer: inv.customerName,
+      email: inv.customerEmail ?? null,
       ref: inv.reference,
       amountCents: inv.totalCents,
-      since: inv.createdAt,
+      sinceISO: inv.createdAt.toISOString(),
+      detail: (inv.lines ?? []).map((l) => `${l.quantity}× ${l.name}`).join(", ") || undefined,
       payUrl: inv.payUrl ?? null,
+      href: inv.payUrl ?? null,
+      invoiceId: inv.id,
     });
   }
 
-  items.sort((a, b) => +b.since - +a.since);
+  items.sort((a, b) => +new Date(b.sinceISO) - +new Date(a.sinceISO));
   const total = items.reduce((s, i) => s + i.amountCents, 0);
-  const now = new Date();
-  const daysAgo = (d: Date) => Math.max(0, Math.floor((now.getTime() - d.getTime()) / 86400000));
-
-  const KIND_TONE: Record<Unpaid["kind"], string> = {
-    Deposit: "border-sky-500/50 text-sky-400 bg-sky-500/10",
-    "Final balance": "border-amber-500/50 text-amber-300 bg-amber-500/10",
-    "Add-on": "border-brand/50 text-brand bg-brand/10",
-    "Custom invoice": "border-violet-500/50 text-violet-400 bg-violet-500/10",
-  };
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 py-10">
       <Link href="/admin" className="text-sm text-muted hover:text-foreground">← Dashboard</Link>
-      <h1 className="display text-4xl text-foreground mt-3">💸 Awaiting Payment ({items.length})</h1>
-      <p className="mt-2 text-muted">Every invoice that&apos;s out the door with money still due - {money(total)} total. Includes team-order deposits &amp; balances, add-on invoices, and custom invoices.</p>
-
-      <div className="mt-6 border border-amber-500/40 divide-y divide-[color:var(--line)]">
-        {items.length === 0 && <p className="px-4 py-6 text-sm text-muted">Nothing outstanding - everyone&apos;s paid up. 🎉</p>}
-        {items.map((it) => (
-          <div key={it.key} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
-            <span className="min-w-0">
-              <span className={`inline-block border px-2 py-0.5 text-xs display mr-2 ${KIND_TONE[it.kind]}`}>{it.kind}</span>
-              {it.orderId ? (
-                <Link href={`/admin/team-order/${it.orderId}`} className="font-mono text-xs text-brand hover:underline">{it.ref}</Link>
-              ) : (
-                <span className="font-mono text-xs text-muted">{it.ref}</span>
-              )}
-              <span className="ml-2 text-foreground">{it.customer}</span>
-              {it.detail && <span className="block text-xs text-muted mt-0.5">{it.detail}</span>}
-              <span className="block text-xs text-muted mt-0.5">sent {daysAgo(it.since)}d ago</span>
-            </span>
-            <span className="flex items-center gap-3 shrink-0">
-              {it.payUrl && (
-                <a href={it.payUrl} target="_blank" rel="noopener noreferrer" className="text-xs display text-brand border border-brand/50 px-2 py-1 hover:bg-brand/10">Pay link</a>
-              )}
-              <span className="display text-foreground whitespace-nowrap">{money(it.amountCents)}</span>
-            </span>
-          </div>
-        ))}
+      <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+        <h1 className="display text-4xl text-foreground">💸 Awaiting Payment ({items.length})</h1>
+        <p className="display text-2xl text-amber-300 tabular-nums">{money(total)} <span className="text-sm text-muted">due</span></p>
       </div>
-      <p className="mt-3 text-xs text-muted">Team-order reminder emails/texts go out automatically after 3 days, then 4 more (max 2 per invoice).</p>
+      <p className="mt-2 text-muted text-sm">Every invoice that&apos;s out the door with money still due - team-order deposits &amp; balances, add-on invoices, and custom invoices. Click a row to open it.</p>
+
+      <div className="mt-6">
+        <AdminAwaitingList items={items} />
+      </div>
+      <p className="mt-4 text-xs text-muted">Team-order reminder emails/texts go out automatically after 3 days, then 4 more (max 2 per invoice). Void a custom invoice to remove it (e.g. after combining it into another).</p>
     </div>
   );
 }

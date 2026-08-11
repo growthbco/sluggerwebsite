@@ -90,22 +90,25 @@ export default async function AdminStoresPage() {
                   {aggMap.get(s.id)?.n ?? 0} orders · {money(Number(aggMap.get(s.id)?.sum ?? 0))}
                 </p>
               </summary>
-              <div className="bg-ink/40 border-t border-line/50 px-3 py-2 space-y-2">
-                <div className="flex flex-wrap gap-3 text-xs">
-                  <Link href={`/store/${s.storeToken}/verify`} className="text-brand hover:underline">🔍 Print-file QA</Link>
-                  <Link href={`/store/${s.storeToken}`} className="text-muted hover:text-foreground hover:underline">View store</Link>
+              <div className="bg-ink/40 border-t border-line/50 px-3 py-3 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  {(s.storeItems?.length ?? 0) > 0 && (
+                    <details className="group/designs w-full">
+                      <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs display bg-brand text-on-brand px-3 py-1.5 hover:bg-brand-dark">
+                        🎨 Manage colors &amp; photos
+                        <span className="opacity-70 transition-transform group-open/designs:rotate-90">▶</span>
+                      </summary>
+                      <div className="mt-3">
+                        <AdminStoreDesigns
+                          teamId={s.id}
+                          items={(s.storeItems ?? []).map((it) => ({ key: it.key, label: it.label, image: it.image ?? null, designs: it.designs ?? [] }))}
+                        />
+                      </div>
+                    </details>
+                  )}
+                  <Link href={`/store/${s.storeToken}/verify`} className="text-xs display border border-line px-3 py-1.5 text-brand hover:border-brand/50">🔍 Print-file QA</Link>
+                  <Link href={`/store/${s.storeToken}`} className="text-xs display border border-line px-3 py-1.5 text-muted hover:text-foreground hover:border-brand/50">View store ↗</Link>
                 </div>
-                {(s.storeItems?.length ?? 0) > 0 && (
-                  <details className="group/designs">
-                    <summary className="cursor-pointer text-xs display text-brand hover:underline list-none">🎨 Manage colors &amp; photos</summary>
-                    <div className="mt-2">
-                      <AdminStoreDesigns
-                        teamId={s.id}
-                        items={(s.storeItems ?? []).map((it) => ({ key: it.key, label: it.label, image: it.image ?? null, designs: it.designs ?? [] }))}
-                      />
-                    </div>
-                  </details>
-                )}
                 {myOrders.length === 0 ? (
                   <p className="text-xs text-muted">No orders yet. Share the store link so families can order.</p>
                 ) : (

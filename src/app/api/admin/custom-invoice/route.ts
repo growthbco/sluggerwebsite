@@ -159,3 +159,44 @@ import { eq } from "drizzle-orm";
 function eqId(id: string) {
   return eq(customInvoices.id, id);
 }
+
+// Void an unpaid custom invoice: deactivate its Stripe pay link so the old
+// link can't be paid (e.g. after combining it into another invoice) and mark
+// it void so it drops off Awaiting Payment. Never touches a paid invoice.
+export async function DELETE(req: Request) {
+  const gate = await requireApiRole("money");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
+  if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
+
+  let body: { id?: string } = {};
+  try { body = await req.json(); } catch {}
+  if (!body.id) return NextResponse.json({ error: "Missing invoice id" }, { status: 400 });
+
+  const db = getDb();
+  const [inv] = await db.select().from(customInvoices).where(eqId(body.id)).limit(1);
+  if (!inv) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+  if (inv.status === "paid") return NextResponse.json({ error: "That invoice is already paid - it can't be voided." }, { status: 400 });
+
+  // Best-effort: find and deactivate the Stripe payment link for this invoice
+  // so the emailed link stops working. Matched by metadata.customInvoiceId.
+  if (stripeEnabled()) {
+    try {
+      const stripe = getStripe();
+      let starting_after: string | undefined;
+      outer: for (let page = 0; page < 5; page++) {
+        const list = await stripe.paymentLinks.list({ limit: 100, ...(starting_after ? { starting_after } : {}) });
+        for (const pl of list.data) {
+          if (pl.metadata?.customInvoiceId === inv.id) {
+            if (pl.active) await stripe.paymentLinks.update(pl.id, { active: false });
+            break outer;
+          }
+        }
+        if (!list.has_more) break;
+        starting_after = list.data[list.data.length - 1]?.id;
+      }
+    } catch (e) { console.error("void invoice: deactivate link failed:", e); }
+  }
+
+  await db.update(customInvoices).set({ status: "void" }).where(eqId(inv.id));
+  return NextResponse.json({ ok: true });
+}
