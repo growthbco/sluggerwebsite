@@ -512,6 +512,11 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                                 initialNumber={o.inboundTrackingNumber}
                               />
                             )}
+                            {/* Buy an extra parcel's label once the primary one
+                                exists - emails the customer that tracking. */}
+                            {paid && o.trackingNumber && (
+                              <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} additional label="🏷 Buy another label + email" />
+                            )}
                             <AdminArchiveButton kind="team_order" id={o.id} archived={false} />
                         </AdminRowMenu>
                       </span>
