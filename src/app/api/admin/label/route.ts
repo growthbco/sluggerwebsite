@@ -59,16 +59,27 @@ export async function POST(req: Request) {
     try {
       const rates = await getLabelRates(to, weightOz);
       if (rates.length === 0) return NextResponse.json({ error: "No USPS/UPS rates returned." }, { status: 502 });
-      // Show a spread of speeds, not just the cheapest few: keep the two
-      // cheapest, then add distinct faster services by delivery estimate.
-      const byDays = [...rates].sort((a, b) => (a.estimatedDays ?? 99) - (b.estimatedDays ?? 99));
+      // rates come sorted cheapest-first. Guarantee a useful spread:
+      //   - the cheapest option from EACH carrier (so USPS ground always shows
+      //     next to UPS, not just whichever carrier happens to win on price),
+      //   - the overall two cheapest,
+      //   - the single fastest express option,
+      // then fill remaining slots with the next-cheapest, capped at 6.
       const picked = new Map<string, (typeof rates)[number]>();
-      for (const r of rates.slice(0, 2)) picked.set(r.rateId, r);
-      for (const r of byDays) {
-        if (picked.size >= 6) break;
-        picked.set(r.rateId, r);
+      const add = (r?: (typeof rates)[number]) => { if (r && picked.size < 6) picked.set(r.rateId, r); };
+      // Cheapest per provider.
+      for (const provider of [...new Set(rates.map((r) => r.provider))]) {
+        add(rates.find((r) => r.provider === provider));
       }
-      return NextResponse.json({ ok: true, to, rates: Array.from(picked.values()) });
+      // Overall two cheapest.
+      add(rates[0]);
+      add(rates[1]);
+      // Fastest (lowest estimatedDays), useful for rush.
+      add([...rates].sort((a, b) => (a.estimatedDays ?? 99) - (b.estimatedDays ?? 99))[0]);
+      // Fill the rest by price.
+      for (const r of rates) add(r);
+      const out = Array.from(picked.values()).sort((a, b) => a.costCents - b.costCents);
+      return NextResponse.json({ ok: true, to, rates: out });
     } catch (e) {
       return NextResponse.json({ error: (e as Error).message }, { status: 502 });
     }
