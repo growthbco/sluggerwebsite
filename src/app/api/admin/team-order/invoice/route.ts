@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { stripeEnabled } from "@/lib/stripe";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 import { sendTeamOrderInvoice } from "@/lib/team-order-invoicing";
 
 export const runtime = "nodejs";
@@ -9,7 +9,8 @@ export const runtime = "nodejs";
 // Admin "Send invoice" button - the actual invoicing logic lives in
 // src/lib/team-order-invoicing.ts (shared with roster-submit auto-invoicing).
 export async function POST(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("money");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled() || !stripeEnabled()) {
     return NextResponse.json({ error: "Database or Stripe not configured" }, { status: 503 });
   }

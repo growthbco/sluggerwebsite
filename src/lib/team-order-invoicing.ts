@@ -207,13 +207,16 @@ export async function sendTeamOrderInvoice(opts: {
       })
       .where(eq(teamOrders.id, order.id));
 
+    // Defense in depth: never let a team name inject URLs or newlines into the
+    // outbound SMS body (the name is customer-supplied on public forms).
+    const safeTeam = order.teamName.replace(/https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim().slice(0, 40) || "your team";
     await smsIfConsented({
       phone: order.contactPhone,
       optInAt: order.smsOptInAt,
       body:
         stage === "deposit"
-          ? `Slugger Athletics: your ${order.teamName} invoice is ready. Pay the 50% deposit to start production: ${link.url}`
-          : `Slugger Athletics: final balance for ${order.teamName} (${order.reference}) is ready. Pay here: ${link.url}`,
+          ? `Slugger Athletics: your ${safeTeam} invoice is ready. Pay the 50% deposit to start production: ${link.url}`
+          : `Slugger Athletics: final balance for ${safeTeam} (${order.reference}) is ready. Pay here: ${link.url}`,
     });
     const emailed = await emailTeamOrderInvoice({
       to: order.contactEmail,

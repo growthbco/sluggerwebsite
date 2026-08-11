@@ -106,8 +106,15 @@ export async function POST(req: Request) {
       );
     }
     await submitTeamOrder(created.id);
-    // Deposit invoice goes out automatically once the roster is in.
-    waitUntil(autoInvoiceOnSubmit(created.id));
+    // Auto-invoice ONLY when the submitter proved they own this funnel by
+    // presenting a valid design token. This endpoint is public and takes an
+    // attacker-controlled teamName / email / phone; without the proof, auto-
+    // sending a branded invoice email + an SMS from our A2P number to those
+    // contacts would be a phishing relay. Tokenless/email-matched submissions
+    // wait for a staff click ("Send invoice") instead.
+    if (body.designToken && design) {
+      waitUntil(autoInvoiceOnSubmit(created.id));
+    }
     // First-touch attribution: where this coach originally came from.
     try {
       const { attributionFromCookie } = await import("@/lib/attribution");

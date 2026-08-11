@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
 
@@ -13,7 +13,8 @@ export const runtime = "nodejs";
 // next invoice charges the right amount. The paid deposit is untouched - only
 // the total (and therefore the remaining balance) moves.
 export async function POST(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("money");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
 
   const body = await req.json().catch(() => null);

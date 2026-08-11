@@ -5,7 +5,7 @@ import { customInvoices } from "@/db/schema";
 import { taxCents as calcTax, SALES_TAX_LABEL } from "@/lib/pricing";
 import { emailCustomInvoice } from "@/lib/email";
 import { getStripe, stripeEnabled } from "@/lib/stripe";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 
@@ -14,7 +14,8 @@ type LineIn = { name?: string; description?: string; quantity?: number; unitPric
 // Admin-only: build a free-form invoice from scratch (name items, price
 // them), create a one-time Stripe payment link, email it to the customer.
 export async function POST(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("money");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled() || !stripeEnabled()) {
     return NextResponse.json({ error: "Database or Stripe not configured" }, { status: 503 });
   }

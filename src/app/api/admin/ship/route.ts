@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { markShipped } from "@/lib/fulfillment";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 
 // Admin-only manual path: record an externally bought (e.g. Pirate Ship)
 // tracking number, flip the status, email the customer.
 export async function POST(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("money");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
 
   let body: { kind?: string; id?: string; trackingNumber?: string } = {};

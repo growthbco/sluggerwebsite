@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { eq, and } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders, designRequests, teamOrderAddons } from "@/db/schema";
-import { isAdmin } from "@/lib/admin-auth";
+import { getAdminSession, canAccess } from "@/lib/admin-auth";
 import { getRoster, getPrintableJerseys } from "@/lib/team-orders";
 import { computeTeamOrderQuote, estimateOrderParcelsOz } from "@/lib/team-order-pricing";
 import { itemLabel, sizeBreakdown } from "@/lib/order-items";
@@ -66,8 +66,10 @@ const STATUS_STYLE: Record<string, string> = {
 
 export default async function AdminTeamOrderDetail({ params }: { params: Promise<{ id: string }> }) {
   if (!dbEnabled()) notFound();
-  if (!(await isAdmin())) redirect("/admin");
   const { id } = await params;
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!canAccess(session.role, `/admin/team-order/${id}`)) redirect("/admin");
 
   const db = getDb();
   const [o] = await db.select().from(teamOrders).where(eq(teamOrders.id, id)).limit(1);

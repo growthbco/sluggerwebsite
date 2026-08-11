@@ -7,7 +7,7 @@ import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
 import { postTeamOrderPaidToDiscord } from "@/lib/discord";
 import { getById as getDesignById } from "@/lib/design-requests";
 import { setThreadStageTag } from "@/lib/discord-bot";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 
@@ -17,7 +17,8 @@ const METHODS = ["Zelle", "CashApp", "Cash", "Check", "Venmo", "Other"];
 // order moves through the same states a Stripe payment would - deposit
 // starts production, full/balance marks it paid and unlocks shipping.
 export async function POST(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("money");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
 
   let body: { teamOrderId?: string; stage?: string; method?: string; amountCents?: number } = {};

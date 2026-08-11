@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 import { JERSEY_STYLES } from "@/lib/team-order-pricing";
 
 export const runtime = "nodejs";
@@ -10,7 +10,8 @@ export const runtime = "nodejs";
 // Admin-only: change a team order's jersey style (which drives the jersey
 // price). Locked once an invoice has been sent.
 export async function POST(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("money");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
 
   let body: { teamOrderId?: string; jerseyStyle?: string } = {};

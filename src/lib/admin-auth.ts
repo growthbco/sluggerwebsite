@@ -106,16 +106,37 @@ export async function isAdmin(): Promise<boolean> {
 // owner manages users in Settings.
 const DESIGNER_ALLOWED_PREFIXES = [
   "/admin/design-requests",
-  "/admin/team-orders",
-  "/admin/team-order/", // order detail + hat sheets (production info)
+  "/admin/team-orders", // the list (read-only production view)
   "/admin/texts",
   "/admin/design-lab",
 ];
+
+// Order-detail pages are money pages (pricing, invoices, payments), so the
+// bare /admin/team-order/ prefix is NOT allowed for designers - only the hat
+// production sheet under it is.
+function designerAllowsOrderPath(pathname: string): boolean {
+  return pathname.startsWith("/admin/team-order/") && pathname.endsWith("/hat-sheet");
+}
 
 export function canAccess(role: AdminRole, pathname: string): boolean {
   if (role === "owner") return true;
   if (pathname.startsWith("/admin/settings")) return false;
   if (role === "staff") return true;
   if (pathname === "/admin" || pathname === "/admin/login") return true;
+  if (designerAllowsOrderPath(pathname)) return true;
   return DESIGNER_ALLOWED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p));
+}
+
+/* ── API-layer role gate ────────────────────────────────────────── */
+// Page redirects (canAccess) are NOT enough: an authenticated designer can
+// call admin APIs directly with their cookie. These helpers enforce role at
+// the API layer. "money" = pricing/invoicing/payment/shipping/store mutations
+// and customer PII; "settings" = user management. Designers are blocked from
+// both; staff and owner pass money; only owner passes settings.
+export async function requireApiRole(area: "money" | "settings"): Promise<{ ok: true; session: AdminSession } | { ok: false; status: 401 | 403 }> {
+  const session = await getAdminSession();
+  if (!session) return { ok: false, status: 401 };
+  if (area === "settings" && session.role !== "owner") return { ok: false, status: 403 };
+  if (area === "money" && session.role === "designer") return { ok: false, status: 403 };
+  return { ok: true, session };
 }

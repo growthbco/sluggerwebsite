@@ -4,7 +4,7 @@ import { dbEnabled, getDb } from "@/db";
 import { teamOrders, orders } from "@/db/schema";
 import { getLabelRates, buyLabel, shippoEnabled, labelReady } from "@/lib/shippo";
 import { saveLabelPurchase } from "@/lib/fulfillment";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 
@@ -29,7 +29,8 @@ async function addressFor(kind: "team_order" | "order", id: string): Promise<Add
 //   { action: "buy",   kind, id, rateId }          -> purchases the label and
 //     saves tracking + PDF. Does NOT ship or email - "Mark shipped" does that.
 export async function POST(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("money");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   if (!shippoEnabled()) return NextResponse.json({ error: "Shippo isn't configured (SHIPPO_API_KEY)." }, { status: 503 });
 

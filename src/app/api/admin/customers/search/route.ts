@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { desc, ilike, or } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { customers, orders, teamOrders, designRequests } from "@/db/schema";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 
@@ -14,7 +14,8 @@ type Hit = { name: string; email: string; phone: string | null; creditCents: num
 // Searches everywhere a contact has ever appeared - the customers table plus
 // order/team-order/design-request contacts - deduped by email, newest first.
 export async function GET(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("money");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
 
   const q = (new URL(req.url).searchParams.get("q") ?? "").trim().slice(0, 80);

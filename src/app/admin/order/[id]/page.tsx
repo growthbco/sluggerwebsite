@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { orders, orderItems, teams } from "@/db/schema";
-import { isAdmin } from "@/lib/admin-auth";
+import { getAdminSession, canAccess } from "@/lib/admin-auth";
 import { AdminArchiveButton } from "@/components/admin-archive-button";
 import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
@@ -38,8 +38,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export default async function AdminOrderDetail({ params }: { params: Promise<{ id: string }> }) {
   if (!dbEnabled()) notFound();
-  if (!(await isAdmin())) redirect("/admin");
   const { id } = await params;
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!canAccess(session.role, `/admin/order/${id}`)) redirect("/admin");
 
   const db = getDb();
   const [o] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
