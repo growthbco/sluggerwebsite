@@ -478,7 +478,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                             {!o.balanceInvoiceUrl && !paid && (
                               <AdminPickupToggle teamOrderId={o.id} pickup={o.localPickup} />
                             )}
-                            {!o.invoiceUrl && !paid && (
+                            {!o.invoiceUrl && !o.depositPaidAt && !paid && (
                               <>
                                 <AdminJerseyStyle teamOrderId={o.id} current={o.jerseyStyle} />
                                 <AdminCustomPrice teamOrderId={o.id} currentCents={o.customJerseyCents} />

@@ -258,3 +258,76 @@ export async function markAddonPaid(addonId: string, sessionId: string, paidTota
   const summary = addon.rows.map((r) => `${r.quantity}× ${r.label}`).join(", ");
   return { addon, order, summary };
 }
+
+
+/** Build a single-use Stripe payment link for a set of add-on rows on an
+ *  order (shared by the public add-on endpoint and the admin combine action).
+ *  Creates the addon batch, the link, and stores the link id on the batch. */
+export async function createAddonCheckoutLink(
+  order: { id: string; reference: string; teamName: string; status: string; jerseyStyle?: string | null; items?: string[] | null; localPricing?: boolean | null; customJerseyCents?: number | null },
+  rows: AddonRow[],
+  totalCents: number,
+): Promise<{ url: string; addonId: string } | { error: string }> {
+  const { getStripe } = await import("@/lib/stripe");
+  const { taxCents, SALES_TAX_LABEL } = await import("@/lib/pricing");
+  const { shippingCentsFor } = await import("@/lib/team-stores");
+  const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+  const stripe = getStripe();
+  try {
+    const addon = await createAddon(order.id, rows, totalCents);
+    const ADDON_SEPARATE_SHIP_MIN = 10;
+    const pieceCount = rows.reduce((s, r) => s + r.quantity, 0);
+    const shipsSeparately = order.status === "shipped" || pieceCount >= ADDON_SEPARATE_SHIP_MIN;
+    const makePrice = async (name: string, unitAmount: number) =>
+      (await stripe.prices.create({ currency: "usd", unit_amount: unitAmount, product_data: { name } })).id;
+    const lineItems: { price: string; quantity: number }[] = [];
+    for (const r of rows) {
+      lineItems.push({
+        quantity: r.quantity,
+        price: await makePrice(
+          `${r.label} - ${[r.design, r.size, r.name?.toUpperCase(), r.number ? `#${r.number}` : null].filter(Boolean).join(" - ")} (add-on ${order.reference})`,
+          r.unitPriceCents,
+        ),
+      });
+    }
+    const addonTax = taxCents(totalCents);
+    if (addonTax > 0) lineItems.push({ quantity: 1, price: await makePrice(SALES_TAX_LABEL, addonTax) });
+    let shippingOptions: { shipping_rate: string }[] = [];
+    if (shipsSeparately) {
+      const boxes = addonParcelsOz(rows);
+      const [byWeight, pickup] = await Promise.all([
+        stripe.shippingRates.create({ display_name: boxes.length > 1 ? "Shipping (2 boxes - hats ship separately)" : "Shipping (by weight)", type: "fixed_amount", fixed_amount: { amount: boxes.reduce((s, w) => s + shippingCentsFor(w), 0), currency: "usd" } }),
+        stripe.shippingRates.create({ display_name: "Free local pickup (Ocala, FL)", type: "fixed_amount", fixed_amount: { amount: 0, currency: "usd" } }),
+      ]);
+      shippingOptions = [{ shipping_rate: byWeight.id }, { shipping_rate: pickup.id }];
+    }
+    const link = await stripe.paymentLinks.create({
+      line_items: lineItems,
+      restrictions: { completed_sessions: { limit: 1 } },
+      ...(shipsSeparately ? { shipping_address_collection: { allowed_countries: ["US"] as const }, shipping_options: shippingOptions } : {}),
+      metadata: { kind: "team_order_addon", addonId: addon.id, teamOrderId: order.id, teamName: order.teamName },
+      after_completion: { type: "redirect", redirect: { url: `${SITE}/checkout/success` } },
+    });
+    await setAddonSession(addon.id, link.id);
+    return { url: link.url!, addonId: addon.id };
+  } catch (e) {
+    console.error("createAddonCheckoutLink failed:", e);
+    return { error: "Could not create the payment link" };
+  }
+}
+
+/** Remove a pending add-on batch (and deactivate its Stripe link). No-op if
+ *  the batch is already paid. */
+export async function removePendingAddon(addonId: string): Promise<boolean> {
+  const db = getDb();
+  const [a] = await db.select().from(teamOrderAddons).where(eq(teamOrderAddons.id, addonId)).limit(1);
+  if (!a || a.status !== "pending") return false;
+  if (a.stripeCheckoutSessionId?.startsWith("plink_")) {
+    try {
+      const { getStripe } = await import("@/lib/stripe");
+      await getStripe().paymentLinks.update(a.stripeCheckoutSessionId, { active: false });
+    } catch {}
+  }
+  await db.delete(teamOrderAddons).where(eq(teamOrderAddons.id, addonId));
+  return true;
+}

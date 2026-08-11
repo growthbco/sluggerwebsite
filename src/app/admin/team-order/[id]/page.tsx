@@ -27,6 +27,7 @@ import { AdminArchiveButton } from "@/components/admin-archive-button";
 import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
 import { AdminPickupButton } from "@/components/admin-pickup-button";
+import { AdminPendingAddons } from "@/components/admin-pending-addons";
 import { TrackingInfo } from "@/components/tracking-info";
 import { AdminRequote } from "@/components/admin-requote";
 
@@ -76,12 +77,29 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
   const [o] = await db.select().from(teamOrders).where(eq(teamOrders.id, id)).limit(1);
   if (!o) notFound();
 
-  const [roster, jerseys, paidAddons, activeDesigns] = await Promise.all([
+  const [roster, jerseys, paidAddons, pendingAddonsRaw, activeDesigns] = await Promise.all([
     getRoster(o.id),
     getPrintableJerseys(o.id),
     db.select().from(teamOrderAddons).where(and(eq(teamOrderAddons.teamOrderId, o.id), eq(teamOrderAddons.status, "paid"))),
+    db.select().from(teamOrderAddons).where(and(eq(teamOrderAddons.teamOrderId, o.id), eq(teamOrderAddons.status, "pending"))),
     db.select({ id: designRequests.id, teamName: designRequests.teamName, reference: designRequests.reference }).from(designRequests),
   ]);
+  // Resolve each pending add-on's live Stripe payment link (new batches store
+  // plink_ ids; legacy ones used expiring cs_ sessions with no reusable link).
+  const pendingAddons = await Promise.all(
+    pendingAddonsRaw.map(async (p) => {
+      let payUrl: string | null = null;
+      const sid = p.stripeCheckoutSessionId;
+      if (sid?.startsWith("plink_")) {
+        try {
+          const { getStripe } = await import("@/lib/stripe");
+          const pl = await getStripe().paymentLinks.retrieve(sid);
+          if (pl.active) payUrl = pl.url;
+        } catch {}
+      }
+      return { id: p.id, rows: p.rows, totalCents: p.totalCents, payUrl };
+    }),
+  );
   const design = o.designRequestId
     ? (await db.select().from(designRequests).where(eq(designRequests.id, o.designRequestId)).limit(1))[0] ?? null
     : null;
@@ -243,7 +261,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
           )}
         </div>
         {/* Pricing settings, locked once an invoice is out. */}
-        {!o.invoiceUrl && !paid && (
+        {!o.invoiceUrl && !o.depositPaidAt && !paid && (
           <div className="mt-4 pt-4 border-t border-line/60 flex flex-wrap items-center gap-2">
             <span className="text-xs display text-muted uppercase tracking-wide w-full">Pricing settings</span>
             <AdminJerseyStyle teamOrderId={o.id} current={o.jerseyStyle} />
@@ -307,6 +325,9 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
       </Section>
 
       {/* Shipping */}
+      {pendingAddons.length > 0 && (
+        <AdminPendingAddons teamOrderId={o.id} pending={pendingAddons} />
+      )}
       <Section title="Shipping">
         <dl className="grid sm:grid-cols-3 gap-4">
           <Field label="Deliver to">
