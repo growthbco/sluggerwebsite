@@ -6,7 +6,7 @@ import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
 import { taxCents } from "@/lib/pricing";
 import { renderTeamOrderInvoice } from "@/lib/email";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 
@@ -15,7 +15,8 @@ export const runtime = "nodejs";
 // Numbers are rebuilt with the same logic as the send route; the pay links
 // are the stored Stripe links, so this page mirrors the customer's email.
 export async function GET(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("money");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
 
   const url = new URL(req.url);

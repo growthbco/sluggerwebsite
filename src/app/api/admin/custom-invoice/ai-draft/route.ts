@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 import { generateJson } from "@/lib/design-assistant";
 
 export const runtime = "nodejs";
@@ -9,7 +9,8 @@ export const runtime = "nodejs";
 // staff member has typed so far. The draft lands in the field for editing -
 // nothing is sent anywhere automatically.
 export async function POST(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("money");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY) {
     return NextResponse.json({ error: "AI not configured" }, { status: 503 });
   }
