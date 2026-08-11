@@ -484,6 +484,13 @@
       "when": 1786455483214,
       "tag": "0068_bitter_nightshade",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1786457374080,
+      "tag": "0069_cuddly_patch",
+      "breakpoints": true
     }
   ]
 }

@@ -94,24 +94,26 @@ export async function POST(req: Request) {
         // (second box, reship, hats going separately). Append it and email
         // the customer this tracking right away - this box is going out now.
         const { appendAdditionalShipment } = await import("@/lib/fulfillment");
-        const sent = await appendAdditionalShipment(kind, body.id, label.trackingNumber, label.labelUrl, (body.note ?? "").trim().slice(0, 80) || undefined);
+        const sent = await appendAdditionalShipment(kind, body.id, label.trackingNumber, label.labelUrl, (body.note ?? "").trim().slice(0, 80) || undefined, label.transactionId);
         return NextResponse.json({
           ok: true,
           additional: true,
           trackingNumber: label.trackingNumber,
           labelUrl: label.labelUrl,
           costCents: label.costCents,
+          provider: label.provider,
           emailed: sent,
         });
       }
       // Primary label: save tracking, but don't ship or email yet - buying the
       // label ahead of time is a separate step from actually sending the box.
-      await saveLabelPurchase(kind, body.id, label.trackingNumber, label.labelUrl);
+      await saveLabelPurchase(kind, body.id, label.trackingNumber, label.labelUrl, label.transactionId);
       return NextResponse.json({
         ok: true,
         trackingNumber: label.trackingNumber,
         labelUrl: label.labelUrl,
         costCents: label.costCents,
+        provider: label.provider,
       });
     } catch (e) {
       return NextResponse.json({ error: (e as Error).message }, { status: 502 });

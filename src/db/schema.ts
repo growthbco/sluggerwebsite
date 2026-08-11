@@ -319,10 +319,13 @@ export const orders = pgTable(
     // Shippo PDF for reprints).
     trackingNumber: text("tracking_number"),
     labelUrl: text("label_url"),
+    // Shippo transaction object id of the primary label (lets us schedule a
+    // carrier pickup for it).
+    shipTransactionId: text("ship_transaction_id"),
     // Extra parcels beyond the first (a second box, a reship, hats shipping
     // on their own). Each carries its own tracking + label + emailed flag.
     additionalShipments: jsonb("additional_shipments").$type<
-      { trackingNumber: string; labelUrl?: string; carrier?: string; service?: string; at: string }[]
+      { trackingNumber: string; labelUrl?: string; carrier?: string; service?: string; transactionId?: string; at: string }[]
     >(),
     shippedAt: timestamp("shipped_at", { withTimezone: true }),
     // Admin can hide a fulfilled/void shop or store order from the active list.
@@ -498,10 +501,13 @@ export const teamOrders = pgTable(
     // Fulfillment (labelUrl = Shippo PDF for reprints)
     trackingNumber: text("tracking_number"),
     labelUrl: text("label_url"),
+    // Shippo transaction object id of the primary label (lets us schedule a
+    // carrier pickup for it).
+    shipTransactionId: text("ship_transaction_id"),
     // Extra parcels beyond the first (a second box, a reship, hats shipping
     // on their own). Each carries its own tracking + label + emailed flag.
     additionalShipments: jsonb("additional_shipments").$type<
-      { trackingNumber: string; labelUrl?: string; carrier?: string; service?: string; at: string }[]
+      { trackingNumber: string; labelUrl?: string; carrier?: string; service?: string; transactionId?: string; at: string }[]
     >(),
     shippedAt: timestamp("shipped_at", { withTimezone: true }),
 

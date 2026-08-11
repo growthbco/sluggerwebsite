@@ -22,20 +22,21 @@ export async function saveLabelPurchase(
   id: string,
   trackingNumber: string,
   labelUrl: string,
+  transactionId?: string,
 ): Promise<boolean> {
   const db = getDb();
   const now = new Date();
   if (kind === "team_order") {
     const [row] = await db
       .update(teamOrders)
-      .set({ trackingNumber, labelUrl, updatedAt: now })
+      .set({ trackingNumber, labelUrl, shipTransactionId: transactionId ?? null, updatedAt: now })
       .where(eq(teamOrders.id, id))
       .returning({ id: teamOrders.id });
     return Boolean(row);
   }
   const [row] = await db
     .update(orders)
-    .set({ trackingNumber, labelUrl })
+    .set({ trackingNumber, labelUrl, shipTransactionId: transactionId ?? null })
     .where(eq(orders.id, id))
     .returning({ id: orders.id });
   return Boolean(row);
@@ -51,9 +52,10 @@ export async function appendAdditionalShipment(
   trackingNumber: string,
   labelUrl: string,
   note?: string,
+  transactionId?: string,
 ): Promise<boolean> {
   const db = getDb();
-  const entry = { trackingNumber, labelUrl, at: new Date().toISOString() };
+  const entry = { trackingNumber, labelUrl, transactionId, at: new Date().toISOString() };
   let email: string | null = null;
   let name: string | null = null;
   let reference = "";

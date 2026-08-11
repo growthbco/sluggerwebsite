@@ -151,7 +151,7 @@ export async function quoteChargedShipping(
 }
 
 /** Buy the label for a previously quoted rate. Returns tracking + label PDF. */
-export async function buyLabel(rateId: string): Promise<{ trackingNumber: string; labelUrl: string; costCents: number }> {
+export async function buyLabel(rateId: string): Promise<{ trackingNumber: string; labelUrl: string; costCents: number; transactionId: string; provider: string; service: string }> {
   if (!labelReady()) throw new Error("Set SHIP_FROM_STREET (your ship-from address) before buying labels.");
   const res = await fetch(`${API}/transactions/`, {
     method: "POST",
@@ -172,7 +172,73 @@ export async function buyLabel(rateId: string): Promise<{ trackingNumber: string
     trackingNumber: t.tracking_number,
     labelUrl: t.label_url,
     costCents: Math.round(parseFloat(t.rate?.amount ?? "0") * 100),
+    transactionId: t.object_id,
+    provider: t.rate?.provider ?? "",
+    service: t.rate?.servicelevel?.name ?? "",
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Carrier pickups (USPS is free; UPS charges)                         */
+/* ------------------------------------------------------------------ */
+
+/** The USPS carrier account object id, needed to schedule a USPS pickup. */
+async function uspsCarrierAccount(): Promise<string | null> {
+  try {
+    const res = await fetch(`${API}/carrier_accounts/?carrier=usps`, { headers: headers() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const acct = (data.results ?? []).find((a: { active?: boolean; object_id: string }) => a.active) ?? (data.results ?? [])[0];
+    return acct?.object_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Schedule a FREE USPS pickup at the ship-from address for the given label
+ *  transactions on a date (all-day window). Returns a confirmation code or an
+ *  error message. */
+export async function scheduleUspsPickup(
+  transactionIds: string[],
+  dateIso: string, // YYYY-MM-DD (Eastern)
+): Promise<{ ok: true; confirmation: string } | { ok: false; error: string }> {
+  if (!shippoEnabled()) return { ok: false, error: "Shipping isn't configured." };
+  if (transactionIds.length === 0) return { ok: false, error: "No USPS labels on this order to schedule a pickup for." };
+  const carrierAccount = await uspsCarrierAccount();
+  if (!carrierAccount) return { ok: false, error: "No USPS carrier account is connected in Shippo." };
+  // USPS carrier pickup windows: 8am-5pm is a safe all-day request.
+  const start = `${dateIso}T08:00:00-04:00`;
+  const end = `${dateIso}T17:00:00-04:00`;
+  const f = fromAddress();
+  try {
+    const res = await fetch(`${API}/pickups/`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        carrier_account: carrierAccount,
+        location: {
+          building_location_type: "Front Door",
+          building_type: "office",
+          instructions: "Packages by the front door.",
+          address: { ...f, object_id: undefined },
+        },
+        transactions: transactionIds,
+        requested_start_time: start,
+        requested_end_time: end,
+        is_test: false,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.status === "ERROR") {
+      const msg = (data.messages ?? []).map((m: { text?: string }) => m.text).filter(Boolean).join("; ");
+      console.error("Shippo pickup failed:", res.status, JSON.stringify(data).slice(0, 500));
+      return { ok: false, error: msg || "USPS couldn't schedule that pickup - try another date." };
+    }
+    return { ok: true, confirmation: data.confirmation_code ?? data.object_id ?? "scheduled" };
+  } catch (e) {
+    console.error("Shippo pickup error:", e);
+    return { ok: false, error: "Could not reach the carrier to schedule the pickup." };
+  }
 }
 
 /* ------------------------------------------------------------------ */

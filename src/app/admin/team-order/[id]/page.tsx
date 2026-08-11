@@ -26,6 +26,7 @@ import { AdminLinkDesign } from "@/components/admin-link-design";
 import { AdminArchiveButton } from "@/components/admin-archive-button";
 import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
+import { AdminPickupButton } from "@/components/admin-pickup-button";
 import { TrackingInfo } from "@/components/tracking-info";
 import { AdminRequote } from "@/components/admin-requote";
 
@@ -335,6 +336,9 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
               the customer its tracking right away. */}
           {paid && o.trackingNumber && (
             <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} additional label="🏷 Buy another label + email" />
+          )}
+          {(o.shipTransactionId || (o.additionalShipments ?? []).some((s) => s.transactionId)) && (
+            <AdminPickupButton kind="team_order" id={o.id} />
           )}
         </div>
         {(o.additionalShipments?.length ?? 0) > 0 && (
