@@ -1,14 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
 export type Txn = {
   at: string;
   customer: string;
+  email?: string | null;
   ref: string;
   kind: "Deposit" | "Final balance" | "Paid in full" | "Add-on" | "Custom invoice" | "Team store" | "Buy-in" | "Shop";
   amountCents: number;
   method: "Stripe" | "Offline";
+  detail?: string[];
 };
 
 const money = (c: number) => `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -32,6 +34,7 @@ const KIND_CHIPS = ["All", "Deposit", "Final balance", "Paid in full", "Add-on",
 export function AdminTransactions({ txns }: { txns: Txn[] }) {
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState<string>("All");
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
@@ -128,16 +131,42 @@ export function AdminTransactions({ txns }: { txns: Txn[] }) {
             </tr>
           </thead>
           <tbody>
-            {visible.map((t, i) => (
-              <tr key={i} className="border-t border-line hover:bg-steel/60">
-                <td className="px-3 py-2.5 text-muted whitespace-nowrap">{fmtDate(t.at)}</td>
-                <td className="px-3 py-2.5 text-foreground">{t.customer}</td>
-                <td className="px-3 py-2.5 font-mono text-xs text-muted">{t.ref}</td>
-                <td className="px-3 py-2.5"><span className={`inline-block border px-2 py-0.5 text-xs display ${KIND_TONE[t.kind]}`}>{t.kind}</span></td>
-                <td className="px-3 py-2.5 text-right tabular-nums text-foreground">{money(t.amountCents)}</td>
-                <td className="px-3 py-2.5 text-xs text-muted">{t.method === "Offline" ? "💵 Offline" : "Stripe"}</td>
-              </tr>
-            ))}
+            {visible.map((t, i) => {
+              const expandable = Boolean(t.detail?.length || t.email);
+              const isOpen = openIdx === i;
+              return (
+              <Fragment key={i}>
+                <tr
+                  className={`border-t border-line ${expandable ? "cursor-pointer hover:bg-steel/60" : "hover:bg-steel/60"}`}
+                  onClick={() => expandable && setOpenIdx(isOpen ? null : i)}
+                >
+                  <td className="px-3 py-2.5 text-muted whitespace-nowrap">{fmtDate(t.at)}</td>
+                  <td className="px-3 py-2.5 text-foreground">
+                    {expandable && <span className="text-muted mr-1.5">{isOpen ? "▾" : "▸"}</span>}
+                    {t.customer}
+                  </td>
+                  <td className="px-3 py-2.5 font-mono text-xs text-muted">{t.ref}</td>
+                  <td className="px-3 py-2.5"><span className={`inline-block border px-2 py-0.5 text-xs display ${KIND_TONE[t.kind]}`}>{t.kind}</span></td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-foreground">{money(t.amountCents)}</td>
+                  <td className="px-3 py-2.5 text-xs text-muted">{t.method === "Offline" ? "💵 Offline" : "Stripe"}</td>
+                </tr>
+                {isOpen && (
+                  <tr className="border-t border-line/40 bg-background/40">
+                    <td colSpan={6} className="px-6 py-3 text-sm">
+                      {t.email && <p className="text-xs text-muted mb-1.5">Billed to <a href={`mailto:${t.email}`} className="text-brand hover:underline">{t.email}</a></p>}
+                      {t.detail?.length ? (
+                        <ul className="space-y-0.5 text-foreground/90 text-xs">
+                          {t.detail.map((d, j) => <li key={j} className="tabular-nums">{d}</li>)}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-muted">No line-item detail on this one.</p>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+              );
+            })}
             {visible.length === 0 && (
               <tr><td colSpan={6} className="px-3 py-8 text-center text-muted">No transactions match these filters.</td></tr>
             )}

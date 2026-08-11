@@ -10,6 +10,8 @@ import { AdminTransactions, type Txn } from "@/components/admin-transactions";
 export const metadata: Metadata = { title: "Transactions", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
+const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+
 // Every dollar in, as a single filterable ledger: team-order deposits and
 // balances, paid add-ons, custom invoices, and store/shop purchases.
 export default async function AdminTransactionsPage() {
@@ -27,6 +29,7 @@ export default async function AdminTransactionsPage() {
         reference: teamOrders.reference,
         teamName: teamOrders.teamName,
         contactName: teamOrders.contactName,
+        contactEmail: teamOrders.contactEmail,
         quotedTotalCents: teamOrders.quotedTotalCents,
         depositCents: teamOrders.depositCents,
         depositPaidAt: teamOrders.depositPaidAt,
@@ -35,7 +38,7 @@ export default async function AdminTransactionsPage() {
       })
       .from(teamOrders),
     db
-      .select({ teamOrderId: teamOrderAddons.teamOrderId, paidAt: teamOrderAddons.paidAt, totalCents: teamOrderAddons.totalCents, paidTotalCents: teamOrderAddons.paidTotalCents })
+      .select({ teamOrderId: teamOrderAddons.teamOrderId, rows: teamOrderAddons.rows, paidAt: teamOrderAddons.paidAt, totalCents: teamOrderAddons.totalCents, paidTotalCents: teamOrderAddons.paidTotalCents })
       .from(teamOrderAddons)
       .where(eq(teamOrderAddons.status, "paid")),
     db.select().from(customInvoices).orderBy(desc(customInvoices.createdAt)).limit(200),
@@ -57,20 +60,27 @@ export default async function AdminTransactionsPage() {
     const dep = t.depositCents ?? Math.round(total / 2);
     const paidInFull = Boolean(t.invoicePaidAt && t.depositPaidAt && Math.abs(+t.invoicePaidAt - +t.depositPaidAt) < 60000);
     if (t.depositPaidAt && !paidInFull && dep > 0) {
-      txns.push({ at: t.depositPaidAt.toISOString(), customer: t.teamName.trim() || t.contactName, ref: t.reference, kind: "Deposit", amountCents: dep, method: offline ? "Offline" : "Stripe" });
+      txns.push({ at: t.depositPaidAt.toISOString(), customer: t.teamName.trim() || t.contactName, email: t.contactEmail, ref: t.reference, kind: "Deposit", amountCents: dep, method: offline ? "Offline" : "Stripe" });
     }
     if (t.invoicePaidAt && (paidInFull ? total : total - dep) > 0) {
-      txns.push({ at: t.invoicePaidAt.toISOString(), customer: t.teamName.trim() || t.contactName, ref: t.reference, kind: paidInFull ? "Paid in full" : "Final balance", amountCents: paidInFull ? total : Math.max(0, total - dep), method: offline ? "Offline" : "Stripe" });
+      txns.push({ at: t.invoicePaidAt.toISOString(), customer: t.teamName.trim() || t.contactName, email: t.contactEmail, ref: t.reference, kind: paidInFull ? "Paid in full" : "Final balance", amountCents: paidInFull ? total : Math.max(0, total - dep), method: offline ? "Offline" : "Stripe" });
     }
   }
   for (const a of addons) {
     if (!a.paidAt) continue;
     const t = orderById.get(a.teamOrderId);
-    txns.push({ at: a.paidAt.toISOString(), customer: t?.teamName.trim() ?? "Add-on", ref: t?.reference ?? "-", kind: "Add-on", amountCents: a.paidTotalCents ?? a.totalCents, method: "Stripe" });
+    const goods = a.rows.reduce((s, r) => s + r.unitPriceCents * r.quantity, 0);
+    const paid = a.paidTotalCents ?? a.totalCents;
+    const detail = a.rows.map(
+      (r) => `${r.quantity}x ${r.label} - ${[r.size, r.name?.toUpperCase(), r.number ? `#${r.number}` : null, r.design].filter(Boolean).join(" - ")} - ${money(r.unitPriceCents)}`,
+    );
+    detail.push(`Goods ${money(goods)}${paid > goods ? ` + tax/shipping ${money(paid - goods)}` : ""} = ${money(paid)}`);
+    txns.push({ at: a.paidAt.toISOString(), customer: t?.teamName.trim() ?? "Add-on", email: t?.contactEmail ?? null, ref: t?.reference ?? "-", kind: "Add-on", amountCents: paid, method: "Stripe", detail });
   }
   for (const inv of invoices) {
     if (inv.status === "paid" && inv.paidAt) {
-      txns.push({ at: inv.paidAt.toISOString(), customer: inv.customerName, ref: inv.reference, kind: "Custom invoice", amountCents: inv.totalCents, method: "Stripe" });
+      const detail = (inv.lines ?? []).map((l) => `${l.quantity}x ${l.description ?? l.name ?? "Item"} - ${money(l.unitPriceCents ?? 0)}`);
+      txns.push({ at: inv.paidAt.toISOString(), customer: inv.customerName, email: inv.customerEmail, ref: inv.reference, kind: "Custom invoice", amountCents: inv.totalCents, method: "Stripe", detail: detail.length ? detail : undefined });
     }
   }
   for (const o of shopOrders) {
