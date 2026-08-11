@@ -5,10 +5,16 @@ import { useStatusFilter } from "@/components/admin-filter-store";
 
 // Filters the dashboard's project rows in place. Rows opt in with a
 // data-search attribute (searchable text) and data-status attribute.
-export function AdminSearch({ statuses }: { statuses: string[] }) {
+export function AdminSearch({ statuses, initialStatus }: { statuses: string[]; initialStatus?: string }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useStatusFilter();
   const ref = useRef<HTMLDivElement>(null);
+
+  // Pre-filter from a ?status= deep link (dashboard pipeline cards).
+  useEffect(() => {
+    if (initialStatus) setStatus(initialStatus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialStatus]);
 
   useEffect(() => {
     const term = q.trim().toLowerCase();
@@ -47,6 +53,7 @@ export function AdminSearch({ statuses }: { statuses: string[] }) {
         placeholder="🔍 Search team, ref, or contact…"
         className="flex-1 min-w-52 bg-steel border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
       />
+      {statuses.length > 0 && (
       <select
         value={status}
         onChange={(e) => setStatus(e.target.value)}
@@ -59,6 +66,7 @@ export function AdminSearch({ statuses }: { statuses: string[] }) {
           </option>
         ))}
       </select>
+      )}
       {(q || status) && (
         <button
           type="button"

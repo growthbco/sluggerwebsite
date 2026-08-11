@@ -1,79 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { desc, sql, eq, isNotNull, isNull } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
-import { designRequests, teamOrders, teams, orders, teamOrderAddons, assistantFacts, customInvoices, designLabVisitors } from "@/db/schema";
+import { designRequests, teamOrders, teams, orders, assistantFacts, designLabVisitors } from "@/db/schema";
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
-import { getRoster } from "@/lib/team-orders";
-import { computeTeamOrderQuote, estimateOrderWeightOz } from "@/lib/team-order-pricing";
-import { sizeBreakdown, ITEM_TYPES } from "@/lib/order-items";
-import { shippingCentsFor } from "@/lib/team-stores";
-import { getLiveTracking, type LiveTracking } from "@/lib/shippo";
 import { AdminLogout } from "@/components/admin-logout";
-import { AdminInvoiceButton } from "@/components/admin-invoice-button";
-import { AdminJerseyStyle } from "@/components/admin-jersey-style";
 import { AdminPipeline } from "@/components/admin-pipeline";
-import { AdminLinkDesign } from "@/components/admin-link-design";
-import { AdminDesignerNote } from "@/components/admin-designer-note";
-import { AdminShipButton } from "@/components/admin-ship-button";
-import { AdminLabelButton } from "@/components/admin-label-button";
-import { TrackingInfo } from "@/components/tracking-info";
-import { inboundTrackingUrlFor } from "@/lib/tracking";
-import { AdminAddonDetails } from "@/components/admin-addon-details";
-import { AdminArchiveButton } from "@/components/admin-archive-button";
-import { AdminLocalToggle } from "@/components/admin-local-toggle";
-import { AdminTaxToggle } from "@/components/admin-tax-toggle";
-import { AdminSearch } from "@/components/admin-search";
-import { AdminNewStore } from "@/components/admin-new-store";
-import { AdminRecordPayment } from "@/components/admin-record-payment";
-import { AdminPickupToggle } from "@/components/admin-pickup-toggle";
-import { AdminRowMenu } from "@/components/admin-row-menu";
-import { AdminCustomPrice } from "@/components/admin-custom-price";
-import { AdminInboundTracking } from "@/components/admin-inbound-tracking";
 import { MarkStaffDevice } from "@/components/mark-staff-device";
-import { STORE_ITEM_PRESETS } from "@/lib/team-stores";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
-const STATUS_TONE: Record<string, string> = {
-  pending_payment: "border-amber-500/50 text-amber-400",
-  submitted: "border-brand/50 text-brand",
-  in_design: "border-brand/50 text-brand",
-  proof_sent: "border-sky-500/50 text-sky-400",
-  changes_requested: "border-amber-500/50 text-amber-400",
-  approved: "border-green-500/50 text-green-400",
-  ordered: "border-green-500/50 text-green-400",
-  cancelled: "border-line text-muted",
-  // team orders
-  draft: "border-line text-muted",
-  collecting: "border-brand/50 text-brand",
-  quoted: "border-amber-500/50 text-amber-400",
-  in_production: "border-sky-500/50 text-sky-400",
-  paid: "border-green-500/50 text-green-400",
-  shipped: "border-green-500/50 text-green-400",
-};
-
-function Badge({ label }: { label: string }) {
-  return (
-    <span className={`inline-block border px-2 py-0.5 text-xs display ${STATUS_TONE[label] ?? "border-line text-muted"}`}>
-      {label.replace(/_/g, " ")}
-    </span>
-  );
-}
-
-function fmtDate(d: Date | string | null | undefined) {
-  if (!d) return "-";
-  const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
-}
-
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
-// Compact source for table cells ("Google (ad) → /pricing" -> "Google (ad)");
-// the full string stays in the hover tooltip.
-const srcShort = (s: string | null | undefined) => (s ? s.split(" → ")[0] : "-");
 
+// The dashboard is a pure OVERVIEW now: money snapshot, the pipeline, and
+// what needs attention. Every list lives on its own sidebar page - Design
+// Requests, Team Orders, Awaiting Payment, Payments, Stores, Shop Orders.
 export default async function AdminPage() {
   if (!adminEnabled()) {
     return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Set ADMIN_PASSWORD to enable the dashboard.</div>;
@@ -84,257 +27,41 @@ export default async function AdminPage() {
   }
 
   const db = getDb();
-  const [designs, torders, stores, recentOrders, paidAddons] = await Promise.all([
+  const [designs, torders, stores, recentOrders, labVisitors, aiFacts] = await Promise.all([
     db
       .select({
-        id: designRequests.id,
-        reference: designRequests.reference,
         teamName: designRequests.teamName,
         status: designRequests.status,
-        contactName: designRequests.contactName,
-        contactEmail: designRequests.contactEmail,
-        revisionsUsed: designRequests.revisionsUsed,
-        neededBy: designRequests.neededBy,
         messages: designRequests.messages,
-        source: designRequests.source,
-        manageToken: designRequests.manageToken,
         archivedAt: designRequests.archivedAt,
-        archivedNote: designRequests.archivedNote,
-        updatedAt: designRequests.updatedAt,
       })
-      .from(designRequests)
-      .orderBy(desc(designRequests.updatedAt)),
+      .from(designRequests),
     db
       .select({
         id: teamOrders.id,
-        reference: teamOrders.reference,
-        teamName: teamOrders.teamName,
         status: teamOrders.status,
-        contactEmail: teamOrders.contactEmail,
-        manageToken: teamOrders.manageToken,
-        jerseyStyle: teamOrders.jerseyStyle,
-        rushShipping: teamOrders.rushShipping,
-        localPricing: teamOrders.localPricing,
-        embroideryFeeWaived: teamOrders.embroideryFeeWaived,
-        taxExempt: teamOrders.taxExempt,
-        designRequestId: teamOrders.designRequestId,
-        designerNote: teamOrders.designerNote,
-        source: teamOrders.source,
-        printFileVerifiedAt: teamOrders.printFileVerifiedAt,
         quotedTotalCents: teamOrders.quotedTotalCents,
-        invoiceUrl: teamOrders.invoiceUrl,
         depositCents: teamOrders.depositCents,
         depositPaidAt: teamOrders.depositPaidAt,
-        balanceInvoiceUrl: teamOrders.balanceInvoiceUrl,
+        invoiceUrl: teamOrders.invoiceUrl,
         invoicePaidAt: teamOrders.invoicePaidAt,
-        trackingNumber: teamOrders.trackingNumber,
-        labelUrl: teamOrders.labelUrl,
-        shippedAt: teamOrders.shippedAt,
-        shippingChargedCents: teamOrders.shippingChargedCents,
-        paymentNote: teamOrders.paymentNote,
-        localPickup: teamOrders.localPickup,
-        customJerseyCents: teamOrders.customJerseyCents,
-        inboundCarrier: teamOrders.inboundCarrier,
-        inboundTrackingNumber: teamOrders.inboundTrackingNumber,
-        inboundTrackingAddedAt: teamOrders.inboundTrackingAddedAt,
+        taxExempt: teamOrders.taxExempt,
         archivedAt: teamOrders.archivedAt,
-        archivedNote: teamOrders.archivedNote,
-        updatedAt: teamOrders.updatedAt,
       })
-      .from(teamOrders)
-      .orderBy(desc(teamOrders.updatedAt)),
+      .from(teamOrders),
+    db.select({ id: teams.id, storeActive: teams.storeActive }).from(teams),
     db
-      .select({
-        id: teams.id,
-        name: teams.name,
-        storeActive: teams.storeActive,
-        storeToken: teams.storeToken,
-      })
-      .from(teams)
-      .orderBy(desc(teams.createdAt)),
-    db
-      .select({
-        id: orders.id,
-        reference: orders.reference,
-        type: orders.type,
-        status: orders.status,
-        customerName: orders.customerName,
-        totalCents: orders.totalCents,
-        trackingNumber: orders.trackingNumber,
-        labelUrl: orders.labelUrl,
-        shippedAt: orders.shippedAt,
-        createdAt: orders.createdAt,
-        teamId: orders.teamId,
-        source: orders.source,
-      })
+      .select({ status: orders.status, totalCents: orders.totalCents, createdAt: orders.createdAt })
       .from(orders)
-      .where(isNull(orders.archivedAt))
       .orderBy(desc(orders.createdAt))
-      .limit(60),
-    db
-      .select({
-        teamOrderId: teamOrderAddons.teamOrderId,
-        rows: teamOrderAddons.rows,
-        totalCents: teamOrderAddons.totalCents,
-        paidTotalCents: teamOrderAddons.paidTotalCents,
-        paidAt: teamOrderAddons.paidAt,
-      })
-      .from(teamOrderAddons)
-      .where(eq(teamOrderAddons.status, "paid"))
-      .orderBy(desc(teamOrderAddons.paidAt)),
+      .limit(200),
+    db.select({ id: designLabVisitors.id, email: designLabVisitors.email, paidAt: designLabVisitors.paidAt }).from(designLabVisitors),
+    db.select().from(assistantFacts),
   ]);
 
-  // Per-store order totals (all-time), computed reliably instead of via a
-  // correlated subquery that was returning 0.
-  const storeAgg = await getDb()
-    .select({
-      teamId: orders.teamId,
-      n: sql<number>`count(*)::int`,
-      sum: sql<number>`coalesce(sum(${orders.totalCents}), 0)::int`,
-    })
-    .from(orders)
-    .where(isNotNull(orders.teamId))
-    .groupBy(orders.teamId);
-  const storeAggMap = new Map(storeAgg.map((a) => [a.teamId, a]));
-
-  // Facts staff taught the AI assistant (rendered in the training panel).
-  const aiFacts = await db.select().from(assistantFacts).orderBy(assistantFacts.createdAt);
-  // Design-lab lead counts for the dashboard card.
-  const labVisitors = await db
-    .select({ id: designLabVisitors.id, email: designLabVisitors.email, paidAt: designLabVisitors.paidAt })
-    .from(designLabVisitors);
-  const labLeads = labVisitors.filter((v) => v.email).length;
-  const labPaid = labVisitors.filter((v) => v.paidAt).length;
-
-  // Free-form custom invoices (newest first).
-  const invoices = await db.select().from(customInvoices).orderBy(desc(customInvoices.createdAt)).limit(15);
-
-  // Paid add-ons grouped by their parent team order, so each order can show
-  // the extra players (name / # / size) that were added after the fact.
-  type AddonView = { rows: typeof paidAddons[number]["rows"]; totalCents: number; paidTotalCents: number | null };
-  const addonsByOrder = new Map<string, AddonView[]>();
-  for (const a of paidAddons) {
-    const list = addonsByOrder.get(a.teamOrderId) ?? [];
-    list.push({ rows: a.rows, totalCents: a.totalCents, paidTotalCents: a.paidTotalCents });
-    addonsByOrder.set(a.teamOrderId, list);
-  }
-
   const activeDesigns = designs.filter((d) => !d.archivedAt);
-  // Designs a standalone order can be manually linked to.
-  const linkableDesigns = activeDesigns.map((d) => ({ id: d.id, teamName: d.teamName, reference: d.reference }));
-  const archivedDesigns = designs.filter((d) => d.archivedAt);
   const activeOrders = torders.filter((o) => !o.archivedAt);
-  const archivedOrders = torders.filter((o) => o.archivedAt);
 
-  // Price each unpaid team order from its roster so "Send invoice" can show
-  // the number upfront, and count in-house pieces (hats we embroider in
-  // Ocala) so they stay visible until shipped - the factory shipment won't
-  // contain them. Roster fetches are per-order but the list is small.
-  const orderEstimates = new Map<string, number>();
-  // Shipping estimate (formula: carrier cost from roster weight + margin).
-  // The real number comes from a live rate when the balance invoice is sent;
-  // this keeps the expected charge visible up front. Pickup = $0.
-  const shipEstimates = new Map<string, number>();
-  const inHouseWork = new Map<string, string>(); // order id -> "11× Snapback Hat"
-  // Orders with any name/number on the roster need print-file QA before
-  // production; plain-gear orders skip that gate entirely.
-  const personalizedOrders = new Set<string>();
-  for (const o of activeOrders) {
-    try {
-      const roster = await getRoster(o.id);
-      if (!roster.length) continue;
-      if (roster.some((r) => (r.playerName ?? "").trim() || (r.playerNumber ?? "").trim())) {
-        personalizedOrders.add(o.id);
-      }
-      if (!(o.status === "paid" || o.invoicePaidAt)) {
-        orderEstimates.set(o.id, computeTeamOrderQuote(o, roster).totalCents);
-        const weightOz = estimateOrderWeightOz(roster);
-        if (weightOz > 0) shipEstimates.set(o.id, shippingCentsFor(weightOz));
-      }
-      if (!o.shippedAt) {
-        // In-house items (hats) broken down BY SIZE so staff can order blanks:
-        // e.g. "Fitted Hat: 5 S/M, 2 L/XL, 3 XXL".
-        const inHouseKeys = ITEM_TYPES.filter((t) => t.inHouse).map((t) => t.key);
-        const bd = sizeBreakdown(roster, inHouseKeys);
-        if (bd.length) {
-          inHouseWork.set(
-            o.id,
-            bd.map((b) => `${b.label}: ${b.parts.map((p) => `${p.n} ${p.size}`).join(", ")} (${b.total})`).join(" · "),
-          );
-        }
-      }
-    } catch {}
-  }
-
-  // Unified recent-payments feed: team-order deposits/balances (Stripe or
-  // recorded offline) and paid add-ons. The old "Recent paid orders" list
-  // only read the shop-orders table, so it said "no orders yet" while team
-  // invoices were getting paid.
-  type PaymentEvent = { at: Date; label: string; sub: string; amountCents: number };
-  const paymentEvents: PaymentEvent[] = [];
-  const orderById = new Map(torders.map((t) => [t.id, t]));
-  for (const t of torders) {
-    const offline = t.paymentNote ? " · 💵 offline" : "";
-    const total = t.quotedTotalCents ?? 0;
-    const dep = t.depositCents ?? Math.round(total / 2);
-    const paidInFull = Boolean(
-      t.invoicePaidAt && t.depositPaidAt && Math.abs(+t.invoicePaidAt - +t.depositPaidAt) < 60000,
-    );
-    if (t.depositPaidAt && !paidInFull) {
-      paymentEvents.push({ at: t.depositPaidAt, label: t.teamName, sub: `50% deposit · ${t.reference}${offline}`, amountCents: dep });
-    }
-    if (t.invoicePaidAt) {
-      paymentEvents.push({
-        at: t.invoicePaidAt,
-        label: t.teamName,
-        sub: `${paidInFull ? "paid in full" : "final balance"} · ${t.reference}${offline}`,
-        amountCents: paidInFull ? total : Math.max(0, total - dep),
-      });
-    }
-  }
-  for (const a of paidAddons) {
-    if (!a.paidAt) continue;
-    const t = orderById.get(a.teamOrderId);
-    paymentEvents.push({
-      at: a.paidAt,
-      label: t?.teamName ?? "Add-on",
-      sub: `paid add-on${t ? ` · ${t.reference}` : ""}`,
-      amountCents: a.paidTotalCents ?? a.totalCents,
-    });
-  }
-  for (const inv of invoices) {
-    if (inv.status === "paid" && inv.paidAt) {
-      paymentEvents.push({ at: inv.paidAt, label: inv.customerName, sub: `custom invoice · ${inv.reference}`, amountCents: inv.totalCents });
-    }
-  }
-  // Shop / team-store / buy-in orders (from the orders table) also count as
-  // money moments - they were previously invisible in this feed.
-  const storeNameById = new Map(stores.map((s) => [s.id, s.name]));
-  for (const o of recentOrders) {
-    if (o.status !== "paid" && o.status !== "fulfilled") continue;
-    const who = o.teamId ? (storeNameById.get(o.teamId) ?? o.customerName ?? "Store order") : (o.customerName ?? "Order");
-    const kind = o.type === "team_store" ? "team store" : o.type === "buy_in" ? "buy-in" : "shop";
-    paymentEvents.push({ at: o.createdAt, label: who, sub: `${kind} · ${o.reference}`, amountCents: o.totalCents });
-  }
-  paymentEvents.sort((a, b) => +b.at - +a.at);
-  const recentPayments = paymentEvents.slice(0, 12);
-
-  // Live carrier status for inbound (factory -> shop) shipments, fetched
-  // in parallel and cached a few minutes in the Shippo lib. Best-effort:
-  // a miss just means the row shows the link without a status line.
-  const inboundLive = new Map<string, LiveTracking>();
-  await Promise.all(
-    activeOrders
-      .filter((o) => o.inboundTrackingNumber)
-      .map(async (o) => {
-        const t = await getLiveTracking(o.inboundCarrier, o.inboundTrackingNumber!);
-        if (t) inboundLive.set(o.id, t);
-      }),
-  );
-
-  // "Waiting on us" = the design work still needs Slugger. Once a design is
-  // approved / ordered / cancelled the work is done, so a trailing client
-  // message ("thanks!", "approved") must NOT keep flagging it.
   const DESIGN_DONE = new Set(["approved", "ordered", "cancelled"]);
   const needsAction = activeDesigns.filter((d) => {
     if (DESIGN_DONE.has(d.status)) return false;
@@ -342,553 +69,94 @@ export default async function AdminPage() {
     return d.status === "changes_requested" || d.status === "submitted" || lastMsg?.from === "client";
   });
 
-  // Money view. Shop/store revenue comes from the orders table (real Stripe
-  // amounts incl. tax); team-order revenue rides on quotedTotalCents.
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const paidThisMonth = recentOrders.filter((o) => o.createdAt >= monthStart && (o.status === "paid" || o.status === "fulfilled"));
-  // Outstanding invoices: an invoice was sent but the money isn't fully in.
   const outstanding = activeOrders
     .filter((o) => o.invoiceUrl && !o.invoicePaidAt)
     .map((o) => {
       const total = o.quotedTotalCents ?? 0;
       const deposit = o.depositCents ?? Math.round(total / 2);
-      const stage = o.depositPaidAt ? "balance" : "deposit";
-      const goodsDue = stage === "deposit" ? deposit : total - deposit;
-      const due = o.taxExempt ? goodsDue : goodsDue + Math.round(goodsDue * 0.07);
-      return { id: o.id, ref: o.reference, team: o.teamName.trim(), stage, due, token: o.manageToken, since: o.updatedAt };
+      const goodsDue = o.depositPaidAt ? total - deposit : deposit;
+      return o.taxExempt ? goodsDue : goodsDue + Math.round(goodsDue * 0.07);
     })
-    .filter((o) => o.due > 0);
-  const outstandingTotal = outstanding.reduce((s, o) => s + o.due, 0);
+    .filter((due) => due > 0);
+  const outstandingTotal = outstanding.reduce((s, d) => s + d, 0);
   const inProduction = activeOrders.filter((o) => o.status === "in_production").length;
-  const daysAgo = (d: Date) => Math.max(0, Math.floor((now.getTime() - d.getTime()) / 86400000));
+  const labLeads = labVisitors.filter((v) => v.email).length;
+  const labPaid = labVisitors.filter((v) => v.paidAt).length;
+
+  const cards = [
+    { href: "/admin/design-requests", icon: "🎨", title: `Design Requests (${activeDesigns.length})`, sub: needsAction.length ? `${needsAction.length} waiting on us` : "All caught up" },
+    { href: "/admin/team-orders", icon: "📦", title: `Team Orders (${activeOrders.length})`, sub: `${inProduction} in production` },
+    { href: "/admin/awaiting-payment", icon: "💸", title: `Awaiting Payment (${outstanding.length})`, sub: `${money(outstandingTotal)} due` },
+    { href: "/admin/texts", icon: "💬", title: "Conversations", sub: "Texts + WhatsApp on (352) 414-7270" },
+    { href: "/admin/customers", icon: "👥", title: "Customers", sub: "Directory with spend + one-tap text" },
+    { href: "/admin/design-lab", icon: "🧪", title: "Design Lab Leads", sub: `${labPaid} paid · ${labLeads} leads` },
+    { href: "/admin/stores", icon: "🏪", title: `Team Stores (${stores.filter((s) => s.storeActive).length} open)`, sub: "Storefronts + sales" },
+    { href: "/admin/payments", icon: "💳", title: "Payments", sub: "Every dollar in, newest first" },
+    { href: "/admin/assistant", icon: "🤖", title: "AI Assistant", sub: `${aiFacts.length} fact${aiFacts.length === 1 ? "" : "s"} taught` },
+  ];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-14">
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
       <MarkStaffDevice />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <span className="display text-brand text-sm">Staff Dashboard</span>
-          <h1 className="display text-4xl text-foreground mt-1">All Projects</h1>
+          <h1 className="display text-4xl text-foreground mt-1">Overview</h1>
         </div>
         <div className="flex items-center gap-3">
           <Link href="/admin/invoice/new" className="text-xs display text-on-brand bg-brand clip-slant px-3 py-1.5 hover:bg-brand-dark">
             + New invoice
-          </Link>
-          <Link href="/admin/customers" className="text-xs display text-foreground border border-line px-3 py-1.5 hover:border-brand/50">
-            Customers →
           </Link>
           <AdminLogout />
         </div>
       </div>
 
       {needsAction.length > 0 && (
-        <p className="mt-4 text-sm text-amber-400">
+        <Link href="/admin/design-requests" className="mt-4 block text-sm text-amber-400 hover:underline">
           ⚠ {needsAction.length} design{needsAction.length === 1 ? "" : "s"} waiting on us:{" "}
           {needsAction.map((d) => d.teamName.trim()).join(", ")}
-        </p>
+        </Link>
       )}
 
       {/* Money snapshot */}
       <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Paid this month", value: money(paidThisMonth.reduce((s, o) => s + o.totalCents, 0)), sub: `${paidThisMonth.length} order${paidThisMonth.length === 1 ? "" : "s"}` },
-          { label: "Outstanding invoices", value: money(outstandingTotal), sub: `${outstanding.length} awaiting payment`, warn: outstanding.length > 0 },
-          { label: "In production", value: String(inProduction), sub: "team orders" },
-          { label: "Team stores", value: String(stores.filter((s) => s.storeActive).length), sub: "open now" },
+          { label: "Paid this month", value: money(paidThisMonth.reduce((s, o) => s + o.totalCents, 0)), sub: `${paidThisMonth.length} order${paidThisMonth.length === 1 ? "" : "s"}`, href: "/admin/payments" },
+          { label: "Outstanding invoices", value: money(outstandingTotal), sub: `${outstanding.length} awaiting payment`, warn: outstanding.length > 0, href: "/admin/awaiting-payment" },
+          { label: "In production", value: String(inProduction), sub: "team orders", href: "/admin/team-orders?status=in_production" },
+          { label: "Team stores", value: String(stores.filter((s) => s.storeActive).length), sub: "open now", href: "/admin/stores" },
         ].map((t) => (
-          <div key={t.label} className={`border p-3 ${t.warn ? "border-amber-500/50 bg-amber-500/5" : "border-line bg-steel"}`}>
+          <Link key={t.label} href={t.href} className={`border p-3 transition-colors ${t.warn ? "border-amber-500/50 bg-amber-500/5 hover:border-amber-400" : "border-line bg-steel hover:border-brand/50"}`}>
             <p className="text-xs text-muted">{t.label}</p>
             <p className="display text-2xl text-foreground mt-1">{t.value}</p>
             <p className="text-xs text-muted mt-0.5">{t.sub}</p>
-          </div>
+          </Link>
         ))}
       </div>
 
-      {/* Order pipeline: where every team order sits + what that stage needs.
-          Cards filter the Team Orders table below. */}
+      {/* Pipeline: clicking a stage opens Team Orders pre-filtered to it. */}
       <div className="mt-4">
         <AdminPipeline
           counts={activeOrders.reduce((acc, o) => {
             acc[o.status] = (acc[o.status] ?? 0) + 1;
             return acc;
           }, {} as Record<string, number>)}
+          linkTo="/admin/team-orders"
         />
       </div>
 
-      <AdminSearch statuses={Array.from(new Set(activeOrders.map((o) => o.status)))} />
-
-
-      <section className="mt-6 scroll-mt-16" id="design-requests">
-        <h2 className="display text-xl text-foreground">Design requests ({activeDesigns.length})</h2>
-        <div className="mt-3 overflow-x-auto border border-line">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-steel text-left text-xs text-muted uppercase">
-                <th className="px-3 py-2">Ref</th>
-                <th className="px-3 py-2">Team</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Contact</th>
-                <th className="px-3 py-2">Source</th>
-                <th className="px-3 py-2">Rev</th>
-                <th className="px-3 py-2">Needed by</th>
-                <th className="px-3 py-2">Last msg</th>
-                <th className="px-3 py-2">Updated</th>
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[color:var(--line)]">
-              {activeDesigns.map((d) => {
-                const lastMsg = d.messages?.[d.messages.length - 1];
-                return (
-                  <tr
-                    key={d.reference}
-                    className="hover:bg-steel/60"
-                    data-section="designs"
-                    data-status={d.status}
-                    data-search={`${d.teamName} ${d.reference} ${d.contactName} ${d.contactEmail}`.toLowerCase()}
-                  >
-                    <td className="px-3 py-2 font-mono text-xs">
-                      <Link href={`/design/manage/${d.manageToken}`} className="text-brand hover:underline">
-                        {d.reference}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2 text-foreground">{d.teamName}</td>
-                    <td className="px-3 py-2"><Badge label={d.status} /></td>
-                    <td className="px-3 py-2 text-muted">{d.contactName}</td>
-                    <td className="px-3 py-2 text-muted whitespace-nowrap" title={d.source ?? "unknown (pre-tracking)"}>{srcShort(d.source)}</td>
-                    <td className="px-3 py-2 text-muted">{d.revisionsUsed ?? 0}/5</td>
-                    <td className="px-3 py-2 text-muted">{fmtDate(d.neededBy)}</td>
-                    <td className="px-3 py-2 text-muted">
-                      {lastMsg ? (lastMsg.from === "client" ? "⚠ client waiting" : lastMsg.name ?? "staff") : "-"}
-                    </td>
-                    <td className="px-3 py-2 text-muted">{fmtDate(d.updatedAt)}</td>
-                    <td className="px-3 py-2">
-                      <AdminArchiveButton kind="design_request" id={d.id} archived={false} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="mt-6 scroll-mt-16" id="team-orders">
-        <h2 className="display text-xl text-foreground">Team orders ({activeOrders.length})</h2>
-        <div className="mt-3 overflow-x-auto border border-line">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-steel text-left text-xs text-muted uppercase">
-                <th className="px-3 py-2">Ref</th>
-                <th className="px-3 py-2">Team</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Contact</th>
-                <th className="px-3 py-2">Source</th>
-                <th className="px-3 py-2">Total</th>
-                <th className="px-3 py-2">Invoice</th>
-                <th className="px-3 py-2">Updated</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[color:var(--line)]">
-              {activeOrders.map((o) => {
-                const estimate = o.quotedTotalCents ?? orderEstimates.get(o.id);
-                const paid = Boolean(o.invoicePaidAt) || o.status === "paid" || o.status === "shipped";
-                const deposit = o.depositCents ?? (estimate ? Math.round(estimate / 2) : 0);
-                return (
-                  <tr
-                    key={o.reference}
-                    className="hover:bg-steel/60"
-                    data-section="orders"
-                    data-status={o.status}
-                    data-search={`${o.teamName} ${o.reference} ${o.contactEmail}`.toLowerCase()}
-                  >
-                    <td className="px-3 py-2 font-mono text-xs">
-                      <Link href={`/admin/team-order/${o.id}`} className="text-brand hover:underline" title="Open the full order detail page">
-                        {o.reference}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2 text-foreground">
-                      <span className="flex flex-wrap items-center gap-2">
-                        <Link href={`/admin/team-order/${o.id}`} className="hover:text-brand hover:underline" title="Open the full order detail page">{o.teamName}</Link>
-                        {addonsByOrder.has(o.id) && (
-                          <AdminAddonDetails addons={addonsByOrder.get(o.id)!} teamName={o.teamName} />
-                        )}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2"><Badge label={o.status} /></td>
-                    <td className="px-3 py-2 text-muted">{o.contactEmail}</td>
-                    <td className="px-3 py-2 text-muted whitespace-nowrap" title={o.source ?? "unknown (pre-tracking)"}>{srcShort(o.source)}</td>
-                    <td className="px-3 py-2 text-foreground">
-                      <span className="flex flex-wrap items-center gap-1.5">
-                        <span className="whitespace-nowrap">
-                          {estimate ? money(estimate) : "-"}
-                          {estimate && !o.quotedTotalCents ? <span className="text-xs text-muted"> est.</span> : null}
-                        </span>
-                        {/* Quote drift: roster changed after the quote locked. */}
-                        {!paid && o.quotedTotalCents && orderEstimates.has(o.id) && orderEstimates.get(o.id) !== o.quotedTotalCents ? (
-                          <Link
-                            href={`/admin/team-order/${o.id}`}
-                            className="text-xs text-amber-300 whitespace-nowrap hover:underline"
-                            title={`Roster now prices at ${money(orderEstimates.get(o.id)!)} but the locked quote is ${money(o.quotedTotalCents)} - open to update`}
-                          >
-                            ⚠️ requote
-                          </Link>
-                        ) : null}
-                        {/* Shipping rides on the FINAL invoice: show the
-                            charged amount once known, else the weight-based
-                            estimate so the full number is visible up front. */}
-                        {o.localPickup ? (
-                          <span className="text-xs text-muted whitespace-nowrap" title="Local order - customer picks up in Ocala, no shipping">
-                            + pickup
-                          </span>
-                        ) : o.shippingChargedCents != null ? (
-                          <span className="text-xs text-muted whitespace-nowrap" title="Shipping charged on the final invoice">
-                            + {o.shippingChargedCents === 0 ? "pickup" : `${money(o.shippingChargedCents)} ship`}
-                          </span>
-                        ) : estimate && shipEstimates.has(o.id) ? (
-                          <span
-                            className="text-xs text-muted whitespace-nowrap"
-                            title="Estimated shipping, charged on the final balance invoice (live rate at that point; $0 if local pickup)"
-                          >
-                            + ~{money(shipEstimates.get(o.id)!)} ship
-                          </span>
-                        ) : null}
-                        {o.customJerseyCents ? (
-                          <span className="text-xs display text-brand" title="Negotiated per-jersey price for this order">
-                            ${(o.customJerseyCents / 100).toFixed(0)}/JERSEY
-                          </span>
-                        ) : (
-                          o.localPricing && <span className="text-xs display text-brand">OCALA</span>
-                        )}
-                        {o.taxExempt && <span className="text-xs display text-brand">TAX-EXEMPT</span>}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 min-w-[16rem]">
-                      <span className="flex flex-wrap items-center gap-1.5">
-                        {/* Pieces we embroider in-house (hats): the factory
-                            shipment won't contain these, so keep them in view
-                            until the order ships. */}
-                        {inHouseWork.has(o.id) && (
-                          <span
-                            title="Embroidered in-house in Ocala - not part of the factory shipment"
-                            className="text-xs display text-amber-300 border border-amber-300/40 px-1.5 py-0.5 whitespace-nowrap"
-                          >
-                            🧢 IN-HOUSE: {inHouseWork.get(o.id)}
-                          </span>
-                        )}
-                        {/* Inbound leg (factory -> shop). Always shown while
-                            tracking exists - redo shipments can arrive after
-                            the original order shipped. Internal only. */}
-                        {o.inboundTrackingNumber && (
-                          <a
-                            href={inboundTrackingUrlFor(o.inboundTrackingNumber, o.inboundCarrier)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={`Inbound from production${o.inboundTrackingAddedAt ? ` - entered ${fmtDate(o.inboundTrackingAddedAt)}` : ""} - click for live carrier tracking`}
-                            className="text-xs display text-violet-400 underline decoration-dotted underline-offset-2 hover:text-violet-300 whitespace-nowrap"
-                          >
-                            ✈ INBOUND · {o.inboundCarrier ?? "?"} {o.inboundTrackingNumber}
-                          </a>
-                        )}
-                        {inboundLive.has(o.id) && (
-                          <span
-                            className="text-xs text-violet-300/90 whitespace-nowrap"
-                            title={inboundLive.get(o.id)!.detail ?? "Latest carrier scan"}
-                          >
-                            {inboundLive.get(o.id)!.status}
-                            {inboundLive.get(o.id)!.location ? ` - ${inboundLive.get(o.id)!.location}` : ""}
-                            {inboundLive.get(o.id)!.at ? ` (${fmtDate(inboundLive.get(o.id)!.at!)})` : ""}
-                          </span>
-                        )}
-                        {o.paymentNote && (
-                          <span className="text-xs text-emerald-300/90 whitespace-nowrap" title={o.paymentNote}>
-                            💵 {o.paymentNote.split(";").pop()?.trim()}
-                          </span>
-                        )}
-                        {/* ONE primary action per state - everything else
-                            lives in the ⋯ menu so rows stay scannable. */}
-                        {o.shippedAt ? (
-                          <>
-                            <span className="text-xs display text-green-400 whitespace-nowrap">🚚 SHIPPED</span>
-                            {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
-                          </>
-                        ) : paid ? (
-                          o.trackingNumber ? (
-                            <>
-                              <span className="text-xs display text-amber-400 whitespace-nowrap" title="Label/tracking ready - customer not emailed yet">READY TO SHIP</span>
-                              <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email" />
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-xs display text-green-400 whitespace-nowrap">PAID</span>
-                              <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />
-                            </>
-                          )
-                        ) : o.depositPaidAt && estimate ? (
-                          <>
-                            <span className="text-xs display text-sky-400 whitespace-nowrap">DEPOSIT ✓</span>
-                            <AdminInvoiceButton
-                              teamOrderId={o.id}
-                              teamName={o.teamName}
-                              dueCents={estimate - deposit}
-                              stage="balance"
-                              resend={Boolean(o.balanceInvoiceUrl)}
-                              localPickup={o.localPickup}
-                            />
-                          </>
-                        ) : estimate ? (
-                          <AdminInvoiceButton
-                            teamOrderId={o.id}
-                            teamName={o.teamName}
-                            dueCents={deposit}
-                            stage="deposit"
-                            resend={Boolean(o.invoiceUrl)}
-                            warnPrintFile={Boolean(o.designRequestId) && !o.printFileVerifiedAt && personalizedOrders.has(o.id)}
-                          />
-                        ) : (
-                          <span className="text-xs text-muted">no roster</span>
-                        )}
-                        {/* Secondary actions in a floating dropdown. */}
-                        <AdminRowMenu>
-                            <AdminDesignerNote teamOrderId={o.id} current={o.designerNote} />
-                            {!o.designRequestId && (
-                              <AdminLinkDesign teamOrderId={o.id} designs={linkableDesigns} />
-                            )}
-                            {!paid && (
-                              <AdminRecordPayment
-                                teamOrderId={o.id}
-                                teamName={o.teamName}
-                                depositPaid={Boolean(o.depositPaidAt)}
-                                suggestedDepositCents={estimate ? deposit : null}
-                              />
-                            )}
-                            {(o.invoiceUrl || estimate) && (
-                              <a
-                                href={`/api/admin/team-order/invoice-view?id=${o.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title={paid ? "View the paid receipt (itemized, incl. shipping) - no Stripe login needed" : o.invoiceUrl ? "See a copy of the invoice the customer received" : "Preview the deposit invoice before sending it"}
-                                className="text-xs display text-muted whitespace-nowrap"
-                              >
-                                {paid ? "View receipt" : "View invoice"}
-                              </a>
-                            )}
-                            {!o.balanceInvoiceUrl && !paid && (
-                              <AdminPickupToggle teamOrderId={o.id} pickup={o.localPickup} />
-                            )}
-                            {!o.invoiceUrl && !paid && (
-                              <>
-                                <AdminJerseyStyle teamOrderId={o.id} current={o.jerseyStyle} />
-                                <AdminCustomPrice teamOrderId={o.id} currentCents={o.customJerseyCents} />
-                                <AdminLocalToggle teamOrderId={o.id} local={o.localPricing} />
-                                <AdminTaxToggle teamOrderId={o.id} exempt={o.taxExempt} />
-                              </>
-                            )}
-                            {o.depositPaidAt && !o.shippedAt && !paid && (
-                              o.trackingNumber ? (
-                                <>
-                                  <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
-                                  <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="Mark shipped + email" />
-                                </>
-                              ) : (
-                                <>
-                                  <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />
-                                  <AdminShipButton kind="team_order" id={o.id} who={o.teamName} label="Add tracking" />
-                                </>
-                              )
-                            )}
-                            {paid && !o.shippedAt && (
-                              <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber ?? undefined} label="Add tracking" />
-                            )}
-                            {paid && !o.shippedAt && o.trackingNumber && (
-                              <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
-                            )}
-                            {!o.shippedAt && o.manageToken && (
-                              <AdminInboundTracking
-                                manageToken={o.manageToken}
-                                initialCarrier={o.inboundCarrier}
-                                initialNumber={o.inboundTrackingNumber}
-                              />
-                            )}
-                            <AdminArchiveButton kind="team_order" id={o.id} archived={false} />
-                        </AdminRowMenu>
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-muted">{fmtDate(o.updatedAt)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {outstanding.length > 0 && (
-        <details className="mt-4 border border-amber-500/40 bg-amber-500/5 group" id="awaiting-payment">
-          <summary className="flex cursor-pointer items-center justify-between px-4 py-2.5 list-none">
-            <span className="display text-sm text-amber-300">💸 Awaiting payment ({outstanding.length})</span>
-            <span className="text-amber-300 transition-transform group-open:rotate-45">+</span>
-          </summary>
-          <div className="divide-y divide-[color:var(--line)] border-t border-amber-500/20">
-            {outstanding.map((o) => (
-              <div key={o.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
-                <span>
-                  <Link href={`/team-order/manage/${o.token}`} className="font-mono text-xs text-brand hover:underline">{o.ref}</Link>
-                  <span className="ml-2 text-foreground">{o.team}</span>
-                  <span className="ml-2 text-xs text-muted">{o.stage} · sent {daysAgo(o.since)}d ago</span>
-                </span>
-                <span className="display text-foreground">{money(o.due)} due</span>
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
-
-      <section className="mt-10 space-y-3">
-        <Link href="/admin/customers" className="flex items-center justify-between border border-line bg-steel px-5 py-4 hover:border-brand/60 transition-colors">
-          <span>
-            <span className="display text-lg text-foreground">👥 Customers</span>
-            <span className="block text-sm text-muted mt-0.5">
-              Every customer in one list - orders, lifetime spend, and one-tap texting.
-            </span>
-          </span>
-          <span className="display text-brand whitespace-nowrap">Open</span>
-        </Link>
-        <Link href="/admin/texts" className="flex items-center justify-between border border-line bg-steel px-5 py-4 hover:border-brand/60 transition-colors">
-          <span>
-            <span className="display text-lg text-foreground">💬 Texts</span>
-            <span className="block text-sm text-muted mt-0.5">
-              Read and reply to customer texts and WhatsApp messages on (352) 414-7270.
-            </span>
-          </span>
-          <span className="display text-brand whitespace-nowrap">Open</span>
-        </Link>
-        <Link href="/admin/design-lab" className="flex items-center justify-between border border-line bg-steel px-5 py-4 hover:border-brand/60 transition-colors">
-          <span>
-            <span className="display text-lg text-foreground">🧪 Design Lab leads</span>
-            <span className="block text-sm text-muted mt-0.5">
-              {labPaid} paid session{labPaid === 1 ? "" : "s"} · {labLeads} lead{labLeads === 1 ? "" : "s"} with contact info - see what each person designed in the AI jersey maker.
-            </span>
-          </span>
-          <span className="display text-brand whitespace-nowrap">Open</span>
-        </Link>
-      </section>
-
-
-      {archivedDesigns.length > 0 && (
-        <details className="mt-6 border border-line bg-steel/50 group">
-          <summary className="flex cursor-pointer items-center justify-between px-4 py-3 list-none">
-            <span className="display text-sm text-muted">Archived design requests ({archivedDesigns.length})</span>
-            <span className="text-brand transition-transform group-open:rotate-45">+</span>
-          </summary>
-          <div className="divide-y divide-[color:var(--line)] border-t border-line">
-            {archivedDesigns.map((d) => (
-              <div key={d.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <div>
-                  <Link href={`/design/manage/${d.manageToken}`} className="font-mono text-xs text-brand hover:underline">
-                    {d.reference}
-                  </Link>
-                  <span className="ml-2 text-foreground">{d.teamName}</span>
-                  <span className="ml-2 text-muted">{d.contactName}</span>
-                  {d.archivedNote && <span className="ml-2 text-xs text-amber-400/90">&quot;{d.archivedNote}&quot;</span>}
-                  <span className="ml-2 text-xs text-muted">archived {fmtDate(d.archivedAt)}</span>
-                </div>
-                <AdminArchiveButton kind="design_request" id={d.id} archived={true} />
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
-
-
-      {archivedOrders.length > 0 && (
-        <details className="mt-6 border border-line bg-steel/50 group">
-          <summary className="flex cursor-pointer items-center justify-between px-4 py-3 list-none">
-            <span className="display text-sm text-muted">Archived team orders ({archivedOrders.length})</span>
-            <span className="text-brand transition-transform group-open:rotate-45">+</span>
-          </summary>
-          <div className="divide-y divide-[color:var(--line)] border-t border-line">
-            {archivedOrders.map((o) => (
-              <div key={o.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <div>
-                  <Link href={`/team-order/manage/${o.manageToken}`} className="font-mono text-xs text-brand hover:underline">
-                    {o.reference}
-                  </Link>
-                  <span className="ml-2 text-foreground">{o.teamName}</span>
-                  <span className="ml-2 text-muted">{o.contactEmail}</span>
-                  {o.archivedNote && <span className="ml-2 text-xs text-amber-400/90">"{o.archivedNote}"</span>}
-                  <span className="ml-2 text-xs text-muted">archived {fmtDate(o.archivedAt)}</span>
-                </div>
-                <AdminArchiveButton kind="team_order" id={o.id} archived={true} />
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
-
-      <div className="mt-10">
-        <section className="scroll-mt-16" id="payments">
-          <h2 className="display text-xl text-foreground">Recent payments</h2>
-          <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
-            {recentPayments.length === 0 && <p className="px-3 py-3 text-sm text-muted">No payments yet.</p>}
-            {recentPayments.map((p, i) => (
-              <div key={i} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
-                <div>
-                  <span className="text-foreground">{p.label}</span>
-                  <span className="ml-2 text-xs text-muted">{p.sub}</span>
-                </div>
-                <span className="text-foreground whitespace-nowrap">
-                  {money(p.amountCents)} <span className="text-muted text-xs">{fmtDate(p.at)}</span>
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {invoices.length > 0 && (
-            <>
-              <div className="flex items-center justify-between mt-8">
-                <h2 className="display text-xl text-foreground">Custom invoices</h2>
-                <Link href="/admin/invoice/new" className="text-xs display text-brand hover:underline">+ New invoice</Link>
-              </div>
-              <div className="mt-3 border border-line divide-y divide-[color:var(--line)]">
-                {invoices.map((inv) => (
-                  <div key={inv.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
-                    <div>
-                      <span className="font-mono text-xs text-foreground">{inv.reference}</span>
-                      <span className="ml-2 text-foreground">{inv.customerName}</span>
-                      <span className={`ml-2 text-xs display ${inv.status === "paid" ? "text-green-400" : "text-amber-400"}`}>
-                        {inv.status === "paid" ? "PAID" : "SENT"}
-                      </span>
-                    </div>
-                    <span className="flex items-center gap-2 whitespace-nowrap">
-                      <span className="text-foreground">{money(inv.totalCents)}</span>
-                      {inv.status !== "paid" && inv.payUrl && (
-                        <a href={inv.payUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-muted hover:text-foreground">
-                          payment link
-                        </a>
-                      )}
-                      <span className="text-muted text-xs">{fmtDate(inv.createdAt)}</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </section>
+      {/* Everything else lives on its own page. */}
+      <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {cards.map((c) => (
+          <Link key={c.href} href={c.href} className="border border-line bg-steel px-4 py-3.5 hover:border-brand/60 transition-colors">
+            <span className="display text-foreground">{c.icon} {c.title}</span>
+            <span className="block text-xs text-muted mt-0.5">{c.sub}</span>
+          </Link>
+        ))}
       </div>
-
-      <section className="mt-10">
-        <Link href="/admin/assistant" className="flex items-center justify-between border border-line bg-steel px-5 py-4 hover:border-brand/60 transition-colors">
-          <span>
-            <span className="display text-lg text-foreground">🤖 Train the AI assistant</span>
-            <span className="block text-sm text-muted mt-0.5">
-              {aiFacts.length} fact{aiFacts.length === 1 ? "" : "s"} taught - add pricing nuances, policies, and product details the bot should treat as official.
-            </span>
-          </span>
-          <span className="display text-brand whitespace-nowrap">Open</span>
-        </Link>
-      </section>
     </div>
   );
 }

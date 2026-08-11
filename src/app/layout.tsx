@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Oswald } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
+import { HideOnAdmin } from "@/components/hide-on-admin";
 import { SiteFooter } from "@/components/site-footer";
 import { StaffShortcut } from "@/components/staff-shortcut";
 import { SiteChat } from "@/components/site-chat";
@@ -72,12 +73,16 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <CartProvider>
-          <SiteHeader />
+          <HideOnAdmin>
+            <SiteHeader />
+          </HideOnAdmin>
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(LOCAL_BUSINESS_JSONLD) }} />
           <main className="flex-1">{children}</main>
-          <SiteFooter />
-          <StaffShortcut />
-          <SiteChat />
+          <HideOnAdmin>
+            <SiteFooter />
+            <StaffShortcut />
+            <SiteChat />
+          </HideOnAdmin>
           <AttributionCapture />
         </CartProvider>
         <Analytics />

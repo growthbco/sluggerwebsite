@@ -18,8 +18,8 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
   {
     title: "Operations",
     items: [
-      { href: "/admin#design-requests", label: "Design Requests", icon: "🎨" },
-      { href: "/admin#team-orders", label: "Team Orders", icon: "📦" },
+      { href: "/admin/design-requests", label: "Design Requests", icon: "🎨" },
+      { href: "/admin/team-orders", label: "Team Orders", icon: "📦" },
       { href: "/admin/design-lab", label: "Design Lab Leads", icon: "🧪" },
       { href: "/admin/stores", label: "Team Stores", icon: "🏪" },
       { href: "/admin/shop-orders", label: "Shop Orders", icon: "🛒" },
@@ -29,8 +29,8 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
     title: "Financials",
     items: [
       { href: "/admin/invoice/new", label: "New Invoice", icon: "🧾" },
-      { href: "/admin#awaiting-payment", label: "Awaiting Payment", icon: "💸" },
-      { href: "/admin#payments", label: "Recent Payments", icon: "💳" },
+      { href: "/admin/awaiting-payment", label: "Awaiting Payment", icon: "💸" },
+      { href: "/admin/payments", label: "Payments", icon: "💳" },
     ],
   },
   {

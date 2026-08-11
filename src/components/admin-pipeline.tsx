@@ -1,11 +1,14 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useStatusFilter } from "@/components/admin-filter-store";
 
 /** The order pipeline as big clickable cards: how many orders sit at each
- *  stage and what that stage needs from you. Clicking a card filters the
- *  Team Orders table (same shared filter as the chips/search). */
-export function AdminPipeline({ counts }: { counts: Record<string, number> }) {
+ *  stage and what that stage needs from you. On the Team Orders page a card
+ *  filters the table in place; with linkTo set (the dashboard), a card
+ *  navigates to that page pre-filtered. */
+export function AdminPipeline({ counts, linkTo }: { counts: Record<string, number>; linkTo?: string }) {
+  const router = useRouter();
   const [status, setStatus] = useStatusFilter();
 
   const STAGES: { value: string; title: string; action: string; emoji: string; tone: string }[] = [
@@ -27,9 +30,11 @@ export function AdminPipeline({ counts }: { counts: Record<string, number> }) {
             key={s.value}
             type="button"
             onClick={() => {
+              if (linkTo) {
+                router.push(`${linkTo}?status=${encodeURIComponent(s.value)}`);
+                return;
+              }
               setStatus(on ? "" : s.value);
-              // Team orders now sit below Design requests - jump to the table
-              // so the filter's effect is visible.
               if (!on) document.getElementById("team-orders")?.scrollIntoView({ behavior: "smooth", block: "start" });
             }}
             title={on ? "Click to clear the filter" : `Show only ${s.title.toLowerCase()} orders`}
