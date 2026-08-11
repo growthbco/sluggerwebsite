@@ -915,6 +915,9 @@ export const smsMessages = pgTable(
     channel: text("channel").notNull().default("sms"), // sms | whatsapp
     body: text("body").notNull(),
     mediaCount: integer("media_count").notNull().default(0),
+    // Public image URLs attached to this message (our Vercel Blob links out,
+    // Twilio media links in) so the thread can show the actual pictures.
+    mediaUrls: jsonb("media_urls").$type<string[]>(),
     staff: text("staff"), // who sent it (outbound only)
     twilioSid: text("twilio_sid"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

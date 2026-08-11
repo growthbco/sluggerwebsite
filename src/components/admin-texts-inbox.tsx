@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { upload } from "@vercel/blob/client";
+import { DropZone, firstImageFile } from "@/components/drop-zone";
 
 type Conversation = {
   phone: string;
@@ -13,7 +16,7 @@ type Conversation = {
   archived: boolean;
   unread: boolean;
 };
-type Message = { id: string; phone: string; direction: string; channel: string; body: string; mediaCount: number; staff: string | null; createdAt: string };
+type Message = { id: string; phone: string; direction: string; channel: string; body: string; mediaCount: number; mediaUrls: string[] | null; staff: string | null; createdAt: string };
 type Context = {
   emails: string[];
   spendCents: number;
@@ -61,6 +64,8 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
   const [nameDraft, setNameDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [drafting, setDrafting] = useState(false);
+  const [pendingImages, setPendingImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
 
@@ -84,6 +89,33 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
       setError(e instanceof Error ? e.message : "Draft failed");
     } finally {
       setDrafting(false);
+    }
+  }
+
+  // Attach images to an outgoing MMS: upload each to our public Blob store,
+  // then send with the message. Drag/drop, paste, or the 📎 button all feed
+  // this. Notes stay text-only (nothing goes to the customer).
+  async function uploadImages(files: FileList | File[]) {
+    if (mode === "note") { setError("Switch to SMS or WhatsApp to attach an image."); return; }
+    const imgs = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (imgs.length === 0) return;
+    setUploading(true);
+    setError("");
+    try {
+      const urls: string[] = [];
+      for (const f of imgs.slice(0, 10)) {
+        if (f.size > 5 * 1024 * 1024) throw new Error(`${f.name || "Image"} is over 5MB - carriers reject large MMS.`);
+        const blob = await upload(`sms-media/${Date.now()}-${f.name || "image.jpg"}`, f, {
+          access: "public",
+          handleUploadUrl: "/api/design-request/upload",
+        });
+        urls.push(blob.url);
+      }
+      setPendingImages((p) => [...p, ...urls].slice(0, 10));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -202,7 +234,8 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
 
   async function send() {
     const phone = active ?? newPhone;
-    if (!phone || !draft.trim() || busy) return;
+    if (!phone || busy) return;
+    if (!draft.trim() && pendingImages.length === 0) return;
     setBusy(true);
     setError("");
     try {
@@ -214,12 +247,14 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
           body: draft.trim(),
           channel: mode === "whatsapp" ? "whatsapp" : "sms",
           note: mode === "note" ? true : undefined,
+          mediaUrls: mode === "note" ? undefined : pendingImages,
           name: !active && newName.trim() ? newName.trim() : undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Send failed");
       setDraft("");
+      setPendingImages([]);
       if (!active) { setActive(data.message.phone); setNewPhone(""); setNewName(""); }
       else loadThread(active);
       loadConvos();
@@ -437,7 +472,18 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
               <div key={m.id} className={`max-w-[80%] ${m.direction === "out" ? "ml-auto" : ""}`}>
                 <div className={`px-3 py-2 text-sm whitespace-pre-wrap break-words rounded ${m.direction === "out" ? "bg-brand text-on-brand" : "bg-background text-foreground border border-line"}`}>
                   {m.body}
-                  {m.mediaCount > 0 && <div className="text-xs opacity-70 mt-1">📎 {m.mediaCount} attachment{m.mediaCount === 1 ? "" : "s"} (view in Twilio)</div>}
+                  {m.mediaUrls && m.mediaUrls.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {m.mediaUrls.map((u, j) => (
+                        <a key={j} href={u} target="_blank" rel="noopener noreferrer" className="block">
+                          <Image src={u} alt="attachment" width={140} height={140} unoptimized className="max-h-40 w-auto rounded border border-black/10 object-cover" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {m.mediaCount > 0 && (!m.mediaUrls || m.mediaUrls.length === 0) && (
+                    <div className="text-xs opacity-70 mt-1">📎 {m.mediaCount} attachment{m.mediaCount === 1 ? "" : "s"}</div>
+                  )}
                 </div>
                 <div className={`mt-0.5 text-[10px] text-muted ${m.direction === "out" ? "text-right" : ""}`}>
                   {m.channel === "whatsapp" ? "WhatsApp · " : ""}{fmt(m.createdAt)}
@@ -474,24 +520,55 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
               </button>
             )}
           </div>
-          <div className="flex gap-2">
+          {pendingImages.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {pendingImages.map((u, i) => (
+                <span key={i} className="relative">
+                  <Image src={u} alt="attachment" width={56} height={56} unoptimized className="h-14 w-14 rounded border border-line object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setPendingImages((p) => p.filter((_, j) => j !== i))}
+                    className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-red-500 text-white text-xs leading-none"
+                    aria-label="Remove"
+                  >×</button>
+                </span>
+              ))}
+              {uploading && <span className="h-14 w-14 grid place-items-center text-xs text-muted border border-line rounded">…</span>}
+            </div>
+          )}
+          <DropZone onFiles={uploadImages} disabled={uploading || mode === "note"} className="flex gap-2 rounded">
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+              onPaste={(e) => {
+                const imgs = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
+                if (imgs.length) { e.preventDefault(); uploadImages(imgs); }
+              }}
               rows={2}
-              placeholder={mode === "note" ? "Internal note… (Enter to save)" : "Type a message… (Enter to send)"}
+              placeholder={mode === "note" ? "Internal note… (Enter to save)" : "Type a message, or drop/paste an image… (Enter to send)"}
               className="flex-1 bg-background border border-line px-3 py-2 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none resize-none"
             />
-            <button
-              type="button"
-              onClick={send}
-              disabled={busy || !draft.trim() || (!active && !newPhone.trim())}
-              className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-5 disabled:opacity-50"
-            >
-              {busy ? "…" : mode === "note" ? "Save" : "Send"}
-            </button>
-          </div>
+            <div className="flex flex-col gap-1">
+              {mode !== "note" && (
+                <label
+                  title="Attach an image (MMS)"
+                  className={`grid place-items-center border border-line px-3 py-2 text-base cursor-pointer hover:border-brand/50 ${uploading ? "opacity-50" : ""}`}
+                >
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files) uploadImages(e.target.files); e.target.value = ""; }} />
+                  📎
+                </label>
+              )}
+              <button
+                type="button"
+                onClick={send}
+                disabled={busy || uploading || (!draft.trim() && pendingImages.length === 0) || (!active && !newPhone.trim())}
+                className="flex-1 clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-5 disabled:opacity-50"
+              >
+                {busy ? "…" : mode === "note" ? "Save" : "Send"}
+              </button>
+            </div>
+          </DropZone>
         </div>
       </section>
 

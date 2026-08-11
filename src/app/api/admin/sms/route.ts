@@ -98,14 +98,18 @@ export async function PUT(req: Request) {
 export async function POST(req: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
-  let body: { phone?: string; body?: string; channel?: string; name?: string; note?: boolean } = {};
+  let body: { phone?: string; body?: string; channel?: string; name?: string; note?: boolean; mediaUrls?: string[] } = {};
   try { body = await req.json(); } catch {}
   const phone = toE164(body.phone ?? "");
   const text = (body.body ?? "").trim().slice(0, 1500);
+  // Only our own public Blob URLs may be attached (no arbitrary MediaUrl).
+  const mediaUrls = (body.mediaUrls ?? [])
+    .filter((u): u is string => typeof u === "string" && /^https:\/\/[^ ]+\.public\.blob\.vercel-storage\.com\//.test(u))
+    .slice(0, 10);
   const contactName = (body.name ?? "").trim().slice(0, 80);
   const channel = body.channel === "whatsapp" ? "whatsapp" : "sms";
   if (!phone) return NextResponse.json({ error: "Enter a valid US phone number." }, { status: 400 });
-  if (!text) return NextResponse.json({ error: "Type a message." }, { status: 400 });
+  if (!text && mediaUrls.length === 0) return NextResponse.json({ error: "Type a message or attach an image." }, { status: 400 });
 
   if (contactName) {
     await getDb().insert(smsContacts).values({ phone, name: contactName }).onConflictDoUpdate({ target: smsContacts.phone, set: { name: contactName } });
@@ -119,12 +123,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, message: row });
   }
 
-  const result = await sendSms(phone, text, channel);
+  const result = await sendSms(phone, text, channel, mediaUrls);
   if (!result.ok) return NextResponse.json({ error: "Twilio rejected the message - check the number and try again." }, { status: 502 });
 
   const [row] = await getDb()
     .insert(smsMessages)
-    .values({ phone, direction: "out", channel, body: text, staff: "admin", twilioSid: result.sid ?? null })
+    .values({ phone, direction: "out", channel, body: text, mediaCount: mediaUrls.length, mediaUrls, staff: "admin", twilioSid: result.sid ?? null })
     .returning();
   return NextResponse.json({ ok: true, message: row });
 }

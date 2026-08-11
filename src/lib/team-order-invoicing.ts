@@ -8,7 +8,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
-import { getRoster } from "@/lib/team-orders";
+import { getRoster, invoiceRosterEntries } from "@/lib/team-orders";
 import { computeTeamOrderQuote, estimateOrderParcelsOz } from "@/lib/team-order-pricing";
 import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 import { emailTeamOrderInvoice } from "@/lib/email";
@@ -232,11 +232,7 @@ export async function sendTeamOrderInvoice(opts: {
       creditAppliedCents: creditForBalance,
       payFullCreditCents: creditForFull,
       localPickup: order.localPickup,
-      roster: roster.map((r) => ({
-        name: (r.playerName ?? "").trim(),
-        number: (r.playerNumber ?? "").trim(),
-        size: (r.sizes?.jersey ?? r.size ?? "").trim(),
-      })),
+      roster: invoiceRosterEntries(roster),
       payUrl: link.url,
       payFullUrl: fullLink?.url ?? undefined,
       payFullCents: fullLink ? (totalCents - creditForFull) + (order.taxExempt ? 0 : taxCents(totalCents - creditForFull)) + fullShipCents : undefined,

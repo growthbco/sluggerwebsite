@@ -17,7 +17,13 @@ export async function POST(req: Request) {
   const channel = rawFrom.startsWith("whatsapp:") ? "whatsapp" : "sms";
   const from = rawFrom.replace(/^whatsapp:/, "");
   const body = (params.Body ?? "").slice(0, 1200);
-  const media = Number(params.NumMedia ?? 0) > 0 ? ` (+${params.NumMedia} attachment${params.NumMedia === "1" ? "" : "s"})` : "";
+  const numMedia = Number(params.NumMedia ?? 0) || 0;
+  const mediaUrls: string[] = [];
+  for (let i = 0; i < Math.min(numMedia, 10); i++) {
+    const u = params[`MediaUrl${i}`];
+    if (u) mediaUrls.push(u);
+  }
+  const media = numMedia > 0 ? ` (+${numMedia} attachment${numMedia === 1 ? "" : "s"})` : "";
 
   // Log to the admin texts inbox (non-fatal).
   try {
@@ -29,7 +35,8 @@ export async function POST(req: Request) {
         direction: "in",
         channel,
         body,
-        mediaCount: Number(params.NumMedia ?? 0) || 0,
+        mediaCount: numMedia,
+        mediaUrls: mediaUrls.length ? mediaUrls : null,
         twilioSid: params.MessageSid ?? params.SmsMessageSid ?? null,
       });
     }

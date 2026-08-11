@@ -182,7 +182,7 @@ export type TeamOrderInvoiceContent = {
   taxDueCents: number;
   taxExempt?: boolean;
   shipCents?: number;
-  roster?: { name: string; number: string; size: string }[];
+  roster?: { name: string; number: string; size: string; item?: string; color?: string }[];
   payUrl: string;
   payFullUrl?: string;
   /** The true pay-in-full charge (goods + tax + shipping). Shown on the
@@ -266,11 +266,17 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
           args.roster && args.roster.length
             ? `<p style="margin:18px 0 6px;font-size:13px;color:#666;"><strong>Your roster (${args.roster.length}):</strong></p>
                <table style="width:100%;border-collapse:collapse;font-size:13px;margin:0 0 14px;">
-                 <tr style="color:#666;"><td style="padding:4px 0;border-bottom:1px solid #e6e0cf;">Player</td><td style="padding:4px 0;border-bottom:1px solid #e6e0cf;">#</td><td style="padding:4px 0;border-bottom:1px solid #e6e0cf;">Size</td></tr>
+                 <tr style="color:#666;">
+                   <td style="padding:4px 0;border-bottom:1px solid #e6e0cf;">Player</td>
+                   <td style="padding:4px 0;border-bottom:1px solid #e6e0cf;">#</td>
+                   ${args.roster.some((r) => r.item) ? `<td style="padding:4px 0;border-bottom:1px solid #e6e0cf;">Item</td>` : ""}
+                   <td style="padding:4px 0;border-bottom:1px solid #e6e0cf;">Size</td>
+                   ${args.roster.some((r) => r.color) ? `<td style="padding:4px 0;border-bottom:1px solid #e6e0cf;">Color</td>` : ""}
+                 </tr>
                  ${args.roster
                    .map(
                      (r) =>
-                       `<tr><td style="padding:4px 0;border-bottom:1px solid #f0ece0;">${esc((r.name || "-").toUpperCase())}</td><td style="padding:4px 0;border-bottom:1px solid #f0ece0;">${esc(r.number || "-")}</td><td style="padding:4px 0;border-bottom:1px solid #f0ece0;">${esc(r.size || "-")}</td></tr>`,
+                       `<tr><td style="padding:4px 0;border-bottom:1px solid #f0ece0;">${esc((r.name || "-").toUpperCase())}</td><td style="padding:4px 0;border-bottom:1px solid #f0ece0;">${esc(r.number || "-")}</td>${args.roster!.some((x) => x.item) ? `<td style="padding:4px 0;border-bottom:1px solid #f0ece0;">${esc(r.item || "-")}</td>` : ""}<td style="padding:4px 0;border-bottom:1px solid #f0ece0;">${esc(r.size || "-")}</td>${args.roster!.some((x) => x.color) ? `<td style="padding:4px 0;border-bottom:1px solid #f0ece0;">${esc(r.color || "-")}</td>` : ""}</tr>`,
                    )
                    .join("")}
                </table>

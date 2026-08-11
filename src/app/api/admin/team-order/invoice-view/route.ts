@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
-import { getRoster } from "@/lib/team-orders";
+import { getRoster, invoiceRosterEntries } from "@/lib/team-orders";
 import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
 import { taxCents } from "@/lib/pricing";
 import { renderTeamOrderInvoice } from "@/lib/email";
@@ -105,11 +105,7 @@ export async function GET(req: Request) {
     taxDueCents: order.taxExempt ? 0 : taxCents(dueCents),
     taxExempt: order.taxExempt,
     shipCents: stage === "balance" ? order.shippingChargedCents ?? 0 : 0,
-    roster: roster.map((r) => ({
-      name: (r.playerName ?? "").trim(),
-      number: (r.playerNumber ?? "").trim(),
-      size: (r.sizes?.jersey ?? r.size ?? "").trim(),
-    })),
+    roster: invoiceRosterEntries(roster),
     payUrl: sentUrl ?? "#",
     payFullUrl: stage === "deposit" ? order.fullInvoiceUrl ?? undefined : undefined,
     localPickup: order.localPickup,

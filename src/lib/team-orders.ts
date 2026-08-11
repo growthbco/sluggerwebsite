@@ -253,3 +253,27 @@ export async function submitTeamOrder(teamOrderId: string) {
     .set({ status: "submitted", selfEntryOpen: false, submittedAt: new Date(), updatedAt: new Date() })
     .where(eq(teamOrders.id, teamOrderId));
 }
+
+import { itemLabel as _itemLabel } from "@/lib/order-items";
+
+/** Roster rows -> invoice recap lines with the RIGHT size per item (not just
+ *  jersey) and the colorway. A row can cover several items (jersey + hat);
+ *  each sized item becomes its own recap line. Falls back to the legacy
+ *  single `size` field / a plain jersey line. */
+export function invoiceRosterEntries(
+  roster: { playerName?: string | null; playerNumber?: string | null; size?: string | null; sizes?: Record<string, string> | null; design?: string | null; quantity?: number | null }[],
+): { name: string; number: string; item: string; size: string; color: string }[] {
+  const out: { name: string; number: string; item: string; size: string; color: string }[] = [];
+  for (const r of roster) {
+    const name = (r.playerName ?? "").trim();
+    const number = (r.playerNumber ?? "").trim();
+    const color = (r.design ?? "").trim();
+    const sized = Object.entries(r.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
+    if (sized.length) {
+      for (const [key, size] of sized) out.push({ name, number, item: _itemLabel(key), size: (size as string).trim(), color });
+    } else if ((r.size ?? "").trim()) {
+      out.push({ name, number, item: "Jersey", size: (r.size as string).trim(), color });
+    }
+  }
+  return out;
+}

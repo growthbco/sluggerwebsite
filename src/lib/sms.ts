@@ -29,12 +29,16 @@ export async function sendSms(
   to: string,
   body: string,
   channel: "sms" | "whatsapp" = "sms",
+  mediaUrls: string[] = [],
 ): Promise<{ ok: boolean; sid?: string }> {
   if (!smsEnabled()) return { ok: false };
   const toNum = toE164(to);
   if (!toNum) return { ok: false };
   const acct = process.env.TWILIO_ACCOUNT_SID!;
   const params = new URLSearchParams({ Body: body.slice(0, 1500) });
+  // MMS: attach up to 10 public image URLs (our Vercel Blob links). Twilio
+  // fetches and forwards them; larger sends are capped by the carrier.
+  for (const u of mediaUrls.slice(0, 10)) params.append("MediaUrl", u);
   if (channel === "whatsapp") {
     params.set("To", `whatsapp:${toNum}`);
     params.set("From", `whatsapp:${process.env.TWILIO_FROM}`);
