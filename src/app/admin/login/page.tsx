@@ -32,12 +32,13 @@ export default function AdminLoginPage() {
   return (
     <div className="mx-auto max-w-sm px-4 py-24">
       <h1 className="display text-3xl text-foreground text-center">Staff Login</h1>
-      <form onSubmit={submit} className="mt-8 space-y-4">
+      <p className="mt-2 text-sm text-muted text-center">Enter your password - it knows who you are.</p>
+      <form onSubmit={submit} className="mt-6 space-y-4">
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Admin password"
+          placeholder="Your password"
           autoFocus
           className="w-full bg-steel border border-line px-3 py-2.5 text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
         />
