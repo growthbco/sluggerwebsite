@@ -40,7 +40,9 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [contactName, setContactName] = useState(prefill?.contactName ?? "");
   const [contactEmail, setContactEmail] = useState(prefill?.contactEmail ?? "");
   const [contactPhone, setContactPhone] = useState(prefill?.contactPhone ?? "");
-  const [jerseyStyle, setJerseyStyle] = useState(styleFromDesign(prefill?.designJerseyStyle) ?? JERSEY_STYLES[0]);
+  // No design style specified -> leave blank rather than silently stamping
+  // "Standard Crew Neck" on the order. Blank prices the same as crew/v-neck.
+  const [jerseyStyle, setJerseyStyle] = useState(styleFromDesign(prefill?.designJerseyStyle) ?? "");
   const [material, setMaterial] = useState(JERSEY_MATERIALS[0].key);
   // Orders from an approved design start with the items the design actually
   // covers (a hoodie design pre-selects hoodie, not the jersey default).
@@ -108,7 +110,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
@@ -125,7 +127,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, designToken: prefill?.designToken, smsConsent: smsOptIn }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, designToken: prefill?.designToken, smsConsent: smsOptIn }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create link");
@@ -228,6 +230,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       <div>
         <label className="display text-sm text-foreground">Jersey Style *</label>
         <select className={`mt-2 ${inputCls}`} value={jerseyStyle} onChange={(e) => setJerseyStyle(e.target.value)}>
+          <option value="">Standard (crew / v-neck)</option>
           {JERSEY_STYLES.map((s) => <option key={s}>{s}</option>)}
         </select>
       </div>

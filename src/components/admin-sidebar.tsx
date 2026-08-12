@@ -24,6 +24,7 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
       { href: "/admin/design-lab", label: "Design Lab Leads", icon: "🧪" },
       { href: "/admin/stores", label: "Team Stores", icon: "🏪" },
       { href: "/admin/shop-orders", label: "Shop Orders", icon: "🛒" },
+      { href: "/admin/pickup", label: "Schedule Pickup", icon: "📮" },
     ],
   },
   {
