@@ -108,9 +108,9 @@ function ItemEditor({ teamId, item }: { teamId: string; item: Item }) {
               className="flex-1 min-w-0 bg-ink border border-line px-2 py-1.5 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
             />
             <span className="flex items-center gap-1 shrink-0">
-              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="text-xs text-muted hover:text-foreground disabled:opacity-30 px-1" title="Move up">↑</button>
-              <button type="button" onClick={() => move(i, 1)} disabled={i === designs.length - 1} className="text-xs text-muted hover:text-foreground disabled:opacity-30 px-1" title="Move down">↓</button>
-              <button type="button" onClick={() => remove(i)} className="text-xs display text-red-400/80 border border-red-500/40 px-1.5 py-0.5 hover:bg-red-500/10" title="Remove">✕</button>
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="text-sm text-muted hover:text-foreground disabled:opacity-30 px-2 py-1.5" title="Move up">↑</button>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === designs.length - 1} className="text-sm text-muted hover:text-foreground disabled:opacity-30 px-2 py-1.5" title="Move down">↓</button>
+              <button type="button" onClick={() => remove(i)} className="text-sm display text-red-400/80 border border-red-500/40 px-2 py-1 hover:bg-red-500/10" title="Remove">✕</button>
             </span>
           </li>
         ))}

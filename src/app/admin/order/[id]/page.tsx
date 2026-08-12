@@ -92,7 +92,7 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
       <Section title="Customer">
         <dl className="grid sm:grid-cols-3 gap-4">
           <Field label="Name">{o.customerName ?? "-"}</Field>
-          <Field label="Email">{o.customerEmail ? <a href={`mailto:${o.customerEmail}`} className="text-brand hover:underline">{o.customerEmail}</a> : "-"}</Field>
+          <Field label="Email">{o.customerEmail ? <a href={`mailto:${o.customerEmail}`} className="text-brand hover:underline break-all">{o.customerEmail}</a> : "-"}</Field>
           <Field label="Source">{o.source ?? "unknown (pre-tracking)"}</Field>
         </dl>
         {o.customerNote && <p className="mt-3 text-sm text-muted border-l-2 border-brand/60 pl-3">📝 {o.customerNote}</p>}

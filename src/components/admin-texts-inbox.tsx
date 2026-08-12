@@ -362,7 +362,7 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
                 type="button"
                 onClick={() => setState(c.phone, { star: !c.starred })}
                 title={c.starred ? "Unstar" : "Star"}
-                className={`px-2 text-sm ${c.starred ? "text-brand" : "text-line hover:text-muted"}`}
+                className={`px-3 py-2 text-base leading-none ${c.starred ? "text-brand" : "text-line hover:text-muted"}`}
               >
                 ★
               </button>

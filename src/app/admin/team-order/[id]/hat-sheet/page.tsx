@@ -158,10 +158,10 @@ export default async function HatSheetPage({ params }: { params: Promise<{ id: s
         {designImages.length > 0 && (
           <div className="mt-6">
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-500">Approved design reference</p>
-            <div className="mt-2 flex gap-3">
+            <div className="mt-2 flex flex-wrap gap-3">
               {designImages.map((u) => (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img key={u} src={u} alt="Approved design" className="h-32 border border-neutral-300 bg-white object-contain" />
+                <img key={u} src={u} alt="Approved design" className="h-32 max-w-full object-contain border border-neutral-300 bg-white" />
               ))}
             </div>
           </div>
@@ -174,7 +174,7 @@ export default async function HatSheetPage({ params }: { params: Promise<{ id: s
           {order.designerNote ? <> <strong className="text-black">Order note:</strong> {order.designerNote}</> : null}
         </div>
 
-        <div className="mt-7 flex gap-10 text-xs text-neutral-600">
+        <div className="mt-7 flex flex-col sm:flex-row gap-4 sm:gap-10 text-xs text-neutral-600">
           <div className="flex-1 border-t border-black pt-1.5">Stitched by / date</div>
           <div className="flex-1 border-t border-black pt-1.5">Cleaned by / date</div>
           <div className="flex-1 border-t border-black pt-1.5">Counted &amp; bagged by / date</div>

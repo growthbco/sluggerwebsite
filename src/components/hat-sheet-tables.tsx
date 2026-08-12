@@ -72,7 +72,8 @@ export function HatSheetTables({
               {" "}· {STAGES.map(({ stage, label }) => `${label} ${doneCount(run.rows, stage)}/${run.rows.length}`).join(" · ")}
             </span>
           </h2>
-          <table className="w-full border-collapse mt-2">
+          <div className="overflow-x-auto mt-2">
+          <table className="w-full border-collapse min-w-[20rem]">
             <thead>
               <tr className="border-b-2 border-black">
                 <th className="text-left text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-500 px-2 py-1">Player</th>
@@ -112,6 +113,7 @@ export function HatSheetTables({
               ))}
             </tbody>
           </table>
+          </div>
         </section>
       ))}
     </>

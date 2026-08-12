@@ -164,7 +164,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
       <Section title="Customer">
         <dl className="grid sm:grid-cols-3 gap-4">
           <Field label="Name">{o.contactName}</Field>
-          <Field label="Email"><a href={`mailto:${o.contactEmail}`} className="text-brand hover:underline">{o.contactEmail}</a></Field>
+          <Field label="Email"><a href={`mailto:${o.contactEmail}`} className="text-brand hover:underline break-all">{o.contactEmail}</a></Field>
           <Field label="Phone">
             {o.contactPhone ? (
               <span className="inline-flex items-center gap-2">

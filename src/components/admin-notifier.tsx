@@ -83,7 +83,7 @@ export function AdminNotifier() {
 
   if (!showAsk || perm !== "default") return null;
   return (
-    <div className="fixed bottom-4 left-4 z-40 max-w-xs border border-brand/50 bg-steel shadow-xl rounded-lg p-3">
+    <div className="fixed bottom-20 sm:bottom-4 left-4 right-4 sm:right-auto z-40 sm:max-w-xs border border-brand/50 bg-steel shadow-xl rounded-lg p-3">
       <p className="text-sm text-foreground display">🔔 Turn on text alerts?</p>
       <p className="text-xs text-muted mt-0.5">Get a desktop notification the moment a customer texts back.</p>
       <div className="mt-2 flex gap-2">
