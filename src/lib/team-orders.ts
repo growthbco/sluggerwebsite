@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq, asc, inArray } from "drizzle-orm";
+import { eq, and, asc, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrders, teamOrderRoster, designRequests } from "@/db/schema";
 import { isInHouseItem } from "@/lib/order-items";
@@ -143,6 +143,54 @@ export async function markJerseysVerified(teamOrderId: string, rowIds: string[],
   const all = await getPrintableJerseys(teamOrderId);
   const allVerified = all.length > 0 && all.every((j) => j.verifiedAt);
   await db.update(teamOrders).set({ printFileVerifiedAt: allVerified ? new Date() : null, updatedAt: new Date() }).where(eq(teamOrders.id, teamOrderId));
+}
+
+/** Coach edits an existing roster row (size correction, name/number fix). Any
+ *  change clears that jersey's print-file verification so QA re-checks it, and
+ *  recomputes the order's overall print gate. Scoped to the order so a token
+ *  can only touch its own rows. */
+export async function updateRosterRow(teamOrderId: string, rowId: string, patch: RosterInput): Promise<boolean> {
+  const db = getDb();
+  const [existing] = await db
+    .select()
+    .from(teamOrderRoster)
+    .where(and(eq(teamOrderRoster.id, rowId), eq(teamOrderRoster.teamOrderId, teamOrderId)))
+    .limit(1);
+  if (!existing) return false;
+  const sizes = patch.sizes ? { ...(existing.sizes ?? {}), ...patch.sizes } : existing.sizes;
+  await db
+    .update(teamOrderRoster)
+    .set({
+      playerName: patch.playerName ?? existing.playerName,
+      playerNumber: patch.playerNumber ?? existing.playerNumber,
+      sizes,
+      size: sizes?.jersey ?? patch.size ?? existing.size,
+      notes: patch.notes ?? existing.notes,
+      design: patch.design ?? existing.design,
+      quantity: patch.quantity != null ? Math.max(1, patch.quantity) : existing.quantity,
+      // A corrected jersey must be re-verified against the print sheet.
+      printVerifiedAt: null,
+      printVerifiedSheet: null,
+    })
+    .where(eq(teamOrderRoster.id, rowId));
+  // Recompute the order-wide print gate (a now-unverified row un-sets it).
+  const all = await getPrintableJerseys(teamOrderId);
+  const allVerified = all.length > 0 && all.every((j) => j.verifiedAt);
+  await db.update(teamOrders).set({ printFileVerifiedAt: allVerified ? new Date() : null, updatedAt: new Date() }).where(eq(teamOrders.id, teamOrderId));
+  return true;
+}
+
+/** Coach removes a roster row. Scoped to the order. */
+export async function deleteRosterRow(teamOrderId: string, rowId: string): Promise<boolean> {
+  const db = getDb();
+  const res = await db
+    .delete(teamOrderRoster)
+    .where(and(eq(teamOrderRoster.id, rowId), eq(teamOrderRoster.teamOrderId, teamOrderId)))
+    .returning({ id: teamOrderRoster.id });
+  if (res.length) {
+    await db.update(teamOrders).set({ updatedAt: new Date() }).where(eq(teamOrders.id, teamOrderId));
+  }
+  return res.length > 0;
 }
 
 /** A player adds their own row via the self-entry link. */

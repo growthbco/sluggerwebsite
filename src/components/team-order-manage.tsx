@@ -31,6 +31,7 @@ type Props = {
   contactPhone?: string | null;
   colors?: string | null;
   placedAt?: string | null; // ISO string of when the order came in
+  locked?: boolean; // order shipped/cancelled: roster is read-only
 };
 
 function rowSizes(r: RosterRow, items: string[]): string {
@@ -43,7 +44,7 @@ function rowSizes(r: RosterRow, items: string[]): string {
     .join(" · ");
 }
 
-export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerseyMaterial, items, shareUrl, roster, submitted, contactName, contactEmail, contactPhone, colors, placedAt }: Props) {
+export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerseyMaterial, items, shareUrl, roster, submitted, contactName, contactEmail, contactPhone, colors, placedAt, locked }: Props) {
   const materialLabel = jerseyMaterial
     ? JERSEY_MATERIALS.find((m) => m.key === jerseyMaterial)?.label ?? jerseyMaterial
     : null;
@@ -231,17 +232,14 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerse
         {roster.length === 0 ? (
           <p className="mt-3 text-muted text-sm">No players yet - share the link above, import, or add them here.</p>
         ) : (
-          <div className="mt-4 border border-line divide-y divide-[color:var(--line)]">
-            {roster.map((r, i) => (
-              <div key={r.id} className="grid grid-cols-[auto_1.4fr_0.5fr_2fr_1fr] gap-3 px-4 py-2.5 text-sm">
-                <span className="text-muted">{i + 1}</span>
-                <span className="text-foreground font-medium uppercase">{r.playerName || "-"}</span>
-                <span className="text-muted">#{r.playerNumber || "-"}</span>
-                <span className="text-muted">{rowSizes(r, items) || "-"}{r.quantity && r.quantity > 1 ? ` ×${r.quantity}` : ""}</span>
-                <span className="text-muted">{[r.design, r.notes].filter(Boolean).join(" · ")}</span>
-              </div>
-            ))}
-          </div>
+          <>
+            {!locked && <p className="mt-4 mb-1 text-xs text-muted">Need to fix a size, name, or number? Tap <span className="text-foreground">Edit</span> on any player - changes save right away, even after you&apos;ve submitted.</p>}
+            <div className="mt-1 border border-line divide-y divide-[color:var(--line)]">
+              {roster.map((r, i) => (
+                <RosterRowItem key={r.id} token={token} row={r} index={i} items={items} locked={locked} onChange={() => router.refresh()} />
+              ))}
+            </div>
+          </>
         )}
       </div>
 
@@ -263,6 +261,107 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerse
           </button>
           <p className="text-xs text-muted mt-3">Refresh to see new players. Submitting closes the roster and sends it to us.</p>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** One roster row: read-only by default, tap Edit to correct name/number/size/
+ *  notes or remove the player. Works after submission (blocked only once the
+ *  order has shipped). */
+function RosterRowItem({ token, row, index, items, locked, onChange }: {
+  token: string;
+  row: RosterRow;
+  index: number;
+  items: string[];
+  locked?: boolean;
+  onChange: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [name, setName] = useState(row.playerName ?? "");
+  const [number, setNumber] = useState(row.playerNumber ?? "");
+  const [notes, setNotes] = useState(row.notes ?? "");
+  const [sizes, setSizes] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const k of items) init[k] = row.sizes?.[k] ?? (k === "jersey" ? row.size ?? "" : "");
+    return init;
+  });
+
+  async function save() {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/team-order/${token}/roster`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rowId: row.id, playerName: name, playerNumber: number, notes, sizes }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not save");
+      setEditing(false);
+      onChange();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (!confirm(`Remove ${row.playerName || "this player"} from the order?`)) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/team-order/${token}/roster`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rowId: row.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not remove");
+      onChange();
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="px-4 py-3 bg-ink/40">
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-muted text-sm">{index + 1}</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Player name" maxLength={60} className="flex-1 min-w-32 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none" />
+          <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="#" maxLength={4} className="w-14 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none" />
+          {items.map((k) => (
+            <select key={k} value={sizes[k] ?? ""} onChange={(e) => setSizes((s) => ({ ...s, [k]: e.target.value }))} className="bg-ink border border-line px-2 py-2 text-sm text-foreground focus:border-brand focus:outline-none" aria-label={`${itemLabel(k)} size`}>
+              <option value="">{itemLabel(k)}: -</option>
+              {sizesFor(k).map((s) => (<option key={s}>{s}</option>))}
+            </select>
+          ))}
+        </div>
+        <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes / color (optional)" maxLength={200} className="mt-2 w-full bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none" />
+        {error && <p className="mt-2 text-sm text-brand">{error}</p>}
+        <div className="mt-2 flex gap-2">
+          <button type="button" onClick={save} disabled={busy} className="clip-slant bg-brand text-on-brand display text-sm px-4 py-1.5 hover:bg-brand-dark disabled:opacity-50">{busy ? "Saving…" : "Save"}</button>
+          <button type="button" onClick={() => { setEditing(false); setError(""); }} disabled={busy} className="display text-sm px-4 py-1.5 border border-line text-muted hover:text-foreground">Cancel</button>
+          <button type="button" onClick={remove} disabled={busy} className="ml-auto display text-sm px-3 py-1.5 border border-red-500/40 text-red-400/80 hover:bg-red-500/10 disabled:opacity-50">Remove</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-2.5 text-sm">
+      <span className="text-muted w-4 shrink-0">{index + 1}</span>
+      <span className="text-foreground font-medium uppercase flex-1 min-w-0 truncate">{row.playerName || "-"}</span>
+      <span className="text-muted w-8 shrink-0">#{row.playerNumber || "-"}</span>
+      <span className="text-muted flex-[2] min-w-0 truncate">{rowSizes(row, items) || "-"}{row.quantity && row.quantity > 1 ? ` ×${row.quantity}` : ""}</span>
+      <span className="text-muted flex-1 min-w-0 truncate hidden sm:block">{[row.design, row.notes].filter(Boolean).join(" · ")}</span>
+      {!locked && (
+        <button type="button" onClick={() => setEditing(true)} className="shrink-0 display text-xs text-brand border border-brand/40 px-2.5 py-1 hover:bg-brand/10">Edit</button>
       )}
     </div>
   );

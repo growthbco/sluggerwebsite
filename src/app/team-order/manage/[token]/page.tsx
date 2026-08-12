@@ -114,6 +114,7 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
         contactPhone={order.contactPhone}
         colors={design?.colors ?? null}
         placedAt={order.createdAt ? new Date(order.createdAt).toISOString() : null}
+        locked={["shipped", "cancelled"].includes(order.status)}
       />
 
       {store && (
