@@ -53,6 +53,16 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
   const [messages, setMessages] = useState<Message[]>([]);
   const [context, setContext] = useState<Context | null>(null);
   const [draft, setDraft] = useState("");
+  // Composer auto-grows with the message (up to ~half the screen) so long
+  // replies - like an AI draft - are fully visible to proofread before sending.
+  // Staff can still drag the handle to size it manually.
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, Math.round(window.innerHeight * 0.5))}px`;
+  }, [draft]);
   const [mode, setMode] = useState<"sms" | "whatsapp" | "note">("sms");
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
@@ -538,6 +548,7 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
           )}
           <DropZone onFiles={uploadImages} disabled={uploading || mode === "note"} className="flex gap-2 rounded">
             <textarea
+              ref={composerRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
@@ -547,7 +558,7 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
               }}
               rows={2}
               placeholder={mode === "note" ? "Internal note… (Enter to save)" : "Type a message, or drop/paste an image… (Enter to send)"}
-              className="flex-1 bg-background border border-line px-3 py-2 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none resize-none"
+              className="flex-1 min-h-[2.75rem] bg-background border border-line px-3 py-2 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none resize-y overflow-y-auto"
             />
             <div className="flex flex-col gap-1">
               {mode !== "note" && (
