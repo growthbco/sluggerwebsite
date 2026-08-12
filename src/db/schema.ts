@@ -510,6 +510,9 @@ export const teamOrders = pgTable(
       { trackingNumber: string; labelUrl?: string; carrier?: string; service?: string; transactionId?: string; at: string }[]
     >(),
     shippedAt: timestamp("shipped_at", { withTimezone: true }),
+    // When the post-delivery "how'd it turn out? leave a review" text went out
+    // (once per order, a few days after shipping). Null = not yet asked.
+    reviewRequestedAt: timestamp("review_requested_at", { withTimezone: true }),
 
     // Inbound production shipment (factory -> Slugger in Florida). Entered by
     // the designer on /design/manage. Internal only - never shown to the

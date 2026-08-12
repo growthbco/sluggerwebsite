@@ -12,6 +12,8 @@ import {
   recordDesignerReminder,
   findAiLeadFollowUpCandidates,
   recordAiLeadFollowUp,
+  findReviewRequestCandidates,
+  recordReviewRequest,
 } from "@/lib/follow-ups";
 import { emailProofFollowUp, emailInvoiceReminder } from "@/lib/email";
 import { sendFollowUpSms } from "@/lib/sms";
@@ -214,6 +216,27 @@ export async function GET(req: Request) {
     aiLeadResults.push({ name, round: lead.round, sent });
   }
 
+  // ── Post-delivery review requests (a few days after shipping) ──────────
+  const reviewUrl = process.env.REVIEW_URL;
+  const reviewCandidates = await findReviewRequestCandidates();
+  const reviewResults: { reference: string; team: string; sent?: boolean }[] = [];
+  for (const c of reviewCandidates) {
+    if (dryRun) {
+      reviewResults.push({ reference: c.reference, team: c.teamName });
+      continue;
+    }
+    const first = (c.contactName || "").trim().split(/\s+/)[0] || "there";
+    const body = `Hi ${first}, it's Slugger Athletics 🐆 Hope your ${c.teamName} gear turned out great! A quick review really helps our small shop - it'd mean a lot: ${reviewUrl}\nReply STOP to opt out.`;
+    let sent = false;
+    try {
+      sent = await sendFollowUpSms({ phone: c.phone, body });
+      if (sent) await recordReviewRequest(c.id);
+    } catch (e) {
+      console.error("review request failed:", e);
+    }
+    reviewResults.push({ reference: c.reference, team: c.teamName, sent });
+  }
+
   // ── 5. Heal AI-lab submissions whose asset sheets failed to extract ────
   let healedSheets: { reference: string; added: string[] }[] = [];
   if (!dryRun) {
@@ -228,6 +251,7 @@ export async function GET(req: Request) {
     designerReminders: staleResults,
     inboundStalls: inboundResults,
     aiLeadFollowUps: aiLeadResults,
+    reviewRequests: reviewResults,
     healedSheets,
   });
 }

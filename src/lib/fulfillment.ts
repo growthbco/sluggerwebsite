@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrders, orders, designRequests } from "@/db/schema";
 import { emailOrderShipped, emailAdditionalShipment } from "@/lib/email";
-import { smsIfConsented } from "@/lib/sms";
+import { sendFollowUpSms } from "@/lib/sms";
 import { archiveDiscordThread } from "@/lib/discord-bot";
 import { trackingUrlFor } from "@/lib/tracking";
 
@@ -110,10 +110,9 @@ export async function markShipped(
         designRequestId: teamOrders.designRequestId,
       });
     if (!row) return null;
-    await smsIfConsented({
+    await sendFollowUpSms({
       phone: row.phone,
-      optInAt: row.smsOptInAt,
-      body: `Slugger Athletics: your ${row.reference} order shipped! Track it: ${trackingUrlFor(tracking)}`,
+      body: `Slugger Athletics: your ${row.reference} order shipped! 🚚 Track it: ${trackingUrlFor(tracking)}\nReply STOP to opt out.`,
     });
     const emailed = await emailOrderShipped({
       to: row.email,

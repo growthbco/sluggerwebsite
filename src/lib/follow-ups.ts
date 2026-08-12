@@ -2,7 +2,7 @@
 // client has gone quiet (no approval, no change request, no message since the
 // proof), and we haven't exhausted the reminder cap.
 
-import { eq } from "drizzle-orm";
+import { eq, and, isNull, isNotNull, lt } from "drizzle-orm";
 import { getDb } from "@/db";
 import { designRequests, teamOrders, designLabVisitors, smsMessages } from "@/db/schema";
 import { toE164 } from "@/lib/sms";
@@ -278,6 +278,39 @@ export async function findAiLeadFollowUpCandidates(now = new Date()): Promise<Ai
     }
   }
   return out;
+}
+
+/* ── Post-delivery review requests ──────────────────────────────────
+ * A few days after a team order ships (enough time to arrive and be worn),
+ * text the coach a friendly "how'd it turn out? mind leaving a review?" with
+ * our review link. Once per order, and only if REVIEW_URL is configured. */
+const REVIEW_AFTER_DAYS = 5;
+
+export type ReviewCandidate = { id: string; reference: string; teamName: string; contactName: string; phone: string };
+
+export async function findReviewRequestCandidates(now = new Date()): Promise<ReviewCandidate[]> {
+  if (!process.env.REVIEW_URL) return [];
+  const db = getDb();
+  const cutoff = new Date(now.getTime() - REVIEW_AFTER_DAYS * DAY_MS);
+  const rows = await db
+    .select()
+    .from(teamOrders)
+    .where(
+      and(
+        eq(teamOrders.status, "shipped"),
+        isNull(teamOrders.reviewRequestedAt),
+        isNotNull(teamOrders.shippedAt),
+        lt(teamOrders.shippedAt, cutoff),
+      ),
+    );
+  return rows
+    .map((o) => ({ id: o.id, reference: o.reference, teamName: o.teamName, contactName: o.contactName, phone: o.contactPhone ?? "" }))
+    .filter((o) => o.phone.trim());
+}
+
+export async function recordReviewRequest(id: string, now = new Date()) {
+  const db = getDb();
+  await db.update(teamOrders).set({ reviewRequestedAt: now }).where(eq(teamOrders.id, id));
 }
 
 export async function recordAiLeadFollowUp(id: string, now = new Date()) {

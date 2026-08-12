@@ -498,6 +498,13 @@
       "when": 1786478275385,
       "tag": "0070_soft_switch",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1786554182356,
+      "tag": "0071_mysterious_vapor",
+      "breakpoints": true
     }
   ]
 }
