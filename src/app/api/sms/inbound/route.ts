@@ -47,12 +47,17 @@ export async function POST(req: Request) {
     }
   } catch (e) { console.error("sms inbox log failed:", e); }
 
-  const hook = process.env.DISCORD_ORDERS_WEBHOOK_URL || process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
+  // Texts get their OWN Discord channel (DISCORD_TEXTS_WEBHOOK_URL) so they
+  // don't clutter the orders feed. If that channel isn't configured we skip
+  // the Discord ping entirely - the admin Texts inbox, desktop alert, and the
+  // email below already make sure nothing is missed. (No orders-channel
+  // fallback on purpose.)
+  const hook = process.env.DISCORD_TEXTS_WEBHOOK_URL;
   if (hook) {
     void fetch(hook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: "Slugger SMS", content: `💬 ${channel === "whatsapp" ? "WhatsApp" : "Text"} from ${from}${media}:\n> ${body}\nReply: https://sluggerathletics.com/admin/texts` }),
+      body: JSON.stringify({ username: "Slugger Texts", content: `💬 ${channel === "whatsapp" ? "WhatsApp" : "Text"} from ${from}${media}:\n> ${body}\nReply: https://sluggerathletics.com/admin/texts` }),
     }).catch(() => {});
   }
   void sendEmail({
