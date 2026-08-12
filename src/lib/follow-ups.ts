@@ -284,10 +284,24 @@ export async function findAiLeadFollowUpCandidates(now = new Date()): Promise<Ai
  * A few days after a team order ships (enough time to arrive and be worn),
  * text the coach a friendly "how'd it turn out? mind leaving a review?" with
  * our review link. Once per order, and only if REVIEW_URL is configured. */
-const REVIEW_AFTER_DAYS = 5;
-const REVIEW_MAX_DAYS = 30; // don't cold-ask for a review on a months-old order
+// The review ask waits until the package is actually Delivered (live carrier
+// status). We start looking 2 days out (nothing arrives faster), stop cold-
+// asking after 30 days, and if tracking never reports Delivered we send anyway
+// at the fallback age so a missed scan doesn't cost us the review.
+const REVIEW_AFTER_DAYS = 2;
+const REVIEW_MAX_DAYS = 30;
+export const REVIEW_FALLBACK_DAYS = 12;
 
-export type ReviewCandidate = { id: string; reference: string; teamName: string; contactName: string; phone: string };
+export type ReviewCandidate = {
+  id: string;
+  reference: string;
+  teamName: string;
+  contactName: string;
+  phone: string;
+  carrier: string | null;
+  trackingNumber: string | null;
+  shippedAt: Date | null;
+};
 
 export async function findReviewRequestCandidates(now = new Date()): Promise<ReviewCandidate[]> {
   if (!process.env.REVIEW_URL) return [];
@@ -307,7 +321,7 @@ export async function findReviewRequestCandidates(now = new Date()): Promise<Rev
       ),
     );
   return rows
-    .map((o) => ({ id: o.id, reference: o.reference, teamName: o.teamName, contactName: o.contactName, phone: o.contactPhone ?? "" }))
+    .map((o) => ({ id: o.id, reference: o.reference, teamName: o.teamName, contactName: o.contactName, phone: o.contactPhone ?? "", carrier: o.shipCarrier, trackingNumber: o.trackingNumber, shippedAt: o.shippedAt }))
     .filter((o) => o.phone.trim());
 }
 
@@ -336,7 +350,7 @@ export async function findOrderReviewCandidates(now = new Date()): Promise<Revie
       ),
     );
   return rows
-    .map((o) => ({ id: o.id, reference: o.reference, teamName: "", contactName: o.customerName ?? "", phone: o.customerPhone ?? "" }))
+    .map((o) => ({ id: o.id, reference: o.reference, teamName: "", contactName: o.customerName ?? "", phone: o.customerPhone ?? "", carrier: o.shipCarrier, trackingNumber: o.trackingNumber, shippedAt: o.shippedAt }))
     .filter((o) => o.phone.trim());
 }
 

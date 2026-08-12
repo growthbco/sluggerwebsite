@@ -16,6 +16,7 @@ import {
   recordReviewRequest,
   findOrderReviewCandidates,
   recordOrderReviewRequest,
+  REVIEW_FALLBACK_DAYS,
   findReferralPromptCandidates,
   recordReferralPrompt,
   findReorderCandidates,
@@ -265,8 +266,22 @@ export async function GET(req: Request) {
     reorderResults.push({ reference: c.reference, team: c.teamName, sent });
   }
 
-  // ── Post-delivery review requests (a few days after shipping) ──────────
+  // ── Post-delivery review requests (only once actually Delivered) ───────
   const reviewUrl = process.env.REVIEW_URL;
+  // True when the package shows Delivered by live tracking, or - if tracking
+  // never reports it - once it's old enough that it has surely arrived.
+  const NOW = Date.now();
+  async function reviewReady(carrier: string | null, tracking: string | null, shippedAt: Date | null): Promise<boolean> {
+    if (carrier && tracking) {
+      try {
+        const live = await getLiveTracking(carrier, tracking);
+        if (live?.status === "Delivered") return true;
+      } catch { /* fall through to age fallback */ }
+    }
+    const ageDays = shippedAt ? (NOW - +shippedAt) / (24 * 60 * 60 * 1000) : 0;
+    return ageDays >= REVIEW_FALLBACK_DAYS;
+  }
+
   const reviewCandidates = await findReviewRequestCandidates();
   const reviewResults: { reference: string; team: string; sent?: boolean }[] = [];
   for (const c of reviewCandidates) {
@@ -274,6 +289,7 @@ export async function GET(req: Request) {
       reviewResults.push({ reference: c.reference, team: c.teamName });
       continue;
     }
+    if (!(await reviewReady(c.carrier, c.trackingNumber, c.shippedAt))) continue; // not delivered yet
     const first = (c.contactName || "").trim().split(/\s+/)[0] || "there";
     const body = `Hi ${first}, it's Slugger Athletics 🐆 Hope your ${c.teamName} gear turned out great! A quick review really helps our small shop - it'd mean a lot: ${reviewUrl}\nReply STOP to opt out.`;
     let sent = false;
@@ -293,6 +309,7 @@ export async function GET(req: Request) {
       reviewResults.push({ reference: c.reference, team: "(store buyer)" });
       continue;
     }
+    if (!(await reviewReady(c.carrier, c.trackingNumber, c.shippedAt))) continue; // not delivered yet
     const first = (c.contactName || "").trim().split(/\s+/)[0] || "there";
     const body = `Hi ${first}, it's Slugger Athletics 🐆 Hope your gear turned out great! A quick review really helps our small shop - it'd mean a lot: ${reviewUrl}\nReply STOP to opt out.`;
     let sent = false;

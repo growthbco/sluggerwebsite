@@ -23,20 +23,21 @@ export async function saveLabelPurchase(
   trackingNumber: string,
   labelUrl: string,
   transactionId?: string,
+  carrier?: string,
 ): Promise<boolean> {
   const db = getDb();
   const now = new Date();
   if (kind === "team_order") {
     const [row] = await db
       .update(teamOrders)
-      .set({ trackingNumber, labelUrl, shipTransactionId: transactionId ?? null, updatedAt: now })
+      .set({ trackingNumber, labelUrl, shipTransactionId: transactionId ?? null, shipCarrier: carrier ?? null, updatedAt: now })
       .where(eq(teamOrders.id, id))
       .returning({ id: teamOrders.id });
     return Boolean(row);
   }
   const [row] = await db
     .update(orders)
-    .set({ trackingNumber, labelUrl, shipTransactionId: transactionId ?? null })
+    .set({ trackingNumber, labelUrl, shipTransactionId: transactionId ?? null, shipCarrier: carrier ?? null })
     .where(eq(orders.id, id))
     .returning({ id: orders.id });
   return Boolean(row);

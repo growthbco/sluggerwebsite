@@ -324,6 +324,9 @@ export const orders = pgTable(
     // Shippo PDF for reprints).
     trackingNumber: text("tracking_number"),
     labelUrl: text("label_url"),
+    // Carrier of the primary outbound label (FedEx/UPS/USPS/DHL) - needed to
+    // poll live delivery status (the review text waits until it's Delivered).
+    shipCarrier: text("ship_carrier"),
     // Shippo transaction object id of the primary label (lets us schedule a
     // carrier pickup for it).
     shipTransactionId: text("ship_transaction_id"),
@@ -506,6 +509,9 @@ export const teamOrders = pgTable(
     // Fulfillment (labelUrl = Shippo PDF for reprints)
     trackingNumber: text("tracking_number"),
     labelUrl: text("label_url"),
+    // Carrier of the primary outbound label (FedEx/UPS/USPS/DHL) - needed to
+    // poll live delivery status (the review text waits until it's Delivered).
+    shipCarrier: text("ship_carrier"),
     // Shippo transaction object id of the primary label (lets us schedule a
     // carrier pickup for it).
     shipTransactionId: text("ship_transaction_id"),

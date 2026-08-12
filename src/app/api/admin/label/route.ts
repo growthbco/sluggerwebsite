@@ -107,7 +107,7 @@ export async function POST(req: Request) {
       }
       // Primary label: save tracking, but don't ship or email yet - buying the
       // label ahead of time is a separate step from actually sending the box.
-      await saveLabelPurchase(kind, body.id, label.trackingNumber, label.labelUrl, label.transactionId);
+      await saveLabelPurchase(kind, body.id, label.trackingNumber, label.labelUrl, label.transactionId, label.provider);
       return NextResponse.json({
         ok: true,
         trackingNumber: label.trackingNumber,

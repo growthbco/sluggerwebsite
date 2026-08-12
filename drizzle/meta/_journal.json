@@ -519,6 +519,13 @@
       "when": 1786555477139,
       "tag": "0073_right_genesis",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1786555781018,
+      "tag": "0074_clever_leo",
+      "breakpoints": true
     }
   ]
 }
