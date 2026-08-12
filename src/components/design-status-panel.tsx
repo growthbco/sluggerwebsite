@@ -53,6 +53,11 @@ export function DesignStatusPanel({
   );
   const [busy, setBusy] = useState<"" | "approving" | "requesting">("");
   const [message, setMessage] = useState("");
+  // Final-approval gate: opening a confirm modal + requiring an explicit
+  // acknowledgment checkbox before we send the design to production, so there's
+  // a clear record the client understood approval is final.
+  const [confirming, setConfirming] = useState(false);
+  const [ack, setAck] = useState(false);
   const [showChanges, setShowChanges] = useState(false);
   const [generalNote, setGeneralNote] = useState("");
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -84,6 +89,7 @@ export function DesignStatusPanel({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not approve");
       setCurrentStatus("approved");
+      setConfirming(false);
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
@@ -215,15 +221,11 @@ export function DesignStatusPanel({
       ) : hasProof ? (
         <section className="flex flex-wrap gap-3">
           <button
-            onClick={approve}
+            onClick={() => { setAck(false); setConfirming(true); }}
             disabled={selected.length === 0 || busy !== ""}
             className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors disabled:opacity-60"
           >
-            {busy === "approving"
-              ? "Approving..."
-              : selected.length > 1
-                ? `✓ Approve ${selected.length} Selected`
-                : "✓ Approve This Proof"}
+            {selected.length > 1 ? `✓ Approve ${selected.length} Selected` : "✓ Approve This Proof"}
           </button>
           <button
             onClick={() => setShowChanges((v) => !v)}
@@ -233,6 +235,52 @@ export function DesignStatusPanel({
           >
             Request Changes{maxedOut ? " (locked)" : ""}
           </button>
+
+          {confirming && (
+            <div
+              className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="approve-confirm-title"
+              onClick={(e) => { if (e.target === e.currentTarget && busy === "") setConfirming(false); }}
+            >
+              <div className="w-full max-w-md bg-steel border border-amber-500/50 p-6 text-left">
+                <h2 id="approve-confirm-title" className="display text-2xl text-foreground">⚠ Are you sure?</h2>
+                <p className="mt-3 text-sm text-foreground/90">
+                  Approving sends {selected.length > 1 ? "these designs" : "this design"} <strong>straight into production</strong>. This is <strong>final</strong> - every name, number, size, logo, and color prints <strong>exactly as shown on the proof</strong>.
+                </p>
+                <p className="mt-2 text-sm text-foreground/90">
+                  Once you approve, it <strong>cannot be changed, cancelled, or refunded</strong>. Please double-check every detail first.
+                </p>
+                <label className="mt-4 flex items-start gap-2.5 text-sm text-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={ack}
+                    onChange={(e) => setAck(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+                  />
+                  <span>I&apos;ve checked every detail. I understand this is final and goes into production as-is, with no changes or refunds.</span>
+                </label>
+                {message && <p className="mt-3 text-sm text-brand">{message}</p>}
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button
+                    onClick={approve}
+                    disabled={!ack || busy !== ""}
+                    className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-6 py-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {busy === "approving" ? "Approving…" : "Yes, approve & produce"}
+                  </button>
+                  <button
+                    onClick={() => setConfirming(false)}
+                    disabled={busy !== ""}
+                    className="clip-slant border border-line text-foreground hover:bg-foreground/5 display px-6 py-3 transition-colors disabled:opacity-50"
+                  >
+                    Go back
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
       ) : (
         <p className="text-muted">No proof yet. We&apos;ll email you when it&apos;s ready.</p>
