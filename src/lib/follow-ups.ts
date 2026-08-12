@@ -4,7 +4,7 @@
 
 import { eq, and, isNull, isNotNull, lt, gt } from "drizzle-orm";
 import { getDb } from "@/db";
-import { designRequests, teamOrders, designLabVisitors, smsMessages } from "@/db/schema";
+import { designRequests, teamOrders, designLabVisitors, smsMessages, orders } from "@/db/schema";
 import { toE164 } from "@/lib/sms";
 
 export const MAX_FOLLOW_UPS = 2;
@@ -314,6 +314,35 @@ export async function findReviewRequestCandidates(now = new Date()): Promise<Rev
 export async function recordReviewRequest(id: string, now = new Date()) {
   const db = getDb();
   await db.update(teamOrders).set({ reviewRequestedAt: now }).where(eq(teamOrders.id, id));
+}
+
+/** Same post-delivery review ask, for store/shop orders (buyer phone captured
+ *  by Stripe at checkout). Fulfilled = shipped for these. */
+export async function findOrderReviewCandidates(now = new Date()): Promise<ReviewCandidate[]> {
+  if (!process.env.REVIEW_URL) return [];
+  const db = getDb();
+  const cutoff = new Date(now.getTime() - REVIEW_AFTER_DAYS * DAY_MS);
+  const floor = new Date(now.getTime() - REVIEW_MAX_DAYS * DAY_MS);
+  const rows = await db
+    .select()
+    .from(orders)
+    .where(
+      and(
+        eq(orders.status, "fulfilled"),
+        isNull(orders.reviewRequestedAt),
+        isNotNull(orders.shippedAt),
+        lt(orders.shippedAt, cutoff),
+        gt(orders.shippedAt, floor),
+      ),
+    );
+  return rows
+    .map((o) => ({ id: o.id, reference: o.reference, teamName: "", contactName: o.customerName ?? "", phone: o.customerPhone ?? "" }))
+    .filter((o) => o.phone.trim());
+}
+
+export async function recordOrderReviewRequest(id: string, now = new Date()) {
+  const db = getDb();
+  await db.update(orders).set({ reviewRequestedAt: now }).where(eq(orders.id, id));
 }
 
 /* ── Referral prompt (a week after delivery) ────────────────────────

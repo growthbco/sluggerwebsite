@@ -14,6 +14,8 @@ import {
   recordAiLeadFollowUp,
   findReviewRequestCandidates,
   recordReviewRequest,
+  findOrderReviewCandidates,
+  recordOrderReviewRequest,
   findReferralPromptCandidates,
   recordReferralPrompt,
   findReorderCandidates,
@@ -282,6 +284,25 @@ export async function GET(req: Request) {
       console.error("review request failed:", e);
     }
     reviewResults.push({ reference: c.reference, team: c.teamName, sent });
+  }
+
+  // Same review ask for store/shop buyers (phone from Stripe checkout).
+  const orderReviewCandidates = await findOrderReviewCandidates();
+  for (const c of orderReviewCandidates) {
+    if (dryRun) {
+      reviewResults.push({ reference: c.reference, team: "(store buyer)" });
+      continue;
+    }
+    const first = (c.contactName || "").trim().split(/\s+/)[0] || "there";
+    const body = `Hi ${first}, it's Slugger Athletics 🐆 Hope your gear turned out great! A quick review really helps our small shop - it'd mean a lot: ${reviewUrl}\nReply STOP to opt out.`;
+    let sent = false;
+    try {
+      sent = await sendFollowUpSms({ phone: c.phone, body });
+      if (sent) await recordOrderReviewRequest(c.id);
+    } catch (e) {
+      console.error("store review request failed:", e);
+    }
+    reviewResults.push({ reference: c.reference, team: "(store buyer)", sent });
   }
 
   // ── 5. Heal AI-lab submissions whose asset sheets failed to extract ────

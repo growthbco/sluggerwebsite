@@ -19,6 +19,7 @@ export async function persistPaidOrder(args: {
   stripePaymentIntentId?: string;
   customerName?: string;
   customerEmail?: string;
+  customerPhone?: string;
   shippingAddress?: {
     line1?: string;
     line2?: string;
@@ -45,6 +46,7 @@ export async function persistPaidOrder(args: {
       status: "paid",
       customerName: args.customerName,
       customerEmail: args.customerEmail,
+      customerPhone: args.customerPhone,
       shippingAddress: args.shippingAddress,
       subtotalCents: args.subtotalCents,
       shippingCents: args.shippingCents,

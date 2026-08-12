@@ -145,8 +145,12 @@ export async function markShipped(
     .update(orders)
     .set({ status: "fulfilled", trackingNumber: tracking, labelUrl: labelUrl ?? existing?.label ?? null, shippedAt: now })
     .where(eq(orders.id, id))
-    .returning({ reference: orders.reference, email: orders.customerEmail, name: orders.customerName });
+    .returning({ reference: orders.reference, email: orders.customerEmail, name: orders.customerName, phone: orders.customerPhone });
   if (!row) return null;
+  await sendFollowUpSms({
+    phone: row.phone,
+    body: `Slugger Athletics: your ${row.reference} order shipped! 🚚 Track it: ${trackingUrlFor(tracking)}\nReply STOP to opt out.`,
+  });
   const emailed = row.email
     ? await emailOrderShipped({
         to: row.email,

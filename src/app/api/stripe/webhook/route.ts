@@ -398,6 +398,7 @@ export async function POST(req: Request) {
             stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : undefined,
             customerName: session.customer_details?.name ?? undefined,
             customerEmail: session.customer_details?.email ?? undefined,
+            customerPhone: session.customer_details?.phone ?? undefined,
             shippingAddress: addr
               ? {
                   line1: addr.line1 ?? undefined,

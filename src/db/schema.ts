@@ -295,6 +295,11 @@ export const orders = pgTable(
 
     customerName: text("customer_name"),
     customerEmail: text("customer_email"),
+    // Buyer phone captured by Stripe Checkout (phone_number_collection). Lets
+    // store buyers get the ship/tracking + review texts, same as team orders.
+    customerPhone: text("customer_phone"),
+    // Post-delivery review request sent (once). Null = not yet asked.
+    reviewRequestedAt: timestamp("review_requested_at", { withTimezone: true }),
     shippingAddress: jsonb("shipping_address").$type<{
       line1?: string;
       line2?: string;
