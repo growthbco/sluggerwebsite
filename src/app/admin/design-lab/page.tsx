@@ -7,6 +7,7 @@ import { dbEnabled, getDb } from "@/db";
 import { designLabVisitors, designLabRenders, designRequests } from "@/db/schema";
 import { ZoomableImage } from "@/components/zoomable-image";
 import { AdminLeadDelete } from "@/components/admin-lead-delete";
+import { AdminBulkLeadDelete } from "@/components/admin-bulk-lead-delete";
 
 export const metadata: Metadata = { title: "Design Lab Leads", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -52,15 +53,19 @@ export default async function DesignLabLeadsPage() {
     if (Boolean(a.paidAt) !== Boolean(b.paidAt)) return a.paidAt ? -1 : 1;
     return b.createdAt.getTime() - a.createdAt.getTime();
   });
+  const junkCount = visitors.filter((v) => !(v.firstName ?? "").trim() && !(v.lastName ?? "").trim() && !v.paidAt).length;
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-14">
       <Link href="/admin" className="text-sm text-muted hover:text-foreground">← Back to dashboard</Link>
       <h1 className="display text-4xl text-foreground mt-3">🧪 Design Lab Leads</h1>
-      <p className="mt-2 text-muted">
-        Everyone who used the AI jersey maker - what they made, how to reach them, and whether they
-        became a design request. Paid sessions float to the top; those are your hottest leads.
-      </p>
+      <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+        <p className="text-muted max-w-2xl">
+          Everyone who used the AI jersey maker - what they made, how to reach them, and whether they
+          became a design request. Paid sessions float to the top; those are your hottest leads.
+        </p>
+        <AdminBulkLeadDelete count={junkCount} />
+      </div>
 
       <div className="mt-8 space-y-8">
         {sorted.length === 0 && <p className="text-muted">No lab visitors yet.</p>}
