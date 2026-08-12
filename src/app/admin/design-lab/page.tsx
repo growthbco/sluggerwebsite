@@ -6,6 +6,7 @@ import { isAdmin, adminEnabled } from "@/lib/admin-auth";
 import { dbEnabled, getDb } from "@/db";
 import { designLabVisitors, designLabRenders, designRequests } from "@/db/schema";
 import { ZoomableImage } from "@/components/zoomable-image";
+import { AdminLeadDelete } from "@/components/admin-lead-delete";
 
 export const metadata: Metadata = { title: "Design Lab Leads", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -83,6 +84,7 @@ export default async function DesignLabLeadsPage() {
                     → became {req.ref} ({req.status})
                   </a>
                 )}
+                <AdminLeadDelete id={v.id} name={name} />
               </div>
               <p className="mt-1 text-sm text-muted">
                 {v.email && (
@@ -100,15 +102,35 @@ export default async function DesignLabLeadsPage() {
                 {v.generations} concepts · first seen {fmt(v.createdAt)}
                 {v.paidAt ? ` · paid ${fmt(v.paidAt)}` : ""}
               </p>
+              {/* Follow-up automation status: shows the "can we help?" texts. */}
+              <p className="mt-1.5 text-xs">
+                {req ? (
+                  <span className="text-green-400">✓ Converted - no follow-ups needed</span>
+                ) : !v.phone ? (
+                  <span className="text-muted">No phone on file - can&apos;t auto-text</span>
+                ) : v.paidAt ? (
+                  <span className="text-muted">Paid session - not in the &quot;didn&apos;t order&quot; follow-up</span>
+                ) : (v.smsFollowUpsSent ?? 0) > 0 ? (
+                  <span className="text-brand">📱 Followed up {v.smsFollowUpsSent}× {v.lastFollowUpAt ? `(last ${fmt(v.lastFollowUpAt)})` : ""}{(v.smsFollowUpsSent ?? 0) >= 2 ? " · done" : " · 1 more if no reply"}</span>
+                ) : (
+                  <span className="text-amber-300">⏳ Auto follow-up text pending (~a day after they designed)</span>
+                )}
+              </p>
               {gallery.length > 0 ? (
-                <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {gallery.map((r) => (
-                    <figure key={r.id}>
-                      <ZoomableImage src={r.url} alt={r.note ?? "AI concept"} />
-                      {r.note && <figcaption className="mt-1 text-[11px] text-muted line-clamp-2">{r.note}</figcaption>}
-                    </figure>
-                  ))}
-                </div>
+                <details className="mt-3 group/gallery">
+                  <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs display text-brand border border-brand/40 px-2.5 py-1 hover:bg-brand/10">
+                    🖼 View {gallery.length} concept{gallery.length === 1 ? "" : "s"}
+                    <span className="opacity-70 transition-transform group-open/gallery:rotate-90">▶</span>
+                  </summary>
+                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {gallery.map((r) => (
+                      <figure key={r.id}>
+                        <ZoomableImage src={r.url} alt={r.note ?? "AI concept"} />
+                        {r.note && <figcaption className="mt-1 text-[11px] text-muted line-clamp-2">{r.note}</figcaption>}
+                      </figure>
+                    ))}
+                  </div>
+                </details>
               ) : (
                 <p className="mt-3 text-xs text-muted">No saved concepts for this visitor.</p>
               )}
