@@ -127,8 +127,9 @@ export async function setPassword(email: string, password: string): Promise<void
 /* ------------------------------- Referrals ------------------------------ */
 
 // Both sides earn this much store credit when a referred customer's first
-// order is paid.
-export const REFERRAL_REWARD_CENTS = 2500;
+// order is paid - enough for a free jersey in any style (covers the $35
+// full-button, our priciest jersey).
+export const REFERRAL_REWARD_CENTS = 3500;
 
 /**
  * Attribute a new customer to a referrer's code. No-op if the customer was

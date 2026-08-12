@@ -513,6 +513,12 @@ export const teamOrders = pgTable(
     // When the post-delivery "how'd it turn out? leave a review" text went out
     // (once per order, a few days after shipping). Null = not yet asked.
     reviewRequestedAt: timestamp("review_requested_at", { withTimezone: true }),
+    // When we texted the coach their referral link ("refer a team, you both
+    // get a free jersey"), once, about a week after delivery.
+    referralPromptedAt: timestamp("referral_prompted_at", { withTimezone: true }),
+    // When we texted a next-season reorder nudge (~a year after the order),
+    // once, so long-cycle teams get invited back before their season.
+    reorderPromptedAt: timestamp("reorder_prompted_at", { withTimezone: true }),
 
     // Inbound production shipment (factory -> Slugger in Florida). Entered by
     // the designer on /design/manage. Internal only - never shown to the

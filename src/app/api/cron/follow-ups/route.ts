@@ -14,7 +14,12 @@ import {
   recordAiLeadFollowUp,
   findReviewRequestCandidates,
   recordReviewRequest,
+  findReferralPromptCandidates,
+  recordReferralPrompt,
+  findReorderCandidates,
+  recordReorderPrompt,
 } from "@/lib/follow-ups";
+import { getOrCreateCustomer } from "@/lib/customers";
 import { emailProofFollowUp, emailInvoiceReminder } from "@/lib/email";
 import { sendFollowUpSms } from "@/lib/sms";
 import { postDesignThreadUpdate } from "@/lib/discord";
@@ -216,6 +221,48 @@ export async function GET(req: Request) {
     aiLeadResults.push({ name, round: lead.round, sent });
   }
 
+  // ── Referral prompt (~a week after delivery): "refer a team, free jersey" ─
+  const referralCandidates = await findReferralPromptCandidates();
+  const referralResults: { reference: string; team: string; sent?: boolean }[] = [];
+  for (const c of referralCandidates) {
+    if (dryRun) {
+      referralResults.push({ reference: c.reference, team: c.teamName });
+      continue;
+    }
+    let sent = false;
+    try {
+      const customer = await getOrCreateCustomer(c.contactEmail, { name: c.contactName, phone: c.phone });
+      const link = `${SITE}/r/${customer.referralCode}`;
+      const first = (c.contactName || "").trim().split(/\s+/)[0] || "there";
+      const body = `Hi ${first}, loved your new ${c.teamName} gear? 🐆 Refer another coach or team to Slugger Athletics and you BOTH get a free custom jersey (any style, our treat). Share your link: ${link}\nReply STOP to opt out.`;
+      sent = await sendFollowUpSms({ phone: c.phone, body });
+      if (sent) await recordReferralPrompt(c.id);
+    } catch (e) {
+      console.error("referral prompt failed:", e);
+    }
+    referralResults.push({ reference: c.reference, team: c.teamName, sent });
+  }
+
+  // ── Next-season reorder win-back (~a year after the order) ─────────────
+  const reorderCandidates = await findReorderCandidates();
+  const reorderResults: { reference: string; team: string; sent?: boolean }[] = [];
+  for (const c of reorderCandidates) {
+    if (dryRun) {
+      reorderResults.push({ reference: c.reference, team: c.teamName });
+      continue;
+    }
+    const first = (c.contactName || "").trim().split(/\s+/)[0] || "there";
+    const body = `Hi ${first}, new season coming up? 🐆 It's about that time to gear up ${c.teamName} again with Slugger Athletics. We still have your design on file, so reordering is quick and easy - just reply and we'll get you set up.\nReply STOP to opt out.`;
+    let sent = false;
+    try {
+      sent = await sendFollowUpSms({ phone: c.phone, body });
+      if (sent) await recordReorderPrompt(c.id);
+    } catch (e) {
+      console.error("reorder prompt failed:", e);
+    }
+    reorderResults.push({ reference: c.reference, team: c.teamName, sent });
+  }
+
   // ── Post-delivery review requests (a few days after shipping) ──────────
   const reviewUrl = process.env.REVIEW_URL;
   const reviewCandidates = await findReviewRequestCandidates();
@@ -245,13 +292,15 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     dryRun,
-    count: results.length + invoiceResults.length + staleResults.length + inboundResults.length + aiLeadResults.length + healedSheets.length,
+    count: results.length + invoiceResults.length + staleResults.length + inboundResults.length + aiLeadResults.length + referralResults.length + reorderResults.length + reviewResults.length + healedSheets.length,
     results,
     invoiceReminders: invoiceResults,
     designerReminders: staleResults,
     inboundStalls: inboundResults,
     aiLeadFollowUps: aiLeadResults,
     reviewRequests: reviewResults,
+    referralPrompts: referralResults,
+    reorderPrompts: reorderResults,
     healedSheets,
   });
 }

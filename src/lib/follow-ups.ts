@@ -316,6 +316,74 @@ export async function recordReviewRequest(id: string, now = new Date()) {
   await db.update(teamOrders).set({ reviewRequestedAt: now }).where(eq(teamOrders.id, id));
 }
 
+/* ── Referral prompt (a week after delivery) ────────────────────────
+ * Text a happy coach their referral link so they can refer another team -
+ * both sides earn a free crew-neck jersey. Once per order. */
+const REFERRAL_AFTER_DAYS = 8;
+const REFERRAL_MAX_DAYS = 40;
+
+export type ReferralCandidate = { id: string; reference: string; teamName: string; contactName: string; contactEmail: string; phone: string };
+
+export async function findReferralPromptCandidates(now = new Date()): Promise<ReferralCandidate[]> {
+  const db = getDb();
+  const cutoff = new Date(now.getTime() - REFERRAL_AFTER_DAYS * DAY_MS);
+  const floor = new Date(now.getTime() - REFERRAL_MAX_DAYS * DAY_MS);
+  const rows = await db
+    .select()
+    .from(teamOrders)
+    .where(
+      and(
+        eq(teamOrders.status, "shipped"),
+        isNull(teamOrders.referralPromptedAt),
+        isNotNull(teamOrders.shippedAt),
+        lt(teamOrders.shippedAt, cutoff),
+        gt(teamOrders.shippedAt, floor),
+      ),
+    );
+  return rows
+    .map((o) => ({ id: o.id, reference: o.reference, teamName: o.teamName, contactName: o.contactName, contactEmail: o.contactEmail, phone: o.contactPhone ?? "" }))
+    .filter((o) => o.phone.trim() && o.contactEmail.trim());
+}
+
+export async function recordReferralPrompt(id: string, now = new Date()) {
+  const db = getDb();
+  await db.update(teamOrders).set({ referralPromptedAt: now }).where(eq(teamOrders.id, id));
+}
+
+/* ── Next-season reorder win-back (~a year later) ───────────────────
+ * Long buying cycles: text last season's teams before this season so they
+ * reorder. Their design is on file, so it's an easy yes. Once per order. */
+const REORDER_MIN_DAYS = 300;
+const REORDER_MAX_DAYS = 400;
+
+export type ReorderCandidate = { id: string; reference: string; teamName: string; contactName: string; phone: string };
+
+export async function findReorderCandidates(now = new Date()): Promise<ReorderCandidate[]> {
+  const db = getDb();
+  const olderThan = new Date(now.getTime() - REORDER_MIN_DAYS * DAY_MS);
+  const notBefore = new Date(now.getTime() - REORDER_MAX_DAYS * DAY_MS);
+  const rows = await db
+    .select()
+    .from(teamOrders)
+    .where(
+      and(
+        isNull(teamOrders.reorderPromptedAt),
+        isNull(teamOrders.archivedAt),
+        isNotNull(teamOrders.shippedAt),
+        lt(teamOrders.shippedAt, olderThan),
+        gt(teamOrders.shippedAt, notBefore),
+      ),
+    );
+  return rows
+    .map((o) => ({ id: o.id, reference: o.reference, teamName: o.teamName, contactName: o.contactName, phone: o.contactPhone ?? "" }))
+    .filter((o) => o.phone.trim());
+}
+
+export async function recordReorderPrompt(id: string, now = new Date()) {
+  const db = getDb();
+  await db.update(teamOrders).set({ reorderPromptedAt: now }).where(eq(teamOrders.id, id));
+}
+
 export async function recordAiLeadFollowUp(id: string, now = new Date()) {
   const db = getDb();
   const [row] = await db.select({ n: designLabVisitors.smsFollowUpsSent }).from(designLabVisitors).where(eq(designLabVisitors.id, id)).limit(1);
