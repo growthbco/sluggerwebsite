@@ -2,7 +2,7 @@
 // client has gone quiet (no approval, no change request, no message since the
 // proof), and we haven't exhausted the reminder cap.
 
-import { eq, and, isNull, isNotNull, lt } from "drizzle-orm";
+import { eq, and, isNull, isNotNull, lt, gt } from "drizzle-orm";
 import { getDb } from "@/db";
 import { designRequests, teamOrders, designLabVisitors, smsMessages } from "@/db/schema";
 import { toE164 } from "@/lib/sms";
@@ -285,6 +285,7 @@ export async function findAiLeadFollowUpCandidates(now = new Date()): Promise<Ai
  * text the coach a friendly "how'd it turn out? mind leaving a review?" with
  * our review link. Once per order, and only if REVIEW_URL is configured. */
 const REVIEW_AFTER_DAYS = 5;
+const REVIEW_MAX_DAYS = 30; // don't cold-ask for a review on a months-old order
 
 export type ReviewCandidate = { id: string; reference: string; teamName: string; contactName: string; phone: string };
 
@@ -292,6 +293,7 @@ export async function findReviewRequestCandidates(now = new Date()): Promise<Rev
   if (!process.env.REVIEW_URL) return [];
   const db = getDb();
   const cutoff = new Date(now.getTime() - REVIEW_AFTER_DAYS * DAY_MS);
+  const floor = new Date(now.getTime() - REVIEW_MAX_DAYS * DAY_MS);
   const rows = await db
     .select()
     .from(teamOrders)
@@ -301,6 +303,7 @@ export async function findReviewRequestCandidates(now = new Date()): Promise<Rev
         isNull(teamOrders.reviewRequestedAt),
         isNotNull(teamOrders.shippedAt),
         lt(teamOrders.shippedAt, cutoff),
+        gt(teamOrders.shippedAt, floor),
       ),
     );
   return rows
