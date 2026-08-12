@@ -189,7 +189,7 @@ export function AdminDialer() {
   return (
     <div className="fixed bottom-4 right-4 z-50">
       {open ? (
-        <div className="w-80 border border-line bg-steel shadow-2xl rounded-xl overflow-hidden">
+        <div className="w-[min(20rem,calc(100vw-1.5rem))] border border-line bg-steel shadow-2xl rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2.5 bg-background/60 border-b border-line">
             <span className="display text-sm text-foreground">📞 Dialer</span>
             <span className="flex items-center gap-2">

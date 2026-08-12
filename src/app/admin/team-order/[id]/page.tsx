@@ -207,15 +207,15 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
         )}
         <div className="mt-4 border border-line divide-y divide-[color:var(--line)]">
           {roster.map((r, i) => (
-            <div key={r.id} className="grid grid-cols-[auto_1.4fr_0.5fr_1.4fr_1fr] gap-3 px-3 py-2 text-sm">
-              <span className="text-muted">{i + 1}</span>
-              <span className="text-foreground uppercase">{r.playerName || "-"}</span>
+            <div key={r.id} className="grid grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1.4fr_0.5fr_1.4fr_1fr] gap-x-3 gap-y-0.5 px-3 py-2 text-sm">
+              <span className="text-muted row-span-2 sm:row-span-1">{i + 1}</span>
+              <span className="text-foreground uppercase truncate">{r.playerName || "-"}</span>
               <span className="text-muted">#{r.playerNumber || "-"}</span>
-              <span className="text-muted">
+              <span className="text-muted col-start-2 sm:col-start-auto">
                 {Object.entries(r.sizes ?? {}).map(([k, v]) => `${itemLabel(k)}: ${v}`).join(" · ") || r.size || "-"}
                 {r.quantity && r.quantity > 1 ? ` ×${r.quantity}` : ""}
               </span>
-              <span className="text-muted">{[r.design, r.notes].filter(Boolean).join(" · ")}</span>
+              <span className="text-muted col-start-2 sm:col-start-auto">{[r.design, r.notes].filter(Boolean).join(" · ")}</span>
             </div>
           ))}
           {roster.length === 0 && <p className="px-3 py-3 text-sm text-muted">No players yet.</p>}

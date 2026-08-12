@@ -131,7 +131,7 @@ export default async function HatSheetPage({ params }: { params: Promise<{ id: s
           )}
         </header>
 
-        <div className="flex gap-3 mt-5">
+        <div className="flex flex-wrap gap-3 mt-5">
           {runKeys.map((k) => {
             const [, size] = k.split("|");
             return (

@@ -41,7 +41,7 @@ export function AdminPipeline({ counts, linkTo }: { counts: Record<string, numbe
             className={`text-left border bg-steel px-3 py-2.5 transition-colors ${on ? "border-brand ring-1 ring-brand" : `${s.tone} hover:border-brand/60`} ${n === 0 && !on ? "opacity-50" : ""}`}
           >
             <div className="flex items-baseline justify-between gap-2">
-              <span className="display text-sm text-foreground whitespace-nowrap">{s.emoji} {s.title}</span>
+              <span className="display text-sm text-foreground whitespace-normal sm:whitespace-nowrap">{s.emoji} {s.title}</span>
               <span className={`display text-xl ${n > 0 ? "text-brand" : "text-muted"}`}>{n}</span>
             </div>
             <p className="mt-0.5 text-[11px] text-muted leading-tight">{s.action}</p>

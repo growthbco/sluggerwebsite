@@ -46,30 +46,32 @@ export function AdminAddonDetails({ addons, teamName }: { addons: Addon[]; teamN
               <p className="text-xs text-muted mb-3">
                 Paid add-ons ordered after the original order. Make these alongside the main roster.
               </p>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs display text-muted border-b border-line">
-                    <th className="py-1.5 pr-2">Name</th>
-                    <th className="py-1.5 pr-2">#</th>
-                    <th className="py-1.5 pr-2">Item</th>
-                    <th className="py-1.5 pr-2">Size</th>
-                    <th className="py-1.5 pr-2 text-right">Qty</th>
-                    <th className="py-1.5 text-right">Price</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r, i) => (
-                    <tr key={i} className="border-b border-line/50">
-                      <td className="py-1.5 pr-2 text-foreground">{r.name?.trim() || "-"}</td>
-                      <td className="py-1.5 pr-2 text-muted">{r.number?.trim() || "-"}</td>
-                      <td className="py-1.5 pr-2 text-foreground">{r.label}</td>
-                      <td className="py-1.5 pr-2 text-foreground">{r.size || "-"}</td>
-                      <td className="py-1.5 pr-2 text-right text-muted">{r.quantity ?? 1}</td>
-                      <td className="py-1.5 text-right text-muted">{money(r.unitPriceCents * (r.quantity ?? 1))}</td>
+              <div className="overflow-x-auto -mx-4 px-4">
+                <table className="w-full text-sm min-w-[26rem]">
+                  <thead>
+                    <tr className="text-left text-xs display text-muted border-b border-line">
+                      <th className="py-1.5 pr-2">Name</th>
+                      <th className="py-1.5 pr-2">#</th>
+                      <th className="py-1.5 pr-2">Item</th>
+                      <th className="py-1.5 pr-2">Size</th>
+                      <th className="py-1.5 pr-2 text-right">Qty</th>
+                      <th className="py-1.5 text-right">Price</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {rows.map((r, i) => (
+                      <tr key={i} className="border-b border-line/50">
+                        <td className="py-1.5 pr-2 text-foreground">{r.name?.trim() || "-"}</td>
+                        <td className="py-1.5 pr-2 text-muted">{r.number?.trim() || "-"}</td>
+                        <td className="py-1.5 pr-2 text-foreground">{r.label}</td>
+                        <td className="py-1.5 pr-2 text-foreground">{r.size || "-"}</td>
+                        <td className="py-1.5 pr-2 text-right text-muted">{r.quantity ?? 1}</td>
+                        <td className="py-1.5 text-right text-muted">{money(r.unitPriceCents * (r.quantity ?? 1))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               <div className="mt-4 border-t border-line pt-3 text-sm">
                 <div className="flex justify-between"><span className="text-muted">Goods ({itemCount} {itemCount === 1 ? "piece" : "pieces"})</span><span className="text-foreground">{money(goods)}</span></div>

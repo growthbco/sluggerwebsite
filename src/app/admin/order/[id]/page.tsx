@@ -102,6 +102,7 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
       </Section>
 
       <Section title={`Items (${items.length})`}>
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <tbody>
             {items.map((it) => (
@@ -121,6 +122,7 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
             <tr className="display text-foreground"><td className="pt-1" colSpan={2}>Total paid</td><td className="pt-1 text-right">{money(o.totalCents)}</td></tr>
           </tfoot>
         </table>
+        </div>
         {(o.addSessionIds?.length ?? 0) > 0 && (
           <p className="mt-3 text-xs text-muted">Includes {o.addSessionIds!.length} self-serve add-on payment{o.addSessionIds!.length === 1 ? "" : "s"} merged into this order.</p>
         )}
