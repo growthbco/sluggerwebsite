@@ -19,10 +19,23 @@ export default function TermsPage() {
         <div>
           <h2 className="display text-xl text-foreground">Custom Orders &amp; Proofs</h2>
           <p className="mt-2">
-            All custom items are made to order. You are responsible for reviewing and
-            approving your design proof, including spelling of names and numbers,
-            before production begins. Once a proof is approved, we are not responsible
-            for errors it contained.
+            All custom items are made to order. Before production begins, you are
+            responsible for carefully reviewing and approving your design proof &mdash;
+            including all spelling of names and numbers, sizes, colors, logos, artwork,
+            and any specific elements you requested.
+          </p>
+          <p className="mt-2">
+            The approved proof is the complete and final specification for your order.
+            We produce exactly what the approved proof shows, and we do not include
+            anything that does not appear on it &mdash; even if it was discussed or
+            requested earlier in the design process. If something you wanted is missing
+            or incorrect, you must request changes before approving. Do not approve a
+            proof that is not exactly what you want.
+          </p>
+          <p className="mt-2">
+            Approval is final. Once you approve a proof, your order moves into production
+            and cannot be changed, cancelled, or refunded. We are not responsible for any
+            errors, omissions, or missing elements in a proof you approved.
           </p>
         </div>
         <div>

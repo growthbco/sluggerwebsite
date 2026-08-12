@@ -261,6 +261,10 @@ export function DesignStatusPanel({
                   />
                   <span>I&apos;ve checked every detail. I understand this is final and goes into production as-is, with no changes or refunds.</span>
                 </label>
+                <p className="mt-2 text-xs text-muted">
+                  By approving you agree to our{" "}
+                  <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">Terms &amp; Conditions</a>.
+                </p>
                 {message && <p className="mt-3 text-sm text-brand">{message}</p>}
                 <div className="mt-5 flex flex-wrap gap-3">
                   <button
