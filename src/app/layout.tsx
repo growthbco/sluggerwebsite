@@ -15,9 +15,12 @@ import reviewsData from "@/data/reviews.json";
 // Google resolves every mention to one business (and inherits rating/hours).
 export const BUSINESS_ID = "https://sluggerathletics.com/#business";
 
-// Verified public profiles. Add Facebook / YouTube / TikTok URLs here as they
-// come in - each additional profile strengthens entity resolution + AI signals.
-const SAME_AS = ["https://www.instagram.com/sluggerathletics/"];
+// Verified public profiles. Each additional profile strengthens entity
+// resolution + AI signals.
+const SAME_AS = [
+  "https://www.instagram.com/sluggerathletics/",
+  "https://www.facebook.com/sluggerathletics/",
+];
 
 // Sitewide LocalBusiness schema: ties every page to the Ocala shop and its
 // Central Florida service area for local search, and exposes the real

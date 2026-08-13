@@ -379,6 +379,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
             {status === "sending" ? "Submitting…" : "Submit Team Order"}
           </button>
           <p className="text-xs text-muted">No payment now - we&apos;ll email your total and a design proof to approve before production.</p>
+          <p className="text-xs text-muted">⏱ Working toward a deadline? Order as early as you can and build in a buffer. We push hard to hit every date, but carrier and shipping delays can happen and are outside our control - if your date is firm, tell us before you order and we&apos;ll be straight with you about it.</p>
         </>
       )}
 

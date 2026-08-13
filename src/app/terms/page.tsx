@@ -70,6 +70,15 @@ export default function TermsPage() {
             roughly one week and is not guaranteed. Specialty items may take longer.
             See our Shipping page for details.
           </p>
+          <p className="mt-2">
+            We work hard to hit every deadline and we&apos;ll always tell you up front if a
+            date is tight. That said, some things are outside our control &mdash; carrier
+            delays, customs holds, weather, and factory backlogs can add time even after
+            an order leaves our hands, and shipping timeframes are estimates, not
+            guarantees. Please build in a buffer when you order for an event or season,
+            and place your order as early as you can. If you have a hard deadline, tell us
+            before you order so we can be honest about whether we can meet it.
+          </p>
         </div>
         <div>
           <h2 className="display text-xl text-foreground">Returns</h2>

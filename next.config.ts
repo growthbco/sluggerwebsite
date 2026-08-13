@@ -12,6 +12,25 @@ const nextConfig: NextConfig = {
       { source: "/jersey-maker", destination: "/custom-jersey-maker", permanent: true },
     ];
   },
+  // Baseline security headers (Lighthouse best-practices + clickjacking / MIME
+  // hardening). Deliberately no Content-Security-Policy yet - a CSP would need
+  // careful allow-listing of Stripe/Twilio/chat before it's safe to enforce.
+  // SAMEORIGIN (not DENY) so our own pages can still be framed if ever needed;
+  // Stripe checkout is a redirect flow, so this doesn't affect payments.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=(), interest-cohort=()" },
+          { key: "X-DNS-Prefetch-Control", value: "on" },
+        ],
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       // Placeholder images for the design preview. Replace with real product CDN later.

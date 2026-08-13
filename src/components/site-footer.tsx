@@ -85,7 +85,9 @@ export function SiteFooter() {
 
         <div className="mt-12 pt-6 border-t border-line flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted">
           <p>© {new Date().getFullYear()} Slugger Athletics LLC · Ocala, FL. All rights reserved.</p>
-          <div className="flex gap-5">
+          <div className="flex gap-5 items-center">
+            <a href="https://www.instagram.com/sluggerathletics/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Instagram</a>
+            <a href="https://www.facebook.com/sluggerathletics/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Facebook</a>
             <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
             <Link href="/terms" className="hover:text-foreground">Terms</Link>
             <Link href="/admin" className="hover:text-foreground">Staff</Link>
