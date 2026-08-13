@@ -366,7 +366,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
         </dl>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {!o.balanceInvoiceUrl && !paid && <AdminPickupToggle teamOrderId={o.id} pickup={o.localPickup} />}
-          {paid && !o.shippedAt && !o.trackingNumber && <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />}
+          {(paid || o.depositPaidAt) && !o.shippedAt && !o.trackingNumber && <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />}
           {paid && !o.shippedAt && o.trackingNumber && (
             <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email customer" />
           )}
