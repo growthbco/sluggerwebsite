@@ -171,6 +171,27 @@ export async function getSiblingPrintOrders(designRequestId: string, excludeId: 
   return out;
 }
 
+/** Full per-order print checklists for every OTHER active order on a design
+ *  (each with its own manage token + printable jerseys), so the designer's
+ *  checklist page can verify the whole shared print sheet - players and the
+ *  coaches/extras that were ordered separately - all in one place. */
+export async function getSiblingChecklists(designRequestId: string, excludeId: string) {
+  const db = getDb();
+  const sibs = await db
+    .select()
+    .from(teamOrders)
+    .where(and(eq(teamOrders.designRequestId, designRequestId), ne(teamOrders.id, excludeId), isNull(teamOrders.archivedAt)))
+    .orderBy(asc(teamOrders.createdAt));
+  const out: { id: string; reference: string; label: string; token: string; jerseys: Awaited<ReturnType<typeof getPrintableJerseys>> }[] = [];
+  for (const s of sibs) {
+    if (!s.manageToken) continue;
+    const jerseys = await getPrintableJerseys(s.id);
+    if (!jerseys.length) continue;
+    out.push({ id: s.id, reference: s.reference, label: s.teamName.trim() || s.contactName, token: s.manageToken, jerseys });
+  }
+  return out;
+}
+
 /** Coach edits an existing roster row (size correction, name/number fix). Any
  *  change clears that jersey's print-file verification so QA re-checks it, and
  *  recomputes the order's overall print gate. Scoped to the order so a token

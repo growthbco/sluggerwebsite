@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
 import { getByManageToken, MAX_REVISIONS, formatProducts } from "@/lib/design-requests";
-import { getByDesignRequestId, getRoster, getPrintableJerseys } from "@/lib/team-orders";
+import { getByDesignRequestId, getRoster, getPrintableJerseys, getSiblingChecklists } from "@/lib/team-orders";
 import { getPaidAddonBatches } from "@/lib/team-order-addons";
 import { JERSEY_MATERIALS, itemLabel, isInHouseItem } from "@/lib/order-items";
 import { getStoreByDesignRequestId, STORE_ITEM_PRESETS } from "@/lib/team-stores";
@@ -56,6 +56,9 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
   );
   // Per-jersey print-file QA: every printable jersey with its own verified state.
   const printJerseys = linkedOrder ? await getPrintableJerseys(linkedOrder.id) : [];
+  // Other orders on this same design (coaches/extras ordered separately) each
+  // get their own checklist so the whole shared print sheet is verifiable here.
+  const siblingChecklists = linkedOrder ? await getSiblingChecklists(request.id, linkedOrder.id) : [];
   // Roster history: the original order (non-add-on rows) plus every paid add-on
   // batch with its own verified status, so the full order history is visible.
   const addonBatches = linkedOrder ? await getPaidAddonBatches(linkedOrder.id) : [];
@@ -109,6 +112,18 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
           jerseys={printJerseys.map((j) => ({ ...j, verifiedAt: j.verifiedAt ? new Date(j.verifiedAt).toISOString() : null }))}
         />
       )}
+
+      {/* Same-design orders ordered separately (e.g. coaches) - each verifiable
+          here so nothing on the shared print sheet is missed. */}
+      {siblingChecklists.map((sc) => (
+        <div key={sc.id} className="space-y-2">
+          <p className="text-sm text-amber-300 display">🧢 Also on this print sheet - ordered separately: {sc.label} <span className="font-mono text-xs text-muted">({sc.reference})</span></p>
+          <PrintChecklist
+            token={sc.token}
+            jerseys={sc.jerseys.map((j) => ({ ...j, verifiedAt: j.verifiedAt ? new Date(j.verifiedAt).toISOString() : null }))}
+          />
+        </div>
+      ))}
 
       {linkedOrder && addonBatches.length > 0 && (
         <section className="bg-steel border border-line p-5">
