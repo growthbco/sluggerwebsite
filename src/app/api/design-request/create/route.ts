@@ -40,6 +40,7 @@ export async function POST(req: Request) {
     inspirationImages?: string[];
     neededBy?: string;
     estimatedPieces?: string;
+    delaysAck?: boolean;
   };
   try {
     body = await req.json();
@@ -100,6 +101,7 @@ export async function POST(req: Request) {
       inspirationImages: body.inspirationImages ?? [],
       neededBy: body.neededBy,
       estimatedPieces: (body.estimatedPieces ?? "").trim().slice(0, 20) || undefined,
+      delaysAck: Boolean(body.delaysAck),
       feeWaivedReason,
       feeWaivedRef,
     });

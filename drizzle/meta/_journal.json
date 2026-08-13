@@ -526,6 +526,13 @@
       "when": 1786555781018,
       "tag": "0074_clever_leo",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1786629088049,
+      "tag": "0075_nosy_maestro",
+      "breakpoints": true
     }
   ]
 }

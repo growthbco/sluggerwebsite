@@ -32,6 +32,8 @@ export type NewDesignRequest = {
   colorHexes?: string[];
   /** When the customer needs the uniforms in hand. ISO date string. */
   neededBy?: string;
+  /** They ticked the required delivery-delay acknowledgment on the intake. */
+  delaysAck?: boolean;
   /** Approximate total piece count the client expects ("3-9", "25+", ...). */
   estimatedPieces?: string;
   /** Fee state - set by the create-request route based on returning-customer
@@ -161,6 +163,7 @@ export async function createDesignRequest(input: NewDesignRequest) {
       neededBy: neededByDate && !isNaN(neededByDate.getTime()) ? neededByDate : null,
       estimatedPieces: input.estimatedPieces ?? null,
       rush,
+      delaysAckAt: input.delaysAck ? new Date() : null,
       statusToken,
       manageToken,
       designFeeAmountCents: DESIGN_FEE_CENTS,

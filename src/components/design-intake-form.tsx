@@ -123,6 +123,7 @@ export function DesignIntakeForm() {
           neededBy: neededBy || undefined,
           estimatedPieces: estimatedPieces || undefined,
           smsConsent: smsOptIn,
+          delaysAck: ackDelays,
         }),
       });
       const data = await res.json();

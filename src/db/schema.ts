@@ -668,6 +668,10 @@ export const designRequests = pgTable(
     // must confirm the timeline is doable before design work starts.
     neededBy: timestamp("needed_by", { withTimezone: true }),
     rush: boolean("rush").notNull().default(false),
+    // When the customer ticked the required "delivery dates are estimates and
+    // delays outside our control aren't our responsibility" acknowledgment on
+    // the intake form - a timestamped record for disputes.
+    delaysAckAt: timestamp("delays_ack_at", { withTimezone: true }),
     // Staff sign-off that we can actually hit the rush date (who + when).
     // Unapproved rush requests show "confirming your date" to the client.
     rushApprovedAt: timestamp("rush_approved_at", { withTimezone: true }),
