@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/services" },
 };
 
-const SITE = "https://www.sluggerathletics.com";
+const SITE = "https://sluggerathletics.com";
 
 // Turn a display price ("$25", "From $25", "Free") into a schema.org price.
 function schemaPrice(price: string | null): string | null {

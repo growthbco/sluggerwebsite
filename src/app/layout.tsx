@@ -9,13 +9,28 @@ import { StaffShortcut } from "@/components/staff-shortcut";
 import { SiteChat } from "@/components/site-chat";
 import { AttributionCapture } from "@/components/attribution-capture";
 
+import reviewsData from "@/data/reviews.json";
+
+// Canonical business entity id, referenced by @id across the schema graph so
+// Google resolves every mention to one business (and inherits rating/hours).
+export const BUSINESS_ID = "https://sluggerathletics.com/#business";
+
+// Verified public profiles. Add Facebook / YouTube / TikTok URLs here as they
+// come in - each additional profile strengthens entity resolution + AI signals.
+const SAME_AS = ["https://www.instagram.com/sluggerathletics/"];
+
 // Sitewide LocalBusiness schema: ties every page to the Ocala shop and its
-// Central Florida service area for local search.
+// Central Florida service area for local search, and exposes the real
+// 4.9-star / 79 review aggregate as a trust signal.
 const LOCAL_BUSINESS_JSONLD = {
   "@context": "https://schema.org",
   "@type": "LocalBusiness",
+  "@id": BUSINESS_ID,
   name: "Slugger Athletics",
+  legalName: "Slugger Athletics LLC",
   url: "https://sluggerathletics.com",
+  logo: "https://sluggerathletics.com/slugger-logo.png",
+  image: "https://sluggerathletics.com/slugger-logo.png",
   email: "apparel@sluggerathletics.com",
   telephone: "+1-352-414-7270",
   address: { "@type": "PostalAddress", addressLocality: "Ocala", addressRegion: "FL", addressCountry: "US" },
@@ -30,7 +45,30 @@ const LOCAL_BUSINESS_JSONLD = {
     { "@type": "City", name: "Leesburg, Florida" },
     { "@type": "AdministrativeArea", name: "Marion County, Florida" },
   ],
+  openingHoursSpecification: {
+    "@type": "OpeningHoursSpecification",
+    dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+    opens: "09:00",
+    closes: "17:00",
+  },
+  sameAs: SAME_AS,
+  aggregateRating: {
+    "@type": "AggregateRating",
+    ratingValue: String(reviewsData.totalRating),
+    reviewCount: String(reviewsData.totalReviews),
+    bestRating: "5",
+    worstRating: "1",
+  },
   priceRange: "$15-$120",
+};
+
+const WEBSITE_JSONLD = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "@id": "https://sluggerathletics.com/#website",
+  url: "https://sluggerathletics.com",
+  name: "Slugger Athletics",
+  publisher: { "@id": BUSINESS_ID },
 };
 import { CartProvider } from "@/lib/cart";
 
@@ -52,6 +90,23 @@ export const metadata: Metadata = {
   },
   description:
     "Custom team uniforms for every sport, embroidered hats, and 3D hype chains. Fast turnaround, in-house design, and easy team ordering.",
+  // Default link-preview card (coaches share links in team FB groups / GroupMe
+  // / texts). Pages can override openGraph.images with their own product shot.
+  openGraph: {
+    type: "website",
+    siteName: "Slugger Athletics",
+    title: "Slugger Athletics - Custom Team Uniforms, Jerseys & Embroidered Hats",
+    description:
+      "Custom team uniforms for every sport, embroidered hats, and 3D hype chains. Fast turnaround, in-house design, no minimums on team stores.",
+    url: "https://sluggerathletics.com",
+    images: [{ url: "/slugger-logo.png", width: 1200, height: 630, alt: "Slugger Athletics - custom team uniforms" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Slugger Athletics - Custom Team Uniforms & Jerseys",
+    description: "Custom team uniforms, jerseys, and embroidered hats. Fast turnaround, in-house design.",
+    images: ["/slugger-logo.png"],
+  },
 };
 
 export default function RootLayout({
@@ -77,6 +132,7 @@ export default function RootLayout({
             <SiteHeader />
           </HideOnAdmin>
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(LOCAL_BUSINESS_JSONLD) }} />
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(WEBSITE_JSONLD) }} />
           <main className="flex-1">{children}</main>
           <HideOnAdmin>
             <SiteFooter />

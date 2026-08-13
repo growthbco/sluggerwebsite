@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "SquadLocker Alternative - Fully Custom Team Stores | Slugger Athletics",
+  title: "SquadLocker Alternative - Fully Custom Team Stores",
   description:
     "Looking for a SquadLocker alternative? Slugger Athletics builds branded online team stores with fully custom, sublimated designs - free mockups, no per-item minimums, and real human support. Great for teams, leagues, schools, and booster clubs.",
   keywords: [
