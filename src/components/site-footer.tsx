@@ -30,6 +30,7 @@ const cols = [
       { href: "/faq", label: "FAQs" },
       { href: "/shipping", label: "Shipping & Delivery" },
       { href: "/returns", label: "Returns & Exchanges" },
+      { href: "/about", label: "About Us" },
       { href: "/contact", label: "Contact" },
     ],
   },

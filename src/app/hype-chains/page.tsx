@@ -127,13 +127,7 @@ export default function HypeChainsPage() {
         "@context": "https://schema.org",
         "@type": "Service",
         serviceType: "Custom 3D Hype Chains",
-        provider: {
-          "@type": "LocalBusiness",
-          name: "Slugger Athletics",
-          email: "apparel@sluggerathletics.com",
-          telephone: "+1-352-414-7270",
-          areaServed: { "@type": "City", name: "Ocala, Florida" },
-        },
+        provider: { "@id": "https://sluggerathletics.com/#business" },
         description: "Custom 3D-printed hype chains and team accessories made in Ocala, FL.",
       }}
     />

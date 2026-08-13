@@ -31,6 +31,14 @@ const PROCESS = [
   { n: 3, t: "We stitch & ship", d: "Embroidery is done in-house, so turnaround is quick - small orders in days, larger runs in a week or two." },
 ];
 
+const EMBROIDERY_FAQS = [
+  { q: "How much does custom embroidery cost in Ocala?", a: "Embroidered hats run about $25-30 each; polos, jackets, and bags are quoted by the item. There's a one-time digitizing fee to convert your logo into a stitch file (waived if you bring your own embroidery file), and no per-color charges." },
+  { q: "Is there a minimum for embroidered items?", a: "We ask for a 6-piece minimum per design on hats and apparel so the one-time setup is worth it. Smaller runs are sometimes possible - just ask." },
+  { q: "How long does custom embroidery take?", a: "Because we stitch in-house in Ocala, small orders are often ready in a few days and larger runs in a week or two after you approve the proof." },
+  { q: "Do you offer 3D puff embroidery?", a: "Yes - flat or raised 3D puff embroidery on caps, your choice. We'll show you both on the proof if you're not sure." },
+  { q: "Can you embroider hats and apparel I supply?", a: "We usually embroider our own quality blanks (Flexfit, Pacific Headwear, and similar) so the stitch-out looks its best and holds up, but reach out about supplied goods and we'll let you know." },
+];
+
 export default function EmbroideryPage() {
   const manualHats = [
     { src: "/products/hats/pine-ridge-flexfit.jpg", alt: "Pine Ridge Outdoors custom embroidered Flexfit hat - Slugger Athletics Ocala FL" },
@@ -39,21 +47,22 @@ export default function EmbroideryPage() {
   ];
   const hatExamples = byCategory("hats").slice(0, 4 - manualHats.length);
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Service",
-    serviceType: "Custom Embroidery",
-    provider: {
-      "@type": "LocalBusiness",
-      name: "Slugger Athletics",
-      email: "apparel@sluggerathletics.com",
-      telephone: "+1-352-414-7270",
-      areaServed: { "@type": "City", name: "Ocala, Florida" },
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Service",
+      serviceType: "Custom Embroidery",
+      provider: { "@id": "https://sluggerathletics.com/#business" },
+      areaServed: "Ocala, FL and Central Florida",
+      description:
+        "Custom embroidery for team hats, caps, polos, jackets, and bags in Ocala, FL.",
     },
-    areaServed: "Ocala, FL and Central Florida",
-    description:
-      "Custom embroidery for team hats, caps, polos, jackets, and bags in Ocala, FL.",
-  };
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: EMBROIDERY_FAQS.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
+    },
+  ];
 
   return (
     <div>
@@ -138,6 +147,22 @@ export default function EmbroideryPage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="mx-auto max-w-4xl px-4 sm:px-6 py-16">
+        <h2 className="display text-3xl sm:text-4xl text-foreground">Custom Embroidery FAQ</h2>
+        <div className="mt-6 divide-y divide-[color:var(--line)] border-y border-line">
+          {EMBROIDERY_FAQS.map((f) => (
+            <details key={f.q} className="group py-4">
+              <summary className="cursor-pointer list-none flex items-center justify-between gap-3 text-foreground display">
+                {f.q}
+                <span className="text-muted transition-transform group-open:rotate-45">＋</span>
+              </summary>
+              <p className="mt-2 text-sm text-muted">{f.a}</p>
+            </details>
+          ))}
         </div>
       </section>
 
