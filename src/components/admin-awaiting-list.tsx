@@ -16,6 +16,7 @@ export type Unpaid = {
   payUrl: string | null;
   href: string | null; // where the row opens (order page, or pay page for custom)
   invoiceId?: string; // custom invoices only - enables Void
+  sendInvoice?: { orderId: string; stage: "deposit" | "balance"; ship: "auto" | "pickup" }; // final invoice not sent yet
 };
 
 const money = (c: number) => `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -33,6 +34,28 @@ export function AdminAwaitingList({ items }: { items: Unpaid[] }) {
   const [voiding, setVoiding] = useState<string | null>(null);
 
   const daysAgo = (iso: string) => Math.max(0, Math.floor((now - new Date(iso).getTime()) / 86400000));
+
+  const [sending, setSending] = useState<string | null>(null);
+
+  async function sendFinalInvoice(it: Unpaid) {
+    if (!it.sendInvoice) return;
+    if (!confirm(`Send the final balance invoice for ${it.customer} (${it.ref})? It emails the coach a pay link${it.sendInvoice.ship === "auto" ? " with live shipping added" : " (local pickup, no shipping)"}.`)) return;
+    setSending(it.key);
+    try {
+      const res = await fetch("/api/admin/team-order/invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamOrderId: it.sendInvoice.orderId, stage: it.sendInvoice.stage, ship: it.sendInvoice.ship }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not send");
+      router.refresh();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setSending(null);
+    }
+  }
 
   async function voidInvoice(id: string) {
     if (!confirm("Void this custom invoice? Its pay link stops working and it drops off this list. (Use this after combining it into another invoice.)")) return;
@@ -80,6 +103,16 @@ export function AdminAwaitingList({ items }: { items: Unpaid[] }) {
             <div className="flex flex-col items-end justify-between gap-2 shrink-0">
               <span className="display text-lg text-foreground tabular-nums whitespace-nowrap">{money(it.amountCents)}</span>
               <div className="flex items-center gap-2">
+                {it.sendInvoice && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); sendFinalInvoice(it); }}
+                    disabled={sending === it.key}
+                    className="text-[11px] display text-on-brand bg-brand px-2 py-1 hover:bg-brand-dark disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {sending === it.key ? "Sending…" : "Send final invoice"}
+                  </button>
+                )}
                 {it.invoiceId && (
                   <button
                     type="button"

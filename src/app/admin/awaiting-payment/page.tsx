@@ -44,6 +44,7 @@ export default async function AdminAwaitingPaymentPage() {
     const goodsDue = stage === "Deposit" ? deposit : total - deposit;
     if (goodsDue <= 0) continue;
     const due = o.taxExempt ? goodsDue : goodsDue + Math.round(goodsDue * 0.07);
+    const payUrl = (stage === "Final balance" ? o.balanceInvoiceUrl : o.invoiceUrl) ?? null;
     items.push({
       key: `to-${o.id}`,
       kind: stage,
@@ -52,8 +53,12 @@ export default async function AdminAwaitingPaymentPage() {
       ref: o.reference,
       amountCents: due,
       sinceISO: o.updatedAt.toISOString(),
-      payUrl: (stage === "Final balance" ? o.balanceInvoiceUrl : o.invoiceUrl) ?? null,
+      payUrl,
       href: `/admin/team-order/${o.id}`,
+      // Final balance not sent yet -> offer to send/email it right here.
+      sendInvoice: stage === "Final balance" && !payUrl
+        ? { orderId: o.id, stage: "balance", ship: o.localPickup ? "pickup" : "auto" }
+        : undefined,
     });
   }
 

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq, and, asc, inArray } from "drizzle-orm";
+import { eq, and, ne, asc, isNull, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrders, teamOrderRoster, designRequests } from "@/db/schema";
 import { isInHouseItem } from "@/lib/order-items";
@@ -143,6 +143,32 @@ export async function markJerseysVerified(teamOrderId: string, rowIds: string[],
   const all = await getPrintableJerseys(teamOrderId);
   const allVerified = all.length > 0 && all.every((j) => j.verifiedAt);
   await db.update(teamOrders).set({ printFileVerifiedAt: allVerified ? new Date() : null, updatedAt: new Date() }).where(eq(teamOrders.id, teamOrderId));
+}
+
+/** Other active team orders that share this order's design (same physical
+ *  print sheet - e.g. coaches ordered on their own order). Lets the print-file
+ *  QA UI surface "these sibling orders also need verifying" so no piece on the
+ *  shared sheet gets missed. Returns only orders that have printable jerseys. */
+export async function getSiblingPrintOrders(designRequestId: string, excludeId: string) {
+  const db = getDb();
+  const sibs = await db
+    .select({ id: teamOrders.id, reference: teamOrders.reference, teamName: teamOrders.teamName, contactName: teamOrders.contactName, status: teamOrders.status })
+    .from(teamOrders)
+    .where(and(eq(teamOrders.designRequestId, designRequestId), ne(teamOrders.id, excludeId), isNull(teamOrders.archivedAt)));
+  const out: { id: string; reference: string; label: string; status: string; total: number; verified: number }[] = [];
+  for (const s of sibs) {
+    const jerseys = await getPrintableJerseys(s.id);
+    if (jerseys.length === 0) continue;
+    out.push({
+      id: s.id,
+      reference: s.reference,
+      label: s.teamName.trim() || s.contactName,
+      status: s.status,
+      total: jerseys.length,
+      verified: jerseys.filter((j) => j.verifiedAt).length,
+    });
+  }
+  return out;
 }
 
 /** Coach edits an existing roster row (size correction, name/number fix). Any

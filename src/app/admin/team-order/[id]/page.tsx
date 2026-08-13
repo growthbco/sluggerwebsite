@@ -6,7 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders, designRequests, teamOrderAddons } from "@/db/schema";
 import { getAdminSession, canAccess } from "@/lib/admin-auth";
-import { getRoster, getPrintableJerseys } from "@/lib/team-orders";
+import { getRoster, getPrintableJerseys, getSiblingPrintOrders } from "@/lib/team-orders";
 import { computeTeamOrderQuote, estimateOrderParcelsOz } from "@/lib/team-order-pricing";
 import { itemLabel, sizeBreakdown } from "@/lib/order-items";
 import { shippingCentsFor } from "@/lib/team-stores";
@@ -77,12 +77,13 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
   const [o] = await db.select().from(teamOrders).where(eq(teamOrders.id, id)).limit(1);
   if (!o) notFound();
 
-  const [roster, jerseys, paidAddons, pendingAddonsRaw, activeDesigns] = await Promise.all([
+  const [roster, jerseys, paidAddons, pendingAddonsRaw, activeDesigns, siblingPrintOrders] = await Promise.all([
     getRoster(o.id),
     getPrintableJerseys(o.id),
     db.select().from(teamOrderAddons).where(and(eq(teamOrderAddons.teamOrderId, o.id), eq(teamOrderAddons.status, "paid"))),
     db.select().from(teamOrderAddons).where(and(eq(teamOrderAddons.teamOrderId, o.id), eq(teamOrderAddons.status, "pending"))),
     db.select({ id: designRequests.id, teamName: designRequests.teamName, reference: designRequests.reference }).from(designRequests),
+    o.designRequestId ? getSiblingPrintOrders(o.designRequestId, o.id) : Promise.resolve([]),
   ]);
   // Resolve each pending add-on's live Stripe payment link (new batches store
   // plink_ ids; legacy ones used expiring cs_ sessions with no reusable link).
@@ -306,6 +307,24 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
                 )}
               </Field>
             </dl>
+            {siblingPrintOrders.length > 0 && (
+              <div className="border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+                <p className="display text-amber-300">🧢 Same design, other orders that also need print-file QA</p>
+                <p className="text-xs text-muted mt-0.5">This team&apos;s pieces are split across more than one order (e.g. coaches ordered separately). Verify each one so nothing on the shared print sheet gets missed.</p>
+                <ul className="mt-2 space-y-1">
+                  {siblingPrintOrders.map((s) => (
+                    <li key={s.id} className="flex flex-wrap items-center justify-between gap-2">
+                      <a href={`/admin/team-order/${s.id}`} className="text-brand hover:underline">
+                        <span className="font-mono text-xs">{s.reference}</span> · {s.label}
+                      </a>
+                      <span className={s.verified === s.total ? "text-green-400 text-xs" : "text-amber-300 text-xs"}>
+                        {s.verified === s.total ? `✓ all ${s.total} verified` : `${s.verified}/${s.total} verified`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {o.designerNote && <p className="text-sm text-muted border-l-2 border-brand/60 pl-3">📝 {o.designerNote}</p>}
             <div className="flex flex-wrap items-center gap-2">
               <AdminDesignerNote teamOrderId={o.id} current={o.designerNote} />
