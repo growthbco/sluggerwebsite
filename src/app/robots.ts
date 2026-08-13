@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
       // Keep private/transactional paths out of the index.
-      disallow: ["/api/", "/admin", "/cart", "/checkout/", "/team-order/join/", "/team-order/manage/", "/design/manage/", "/design/status/", "/store/"],
+      disallow: ["/api/", "/admin", "/cart", "/checkout/", "/team-order/join/", "/team-order/manage/", "/design/manage/", "/design/status/", "/store/", "/portal/"],
     },
     sitemap: `${SITE}/sitemap.xml`,
   };

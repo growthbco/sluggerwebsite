@@ -1,7 +1,13 @@
+import type { Metadata } from "next";
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { AdminDialer } from "@/components/admin-dialer";
 import { AdminNotifier } from "@/components/admin-notifier";
 import { getAdminSession } from "@/lib/admin-auth";
+
+// Belt-and-suspenders with robots.ts: every /admin route is noindex at the
+// layout level, so the whole back office (current + any future page) stays
+// out of search results even if a page forgets its own robots metadata.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 // Every /admin page shares the persistent sidebar (desktop) / pill bar
 // (mobile). The sidebar filters itself by the logged-in user's role; the
