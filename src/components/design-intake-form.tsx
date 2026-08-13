@@ -32,6 +32,7 @@ export function DesignIntakeForm() {
   const [statusUrl, setStatusUrl] = useState<string | null>(null);
   const [welcomeBack, setWelcomeBack] = useState(false);
   const [smsOptIn, setSmsOptIn] = useState(false);
+  const [ackDelays, setAckDelays] = useState(false);
 
   // Returning customer on the same device: prefill contact info so they don't
   // retype it. Saved (locally only) after each successful submit.
@@ -177,6 +178,7 @@ export function DesignIntakeForm() {
     productTypes.length > 0 &&
     estimatedPieces &&
     (vision.trim() || images.length > 0) &&
+    ackDelays &&
     !uploading;
 
   return (
@@ -393,7 +395,7 @@ export function DesignIntakeForm() {
           );
         })()}
         {neededBy && (
-          <p className="mt-2 text-xs text-muted">
+          <p className="mt-2 text-sm font-semibold text-foreground">
             ⏱ This helps us plan, but shipping timeframes are estimates - carrier, customs, or weather delays outside our control can add time. Please order as early as you can and build in a buffer. If this date is firm, tell us in the notes so we can confirm before we start.
           </p>
         )}
@@ -443,6 +445,20 @@ export function DesignIntakeForm() {
 
       {status === "error" && <p className="text-sm text-brand">{message}</p>}
       {message && status !== "error" && <p className="text-sm text-brand">{message}</p>}
+
+      <label className="flex items-start gap-2.5 text-sm text-foreground cursor-pointer select-none border border-line bg-steel p-3">
+        <input
+          type="checkbox"
+          checked={ackDelays}
+          onChange={(e) => setAckDelays(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+        />
+        <span>
+          I understand delivery dates are estimates. Slugger Athletics works hard to hit every deadline, but is
+          <strong> not responsible for shipping carrier, customs, weather, or other delays outside its control</strong>.
+          I&apos;ll order early and build in a buffer, and flag any firm deadline before production.
+        </span>
+      </label>
 
       <button
         onClick={submit}
