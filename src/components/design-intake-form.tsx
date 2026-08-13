@@ -392,6 +392,11 @@ export function DesignIntakeForm() {
             </p>
           );
         })()}
+        {neededBy && (
+          <p className="mt-2 text-xs text-muted">
+            ⏱ This helps us plan, but shipping timeframes are estimates - carrier, customs, or weather delays outside our control can add time. Please order as early as you can and build in a buffer. If this date is firm, tell us in the notes so we can confirm before we start.
+          </p>
+        )}
       </div>
 
       {/* Inspiration uploads */}
