@@ -54,20 +54,25 @@ export default async function ServiceAreaPage({ params }: { params: Promise<{ ci
       exampleAltSuffix={` - custom team uniforms ${area.city} FL`}
       localTitle={`Why ${area.city} Teams Choose Slugger`}
       localBody={<>{area.blurb}</>}
-      jsonLd={{
-        "@context": "https://schema.org",
-        "@type": "Service",
-        serviceType: "Custom Team Uniforms",
-        provider: {
-          "@type": "LocalBusiness",
-          name: "Slugger Athletics",
-          email: "apparel@sluggerathletics.com",
-          telephone: "+1-352-414-7270",
-          address: { "@type": "PostalAddress", addressLocality: "Ocala", addressRegion: "FL", addressCountry: "US" },
+      jsonLd={[
+        {
+          "@context": "https://schema.org",
+          "@type": "Service",
+          serviceType: "Custom Team Uniforms",
+          provider: { "@id": "https://sluggerathletics.com/#business" },
+          areaServed: { "@type": "City", name: `${area.city}, Florida` },
+          description: `Custom team uniforms, jerseys, and embroidered hats for ${area.city}, Florida teams.`,
         },
-        areaServed: { "@type": "City", name: `${area.city}, Florida` },
-        description: `Custom team uniforms, jerseys, and embroidered hats for ${area.city}, Florida teams.`,
-      }}
+        {
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Home", item: "https://sluggerathletics.com/" },
+            { "@type": "ListItem", position: 2, name: "Custom Uniforms", item: "https://sluggerathletics.com/custom-uniforms" },
+            { "@type": "ListItem", position: 3, name: area.city, item: `https://sluggerathletics.com/custom-uniforms/${area.slug}` },
+          ],
+        },
+      ]}
     />
     {/* Sport interlinks with keyword anchors */}
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-16">

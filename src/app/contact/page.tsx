@@ -8,19 +8,20 @@ export const metadata: Metadata = {
     "Reach Slugger Athletics about team orders, custom designs, order status, and returns. Email, call, or send us a message - we reply within one business day.",
 };
 
+// Reference the single canonical business entity (defined sitewide in
+// layout.tsx) and just extend it with a ContactPoint, rather than emitting a
+// second, conflicting Organization node for the same business.
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "Organization",
-  name: "Slugger Athletics",
-  legalName: "Slugger Athletics LLC",
-  email: "apparel@sluggerathletics.com",
-  telephone: "+1-352-414-7270",
-  address: { "@type": "PostalAddress", addressLocality: "Ocala", addressRegion: "FL", addressCountry: "US" },
+  "@type": "LocalBusiness",
+  "@id": "https://sluggerathletics.com/#business",
   contactPoint: {
     "@type": "ContactPoint",
     contactType: "customer service",
     email: "apparel@sluggerathletics.com",
     telephone: "+1-352-414-7270",
+    areaServed: "US",
+    availableLanguage: "English",
   },
 };
 

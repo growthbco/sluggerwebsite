@@ -23,12 +23,11 @@ export default function Home() {
           <>
             <Image
               src={heroPhoto}
-              alt="Slugger Athletics team"
+              alt="Custom team uniforms and jerseys by Slugger Athletics"
               fill
               priority
               sizes="100vw"
               className="object-cover object-[center_25%]"
-              unoptimized
             />
             {/* Dark on the left so the headline stays readable, fading to reveal
                 the team photo on the right (matches the current site banner). */}

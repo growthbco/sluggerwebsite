@@ -19,15 +19,20 @@ export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; 
       "@context": "https://schema.org",
       "@type": "Service",
       serviceType: page.h1,
-      provider: {
-        "@type": "LocalBusiness",
-        name: "Slugger Athletics",
-        email: "apparel@sluggerathletics.com",
-        telephone: "+1-352-414-7270",
-        address: { "@type": "PostalAddress", addressLocality: "Ocala", addressRegion: "FL", addressCountry: "US" },
-      },
+      // Reference the single canonical business entity (defined sitewide in
+      // layout.tsx) instead of a duplicate anonymous node - so it inherits the
+      // rating, hours, and sameAs.
+      provider: { "@id": "https://sluggerathletics.com/#business" },
       areaServed: [{ "@type": "City", name: "Ocala, Florida" }, { "@type": "Country", name: "United States" }],
       description: page.metaDescription,
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://sluggerathletics.com/" },
+        { "@type": "ListItem", position: 2, name: page.h1, item: `https://sluggerathletics.com/${page.slug}` },
+      ],
     },
     {
       "@context": "https://schema.org",

@@ -70,9 +70,20 @@ export default async function ProductPage({
     },
   };
 
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${SITE}/` },
+      { "@type": "ListItem", position: 2, name: "Team Uniforms", item: `${SITE}/team-uniforms` },
+      { "@type": "ListItem", position: 3, name: p.name, item: `${SITE}/product/${p.slug}` },
+    ],
+  };
+
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
 
       {/* Breadcrumb */}
       <nav className="text-sm text-muted mb-6">

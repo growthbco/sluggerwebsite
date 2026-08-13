@@ -1,6 +1,8 @@
 // Sport-specific uniform landing pages (multi-sport expansion). Shared data
 // consumed by the /custom-<sport>-uniforms pages.
 
+import type { Metadata } from "next";
+
 export type SportPage = {
   slug: string; // URL path segment, e.g. "custom-basketball-uniforms"
   sport: string;
@@ -246,3 +248,24 @@ export const SPORT_PAGES: SportPage[] = [
     pricing: [{ label: "Bowling shirts from", cents: 2800 }, { label: "Dry-fit shirts", cents: 2000 }, { label: "Hats from", cents: 2500 }, { label: "Quarter-zips", cents: 3800 }],
   },
 ];
+
+/** Full page metadata for a sport landing page, including a sport-specific
+ *  Open Graph / Twitter card image (the mockup) so a shared link shows that
+ *  sport's uniform instead of a generic logo. */
+export function sportMetadata(page: SportPage): Metadata {
+  const url = `https://sluggerathletics.com/${page.slug}`;
+  return {
+    title: page.metaTitle,
+    description: page.metaDescription,
+    alternates: { canonical: `/${page.slug}` },
+    openGraph: {
+      type: "website",
+      siteName: "Slugger Athletics",
+      title: page.metaTitle,
+      description: page.metaDescription,
+      url,
+      images: [{ url: page.mockup, width: 1200, height: 630, alt: page.h1 }],
+    },
+    twitter: { card: "summary_large_image", title: page.metaTitle, description: page.metaDescription, images: [page.mockup] },
+  };
+}
