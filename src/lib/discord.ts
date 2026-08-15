@@ -503,6 +503,85 @@ export async function postContactToDiscord(msg: ContactPayload): Promise<boolean
   return send(url, body);
 }
 
+/** Ping the invoice channel when the print vendor submits an invoice, so
+ *  someone can pay it. Flags (duty out of band / quantity mismatch) are called
+ *  out right in the embed so problems are visible before anyone pays. */
+export async function postInvoiceToDiscord(inv: {
+  reference: string;
+  designerName?: string | null;
+  subtotalCents: number;
+  dutyCents: number;
+  previousBalanceCents: number;
+  totalCents: number;
+  dutyBps: number;
+  dutyFlag: boolean;
+  anyQtyMismatch: boolean;
+  anyDoubleBill: boolean;
+  lineCount: number;
+  adminUrl: string;
+}): Promise<boolean> {
+  // Prefer a dedicated invoice channel; fall back to team-orders, then orders.
+  // Track whether the chosen channel is a Forum, because forum webhooks 400
+  // unless the post carries a thread_name.
+  let url: string | undefined;
+  let isForum = false;
+  if (process.env.DISCORD_INVOICES_WEBHOOK_URL) {
+    url = process.env.DISCORD_INVOICES_WEBHOOK_URL;
+    isForum = process.env.DISCORD_INVOICES_FORUM === "true";
+  } else if (process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL) {
+    url = process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
+    isForum = process.env.DISCORD_TEAM_ORDERS_FORUM === "true";
+  } else if (process.env.DISCORD_ORDERS_WEBHOOK_URL) {
+    url = process.env.DISCORD_ORDERS_WEBHOOK_URL;
+    isForum = process.env.DISCORD_ORDERS_FORUM === "true";
+  }
+  if (!url) {
+    console.warn("No invoice/orders webhook set - skipping invoice Discord post");
+    return false;
+  }
+
+  const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+  const flags: string[] = [];
+  if (inv.anyDoubleBill) flags.push("🛑 An order here was already billed on a prior invoice — do not pay twice");
+  if (inv.dutyFlag) flags.push(`⚠️ Duty ${(inv.dutyBps / 100).toFixed(1)}% is outside the normal 15-19% range`);
+  if (inv.anyQtyMismatch) flags.push("⚠️ A quantity does not match our records");
+
+  const fields = [
+    { name: "Goods", value: money(inv.subtotalCents), inline: true },
+    {
+      name: "Duty",
+      value: `${money(inv.dutyCents)} (${(inv.dutyBps / 100).toFixed(1)}%)`,
+      inline: true,
+    },
+    ...(inv.previousBalanceCents > 0
+      ? [{ name: "Prev. balance", value: money(inv.previousBalanceCents), inline: true }]
+      : []),
+    { name: "Total to pay", value: `**${money(inv.totalCents)}**`, inline: false },
+    { name: "Review + pay", value: inv.adminUrl, inline: false },
+  ];
+  if (flags.length) fields.unshift({ name: "Needs a look", value: flags.join("\n"), inline: false });
+
+  const body: Record<string, unknown> = {
+    username: "Slugger Invoices",
+    // Forum channels require a thread_name to open the post; text channels
+    // ignore it. Including it always keeps both kinds happy.
+    ...(isForum ? { thread_name: `Invoice ${inv.reference}` } : {}),
+    embeds: [
+      {
+        title: `🧾 New designer invoice ${inv.reference}`,
+        description: `${inv.lineCount} line${inv.lineCount === 1 ? "" : "s"}${
+          inv.designerName ? ` from ${inv.designerName}` : ""
+        }`,
+        color: flags.length ? 0xe74c3c : GOLD,
+        fields,
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  };
+
+  return send(url, body);
+}
+
 const DISCORD_MAX_ATTEMPTS = 3;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

@@ -59,6 +59,14 @@ export const teamOrderStatus = pgEnum("team_order_status", [
   "cancelled",
 ]);
 
+// Vendor (print designer) invoice lifecycle: he submits after an order is
+// produced, we reconcile it against our records, then pay.
+export const designerInvoiceStatus = pgEnum("designer_invoice_status", [
+  "submitted", // designer sent it via the private link; awaiting our review/pay
+  "paid", // one of us paid it
+  "void", // mistake / duplicate, set aside
+]);
+
 // Design intake → proof → approval funnel; precedes the team order.
 export const designRequestStatus = pgEnum("design_request_status", [
   "pending_payment", // intake filled but $35 design fee not yet paid (Stripe pending)
@@ -1030,3 +1038,66 @@ export const teamOrderRosterRelations = relations(teamOrderRoster, ({ one }) => 
     references: [teamOrders.id],
   }),
 }));
+
+/* ------------------------------------------------------------------ */
+/* Designer (print vendor) invoices — submit via private link, we pay */
+/* ------------------------------------------------------------------ */
+
+// The print vendor bills us AFTER an order is produced. He fills a private,
+// no-login link that already lists the orders we're expecting to be billed for
+// (with the piece counts we have on record), so his quantities can be checked
+// against ours and his duty ("Tex") charge can be flagged when it drifts out of
+// the normal range. On submit we ping the Discord invoice channel so someone
+// pays it.
+export const designerInvoices = pgTable(
+  "designer_invoices",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    reference: text("reference").notNull(), // INV-XXXXXX
+
+    status: designerInvoiceStatus("status").notNull().default("submitted"),
+
+    // Who submitted (free text the designer types; we only have one vendor now
+    // but this keeps the record honest if that changes).
+    designerName: text("designer_name"),
+
+    // One row per billed line. `teamOrderId`/`orderRef` are set when the line is
+    // matched to one of our orders; `ourQty` snapshots the piece count we had on
+    // record at submit time so a later roster edit can't hide a mismatch.
+    lines: jsonb("lines")
+      .$type<
+        {
+          team: string;
+          garment: string;
+          qty: number;
+          unitCents: number;
+          teamOrderId?: string;
+          orderRef?: string;
+          ourQty?: number;
+          // If this order was already billed on an earlier (non-void) invoice,
+          // the ref it was billed on. Guards against paying for it twice.
+          alreadyBilledOn?: string;
+        }[]
+      >()
+      .notNull()
+      .default([]),
+
+    subtotalCents: integer("subtotal_cents").notNull().default(0), // goods only
+    dutyCents: integer("duty_cents").notNull().default(0), // the "Tex" line, as entered
+    previousBalanceCents: integer("previous_balance_cents").notNull().default(0), // carryover
+    totalCents: integer("total_cents").notNull().default(0), // what he's asking for
+
+    notes: text("notes"),
+
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    paidBy: text("paid_by"), // which of us marked it paid
+    paymentNote: text("payment_note"),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("designer_invoices_reference_idx").on(t.reference),
+    index("designer_invoices_status_idx").on(t.status),
+  ],
+);
