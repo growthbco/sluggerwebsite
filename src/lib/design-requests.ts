@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { eq, ne, and, or, desc, sql } from "drizzle-orm";
+import { eq, ne, and, or, asc, desc, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { designRequests, teamOrders } from "@/db/schema";
+import { designRequests, teamOrders, designLabVisitors, designLabRenders } from "@/db/schema";
 
 // Default design fee (env override: DESIGN_FEE_CENTS). Filters out customers
 // who would otherwise shop our designs elsewhere. Credited to the final order.
@@ -174,6 +174,58 @@ export async function createDesignRequest(input: NewDesignRequest) {
     .returning();
 
   return { id: row.id, reference, statusToken, manageToken, rush, neededBy: row.neededBy, waived };
+}
+
+/** Convert an AI Jersey Maker lead into a design request so staff can pick up
+ *  their saved designs in the editable AI studio. Seeds aiDesignState.versions
+ *  from the lead's saved renders, carries over their contact, and does NOT
+ *  notify the designer (this is staff continuing an existing design, not a
+ *  fresh intake). Idempotent: if the lead's email already has a request, that
+ *  one is returned instead of creating a duplicate. */
+export async function convertLeadToDesignRequest(
+  visitorId: string,
+): Promise<{ ok: boolean; manageToken?: string; reference?: string; error?: string }> {
+  const db = getDb();
+  const [v] = await db.select().from(designLabVisitors).where(eq(designLabVisitors.id, visitorId)).limit(1);
+  if (!v) return { ok: false, error: "Lead not found" };
+  if (!v.email) return { ok: false, error: "This lead has no email on file yet, so it can't be converted." };
+
+  // Already has a design request (matched by email)? Reuse it - no duplicate.
+  const email = v.email.trim().toLowerCase();
+  const [existing] = await db
+    .select({ manageToken: designRequests.manageToken, reference: designRequests.reference })
+    .from(designRequests)
+    .where(sql`lower(${designRequests.contactEmail}) = ${email}`)
+    .limit(1);
+  if (existing?.manageToken) return { ok: true, manageToken: existing.manageToken, reference: existing.reference };
+
+  const renders = await db
+    .select()
+    .from(designLabRenders)
+    .where(eq(designLabRenders.visitorId, visitorId))
+    .orderBy(asc(designLabRenders.createdAt));
+  const versions = renders.map((r) => ({ url: r.url, note: r.note ?? "", at: (r.createdAt ?? new Date()).toISOString() }));
+
+  const name = [v.firstName, v.lastName].map((s) => (s ?? "").trim()).filter(Boolean).join(" ") || "Design Lab Lead";
+  const reference = makeRef();
+  const statusToken = token();
+  const manageToken = token();
+  await db.insert(designRequests).values({
+    reference,
+    status: "in_design", // staff is actively working the design
+    teamName: `${name}'s Design`,
+    contactName: name,
+    contactEmail: v.email,
+    contactPhone: v.phone ?? null,
+    productTypes: ["Jersey / Shirt"],
+    aiDesignState: { versions },
+    statusToken,
+    manageToken,
+    designFeeAmountCents: DESIGN_FEE_CENTS,
+    designFeePaidAt: new Date(),
+    designFeeWaivedReason: "design_lab_lead",
+  });
+  return { ok: true, manageToken, reference };
 }
 
 /** Save the Discord thread id of this request's forum post so follow-up

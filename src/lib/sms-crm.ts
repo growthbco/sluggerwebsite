@@ -85,7 +85,11 @@ export async function namesByPhone(): Promise<Map<string, string>> {
   }
   for (const r of sc) {
     const k = last10(r.phone);
-    if (k.length === 10 && r.name) map.set(k, r.name);
+    // Skip auto-generated "(708) 910-8532" fallback names that state-only
+    // contact rows (star/archive/mark-read) store because smsContacts.name is
+    // NOT NULL. Letting those override would replace a real record-derived name
+    // with the phone number. A real name always contains a letter.
+    if (k.length === 10 && r.name && /[a-zA-Z]/.test(r.name)) map.set(k, r.name);
   }
   return map;
 }

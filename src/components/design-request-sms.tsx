@@ -20,7 +20,7 @@ type Message = {
 const time = (iso: string) =>
   new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-export function DesignRequestSms({ phone, name }: { phone: string; name?: string | null }) {
+export function DesignRequestSms({ phone, name, token }: { phone: string; name?: string | null; token: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [body, setBody] = useState("");
   const [loading, setLoading] = useState(true);
@@ -48,6 +48,26 @@ export function DesignRequestSms({ phone, name }: { phone: string; name?: string
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages.length]);
+
+  const [pinning, setPinning] = useState<string | null>(null);
+  async function useAsInspiration(url: string) {
+    setPinning(url);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/design-request/add-inspiration", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, url }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d?.error || "Could not add");
+      // Reload so the AI studio on this page picks up the new inspiration image.
+      window.location.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not add to studio");
+      setPinning(null);
+    }
+  }
 
   async function send() {
     const text = body.trim();
@@ -102,9 +122,27 @@ export function DesignRequestSms({ phone, name }: { phone: string; name?: string
                   }`}
                 >
                   {note && <div className="text-[10px] uppercase tracking-wide opacity-70 mb-1">Internal note</div>}
-                  <div className="whitespace-pre-wrap break-words">{m.body}</div>
+                  {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
                   {m.mediaUrls && m.mediaUrls.length > 0 && (
-                    <div className="mt-1 text-[11px] opacity-80">{m.mediaUrls.length} image(s)</div>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {m.mediaUrls.map((u, i) => (
+                        <div key={i} className="flex flex-col gap-1">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <a href={u} target="_blank" rel="noreferrer">
+                            <img src={u} alt="texted image" className="max-h-44 rounded border border-line" />
+                          </a>
+                          {m.direction === "in" && (
+                            <button
+                              onClick={() => useAsInspiration(u)}
+                              disabled={pinning === u}
+                              className="text-[11px] display text-brand hover:underline disabled:opacity-50 text-left"
+                            >
+                              {pinning === u ? "Adding…" : "+ Use as inspiration"}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   )}
                   <div className={`mt-1 text-[10px] ${out && !note ? "text-on-brand/70" : "text-muted"}`}>
                     {out && m.staff ? `${m.staff} · ` : ""}{time(m.createdAt)}

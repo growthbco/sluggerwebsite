@@ -209,10 +209,21 @@ export async function postTeamOrderPaidToDiscord(args: {
   details?: string;
 }): Promise<boolean> {
   const designUrl = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
-  const url =
-    args.designThreadId && designUrl
-      ? `${designUrl}?thread_id=${args.designThreadId}`
-      : process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
+  // Prefer the order's existing design thread. Otherwise post to the
+  // #design-requests channel (where all orders live now), falling back to
+  // #team-orders. A base forum-channel post needs a thread_name or Discord
+  // 400s it - which is what left standalone-order payments unannounced.
+  let url: string | undefined;
+  let threadName: string | undefined;
+  if (args.designThreadId && designUrl) {
+    url = `${designUrl}?thread_id=${args.designThreadId}`;
+  } else if (designUrl) {
+    url = designUrl;
+    if (process.env.DISCORD_DESIGN_REQUESTS_FORUM === "true") threadName = `${args.teamName} (${args.reference})`;
+  } else if (process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL) {
+    url = process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
+    if (process.env.DISCORD_TEAM_ORDERS_FORUM === "true") threadName = `${args.teamName} (${args.reference})`;
+  }
   if (!url) return false;
   const amt = `$${(args.totalCents / 100).toFixed(2)}`;
   const isDeposit = args.stage === "deposit";
@@ -221,6 +232,7 @@ export async function postTeamOrderPaidToDiscord(args: {
     // Payments always ping - these gate production and shipping.
     content: isDeposit ? "@here 💰 Deposit paid - clear to start" : "@here 💰 Paid in full",
     allowed_mentions: { parse: ["everyone"] },
+    ...(threadName ? { thread_name: threadName } : {}),
     embeds: [
       {
         title: isDeposit

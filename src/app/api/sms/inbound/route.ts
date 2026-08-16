@@ -1,6 +1,5 @@
 import { validTwilioSignature, formParams } from "@/lib/twilio-webhook";
 import { rehostTwilioMedia } from "@/lib/sms";
-import { sendEmail, CONTACT_INBOX } from "@/lib/email";
 
 export const runtime = "nodejs";
 
@@ -49,9 +48,10 @@ export async function POST(req: Request) {
 
   // Texts get their OWN Discord channel (DISCORD_TEXTS_WEBHOOK_URL) so they
   // don't clutter the orders feed. If that channel isn't configured we skip
-  // the Discord ping entirely - the admin Texts inbox, desktop alert, and the
-  // email below already make sure nothing is missed. (No orders-channel
-  // fallback on purpose.)
+  // the Discord ping entirely - the admin Texts inbox and desktop alert already
+  // make sure nothing is missed. (No orders-channel fallback on purpose.)
+  // Email notifications on inbound texts were removed at the owner's request -
+  // Discord + the inbox cover it.
   const hook = process.env.DISCORD_TEXTS_WEBHOOK_URL;
   if (hook) {
     void fetch(hook, {
@@ -60,11 +60,6 @@ export async function POST(req: Request) {
       body: JSON.stringify({ username: "Slugger Texts", content: `💬 ${channel === "whatsapp" ? "WhatsApp" : "Text"} from ${from}${media}:\n> ${body}\nReply: https://sluggerathletics.com/admin/texts` }),
     }).catch(() => {});
   }
-  void sendEmail({
-    to: CONTACT_INBOX,
-    subject: `New text from ${from}`,
-    html: `<p><strong>${from}</strong> texted the shop number${media}:</p><blockquote>${body.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</blockquote><p>Reply by texting them back from your phone or the Twilio console.</p>`,
-  }).catch(() => {});
 
   // Empty TwiML = no auto-reply; humans answer.
   return new Response(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, { headers: { "Content-Type": "text/xml" } });

@@ -8,6 +8,7 @@ import { designLabVisitors, designLabRenders, designRequests } from "@/db/schema
 import { ZoomableImage } from "@/components/zoomable-image";
 import { AdminLeadDelete } from "@/components/admin-lead-delete";
 import { AdminBulkLeadDelete } from "@/components/admin-bulk-lead-delete";
+import { LabLeadConvertButton } from "@/components/lab-lead-convert-button";
 
 export const metadata: Metadata = { title: "Design Lab Leads", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -84,11 +85,13 @@ export default async function DesignLabLeadsPage() {
                 ) : (
                   <span className="text-[11px] display border border-line text-muted px-2 py-0.5">ANONYMOUS</span>
                 )}
-                {req && (
+                {req ? (
                   <a href={`/design/manage/${req.manageToken}`} className="text-xs display text-sky-400 underline decoration-dotted underline-offset-2">
                     → became {req.ref} ({req.status})
                   </a>
-                )}
+                ) : v.email ? (
+                  <LabLeadConvertButton visitorId={v.id} />
+                ) : null}
                 <AdminLeadDelete id={v.id} name={name} />
               </div>
               <p className="mt-1 text-sm text-muted">

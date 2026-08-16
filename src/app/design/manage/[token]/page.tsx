@@ -259,7 +259,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
       {adminSession && (
         <div className="pt-6 border-t border-line">
           {smsPhone ? (
-            <DesignRequestSms phone={smsPhone} name={request.contactName} />
+            <DesignRequestSms phone={smsPhone} name={request.contactName} token={token} />
           ) : (
             <p className="text-sm text-muted">No phone number on file for this customer, so there is nothing to text.</p>
           )}
