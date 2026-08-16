@@ -61,7 +61,7 @@ export type Bundle = {
 export const BUNDLES: Bundle[] = [
   {
     name: "Game Day Bundle",
-    priceCents: 8500,
+    priceCents: 8900,
     compareAtCents: 9300,
     includes: ["Crew-Style Custom Jersey", "Baseball / Softball Pants", "Snapback Hat"],
     image: "/bundles/game-day.jpg",
@@ -69,7 +69,7 @@ export const BUNDLES: Bundle[] = [
   },
   {
     name: "Home & Away Bundle",
-    priceCents: 9000,
+    priceCents: 9300,
     compareAtCents: 9600,
     includes: ["2 Crew-Style Custom Jerseys (home + away)", "Baseball / Softball Pants"],
     image: "/bundles/home-away.jpg",
@@ -77,7 +77,7 @@ export const BUNDLES: Bundle[] = [
   },
   {
     name: "The Total Package",
-    priceCents: 12000,
+    priceCents: 12900,
     compareAtCents: 13600,
     includes: ["2 Crew-Style Custom Jerseys (home + away)", "Baseball / Softball Pants", "Snapback Hat", "Custom Socks"],
     image: "/bundles/total-package.jpg",
