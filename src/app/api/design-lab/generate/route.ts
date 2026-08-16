@@ -5,7 +5,7 @@ import { put } from "@vercel/blob";
 import { eq, sql } from "drizzle-orm";
 import { getDb, dbEnabled } from "@/db";
 import { designLabVisitors } from "@/db/schema";
-import { getOrCreateVisitor, tierFor, LAB_COOKIE, encryptCleanUrl } from "@/lib/design-lab";
+import { getOrCreateVisitor, tierFor, LAB_COOKIE, encryptCleanUrl, FREE_GENS } from "@/lib/design-lab";
 import { watermarkImage, generateJerseyImage, type ImagePart } from "@/lib/jersey-image";
 
 export const runtime = "nodejs";
@@ -188,7 +188,7 @@ export async function POST(req: Request) {
         .set({ generations: sql`${designLabVisitors.generations} + 1` })
         .where(eq(designLabVisitors.id, visitorCtx.visitor.id))
         .returning();
-      ladderState = { used: updated.generations, free: 3 };
+      ladderState = { used: updated.generations, free: FREE_GENS };
     }
     const out = NextResponse.json({ image: `data:${mime};base64,${payload.data}`, cleanToken, usedToday: used, capToday: DAILY_CAP, ladder: ladderState });
     if (visitorCtx?.setCookie) out.cookies.set(LAB_COOKIE, visitorCtx.setCookie, { httpOnly: true, maxAge: 31536000, path: "/" });

@@ -2,7 +2,7 @@
 
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { customers, teamOrders, designRequests, teamOrderAddons, smsContacts } from "@/db/schema";
+import { customers, teamOrders, designRequests, teamOrderAddons, smsContacts, designLabVisitors } from "@/db/schema";
 
 const last10 = (p: string | null | undefined) => (p ?? "").replace(/\D/g, "").slice(-10);
 
@@ -68,14 +68,18 @@ export async function customerContext(phone: string) {
 export async function namesByPhone(): Promise<Map<string, string>> {
   const db = getDb();
   const map = new Map<string, string>();
-  const [cs, ts, ds, sc] = await Promise.all([
+  const [cs, ts, ds, dl, sc] = await Promise.all([
     db.select({ phone: customers.phone, name: customers.name }).from(customers),
     db.select({ phone: teamOrders.contactPhone, name: teamOrders.contactName }).from(teamOrders),
     db.select({ phone: designRequests.contactPhone, name: designRequests.contactName }).from(designRequests),
+    db.select({ phone: designLabVisitors.phone, first: designLabVisitors.firstName, last: designLabVisitors.lastName }).from(designLabVisitors),
     db.select({ phone: smsContacts.phone, name: smsContacts.name }).from(smsContacts),
   ]);
-  // Record-derived names first, then staff-saved contacts OVERRIDE them.
-  for (const r of [...cs, ...ts, ...ds]) {
+  // Design-lab leads store first/last separately - join into one name.
+  const dlNames = dl.map((r) => ({ phone: r.phone, name: [r.first, r.last].map((s) => (s ?? "").trim()).filter(Boolean).join(" ") }));
+  // Record-derived names first (order/design contacts win over lab leads),
+  // then staff-saved contacts OVERRIDE them.
+  for (const r of [...cs, ...ts, ...ds, ...dlNames]) {
     const k = last10(r.phone);
     if (k.length === 10 && r.name && !map.has(k)) map.set(k, r.name);
   }

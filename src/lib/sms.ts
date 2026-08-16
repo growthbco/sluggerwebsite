@@ -71,12 +71,37 @@ export async function sendSms(
   }
 }
 
+/** Record an outbound automated text in smsMessages so it shows in the Texts
+ *  inbox thread (manual sends via /api/admin/sms already log themselves; the
+ *  automated senders below did not, which left follow-ups invisible). Best-
+ *  effort: a logging failure never affects the send. `staff` labels who/what
+ *  sent it so auto texts are distinguishable from staff replies. */
+async function logOutboundSms(phone: string, body: string, sid: string | undefined, staff = "System") {
+  try {
+    const to = toE164(phone);
+    if (!to) return;
+    const { getDb } = await import("@/db");
+    const { smsMessages } = await import("@/db/schema");
+    await getDb().insert(smsMessages).values({
+      phone: to,
+      direction: "out",
+      channel: "sms",
+      body: body.slice(0, 1500),
+      staff,
+      twilioSid: sid,
+    });
+  } catch (e) {
+    console.error("logOutboundSms failed:", e);
+  }
+}
+
 /** Text a customer an order update ONLY if they actively opted in on a form
  *  (smsOptInAt) and left a phone. Fire-and-forget: failures just log, they
  *  never break the flow that triggered them. */
 export async function smsIfConsented(opts: { phone?: string | null; optInAt?: Date | null; body: string }): Promise<boolean> {
   if (!opts.optInAt || !opts.phone) return false;
   const r = await sendSms(opts.phone, opts.body);
+  if (r.ok) await logOutboundSms(opts.phone, opts.body, r.sid);
   return r.ok;
 }
 
@@ -88,6 +113,7 @@ export async function smsIfConsented(opts: { phone?: string | null; optInAt?: Da
 export async function sendFollowUpSms(opts: { phone?: string | null; body: string }): Promise<boolean> {
   if (!opts.phone) return false;
   const r = await sendSms(opts.phone, opts.body);
+  if (r.ok) await logOutboundSms(opts.phone, opts.body, r.sid, "Auto follow-up");
   return r.ok;
 }
 

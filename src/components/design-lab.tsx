@@ -394,7 +394,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
                 <div>
                   <p className="display text-2xl text-foreground">🔥 You&apos;re on a roll!</p>
                   <p className="text-sm text-muted mt-1">
-                    Unlock <span className="text-brand font-semibold">5 more free designs</span> - and we&apos;ll save
+                    Unlock <span className="text-brand font-semibold">7 more free designs</span> - and we&apos;ll save
                     your concepts so our designer can pick up right where you leave off.
                   </p>
                 </div>
@@ -432,7 +432,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
                   }}
                   className="w-full clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg py-3.5 disabled:opacity-50"
                 >
-                  {unlocking ? "Unlocking…" : "Unlock 5 More Free Designs"}
+                  {unlocking ? "Unlocking…" : "Unlock 7 More Free Designs"}
                 </button>
                 <p className="text-[11px] text-muted text-center">No spam - we only reach out about your designs.</p>
               </>

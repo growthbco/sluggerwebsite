@@ -4,10 +4,10 @@ import { dbEnabled, getDb } from "@/db";
 import { designLabVisitors } from "@/db/schema";
 
 // The monetization ladder for the AI design lab:
-//   0-2  generations: free, anonymous
-//   3-7  generations: requires an email (lead capture)
+//   0    generation:  free, anonymous (one free design to hook them)
+//   1-7  generations: requires an email/name/phone (lead capture)
 //   8+   generations: requires the $10 credited "design session"
-export const FREE_GENS = 3;
+export const FREE_GENS = 1;
 export const EMAIL_GENS = 8;
 export const PAID_GENS = 100; // sanity ceiling even for paid sessions
 
