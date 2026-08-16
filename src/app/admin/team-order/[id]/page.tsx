@@ -6,7 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders, designRequests, teamOrderAddons } from "@/db/schema";
 import { getAdminSession, canAccess } from "@/lib/admin-auth";
-import { getRoster, getPrintableJerseys, getSiblingPrintOrders } from "@/lib/team-orders";
+import { getRoster, getPrintableJerseys, getSiblingPrintOrders, findRelatedOrdersByContact } from "@/lib/team-orders";
 import { computeTeamOrderQuote, estimateOrderParcelsOz } from "@/lib/team-order-pricing";
 import { itemLabel, sizeBreakdown } from "@/lib/order-items";
 import { shippingCentsFor } from "@/lib/team-stores";
@@ -105,6 +105,9 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
     ? (await db.select().from(designRequests).where(eq(designRequests.id, o.designRequestId)).limit(1))[0] ?? null
     : null;
 
+  // Duplicate guard: other non-cancelled orders sharing this contact.
+  const relatedOrders = await findRelatedOrdersByContact({ excludeId: o.id, email: o.contactEmail, phone: o.contactPhone, teamName: o.teamName });
+
   const quote = computeTeamOrderQuote(o, roster);
   const estimate = o.quotedTotalCents ?? (quote.totalCents > 0 ? quote.totalCents : null);
   const deposit = o.depositCents ?? (estimate ? Math.round(estimate / 2) : 0);
@@ -160,6 +163,32 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
           <p className={`display mt-0.5 ${nextStep.tone}`}>{nextStep.text}</p>
         </div>
       </header>
+
+      {/* Duplicate guard: same-contact orders. Highlights likely duplicates
+          (same team, unpaid) so staff can merge/delete instead of hunting. */}
+      {relatedOrders.length > 0 && (
+        <div className={`border px-4 py-3 ${relatedOrders.some((r) => r.likelyDuplicate) ? "border-[#e5533c]/50 bg-[#e5533c]/5" : "border-amber-300/40 bg-amber-300/5"}`}>
+          <div className="text-xs display uppercase tracking-wide text-foreground">
+            {relatedOrders.some((r) => r.likelyDuplicate) ? "⚠ Possible duplicate order" : "Other orders from this contact"}
+          </div>
+          <p className="text-sm text-muted mt-0.5">
+            This customer has {relatedOrders.length} other {relatedOrders.length === 1 ? "order" : "orders"} on file. If any is an accidental restart, delete it so this team stays as one order.
+          </p>
+          <ul className="mt-2 space-y-1">
+            {relatedOrders.map((r) => (
+              <li key={r.id} className="text-sm">
+                <Link href={`/admin/team-order/${r.id}`} className="text-brand hover:underline font-mono">{r.reference}</Link>
+                <span className="text-muted">
+                  {" "}· {r.teamName} · {r.players} {r.players === 1 ? "player" : "players"} · {r.status.replace(/_/g, " ")}
+                  {r.hasDesign ? " · design linked" : " · no design"}
+                  {r.paid ? " · paid" : ""}
+                  {r.likelyDuplicate ? " · looks like a duplicate" : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Customer */}
       <Section title="Customer">

@@ -89,6 +89,67 @@ export async function getByManageToken(token: string) {
 /** The team order (if any) that fulfills a given design request. Used by the
  *  designer-facing print-file QA so they can verify against the roster the
  *  team submitted, without exposing the QA tool to the coach. */
+/** Duplicate/related-order guard: other (non-cancelled) team orders that share
+ *  this order's contact (email OR last-10 phone). Self-serve customers often
+ *  re-run the order form instead of editing, spinning up duplicates - this
+ *  surfaces them so staff can merge or delete. Not a hard block: some teams
+ *  legitimately place separate orders (e.g. jerseys + pullovers), so we flag
+ *  rather than prevent. `likelyDuplicate` marks the high-signal case (same
+ *  team, unpaid). */
+export type RelatedOrder = {
+  id: string;
+  reference: string;
+  teamName: string;
+  status: string;
+  createdAt: Date | null;
+  players: number;
+  hasDesign: boolean;
+  paid: boolean;
+  likelyDuplicate: boolean;
+};
+
+export async function findRelatedOrdersByContact(opts: {
+  excludeId: string;
+  email?: string | null;
+  phone?: string | null;
+  teamName?: string | null;
+}): Promise<RelatedOrder[]> {
+  const db = getDb();
+  const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
+  const email = norm(opts.email);
+  const phone10 = (opts.phone ?? "").replace(/\D/g, "").slice(-10);
+  const team = norm(opts.teamName);
+  if (!email && !phone10) return [];
+
+  const rows = await db.select().from(teamOrders);
+  const matches = rows.filter(
+    (o) =>
+      o.id !== opts.excludeId &&
+      o.status !== "cancelled" &&
+      ((email && norm(o.contactEmail) === email) ||
+        (phone10 && (o.contactPhone ?? "").replace(/\D/g, "").slice(-10) === phone10)),
+  );
+
+  const out: RelatedOrder[] = [];
+  for (const o of matches) {
+    const roster = await getRoster(o.id);
+    const paid = Boolean(o.depositPaidAt || o.invoicePaidAt);
+    out.push({
+      id: o.id,
+      reference: o.reference,
+      teamName: o.teamName,
+      status: o.status,
+      createdAt: o.createdAt,
+      players: roster.length,
+      hasDesign: Boolean(o.designRequestId),
+      paid,
+      // High-signal duplicate: same team name, not paid yet.
+      likelyDuplicate: !paid && Boolean(team) && norm(o.teamName) === team,
+    });
+  }
+  return out.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+}
+
 export async function getByDesignRequestId(designRequestId: string) {
   const db = getDb();
   const [row] = await db

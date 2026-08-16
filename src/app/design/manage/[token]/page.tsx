@@ -13,6 +13,9 @@ import { PrintFileThumbs } from "@/components/print-file-thumbs";
 import { TeamStoreTeaser } from "@/components/team-store-teaser";
 import { PrintChecklist } from "@/components/print-checklist";
 import { InboundTracking } from "@/components/inbound-tracking";
+import { DesignRequestSms } from "@/components/design-request-sms";
+import { getAdminSession } from "@/lib/admin-auth";
+import { toE164 } from "@/lib/sms";
 
 export const metadata: Metadata = { title: "Manage Design Request", robots: { index: false } };
 
@@ -34,6 +37,12 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
   if (!request) return <Centered title="Link not found">This management link is invalid or has expired.</Centered>;
 
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
+  // Admin-only: a logged-in staff session unlocks the customer SMS thread on
+  // this page. Designers open the same link without an admin cookie and never
+  // see the customer's phone or texts (keeps clients from being poached).
+  const adminSession = await getAdminSession();
+  const smsPhone = request.contactPhone ? toE164(request.contactPhone) : null;
 
   // Designer-only print-file QA: only renders once the client has approved this
   // design AND started a linked team order with at least one roster entry.
@@ -246,6 +255,16 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
       <div className="pt-6 border-t border-line">
         <DesignMessages token={token} role="designer" initialMessages={request.messages ?? []} status={request.status} />
       </div>
+
+      {adminSession && (
+        <div className="pt-6 border-t border-line">
+          {smsPhone ? (
+            <DesignRequestSms phone={smsPhone} name={request.contactName} />
+          ) : (
+            <p className="text-sm text-muted">No phone number on file for this customer, so there is nothing to text.</p>
+          )}
+        </div>
+      )}
 
       {storeEligible && (
         <div className="pt-6 border-t border-line">

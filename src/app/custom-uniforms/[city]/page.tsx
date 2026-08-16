@@ -17,8 +17,10 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   const area = getServiceArea(city);
   if (!area) return {};
   return {
-    title: `Custom Team Uniforms for ${area.city}, FL - Jerseys, Hats & More`,
-    description: `Custom team uniforms, jerseys, and embroidered hats for ${area.city} teams - free design, transparent 2026 pricing, made ${area.proximity}. Travel ball, league, school, and business orders welcome.`,
+    title: area.metaTitle ?? `Custom Team Uniforms for ${area.city}, FL - Jerseys, Hats & More`,
+    description:
+      area.metaDescription ??
+      `Custom team uniforms, jerseys, and embroidered hats for ${area.city} teams - free design, transparent 2026 pricing, made ${area.proximity}. Travel ball, league, school, and business orders welcome.`,
     alternates: { canonical: `/custom-uniforms/${area.slug}` },
   };
 }
@@ -32,14 +34,18 @@ export default async function ServiceAreaPage({ params }: { params: Promise<{ ci
     <>
     <InfoPage
       eyebrow={`Serving ${area.city}, Florida`}
-      h1={`Custom Team Uniforms for ${area.city}`}
+      h1={area.h1 ?? `Custom Team Uniforms for ${area.city}`}
       intro={
-        <>
-          Slugger Athletics designs and produces{" "}
-          <strong className="text-foreground">custom team uniforms for {area.city}</strong> teams -
-          fully sublimated jerseys, in-house embroidered hats, and complete uniform sets, made{" "}
-          {area.proximity}. Free design mockups, per-player roster entry, and honest 2026 pricing.
-        </>
+        area.intro ? (
+          <>{area.intro}</>
+        ) : (
+          <>
+            Slugger Athletics designs and produces{" "}
+            <strong className="text-foreground">custom team uniforms for {area.city}</strong> teams -
+            fully sublimated jerseys, in-house embroidered hats, and complete uniform sets, made{" "}
+            {area.proximity}. Free design mockups, per-player roster entry, and honest 2026 pricing.
+          </>
+        )
       }
       offeringsTitle={`What ${area.city} Teams Order`}
       offeringsBlurb="Travel ball, rec leagues, schools, businesses - if it needs a uniform, we make it."
@@ -49,7 +55,9 @@ export default async function ServiceAreaPage({ params }: { params: Promise<{ ci
         { t: "Full Uniform Bundles", d: "Game Day, Home & Away, and Total Package bundles - one per-player price for the whole set." },
         { t: "Free Team Stores", d: "We set up a free online store for your team so every player and parent orders their own gear - no collecting money or sizes." },
       ]}
-      exampleCategory="uniforms"
+      exampleCategory={area.realPhotos ? undefined : "uniforms"}
+      manualExamples={area.realPhotos}
+      exampleFit={area.realPhotos ? "cover" : undefined}
       exampleTitle="Recent Custom Work"
       exampleAltSuffix={` - custom team uniforms ${area.city} FL`}
       localTitle={`Why ${area.city} Teams Choose Slugger`}
@@ -72,8 +80,54 @@ export default async function ServiceAreaPage({ params }: { params: Promise<{ ci
             { "@type": "ListItem", position: 3, name: area.city, item: `https://sluggerathletics.com/custom-uniforms/${area.slug}` },
           ],
         },
+        ...(area.faqs && area.faqs.length
+          ? [
+              {
+                "@context": "https://schema.org",
+                "@type": "FAQPage",
+                mainEntity: area.faqs.map((f) => ({
+                  "@type": "Question",
+                  name: f.q,
+                  acceptedAnswer: { "@type": "Answer", text: f.a },
+                })),
+              },
+            ]
+          : []),
       ]}
     />
+
+    {/* Metro pages (Orlando etc.) get deep-dive copy, an ordering-process
+        block, a delivery note, and an FAQ. Nearby-town pages skip all of this. */}
+    {area.deepDive && area.deepDive.length > 0 && (
+      <section className="mx-auto max-w-3xl px-4 sm:px-6 pb-12 space-y-5">
+        {area.deepDive.map((p, i) => (
+          <p key={i} className="text-muted leading-relaxed">{p}</p>
+        ))}
+      </section>
+    )}
+
+    {area.process && area.process.length > 0 && (
+      <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-16">
+        <h2 className="display text-2xl text-foreground">How Ordering Works for {area.city} Teams</h2>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {area.process.map((s) => (
+            <div key={s.t} className="bg-steel border border-line clip-slant p-5">
+              <div className="display text-brand text-sm">{s.t}</div>
+              <p className="mt-2 text-sm text-muted leading-relaxed">{s.d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
+
+    {area.delivery && (
+      <section className="mx-auto max-w-3xl px-4 sm:px-6 pb-16">
+        <div className="bg-steel border border-line clip-slant p-6">
+          <h2 className="display text-xl text-foreground">Getting Your Uniforms in {area.city}</h2>
+          <p className="mt-3 text-muted leading-relaxed">{area.delivery}</p>
+        </div>
+      </section>
+    )}
     {/* Sport interlinks with keyword anchors */}
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-16">
       <h2 className="display text-2xl text-foreground">Every Sport for {area.city} Teams</h2>
@@ -87,6 +141,23 @@ export default async function ServiceAreaPage({ params }: { params: Promise<{ ci
         <Link href="/pricing" className="text-brand hover:underline">2026 Pricing &amp; Bundles</Link>
       </div>
     </section>
+
+    {area.faqs && area.faqs.length > 0 && (
+      <section className="mx-auto max-w-3xl px-4 sm:px-6 pb-20">
+        <h2 className="display text-2xl text-foreground">{area.city} Custom Uniform FAQs</h2>
+        <div className="mt-6 divide-y divide-line border-y border-line">
+          {area.faqs.map((f) => (
+            <details key={f.q} className="group py-4">
+              <summary className="display text-base text-foreground cursor-pointer list-none flex justify-between gap-4">
+                {f.q}
+                <span className="text-brand transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <p className="mt-3 text-muted leading-relaxed">{f.a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+    )}
     </>
   );
 }
