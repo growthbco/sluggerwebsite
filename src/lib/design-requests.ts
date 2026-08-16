@@ -217,6 +217,10 @@ export async function convertLeadToDesignRequest(
     contactName: name,
     contactEmail: v.email,
     contactPhone: v.phone ?? null,
+    // The lead gave their phone at the lab's email gate (with the SMS consent
+    // note), so carry that consent over - otherwise proof/notification texts
+    // silently skip them and never reach the Texts inbox.
+    smsOptInAt: v.phone ? new Date() : null,
     productTypes: ["Jersey / Shirt"],
     aiDesignState: { versions },
     statusToken,
