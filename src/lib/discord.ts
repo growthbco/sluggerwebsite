@@ -719,3 +719,27 @@ export async function postDesignThreadUpdate(opts: {
   }
   return send(url, body);
 }
+
+/** Open ONE home thread for a design request in #design-requests and return its
+ *  thread id (so it can be persisted). Used when a request is created outside
+ *  the normal intake (e.g. converting a lab lead) so every later event
+ *  (proof / changes / client reply) nests in one thread instead of spawning a
+ *  new post each time. Quiet: no @here, no designer ping. */
+export async function createDesignThread(args: { title: string; description?: string }): Promise<string | null> {
+  const baseUrl = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
+  if (!baseUrl) return null;
+  const body: Record<string, unknown> = {
+    username: "Slugger Design Requests",
+    embeds: [
+      {
+        title: args.title,
+        ...(args.description ? { description: args.description } : {}),
+        color: GOLD,
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  };
+  if (process.env.DISCORD_DESIGN_REQUESTS_FORUM === "true") body.thread_name = args.title.slice(0, 100);
+  const msg = await sendAndReturn(baseUrl, body);
+  return msg?.channel_id ?? null;
+}

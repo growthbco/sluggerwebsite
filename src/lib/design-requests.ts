@@ -210,25 +210,43 @@ export async function convertLeadToDesignRequest(
   const reference = makeRef();
   const statusToken = token();
   const manageToken = token();
-  await db.insert(designRequests).values({
-    reference,
-    status: "in_design", // staff is actively working the design
-    teamName: `${name}'s Design`,
-    contactName: name,
-    contactEmail: v.email,
-    contactPhone: v.phone ?? null,
-    // The lead gave their phone at the lab's email gate (with the SMS consent
-    // note), so carry that consent over - otherwise proof/notification texts
-    // silently skip them and never reach the Texts inbox.
-    smsOptInAt: v.phone ? new Date() : null,
-    productTypes: ["Jersey / Shirt"],
-    aiDesignState: { versions },
-    statusToken,
-    manageToken,
-    designFeeAmountCents: DESIGN_FEE_CENTS,
-    designFeePaidAt: new Date(),
-    designFeeWaivedReason: "design_lab_lead",
-  });
+  const teamName = `${name}'s Design`;
+  const [row] = await db
+    .insert(designRequests)
+    .values({
+      reference,
+      status: "in_design", // staff is actively working the design
+      teamName,
+      contactName: name,
+      contactEmail: v.email,
+      contactPhone: v.phone ?? null,
+      // The lead gave their phone at the lab's email gate (with the SMS consent
+      // note), so carry that consent over - otherwise proof/notification texts
+      // silently skip them and never reach the Texts inbox.
+      smsOptInAt: v.phone ? new Date() : null,
+      productTypes: ["Jersey / Shirt"],
+      aiDesignState: { versions },
+      statusToken,
+      manageToken,
+      designFeeAmountCents: DESIGN_FEE_CENTS,
+      designFeePaidAt: new Date(),
+      designFeeWaivedReason: "design_lab_lead",
+    })
+    .returning({ id: designRequests.id });
+
+  // Open ONE home thread in #design-requests and save it, so every later event
+  // (proof/changes/reply) nests there instead of spawning a new post each time.
+  try {
+    const { createDesignThread } = await import("@/lib/discord");
+    const threadId = await createDesignThread({
+      title: `${teamName} (${reference})`,
+      description: "Continuing a Jersey Maker lead's design in the studio.",
+    });
+    if (threadId) await setDiscordThreadId(row.id, threadId);
+  } catch (e) {
+    console.error("convert: design thread create failed", e);
+  }
+
   return { ok: true, manageToken, reference };
 }
 
