@@ -144,7 +144,10 @@ export async function POST(req: Request) {
       contactName: body.contactName.trim().slice(0, 80),
       contactEmail: body.contactEmail.trim().slice(0, 120),
       contactPhone: (body.contactPhone ?? "").trim().slice(0, 30) || undefined,
-      smsConsent: body.smsConsent === true,
+      // The lab captures the phone behind the SMS consent note at the email
+      // gate, so a phone on file means they opted in - otherwise proof texts
+      // silently skip lab customers (they only get the email).
+      smsConsent: body.smsConsent === true || Boolean((body.contactPhone ?? "").trim()),
       vision,
       notes: (body.notes ?? "").trim().slice(0, 500) || undefined,
       colorHexes: (body.colorHexes ?? []).slice(0, 6),
