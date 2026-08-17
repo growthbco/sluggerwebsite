@@ -25,6 +25,45 @@ export type SportPage = {
 
 export const SPORT_PAGES: SportPage[] = [
   {
+    slug: "custom-cheer-uniforms",
+    sport: "Cheer",
+    h1: "Custom Cheer Uniforms",
+    metaTitle: "Custom Cheer Uniforms & Rhinestone Sets - Free Design | Slugger Athletics",
+    metaDescription:
+      "Custom sublimated cheer uniforms and full sets - crop-top and skirt sets, briefs, pom-poms, bows, socks, and bags - with your colors and rhinestones dyed in. Free design, from $120, made in Ocala FL.",
+    intro:
+      "Custom sublimated cheer uniforms and full sets, designed free with your colors, rhinestones, and mascot dyed right in. Crop-top and skirt sets, briefs, pom-poms, bows, socks, and bags, made in Ocala FL and shipped nationwide. All-star gyms, school squads, and rec teams welcome.",
+    mockup: "/styles/sport-cheer.jpg",
+    offerings: [
+      { t: "Cheer Uniforms", d: "Sublimated crop-top and skirt sets in your colors, simple or loaded with rhinestones. Names and numbers optional." },
+      { t: "Briefs & Crop Tops", d: "Matching briefs and crop tops to round out the look for practice and competition." },
+      { t: "Pom-Poms, Bows & Bags", d: "Coordinated pom-poms, hair bows, and team bags so the whole squad matches head to toe." },
+      { t: "Custom Socks", d: "Team socks sublimated to match your uniform design." },
+    ],
+    localBody:
+      "From all-star gyms to school and rec squads across Ocala and Central Florida, we design cheer sets free, produce them in full-dye sublimation, and deliver locally or ship anywhere. One roster link sizes the whole squad, and every family can order their own through a free team store.",
+    deepDive: [
+      "Cheer uniforms take a beating - tumbling, stunting, a full season of competitions - so we build them in full-dye sublimation, where your colors, rhinestone patterns, and mascot are dyed into the fabric instead of pressed on top. That means no cracking, no peeling, and a set that photographs as sharp at the last competition as the first. Simple designs or fully blinged out, the price stays the same per piece.",
+      "Everything coordinates: crop-top and skirt sets, briefs, matching pom-poms, hair bows, socks, and team bags, all in one design. Send us your gym's colors and logo, or just an idea, and our in-house designer sends a free mockup before you spend a dollar. Once you approve it, one shared roster link sizes the whole squad and each family can order their own pieces through a free team store.",
+    ],
+    faqs: [
+      { q: "How much do custom cheer uniforms cost?", a: "Simple sublimated uniform sets start at $120, and rhinestone sets are $150. Accessories: socks $20, hair bows $25, pom-poms $40, briefs $35, crop tops $48, and team bags $90. Full-package pricing is available when you outfit the whole squad." },
+      { q: "Can you match our gym's colors and add rhinestones?", a: "Yes. You pick your exact colors, and rhinestones, metallic accents, and your mascot are all part of the design. There are no per-color charges." },
+      { q: "Do you outfit all-star gyms and school squads?", a: "Both, plus rec and youth teams. Every squad uses the same free-design, roster-based process, with a team store so each family orders their own set." },
+      { q: "How long does a cheer order take?", a: "Most orders are ready 2 to 3 weeks after you approve the design and pay the deposit, with rush production available when a competition sneaks up." },
+    ],
+    pricing: [
+      { label: "Uniform (simple)", cents: 12000 },
+      { label: "Uniform (rhinestones)", cents: 15000 },
+      { label: "Crop Top", cents: 4800 },
+      { label: "Brief Short", cents: 3500 },
+      { label: "Pom-Poms", cents: 4000 },
+      { label: "Hair Bow", cents: 2500 },
+      { label: "Team Bag", cents: 9000 },
+      { label: "Socks", cents: 2000 },
+    ],
+  },
+  {
     slug: "custom-baseball-uniforms",
     sport: "Baseball",
     h1: "Custom Baseball Uniforms",
