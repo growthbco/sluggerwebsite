@@ -156,10 +156,10 @@ export const SPORT_PAGES: SportPage[] = [
   {
     slug: "custom-flag-football-uniforms",
     sport: "Flag Football",
-    h1: "Custom Flag Football Uniforms",
-    metaTitle: "Custom Flag Football Uniforms & Jerseys - Free Design",
+    h1: "Custom Flag Football Uniforms & Jerseys",
+    metaTitle: "Custom Flag Football Jerseys & Uniforms - From $28, Free Design",
     metaDescription:
-      "Custom sublimated flag football jerseys with names and numbers included, from $28. Youth and adult leagues, free design mockup, made in Ocala FL.",
+      "Custom sublimated flag football jerseys and uniforms with names and numbers included, from $28. Youth flag football and adult leagues, free design mockup, made in Ocala FL.",
     intro:
       "Flag football is exploding across Florida - and your squad should look the part. Custom sublimated flag jerseys from $28 with names, numbers, and team colors dyed in, sized youth through adult at one flat price. Free design mockup before anything is produced.",
     mockup: "/styles/sport-flag-football.jpg",
@@ -172,16 +172,16 @@ export const SPORT_PAGES: SportPage[] = [
     localBody:
       "From Ocala youth leagues to adult flag nights, we keep Central Florida flag teams looking sharp - free designs, per-player sizing, and pickup at the shop.",
     deepDive: ["Flag football is the fastest-growing team sport in Florida - youth leagues, adult co-ed nights, and now girls' high school flag. We build loose, breathable sublimated jerseys made for flag pulls and July humidity, with names and numbers dyed in so they survive a whole season of turf.", "Leagues love ordering with us because every team can run its own colorway inside one design family, and each roster fills itself through a shared link - no size spreadsheets, no collecting cash."],
-    faqs: [{"q": "How much are custom flag football jerseys?", "a": "Sublimated jerseys start at $28 with names and numbers included, youth through adult sizes at one flat price. Practice-weight dry-fit shirts are $20."}, {"q": "Can you outfit an entire league?", "a": "Yes - we run one design family with a different colorway per team, and each team gets its own roster link. Ask about league pricing on the total piece count."}, {"q": "How fast can a flag order turn around?", "a": "Most orders ship 2-3 weeks after design approval; rush is about a week. Short season? Start the free design now and lock sizes later."}],
+    faqs: [{"q": "How much are custom flag football jerseys?", "a": "Sublimated jerseys start at $28 with names and numbers included, youth through adult sizes at one flat price. Practice-weight dry-fit shirts are $20."}, {"q": "Can you outfit an entire league?", "a": "Yes - we run one design family with a different colorway per team, and each team gets its own roster link. Ask about league pricing on the total piece count."}, {"q": "How fast can a flag order turn around?", "a": "Most orders ship 2-3 weeks after design approval; rush is about a week. Short season? Start the free design now and lock sizes later."}, {"q": "Do you make youth flag football uniforms?", "a": "Yes - youth flag football uniforms and jerseys in every size from Youth Small up, at the same flat price as adult, with names and numbers included. Great for rec leagues and NFL Flag-style programs."}],
     pricing: [{ label: "Jerseys from", cents: 2800 }, { label: "Custom shorts", cents: 2500 }, { label: "Practice jerseys", cents: 2000 }, { label: "Hats from", cents: 2500 }],
   },
   {
     slug: "custom-football-uniforms",
     sport: "Football",
-    h1: "Custom Football Uniforms",
-    metaTitle: "Custom Football Uniforms & Jerseys - Free Design, Ocala FL",
+    h1: "Custom Football Uniforms & Jerseys",
+    metaTitle: "Custom Football Jerseys & Uniforms - From $28, Free Design",
     metaDescription:
-      "Custom sublimated football jerseys and uniforms with names and numbers included. Youth leagues to adult flag and 7v7 - free design mockup, made in Ocala FL.",
+      "Custom sublimated football jerseys and uniforms with names and numbers included, from $28. Youth football jerseys, 7v7, and adult leagues - free design mockup, made in Ocala FL.",
     intro:
       "Custom sublimated football jerseys built for Friday nights and Saturday mornings - names, numbers, and team colors dyed into breathable performance fabric. Youth tackle, 7v7, or adult league: free design mockup first, production after you approve.",
     mockup: "/styles/sport-football.jpg",
@@ -194,7 +194,7 @@ export const SPORT_PAGES: SportPage[] = [
     localBody:
       "From Marion County youth football to adult leagues across Central Florida, we outfit programs with free design work and local pickup - and ship nationwide.",
     deepDive: ["From youth tackle programs to 7v7 circuits, football uniforms take the most abuse of any sport we make - which is exactly why sublimation matters. Numbers and logos dyed into the fabric cannot crack in a pile-up or peel in the wash, and the breathable poly holds up under pads.", "We outfit full programs: game jerseys, $20 dry-fit practice shirts in team colors, and sideline gear - hoodies, quarter-zips, and embroidered caps for coaches and staff, all in one design language."],
-    faqs: [{"q": "How much are custom football jerseys?", "a": "Sublimated game jerseys start at $28 with numbers and names included; practice-weight dry-fit shirts are $20. Sideline hoodies are $40 and embroidered caps $25-30."}, {"q": "Do the jerseys work with pads?", "a": "Yes - we size for over-pads wear on tackle orders. Tell us the age group and we will recommend sizing in your free mockup review."}, {"q": "Can you outfit coaches and staff to match?", "a": "Absolutely - matching polos, quarter-zips, hoodies, and caps in the same design family, added to the same team order."}],
+    faqs: [{"q": "How much are custom football jerseys?", "a": "Sublimated game jerseys start at $28 with numbers and names included; practice-weight dry-fit shirts are $20. Sideline hoodies are $40 and embroidered caps $25-30."}, {"q": "Do the jerseys work with pads?", "a": "Yes - we size for over-pads wear on tackle orders. Tell us the age group and we will recommend sizing in your free mockup review."}, {"q": "Can you outfit coaches and staff to match?", "a": "Absolutely - matching polos, quarter-zips, hoodies, and caps in the same design family, added to the same team order."}, {"q": "Do you make youth football jerseys and uniforms?", "a": "Yes - youth football jerseys and full uniforms from Youth Small up, sized for over-pads wear on tackle orders, all at one flat price. Tackle, flag, or 7v7."}],
     realPhotos: [{ src: "/styles/football-game-jersey.jpg", alt: "Custom sublimated tackle football game jersey - red Georgia design with over-pads cut and mesh panels, made by Slugger Athletics" }, { src: "/styles/football-palms.jpg", alt: "Custom youth football game jersey - black with blue and purple palm tree sublimation, Slugger Athletics house design" }],
     pricing: [{ label: "Game jerseys from", cents: 2800 }, { label: "Practice jerseys", cents: 2000 }, { label: "Sideline hoodies", cents: 4000 }, { label: "Hats from", cents: 2500 }],
   },
