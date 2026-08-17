@@ -23,6 +23,7 @@ type Props = {
   colors: string | null;
   colorHexes: string[];
   contact: { name: string; email: string; phone: string | null };
+  source?: string | null;
   inspirationImages: string[];
   proofImages: string[];
   proofLabels?: Record<string, string>;
@@ -49,6 +50,7 @@ export function DesignManagePanel({
   colors,
   colorHexes,
   contact,
+  source,
   inspirationImages,
   proofImages,
   proofLabels = {},
@@ -281,6 +283,11 @@ export function DesignManagePanel({
           <div className="text-muted">{contact.name}</div>
           <div className="text-muted">{contact.email}</div>
           {contact.phone && <div className="text-muted">{contact.phone}</div>}
+          {source && (
+            <div className="mt-1 text-xs text-muted">
+              <span className="text-foreground">Source:</span> {source}
+            </div>
+          )}
         </div>
         {products && (
           <div className="sm:col-span-2">

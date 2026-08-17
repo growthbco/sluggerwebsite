@@ -224,6 +224,7 @@ export async function convertLeadToDesignRequest(
       // note), so carry that consent over - otherwise proof/notification texts
       // silently skip them and never reach the Texts inbox.
       smsOptInAt: v.phone ? new Date() : null,
+      source: "AI Design Lab",
       productTypes: ["Jersey / Shirt"],
       aiDesignState: { versions },
       statusToken,

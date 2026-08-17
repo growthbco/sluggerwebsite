@@ -208,6 +208,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
         colors={request.colors}
         colorHexes={request.colorHexes ?? []}
         contact={{ name: request.contactName, email: request.contactEmail, phone: request.contactPhone }}
+        source={request.source ?? (/AI DESIGN LAB/i.test(request.vision ?? "") || request.designFeeWaivedReason === "design_lab_lead" ? "AI Design Lab" : "Direct")}
         inspirationImages={request.inspirationImages ?? []}
         proofImages={request.proofImages ?? []}
         proofLabels={request.proofLabels ?? {}}
