@@ -4,17 +4,16 @@
  * design input. Writes src/data/mockups.json so the storefront uses them.
  *
  * Run: npx tsx scripts/generate-catalog-mockups.ts
- * Needs GEMINI_API_KEY in .env.local. Throttled to respect rate limits.
+ * Needs OPENAI_API_KEY in .env.local. Throttled to respect rate limits.
  */
-import { GoogleGenAI } from "@google/genai";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { config } from "dotenv";
 import path from "node:path";
+import { generateJerseyImage, type ImagePart } from "@/lib/jersey-image";
 
 config({ path: ".env.local" });
 
-const MODEL = "gemini-2.5-flash-image";
 const OUT_DIR = path.join(process.cwd(), "public", "mockups");
 const CATALOG = path.join(process.cwd(), "src", "data", "migrated-products.json");
 const MANIFEST = path.join(process.cwd(), "src", "data", "mockups.json");
@@ -60,9 +59,8 @@ const mimeFor = (f: string) =>
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.error("✗ GEMINI_API_KEY not set in .env.local");
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("✗ OPENAI_API_KEY not set in .env.local");
     process.exit(1);
   }
 
@@ -70,7 +68,6 @@ async function main() {
   const targets = products.filter((p) => garmentFor(p) && p.images[0]);
   console.log(`${targets.length} apparel products to render (×3 views = ${targets.length * 3} images)\n`);
 
-  const ai = new GoogleGenAI({ apiKey });
   await mkdir(OUT_DIR, { recursive: true });
 
   const manifest: Record<string, { hero?: string; front?: string; back?: string }> = existsSync(
@@ -86,9 +83,9 @@ async function main() {
       console.log(`  ✗ ${p.slug}: source image missing`);
       continue;
     }
-    const designPart = {
-      inlineData: {
-        mimeType: mimeFor(srcDisk),
+    const designPart: ImagePart = {
+      inline_data: {
+        mime_type: mimeFor(srcDisk),
         data: (await readFile(srcDisk)).toString("base64"),
       },
     };
@@ -104,16 +101,20 @@ async function main() {
         continue;
       }
       try {
-        const res = await ai.models.generateContent({
-          model: MODEL,
-          contents: [{ text: `${BASE(garment)} ${view.instr}` }, designPart],
-        });
-        const img = res.candidates?.[0]?.content?.parts?.find((x) => x.inlineData);
-        if (!img?.inlineData?.data) {
-          console.log(`  ✗ ${p.slug}-${view.suffix}: no image`);
+        const result = await generateJerseyImage(
+          [{ text: `${BASE(garment)} ${view.instr}` }, designPart],
+          "4:3",
+          {
+            forceOpenai: true,
+            quality: "high",
+            operation: "catalog_mockup_generation",
+          },
+        );
+        if ("error" in result) {
+          console.log(`  ✗ ${p.slug}-${view.suffix}: ${result.error}`);
           continue;
         }
-        await writeFile(path.join(process.cwd(), "public", outRel), Buffer.from(img.inlineData.data, "base64"));
+        await writeFile(path.join(process.cwd(), "public", outRel), Buffer.from(result.data, "base64"));
         manifest[p.slug][view.suffix as "hero" | "front" | "back"] = outRel;
         await writeFile(MANIFEST, JSON.stringify(manifest, null, 2)); // save incrementally
         console.log(`  ✓ ${p.slug}-${view.suffix}`);

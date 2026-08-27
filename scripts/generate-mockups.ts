@@ -1,10 +1,9 @@
 /**
  * Generates UNIFORM jersey product mockups from flat design art using
- * Google Gemini 2.5 Flash Image ("nano-banana"), image-to-image editing.
+ * OpenAI GPT Image, using the same OpenAI-only path as the website.
  *
  * Setup:
- *   1. Get a Gemini API key: https://aistudio.google.com/apikey
- *   2. Add to .env.local:  GEMINI_API_KEY="..."
+ *   1. Add OPENAI_API_KEY to .env.local.
  *   3. Drop flat design PNGs into  ./designs/   (filename = product name/slug).
  *      Optionally add  ./designs/_reference.png  — a sample jersey mockup whose
  *      STYLE (front+back angle, white background) every output should match.
@@ -12,14 +11,13 @@
  *
  * Outputs uniform mockups to  ./public/mockups/<name>.png  and prints a summary.
  */
-import { GoogleGenAI } from "@google/genai";
 import { readdir, readFile, writeFile, mkdir } from "node:fs/promises";
 import { config } from "dotenv";
 import path from "node:path";
+import { generateJerseyImage, type ImagePart } from "@/lib/jersey-image";
 
 config({ path: ".env.local" });
 
-const MODEL = "gemini-2.5-flash-image";
 const DESIGNS_DIR = path.join(process.cwd(), "designs");
 const OUT_DIR = path.join(process.cwd(), "public", "mockups");
 
@@ -62,16 +60,12 @@ const mimeFor = (file: string) =>
 
 async function fileToPart(file: string) {
   const data = await readFile(file);
-  return { inlineData: { mimeType: mimeFor(file), data: data.toString("base64") } };
+  return { inline_data: { mime_type: mimeFor(file), data: data.toString("base64") } } satisfies ImagePart;
 }
 
 async function main() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.error(
-      "✗ GEMINI_API_KEY is not set.\n" +
-        "  Get one at https://aistudio.google.com/apikey and add it to .env.local",
-    );
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("✗ OPENAI_API_KEY is not set in .env.local");
     process.exit(1);
   }
 
@@ -93,12 +87,11 @@ async function main() {
     process.exit(1);
   }
 
-  const ai = new GoogleGenAI({ apiKey });
   await mkdir(OUT_DIR, { recursive: true });
 
   const refPart = reference ? await fileToPart(path.join(DESIGNS_DIR, reference)) : null;
   console.log(
-    `Generating ${designs.length} mockup(s) with ${MODEL}` +
+    `Generating ${designs.length} mockup(s) with OpenAI GPT Image` +
       (refPart ? ` (matching style of ${reference})` : "") + "\n",
   );
 
@@ -110,19 +103,22 @@ async function main() {
 
     for (const view of VIEWS) {
       try {
-        const parts: object[] = [{ text: `${BASE_PROMPT} ${view.instr}` }, designPart];
+        const parts: ImagePart[] = [{ text: `${BASE_PROMPT} ${view.instr}` }, designPart];
         if (refPart) {
           parts.push({ text: "Match the presentation style of this reference mockup:" }, refPart);
         }
 
-        const res = await ai.models.generateContent({ model: MODEL, contents: parts });
-        const imgPart = res.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
-        if (!imgPart?.inlineData?.data) {
-          console.log(`  ✗ ${name}-${view.suffix}: model returned no image`);
+        const result = await generateJerseyImage(parts, "4:3", {
+          forceOpenai: true,
+          quality: "high",
+          operation: "catalog_mockup_generation",
+        });
+        if ("error" in result) {
+          console.log(`  ✗ ${name}-${view.suffix}: ${result.error}`);
           continue;
         }
         const out = path.join(OUT_DIR, `${name}-${view.suffix}.png`);
-        await writeFile(out, Buffer.from(imgPart.inlineData.data, "base64"));
+        await writeFile(out, Buffer.from(result.data, "base64"));
         ok++;
         console.log(`  ✓ ${name}-${view.suffix} → public/mockups/${name}-${view.suffix}.png`);
       } catch (e) {
