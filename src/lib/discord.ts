@@ -1,5 +1,6 @@
 // Posts new orders to Discord via an incoming webhook (no bot to host).
-// Used for paid Shop/Buy-In orders (#orders) and team orders (#team-orders).
+// Used for paid Shop/Buy-In orders (#orders) and custom projects in the
+// Design Requests forum.
 import { itemLabel, notDesignerMade } from "@/lib/order-items";
 
 const GOLD = 0xb8a36c;
@@ -211,8 +212,7 @@ type TeamOrderPayload = {
   whiteLabel?: boolean;
 };
 
-/** Announce an invoice payment - into the design's thread when linked,
- *  otherwise the #team-orders channel. */
+/** Announce a custom-order payment in its Design Requests forum thread. */
 export async function postTeamOrderPaidToDiscord(args: {
   reference: string;
   teamName: string;
@@ -223,10 +223,9 @@ export async function postTeamOrderPaidToDiscord(args: {
   details?: string;
 }): Promise<boolean> {
   const designUrl = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
-  // Prefer the order's existing design thread. Otherwise post to the
-  // #design-requests channel (where all orders live now), falling back to
-  // #team-orders. A base forum-channel post needs a thread_name or Discord
-  // 400s it - which is what left standalone-order payments unannounced.
+  // Prefer the order's persistent project thread. A missing id opens a new
+  // Design Requests post as a final safety net; callers normally resolve and
+  // persist the thread before reaching this function.
   let url: string | undefined;
   let threadName: string | undefined;
   if (args.designThreadId && designUrl) {
@@ -234,15 +233,12 @@ export async function postTeamOrderPaidToDiscord(args: {
   } else if (designUrl) {
     url = designUrl;
     if (process.env.DISCORD_DESIGN_REQUESTS_FORUM === "true") threadName = `${args.teamName} (${args.reference})`;
-  } else if (process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL) {
-    url = process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
-    if (process.env.DISCORD_TEAM_ORDERS_FORUM === "true") threadName = `${args.teamName} (${args.reference})`;
   }
   if (!url) return false;
   const amt = `$${(args.totalCents / 100).toFixed(2)}`;
   const isDeposit = args.stage === "deposit";
   return send(url, {
-    username: "Slugger Team Orders",
+    username: "Slugger Custom Orders",
     // Payments always ping - these gate production and shipping.
     content: isDeposit ? "@here 💰 Deposit paid - clear to start" : "@here 💰 Paid in full",
     allowed_mentions: { parse: ["everyone"] },
@@ -279,12 +275,11 @@ export async function postAddonToDesignerDiscord(args: {
   const printRows = args.rows.filter((r) => !r.key || !notDesignerMade(r.key));
   if (printRows.length === 0) return true;
   const designUrl = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
-  // Prefer the project's thread; fall back to the design channel, then the
-  // team-orders channel so the ping isn't lost if design Discord isn't set.
+  // Prefer the project's thread; otherwise create a Design Requests post.
   const url =
     args.designThreadId && designUrl
       ? `${designUrl}?thread_id=${args.designThreadId}`
-      : designUrl || process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
+      : designUrl;
   if (!url) {
     console.warn("No Discord webhook set - skipping add-on designer ping");
     return false;
@@ -297,7 +292,10 @@ export async function postAddonToDesignerDiscord(args: {
     })
     .join("\n");
   return send(url, {
-    username: "Slugger Team Orders",
+    username: "Slugger Custom Orders",
+    ...(!args.designThreadId && process.env.DISCORD_DESIGN_REQUESTS_FORUM === "true"
+      ? { thread_name: `${args.teamName} (${args.reference})`.slice(0, 100) }
+      : {}),
     content: "@here ➕ Add-on to add to the print file",
     allowed_mentions: { parse: ["everyone"] },
     embeds: [
@@ -311,29 +309,20 @@ export async function postAddonToDesignerDiscord(args: {
   });
 }
 
-/** Post a team order's roster (no pricing). Linked orders land INSIDE the
- *  design's existing thread so a project's whole story lives in one place;
- *  standalone orders go to the #team-orders channel. */
+/** Post a team order's roster (no pricing) in the Design Requests forum.
+ *  Linked orders reuse the design thread; standalone/manual orders receive
+ *  their own persistent thread there. */
 export async function postTeamOrderToDiscord(
   order: TeamOrderPayload,
   opts: { designThreadId?: string | null } = {},
 ): Promise<boolean> {
   const designUrl = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
   const useDesignThread = Boolean(opts.designThreadId && designUrl);
-  // Standalone orders (no linked design) go to the dedicated team-orders
-  // channel; if that isn't configured, fall back to the design-requests or
-  // general orders channel so a submitted roster is NEVER silently dropped.
-  const standaloneUrl =
-    process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL || designUrl || process.env.DISCORD_ORDERS_WEBHOOK_URL;
-  const url = useDesignThread ? `${designUrl}?thread_id=${opts.designThreadId}` : standaloneUrl;
+  const url = useDesignThread ? `${designUrl}?thread_id=${opts.designThreadId}` : designUrl;
   if (!url) {
-    console.warn("No Discord webhook configured (team-orders/design-requests/orders) - skipping team-order post");
+    console.warn("DISCORD_DESIGN_REQUESTS_WEBHOOK_URL not set - skipping team-order post");
     return false;
   }
-  // A forum channel needs a thread_name; a fallback to a non-forum channel must
-  // not send one. Only treat as a forum post when we're on the team-orders
-  // webhook AND it's flagged as a forum.
-  const isTeamOrdersForum = url === process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL && process.env.DISCORD_TEAM_ORDERS_FORUM === "true";
 
   // In-house items (hats) are embroidered at the shop, not by the factory -
   // the designer never needs to see them, so they're filtered out of this
@@ -389,17 +378,15 @@ export async function postTeamOrderToDiscord(
   ];
 
   const body: Record<string, unknown> = {
-    username: "Slugger Team Orders",
+    username: "Slugger Custom Orders",
     // A submitted roster is production work - tag Bonans directly, not @here.
     content: `<@${DESIGNER_USER_ID}> 📋 New roster submitted`,
     allowed_mentions: { parse: [], users: [DESIGNER_USER_ID] },
     embeds,
   };
 
-  // Standalone orders in a Forum #team-orders channel get their own thread;
-  // linked orders are already targeting the design thread via ?thread_id, and a
-  // non-forum fallback channel must not get a thread_name.
-  if (!useDesignThread && isTeamOrdersForum) {
+  // Safety net for legacy callers that did not resolve an order thread first.
+  if (!useDesignThread && process.env.DISCORD_DESIGN_REQUESTS_FORUM === "true") {
     body.thread_name = `${order.teamName} (${order.reference})`.slice(0, 100);
   }
 
@@ -565,7 +552,7 @@ export async function postInvoiceToDiscord(inv: {
   lineCount: number;
   adminUrl: string;
 }): Promise<{ ok: boolean; threadId?: string }> {
-  // Prefer a dedicated invoice channel; fall back to team-orders, then orders.
+  // Prefer a dedicated invoice channel; fall back to the paid-orders channel.
   // Track whether the chosen channel is a Forum, because forum webhooks 400
   // unless the post carries a thread_name.
   let url: string | undefined;
@@ -573,9 +560,6 @@ export async function postInvoiceToDiscord(inv: {
   if (process.env.DISCORD_INVOICES_WEBHOOK_URL) {
     url = process.env.DISCORD_INVOICES_WEBHOOK_URL;
     isForum = process.env.DISCORD_INVOICES_FORUM === "true";
-  } else if (process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL) {
-    url = process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
-    isForum = process.env.DISCORD_TEAM_ORDERS_FORUM === "true";
   } else if (process.env.DISCORD_ORDERS_WEBHOOK_URL) {
     url = process.env.DISCORD_ORDERS_WEBHOOK_URL;
     isForum = process.env.DISCORD_ORDERS_FORUM === "true";
@@ -647,9 +631,6 @@ export async function postInvoicePaidToDiscord(inv: {
   if (process.env.DISCORD_INVOICES_WEBHOOK_URL) {
     baseUrl = process.env.DISCORD_INVOICES_WEBHOOK_URL;
     isForum = process.env.DISCORD_INVOICES_FORUM === "true";
-  } else if (process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL) {
-    baseUrl = process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
-    isForum = process.env.DISCORD_TEAM_ORDERS_FORUM === "true";
   } else if (process.env.DISCORD_ORDERS_WEBHOOK_URL) {
     baseUrl = process.env.DISCORD_ORDERS_WEBHOOK_URL;
     isForum = process.env.DISCORD_ORDERS_FORUM === "true";

@@ -5,7 +5,6 @@ import { eq } from "drizzle-orm";
 import { postOrderToDiscord, postStoreOrderToDiscord, postTeamOrderPaidToDiscord, postAddonToDesignerDiscord, postDesignThreadUpdate } from "@/lib/discord";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders, teams } from "@/db/schema";
-import { getById } from "@/lib/design-requests";
 import { emailOrderConfirmation } from "@/lib/email";
 import { persistPaidOrder } from "@/lib/orders";
 import { creditCustomer } from "@/lib/customers";
@@ -122,9 +121,9 @@ export async function POST(req: Request) {
         const paidTotal = session.amount_total ?? 0;
         const result = await markAddonPaid(session.metadata.addonId, session.id, paidTotal);
         if (result) {
-          const { getById } = await import("@/lib/design-requests");
           const { taxCents } = await import("@/lib/pricing");
-          const design = result.order.designRequestId ? await getById(result.order.designRequestId) : null;
+          const { ensureTeamOrderDiscordThread } = await import("@/lib/team-orders");
+          const discordThreadId = await ensureTeamOrderDiscordThread(result.order.id);
           // Itemized breakdown so the ping is self-explanatory: who was added,
           // and exactly why the total is what it is (goods + tax + shipping).
           const money = (c: number) => `$${(c / 100).toFixed(2)}`;
@@ -144,7 +143,7 @@ export async function POST(req: Request) {
             teamName: `➕ ${result.order.teamName}`,
             totalCents: paidTotal,
             stage: "balance",
-            designThreadId: design?.discordThreadId,
+            designThreadId: discordThreadId,
             details,
           });
           // Tell the designer to add these pieces to the print file (posts in
@@ -153,7 +152,7 @@ export async function POST(req: Request) {
             reference: result.order.reference,
             teamName: result.order.teamName,
             rows: result.addon.rows,
-            designThreadId: design?.discordThreadId,
+            designThreadId: discordThreadId,
           });
           const buyerEmail = session.customer_details?.email ?? result.order.contactEmail;
           if (buyerEmail) {
@@ -223,9 +222,11 @@ export async function POST(req: Request) {
           )
           .where(eq(teamOrders.id, session.metadata.teamOrderId))
           .returning({
+            id: teamOrders.id,
             reference: teamOrders.reference,
             teamName: teamOrders.teamName,
             designRequestId: teamOrders.designRequestId,
+            discordThreadId: teamOrders.discordThreadId,
             contactEmail: teamOrders.contactEmail,
           });
         if (row) {
@@ -242,17 +243,17 @@ export async function POST(req: Request) {
               await redeemCredit(row.contactEmail, applied);
             }
           } catch (e) { console.error("referral settle (team invoice) failed:", e); }
-          const { getById } = await import("@/lib/design-requests");
-          const design = row.designRequestId ? await getById(row.designRequestId) : null;
+          const { ensureTeamOrderDiscordThread } = await import("@/lib/team-orders");
+          const discordThreadId = await ensureTeamOrderDiscordThread(row.id);
           await postTeamOrderPaidToDiscord({
             reference: row.reference,
             teamName: row.teamName,
             totalCents: session.amount_total ?? 0,
             stage: isDeposit ? "deposit" : "balance",
-            designThreadId: design?.discordThreadId,
+            designThreadId: discordThreadId,
           });
           const { setThreadStageTag } = await import("@/lib/discord-bot");
-          await setThreadStageTag(design?.discordThreadId, isDeposit ? "💰 Deposit Paid" : "💸 Paid in Full");
+          await setThreadStageTag(discordThreadId, isDeposit ? "💰 Deposit Paid" : "💸 Paid in Full");
           // Confirm payment to the customer and point them to their portal so
           // they know where to track the order from here.
           if (row.contactEmail) {

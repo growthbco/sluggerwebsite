@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { autoInvoiceOnSubmit } from "@/lib/team-order-invoicing";
 import { dbEnabled } from "@/db";
-import { getByManageToken, getRoster, submitTeamOrder } from "@/lib/team-orders";
+import { getByManageToken, getRoster, submitTeamOrder, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { minPiecesForItems } from "@/lib/order-items";
 import { postTeamOrderToDiscord } from "@/lib/discord";
 import { markOrdered, getById, approvedMockupImages } from "@/lib/design-requests";
@@ -11,7 +11,7 @@ import { setThreadStageTag } from "@/lib/discord-bot";
 export const runtime = "nodejs";
 
 // Coach submits the order via their private manage link: locks self-entry and
-// posts the final roster to #team-orders.
+// posts the final roster into the order's Design Requests forum thread.
 export async function POST(_req: Request, { params }: { params: Promise<{ token: string }> }) {
   if (!dbEnabled()) {
     return NextResponse.json({ error: "Database not configured" }, { status: 503 });
@@ -58,7 +58,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ token:
   try {
     await submitTeamOrder(order.id);
     // Linked orders post into the design's existing thread (one project, one
-    // thread); standalone orders go to #team-orders.
+    // thread); standalone orders get their own thread in the same forum.
+    const discordThreadId = await ensureTeamOrderDiscordThread(order.id);
     await postTeamOrderToDiscord(
       {
         reference: order.reference,
@@ -80,7 +81,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ token:
           notes: r.notes ?? undefined,
         })),
       },
-      { designThreadId: design?.discordThreadId },
+      { designThreadId: discordThreadId },
     );
     // If this team order is linked to a design request, flip the design to
     // "ordered" so the funnel reflects the linked outcome.
@@ -88,7 +89,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ token:
       try { await markOrdered(order.designRequestId); } catch (e) { console.error("markOrdered failed:", e); }
     }
 
-    await setThreadStageTag(design?.discordThreadId, "📋 Roster In");
+    await setThreadStageTag(discordThreadId, "📋 Roster In");
     // Roster in → deposit invoice goes out by itself (print-file QA comes
     // after; production only starts once the deposit is paid).
     waitUntil(autoInvoiceOnSubmit(order.id));

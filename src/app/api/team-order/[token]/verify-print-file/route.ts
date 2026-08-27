@@ -4,9 +4,9 @@ import {
   getByManageToken,
   getRoster,
   savePrintFileVerification,
+  ensureTeamOrderDiscordThread,
 } from "@/lib/team-orders";
 import { verifyPrintFiles, type RosterEntry } from "@/lib/print-file-verifier";
-import { getById as getDesignById } from "@/lib/design-requests";
 import { postDesignThreadUpdate } from "@/lib/discord";
 
 export const runtime = "nodejs";
@@ -76,11 +76,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       }
     }
 
-    // Post to the linked design Discord thread (if any) so the designer/team
-    // get an auditable "Print file verified" message.
-    if (order.designRequestId) {
-      const design = await getDesignById(order.designRequestId);
-      if (design?.discordThreadId) {
+    // Keep the QA audit in this order's persistent Design Requests thread.
+    {
+      const discordThreadId = await ensureTeamOrderDiscordThread(order.id);
+      if (discordThreadId) {
         const fields = result.ok
           ? [{ name: "Result", value: `✅ ${result.summary}`, inline: false }]
           : [
@@ -94,7 +93,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         const scopeNote = addonsOnly ? " [add-ons only]" : "";
         const against = addonsOnly ? "the added pieces" : "the submitted roster";
         await postDesignThreadUpdate({
-          threadId: design.discordThreadId,
+          threadId: discordThreadId,
           title: result.ok
             ? `🔍 Print file verified${scopeNote} - ${order.teamName} (${order.reference})`
             : `🔍 Print file QA${scopeNote} - ${order.teamName} (${order.reference})`,

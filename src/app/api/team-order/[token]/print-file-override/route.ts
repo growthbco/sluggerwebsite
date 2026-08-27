@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
-import { getByManageToken } from "@/lib/team-orders";
-import { getById as getDesignById } from "@/lib/design-requests";
+import { getByManageToken, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { postDesignThreadUpdate } from "@/lib/discord";
 
 export const runtime = "nodejs";
@@ -46,11 +45,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     .where(eq(teamOrders.id, order.id));
 
   // Note the manual sign-off in the design thread for the audit trail.
-  if (clearedByOverride && order.designRequestId) {
-    const design = await getDesignById(order.designRequestId);
-    if (design?.discordThreadId) {
+  if (clearedByOverride) {
+    const discordThreadId = await ensureTeamOrderDiscordThread(order.id);
+    if (discordThreadId) {
       await postDesignThreadUpdate({
-        threadId: design.discordThreadId,
+        threadId: discordThreadId,
         title: `✍️ Print file manually approved - ${order.teamName} (${order.reference})`,
         description: `Staff reviewed ${dismissed.length} AI-flagged item${dismissed.length === 1 ? "" : "s"} and marked ${dismissed.length === 1 ? "it" : "them"} correct. Clear for production.`,
         username: "Slugger Print QA",

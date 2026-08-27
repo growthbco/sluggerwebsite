@@ -33,7 +33,7 @@ import { getDb } from "@/db";
 import { teamOrders, designRequests } from "@/db/schema";
 import { and, eq, ne, isNull, isNotNull, or, lt, sql } from "drizzle-orm";
 import { getLiveTracking } from "@/lib/shippo";
-import { getById as getDesignById } from "@/lib/design-requests";
+import { ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -203,7 +203,7 @@ export async function GET(req: Request) {
   {
     const sdb = getDb();
     const stuck = await sdb
-      .select({ id: teamOrders.id, reference: teamOrders.reference, teamName: teamOrders.teamName, designRequestId: teamOrders.designRequestId })
+      .select({ id: teamOrders.id, reference: teamOrders.reference, teamName: teamOrders.teamName })
       .from(teamOrders)
       .where(
         and(
@@ -211,7 +211,6 @@ export async function GET(req: Request) {
           isNull(teamOrders.invoiceUrl),
           isNull(teamOrders.depositPaidAt),
           isNull(teamOrders.archivedAt),
-          isNotNull(teamOrders.designRequestId),
           sql`${teamOrders.createdAt} < now() - interval '2 hours'`,
         ),
       );
@@ -221,8 +220,7 @@ export async function GET(req: Request) {
         const res = await sendTeamOrderInvoice({ teamOrderId: o.id, stage: "deposit" });
         stuckInvoiceResults.push({ reference: o.reference, team: o.teamName, sent: res.ok, error: res.ok ? undefined : res.error });
         if (res.ok) {
-          let threadId: string | null = null;
-          if (o.designRequestId) { try { threadId = (await getDesignById(o.designRequestId))?.discordThreadId ?? null; } catch {} }
+          const threadId = await ensureTeamOrderDiscordThread(o.id);
           await postDesignThreadUpdate({
             threadId: threadId ?? undefined,
             title: `🧾 Safety net: sent the missing deposit invoice - ${o.teamName} (${o.reference})`,
@@ -299,10 +297,10 @@ export async function GET(req: Request) {
         inboundResults.push({ reference: o.reference, team: o.teamName, status: live.status });
         continue;
       }
-      const design = o.designRequestId ? await getDesignById(o.designRequestId) : null;
+      const threadId = await ensureTeamOrderDiscordThread(o.id);
       const days = Math.floor((labelStalled ? addedAge : scanAge!) / 86400000);
       const nudged = await postDesignThreadUpdate({
-        threadId: design?.discordThreadId,
+        threadId: threadId ?? undefined,
         title: `🚨 Inbound shipment not moving - ${o.teamName} (${o.reference})`,
         description: labelStalled
           ? `The ${o.inboundCarrier ?? ""} label for this order was created **${days} day${days === 1 ? "" : "s"} ago** but the carrier still has NOT received the package. Please drop it off or reply here with what's holding it up.`

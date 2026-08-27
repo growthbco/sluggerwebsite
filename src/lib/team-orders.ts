@@ -23,6 +23,8 @@ export type NewTeamOrder = {
   jerseyMaterial?: string;
   items?: string[];
   designRequestId?: string;
+  /** Discord home for this order. Usually the linked design's forum thread. */
+  discordThreadId?: string;
   // Inherited from a rush design request: flags the flat $100 rush order fee.
   rushShipping?: boolean;
   // Active SMS opt-in checked on the order form.
@@ -67,6 +69,7 @@ export async function createTeamOrder(input: NewTeamOrder) {
       jerseyMaterial: input.jerseyMaterial ?? fabricForStyle(input.jerseyStyle),
       items: input.items?.length ? input.items : ["jersey"],
       designRequestId: input.designRequestId,
+      discordThreadId: input.discordThreadId,
       rushShipping: input.rushShipping ?? false,
       requiresNames: input.requiresNames ?? defaultRequiresNames(input.items),
       smsOptInAt: input.smsOptIn ? new Date() : undefined,
@@ -96,6 +99,63 @@ export async function getByManageToken(token: string) {
   const db = getDb();
   const [row] = await db.select().from(teamOrders).where(eq(teamOrders.manageToken, token)).limit(1);
   return row ?? null;
+}
+
+/** Resolve the single Discord home for a custom order.
+ *
+ * Linked orders reuse their design request's thread. Standalone/manual orders
+ * get their own thread in the Design Requests forum. The result is persisted
+ * on team_orders so payments, add-ons, QA, notes, and shipping never have to
+ * guess a destination or create duplicate posts. */
+export async function ensureTeamOrderDiscordThread(orderId: string): Promise<string | null> {
+  const db = getDb();
+  const [order] = await db
+    .select({
+      id: teamOrders.id,
+      reference: teamOrders.reference,
+      teamName: teamOrders.teamName,
+      designRequestId: teamOrders.designRequestId,
+      discordThreadId: teamOrders.discordThreadId,
+    })
+    .from(teamOrders)
+    .where(eq(teamOrders.id, orderId))
+    .limit(1);
+  if (!order) return null;
+  if (order.discordThreadId) return order.discordThreadId;
+
+  let threadId: string | null = null;
+  if (order.designRequestId) {
+    const [design] = await db
+      .select({ discordThreadId: designRequests.discordThreadId })
+      .from(designRequests)
+      .where(eq(designRequests.id, order.designRequestId))
+      .limit(1);
+    threadId = design?.discordThreadId ?? null;
+  }
+
+  if (!threadId) {
+    const { createDesignThread } = await import("@/lib/discord");
+    threadId = await createDesignThread({
+      title: `${order.teamName} (${order.reference})`,
+      description: order.designRequestId
+        ? "Custom order linked to this design request."
+        : "Custom order entered without a prior website design request.",
+    });
+    if (threadId && order.designRequestId) {
+      await db
+        .update(designRequests)
+        .set({ discordThreadId: threadId, updatedAt: new Date() })
+        .where(eq(designRequests.id, order.designRequestId));
+    }
+  }
+
+  if (threadId) {
+    await db
+      .update(teamOrders)
+      .set({ discordThreadId: threadId, updatedAt: new Date() })
+      .where(eq(teamOrders.id, order.id));
+  }
+  return threadId;
 }
 
 /** The team order (if any) that fulfills a given design request. Used by the

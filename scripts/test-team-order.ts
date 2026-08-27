@@ -1,4 +1,4 @@
-// One-off: posts a sample roster to the #team-orders channel to verify the webhook.
+// One-off: posts a sample roster to the Design Requests forum to verify the webhook.
 import { config } from "dotenv";
 config({ path: ".env.local" });
 import { postTeamOrderToDiscord } from "../src/lib/discord";

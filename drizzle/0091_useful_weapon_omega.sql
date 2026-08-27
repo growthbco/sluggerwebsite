@@ -1,0 +1,1 @@
+ALTER TABLE "team_orders" ADD COLUMN "discord_thread_id" text;

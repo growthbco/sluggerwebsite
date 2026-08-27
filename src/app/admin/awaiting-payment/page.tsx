@@ -10,8 +10,6 @@ import { AdminAwaitingList, type Unpaid } from "@/components/admin-awaiting-list
 export const metadata: Metadata = { title: "Awaiting Payment", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
-const money = (c: number) => `$${(c / 100).toFixed(2)}`;
-
 // One place for every invoice that's out the door but not yet paid: team-order
 // deposits/balances, pending add-on invoices, and unpaid custom invoices.
 export default async function AdminAwaitingPaymentPage() {
@@ -126,20 +124,23 @@ export default async function AdminAwaitingPaymentPage() {
     });
   }
 
-  items.sort((a, b) => +new Date(b.sinceISO) - +new Date(a.sinceISO));
-  const total = items.reduce((s, i) => s + i.amountCents, 0);
+  // Oldest receivables deserve attention first. The client keeps this order
+  // when the list is searched or filtered.
+  items.sort((a, b) => +new Date(a.sinceISO) - +new Date(b.sinceISO));
 
   return (
-    <div className="mx-auto max-w-4xl px-4 sm:px-6 py-10">
-      <AdminPageHeader eyebrow="Financials" title={`Awaiting Payment (${items.length})`}>
-        <p className="display text-2xl text-amber-300 tabular-nums">{money(total)} <span className="text-sm text-muted">due</span></p>
-      </AdminPageHeader>
-      <p className="mt-2 text-muted text-sm">Every invoice that&apos;s out the door with money still due - team-order deposits &amp; balances, add-on invoices, and custom invoices. Click a row to open it.</p>
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <AdminPageHeader eyebrow="Financials" title="Awaiting payment" />
+      <p className="-mt-3 max-w-2xl text-sm leading-6 text-muted">
+        Track every sent invoice with money still due. Older balances appear first so the next follow-up is easy to spot.
+      </p>
 
-      <div className="mt-6">
-        <AdminAwaitingList items={items} />
+      <div className="mt-7">
+        <AdminAwaitingList items={items} generatedAtISO={new Date().toISOString()} />
       </div>
-      <p className="mt-4 text-xs text-muted">Team-order reminder emails/texts go out automatically after 3 days, then 4 more (max 2 per invoice). Void a custom invoice to remove it (e.g. after combining it into another).</p>
+      <p className="mt-5 max-w-3xl text-xs leading-5 text-muted">
+        Team-order reminders go out automatically after 3 days, then once more 4 days later. Void a custom invoice only after it has been replaced or combined.
+      </p>
     </div>
   );
 }

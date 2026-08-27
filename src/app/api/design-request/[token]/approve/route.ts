@@ -107,6 +107,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         ),
         items: itemsForDesign(request),
         designRequestId: request.id,
+        discordThreadId: request.discordThreadId ?? undefined,
         rushShipping: Boolean(request.rush),
         smsOptIn: Boolean(request.smsOptInAt),
       });

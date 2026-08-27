@@ -505,6 +505,10 @@ export const teamOrders = pgTable(
 
     // Optional link back to the design request this team order fulfills.
     designRequestId: uuid("design_request_id"),
+    // Canonical Discord thread for this order. Usually copied from the linked
+    // design request, but standalone/manual orders can own a thread in the
+    // Design Requests forum without inventing a design-request DB record.
+    discordThreadId: text("discord_thread_id"),
 
     quotedTotalCents: integer("quoted_total_cents"),
     // Two-stage invoicing: a 50% deposit starts production; the balance is

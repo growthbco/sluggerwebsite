@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
-import { getByManageToken, getPrintableJerseys, markJerseysVerified } from "@/lib/team-orders";
+import { getByManageToken, getPrintableJerseys, markJerseysVerified, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { verifyPrintFiles, type RosterEntry } from "@/lib/print-file-verifier";
 import { getById as getDesignById } from "@/lib/design-requests";
 import { postDesignThreadUpdate } from "@/lib/discord";
@@ -39,13 +39,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       await markJerseysVerified(order.id, rowIds, printFileUrls[0]);
     }
 
-    if (order.designRequestId) {
-      const design = await getDesignById(order.designRequestId);
-      if (design?.discordThreadId) {
+    {
+      const design = order.designRequestId ? await getDesignById(order.designRequestId) : null;
+      const discordThreadId = await ensureTeamOrderDiscordThread(order.id);
+      if (discordThreadId) {
         const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
-        const link = design.manageToken ? `\n\n🔗 [Open this order](${SITE}/design/manage/${design.manageToken})` : "";
+        const link = design?.manageToken
+          ? `\n\n🔗 [Open this order](${SITE}/design/manage/${design.manageToken})`
+          : order.manageToken
+            ? `\n\n🔗 [Open this order](${SITE}/team-order/manage/${order.manageToken})`
+            : "";
         await postDesignThreadUpdate({
-          threadId: design.discordThreadId,
+          threadId: discordThreadId,
           title: result.ok
             ? `🔍 ${roster.length} jersey${roster.length === 1 ? "" : "s"} verified - ${order.teamName} (${order.reference})`
             : `🔍 Print file QA - ${order.teamName} (${order.reference})`,

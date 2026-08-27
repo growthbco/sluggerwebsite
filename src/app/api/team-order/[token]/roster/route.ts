@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
-import { getByManageToken, updateRosterRow, deleteRosterRow } from "@/lib/team-orders";
-import { getById as getDesignById } from "@/lib/design-requests";
+import { getByManageToken, updateRosterRow, deleteRosterRow, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { postDesignThreadUpdate } from "@/lib/discord";
 
 export const runtime = "nodejs";
@@ -16,13 +15,12 @@ function pingStaff(order: Awaited<ReturnType<typeof getByManageToken>>, summary:
   if (!order) return;
   void (async () => {
     try {
-      const design = order.designRequestId ? await getDesignById(order.designRequestId) : null;
       await postDesignThreadUpdate({
-        threadId: design?.discordThreadId ?? undefined,
+        threadId: (await ensureTeamOrderDiscordThread(order.id)) ?? undefined,
         title: `✏️ Roster change by coach - ${order.teamName} (${order.reference})`,
         description: `${summary}\n\nThe coach edited the roster from their manage link after the order was submitted. Re-check the print file for the affected jersey before it goes to production.`,
         mention: true,
-        username: "Slugger Team Orders",
+        username: "Slugger Custom Orders",
       });
     } catch (e) {
       console.error("roster-change ping failed:", e);

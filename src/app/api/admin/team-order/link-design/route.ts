@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
 import { isAdmin } from "@/lib/admin-auth";
-import { getRoster } from "@/lib/team-orders";
+import { getRoster, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { getById, markOrdered, approvedMockupImages } from "@/lib/design-requests";
 import { postTeamOrderToDiscord } from "@/lib/discord";
 import { setThreadStageTag } from "@/lib/discord-bot";
@@ -31,7 +31,10 @@ export async function POST(req: Request) {
   const design = await getById(body.designRequestId);
   if (!design) return NextResponse.json({ error: "Design not found" }, { status: 404 });
 
-  await db.update(teamOrders).set({ designRequestId: design.id, updatedAt: new Date() }).where(eq(teamOrders.id, order.id));
+  await db
+    .update(teamOrders)
+    .set({ designRequestId: design.id, discordThreadId: design.discordThreadId, updatedAt: new Date() })
+    .where(eq(teamOrders.id, order.id));
 
   // Best-effort: mark the design ordered + drop the roster into its thread so
   // the whole project is together in Discord.
@@ -42,6 +45,7 @@ export async function POST(req: Request) {
   }
   try {
     const roster = await getRoster(order.id);
+    const discordThreadId = await ensureTeamOrderDiscordThread(order.id);
     await postTeamOrderToDiscord(
       {
         reference: order.reference,
@@ -63,9 +67,9 @@ export async function POST(req: Request) {
           notes: r.notes ?? undefined,
         })),
       },
-      { designThreadId: design.discordThreadId },
+      { designThreadId: discordThreadId },
     );
-    await setThreadStageTag(design.discordThreadId, "📋 Roster In");
+    await setThreadStageTag(discordThreadId, "📋 Roster In");
   } catch (e) {
     console.error("link Discord post failed:", e);
   }

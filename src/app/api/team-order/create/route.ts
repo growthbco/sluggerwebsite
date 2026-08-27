@@ -27,11 +27,13 @@ export async function POST(req: Request) {
   let contactEmail = body.contactEmail;
   let contactPhone = body.contactPhone;
   let designRequestId: string | undefined;
+  let discordThreadId: string | undefined;
   let rushFromDesign = false;
   if (body.designToken) {
     const design = await getByStatusToken(body.designToken);
     if (design && design.status !== "cancelled") {
       designRequestId = design.id;
+      discordThreadId = design.discordThreadId ?? undefined;
       rushFromDesign = Boolean(design.rush);
       if (design.status === "approved" || design.status === "ordered") {
         teamName = design.teamName;
@@ -48,6 +50,7 @@ export async function POST(req: Request) {
     const design = await findActiveDesignByEmail(body.contactEmail);
     if (design) {
       designRequestId = design.id;
+      discordThreadId = design.discordThreadId ?? undefined;
       rushFromDesign = Boolean(design.rush);
     }
   }
@@ -83,6 +86,7 @@ export async function POST(req: Request) {
       jerseyMaterial: body.jerseyMaterial,
       items: body.items,
       designRequestId,
+      discordThreadId,
       rushShipping: rushFromDesign,
       smsOptIn: body.smsConsent === true && Boolean(contactPhone),
     });

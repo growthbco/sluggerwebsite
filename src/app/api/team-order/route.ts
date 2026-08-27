@@ -4,7 +4,7 @@ import { postTeamOrderToDiscord } from "@/lib/discord";
 import { setThreadStageTag } from "@/lib/discord-bot";
 import { dbEnabled } from "@/db";
 import { getByStatusToken, findActiveDesignByEmail, markOrdered, approvedMockupImages } from "@/lib/design-requests";
-import { createTeamOrder, addRosterRow, submitTeamOrder } from "@/lib/team-orders";
+import { createTeamOrder, addRosterRow, submitTeamOrder, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { autoInvoiceOnSubmit } from "@/lib/team-order-invoicing";
 
 export const runtime = "nodejs";
@@ -121,6 +121,7 @@ export async function POST(req: Request) {
           jerseyMaterial: body.jerseyMaterial,
           items,
           designRequestId: design?.id,
+          discordThreadId: design?.discordThreadId ?? undefined,
           rushShipping: design?.rush ?? false,
           smsOptIn: (body.smsConsent === true && Boolean(contactPhone)) || Boolean(design?.smsOptInAt),
         });
@@ -179,6 +180,7 @@ export async function POST(req: Request) {
 
     // 2. Notify (never the source of truth). Linked orders post into the
     // design's existing thread so the whole project stays in one place.
+    const discordThreadId = await ensureTeamOrderDiscordThread(created.id);
     const posted = await postTeamOrderToDiscord(
       {
         reference: created.reference,
@@ -202,10 +204,10 @@ export async function POST(req: Request) {
           ? `${process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com"}/design/manage/${design.manageToken}`
           : `${process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com"}/team-order/manage/${created.manageToken}`,
       },
-      { designThreadId: design?.discordThreadId },
+      { designThreadId: discordThreadId },
     );
 
-    await setThreadStageTag(design?.discordThreadId, "📋 Roster In");
+    await setThreadStageTag(discordThreadId, "📋 Roster In");
 
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     return NextResponse.json({

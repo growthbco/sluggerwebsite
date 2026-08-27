@@ -8,7 +8,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
-import { getRoster, invoiceRosterEntries } from "@/lib/team-orders";
+import { getRoster, invoiceRosterEntries, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { computeTeamOrderQuote, estimateOrderParcelsOz } from "@/lib/team-order-pricing";
 import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 import { emailTeamOrderInvoice } from "@/lib/email";
@@ -102,15 +102,22 @@ export async function sendTeamOrderInvoice(opts: {
   };
   const wantShip = stage === "balance" && (opts.ship ? opts.ship !== "pickup" : !order.localPickup);
   if (wantShip) {
-    const parcels = parcelsFor();
-    if (parcels.length > 0) {
-      const zip = order.shippingAddress?.postalCode;
-      if (!zip) {
-        return { ok: false as const, error: "No shipping address on file - collect one or use local pickup.", status: 409 };
-      }
-      const { quoteShippingCents } = await import("@/lib/ship-quote");
-      for (const w of parcels) {
-        shipCents += (await quoteShippingCents(zip, w)).chargedCents;
+    // A pre-set amount is an intentional staff override (for example, a
+    // customer-approved rush shipment). Preserve it when the final invoice is
+    // generated instead of silently replacing it with the normal ground quote.
+    if (order.shippingChargedCents != null && !opts.shipWeightOz) {
+      shipCents = order.shippingChargedCents;
+    } else {
+      const parcels = parcelsFor();
+      if (parcels.length > 0) {
+        const zip = order.shippingAddress?.postalCode;
+        if (!zip) {
+          return { ok: false as const, error: "No shipping address on file - collect one or use local pickup.", status: 409 };
+        }
+        const { quoteShippingCents } = await import("@/lib/ship-quote");
+        for (const w of parcels) {
+          shipCents += (await quoteShippingCents(zip, w)).chargedCents;
+        }
       }
     }
   }
@@ -288,7 +295,7 @@ export async function autoInvoiceOnSubmit(teamOrderId: string): Promise<void> {
     if (!stripeEnabled()) return;
     const db = getDb();
     const [o] = await db
-      .select({ id: teamOrders.id, reference: teamOrders.reference, teamName: teamOrders.teamName, status: teamOrders.status, invoiceUrl: teamOrders.invoiceUrl, depositPaidAt: teamOrders.depositPaidAt, designRequestId: teamOrders.designRequestId })
+      .select({ id: teamOrders.id, reference: teamOrders.reference, teamName: teamOrders.teamName, status: teamOrders.status, invoiceUrl: teamOrders.invoiceUrl, depositPaidAt: teamOrders.depositPaidAt })
       .from(teamOrders)
       .where(eq(teamOrders.id, teamOrderId))
       .limit(1);
@@ -296,15 +303,8 @@ export async function autoInvoiceOnSubmit(teamOrderId: string): Promise<void> {
 
     const result = await sendTeamOrderInvoice({ teamOrderId, stage: "deposit" });
 
-    // Log the outcome into the project's Discord thread (linked designs only -
-    // standalone orders already posted their roster embed moments ago).
-    let threadId: string | null = null;
-    if (o.designRequestId) {
-      try {
-        const { getById } = await import("@/lib/design-requests");
-        threadId = (await getById(o.designRequestId))?.discordThreadId ?? null;
-      } catch {}
-    }
+    // Log the outcome in the same Design Requests thread as the roster.
+    const threadId = await ensureTeamOrderDiscordThread(o.id);
     const { postDesignThreadUpdate } = await import("@/lib/discord");
     const money = (c: number) => `$${(c / 100).toFixed(2)}`;
     if (result.ok) {

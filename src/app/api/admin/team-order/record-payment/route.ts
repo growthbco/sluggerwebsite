@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
-import { getRoster } from "@/lib/team-orders";
+import { getRoster, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
 import { postTeamOrderPaidToDiscord } from "@/lib/discord";
-import { getById as getDesignById } from "@/lib/design-requests";
 import { setThreadStageTag } from "@/lib/discord-bot";
 import { requireApiRole } from "@/lib/admin-auth";
 
@@ -86,13 +85,13 @@ export async function POST(req: Request) {
 
   // Same Discord moment a Stripe payment gets, plus a heads-up that any
   // previously emailed Stripe links are now stale.
-  const design = order.designRequestId ? await getDesignById(order.designRequestId) : null;
+  const discordThreadId = await ensureTeamOrderDiscordThread(order.id);
   await postTeamOrderPaidToDiscord({
     reference: order.reference,
     teamName: order.teamName,
     totalCents: paidCents,
     stage: stage === "deposit" ? "deposit" : "balance",
-    designThreadId: design?.discordThreadId,
+    designThreadId: discordThreadId,
     details: `Recorded manually by staff - paid via **${method}** (not Stripe).${
       order.invoiceUrl || order.balanceInvoiceUrl
         ? " A Stripe invoice link was previously sent - let the customer know to ignore it."
@@ -100,7 +99,7 @@ export async function POST(req: Request) {
     }`,
   });
 
-  await setThreadStageTag(design?.discordThreadId, stage === "deposit" ? "💰 Deposit Paid" : "💸 Paid in Full");
+  await setThreadStageTag(discordThreadId, stage === "deposit" ? "💰 Deposit Paid" : "💸 Paid in Full");
 
   return NextResponse.json({ ok: true, stage, method, paidCents, paymentNote });
 }

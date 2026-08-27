@@ -31,20 +31,9 @@ export async function POST(req: Request) {
   // Move the design thread's stage tag along. Best-effort.
   if (body.kind === "team_order") {
     try {
-      const { getDb } = await import("@/db");
-      const { teamOrders } = await import("@/db/schema");
-      const { eq } = await import("drizzle-orm");
-      const [o] = await getDb()
-        .select({ designRequestId: teamOrders.designRequestId })
-        .from(teamOrders)
-        .where(eq(teamOrders.id, body.id))
-        .limit(1);
-      if (o?.designRequestId) {
-        const { getById } = await import("@/lib/design-requests");
-        const design = await getById(o.designRequestId);
-        const { setThreadStageTag } = await import("@/lib/discord-bot");
-        await setThreadStageTag(design?.discordThreadId, "🚚 Shipped");
-      }
+      const { ensureTeamOrderDiscordThread } = await import("@/lib/team-orders");
+      const { setThreadStageTag } = await import("@/lib/discord-bot");
+      await setThreadStageTag(await ensureTeamOrderDiscordThread(body.id), "🚚 Shipped");
     } catch (e) {
       console.error("ship stage tag failed:", e);
     }

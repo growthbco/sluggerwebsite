@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { and, eq, isNull, ne, inArray } from "drizzle-orm";
+import { and, isNull, ne, inArray } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
-import { getByManageToken, saveInboundTracking } from "@/lib/team-orders";
-import { getById as getDesignById } from "@/lib/design-requests";
+import { getByManageToken, saveInboundTracking, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { INBOUND_CARRIERS, inboundTrackingUrlFor } from "@/lib/tracking";
 import { emailInboundShipment } from "@/lib/email";
 import { postDesignThreadUpdate } from "@/lib/discord";
@@ -71,14 +70,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   // same tracking to each (validated against the open-candidate set so a
   // stale/shipped order can't be tagged by accident).
   const alsoIds = (Array.isArray(body.alsoOrderIds) ? body.alsoOrderIds : []).filter((x) => typeof x === "string").slice(0, 25);
-  const boxmates: { id: string; reference: string; teamName: string; designRequestId?: string | null }[] = [];
+  const boxmates: { id: string; reference: string; teamName: string }[] = [];
   if (alsoIds.length) {
     const candidates = await boxmateCandidates(order.id);
     const valid = candidates.filter((c) => alsoIds.includes(c.id));
     for (const c of valid) {
       await saveInboundTracking(c.id, trackingNumber, carrier);
-      const [full] = await getDb().select({ designRequestId: teamOrders.designRequestId }).from(teamOrders).where(eq(teamOrders.id, c.id)).limit(1);
-      boxmates.push({ ...c, designRequestId: full?.designRequestId });
+      boxmates.push(c);
     }
   }
 
@@ -97,10 +95,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   }
   const boxNote = allRefs.length > 1 ? `\nThis box also contains: ${allRefs.join(", ")}.` : "";
   for (const target of [order, ...boxmates]) {
-    if (!target.designRequestId) continue;
-    const design = await getDesignById(target.designRequestId);
     await postDesignThreadUpdate({
-      threadId: design?.discordThreadId,
+      threadId: (await ensureTeamOrderDiscordThread(target.id)) ?? undefined,
       title: `📦 Inbound shipment - ${target.teamName} (${target.reference})`,
       description: `Production order is on the way to the shop.\n[${carrier} ${trackingNumber}](${trackingUrl})${boxNote}`,
       mention: notify,

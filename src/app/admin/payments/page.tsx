@@ -12,8 +12,17 @@ export const dynamic = "force-dynamic";
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
-// Every dollar in, as a single filterable ledger: team-order deposits and
-// balances, paid add-ons, custom invoices, and store/shop purchases.
+function offlineMethod(note: string | null, stages: string[]): string | null {
+  const lines = (note ?? "").split(";").map((line) => line.trim());
+  for (const line of lines) {
+    const match = line.match(/^(deposit|balance|full) via ([^-]+?)\s*-/i);
+    if (match && stages.includes(match[1].toLowerCase())) return match[2].trim();
+  }
+  return null;
+}
+
+// Recorded payment activity in one filterable view: team-order deposits and
+// balances, paid add-ons, custom invoices, and store/shop order totals.
 export default async function AdminTransactionsPage() {
   if (!adminEnabled()) redirect("/admin");
   const session = await getAdminSession();
@@ -39,15 +48,14 @@ export default async function AdminTransactionsPage() {
       })
       .from(teamOrders),
     db
-      .select({ teamOrderId: teamOrderAddons.teamOrderId, rows: teamOrderAddons.rows, paidAt: teamOrderAddons.paidAt, totalCents: teamOrderAddons.totalCents, paidTotalCents: teamOrderAddons.paidTotalCents })
+      .select({ id: teamOrderAddons.id, teamOrderId: teamOrderAddons.teamOrderId, rows: teamOrderAddons.rows, paidAt: teamOrderAddons.paidAt, totalCents: teamOrderAddons.totalCents, paidTotalCents: teamOrderAddons.paidTotalCents })
       .from(teamOrderAddons)
       .where(eq(teamOrderAddons.status, "paid")),
-    db.select().from(customInvoices).orderBy(desc(customInvoices.createdAt)).limit(200),
+    db.select().from(customInvoices).orderBy(desc(customInvoices.createdAt)),
     db
-      .select({ reference: orders.reference, type: orders.type, status: orders.status, customerName: orders.customerName, totalCents: orders.totalCents, createdAt: orders.createdAt, teamId: orders.teamId })
+      .select({ id: orders.id, reference: orders.reference, type: orders.type, status: orders.status, customerName: orders.customerName, customerEmail: orders.customerEmail, totalCents: orders.totalCents, createdAt: orders.createdAt, teamId: orders.teamId, addSessionIds: orders.addSessionIds })
       .from(orders)
-      .orderBy(desc(orders.createdAt))
-      .limit(400),
+      .orderBy(desc(orders.createdAt)),
     db.select({ id: teams.id, name: teams.name }).from(teams),
   ]);
 
@@ -56,18 +64,40 @@ export default async function AdminTransactionsPage() {
   const txns: Txn[] = [];
 
   for (const t of torders) {
-    // "Offline" ONLY when the money was recorded via the manual Record-Payment
-    // flow (its note reads "<stage> via <method> - $X (date)"). A free-form note
-    // like a delivery hand-off note must NOT mislabel a real Stripe payment.
-    const offline = / via /.test(t.paymentNote ?? "");
     const total = t.quotedTotalCents ?? 0;
     const dep = t.depositCents ?? Math.round(total / 2);
     const paidInFull = Boolean(t.invoicePaidAt && t.depositPaidAt && Math.abs(+t.invoicePaidAt - +t.depositPaidAt) < 60000);
     if (t.depositPaidAt && !paidInFull && dep > 0) {
-      txns.push({ at: t.depositPaidAt.toISOString(), customer: t.teamName.trim() || t.contactName, email: t.contactEmail, ref: t.reference, kind: "Deposit", amountCents: dep, method: offline ? "Offline" : "Stripe" });
+      const manual = offlineMethod(t.paymentNote, ["deposit"]);
+      txns.push({
+        id: `team-${t.id}-deposit`,
+        at: t.depositPaidAt.toISOString(),
+        customer: t.teamName.trim() || t.contactName,
+        email: t.contactEmail,
+        ref: t.reference,
+        kind: "Deposit",
+        amountCents: dep,
+        method: manual ? "Offline" : "Stripe",
+        methodDetail: manual ?? undefined,
+        basis: "Goods",
+        href: `/admin/team-order/${t.id}`,
+      });
     }
     if (t.invoicePaidAt && (paidInFull ? total : total - dep) > 0) {
-      txns.push({ at: t.invoicePaidAt.toISOString(), customer: t.teamName.trim() || t.contactName, email: t.contactEmail, ref: t.reference, kind: paidInFull ? "Paid in full" : "Final balance", amountCents: paidInFull ? total : Math.max(0, total - dep), method: offline ? "Offline" : "Stripe" });
+      const manual = offlineMethod(t.paymentNote, paidInFull ? ["full"] : ["balance"]);
+      txns.push({
+        id: `team-${t.id}-${paidInFull ? "full" : "balance"}`,
+        at: t.invoicePaidAt.toISOString(),
+        customer: t.teamName.trim() || t.contactName,
+        email: t.contactEmail,
+        ref: t.reference,
+        kind: paidInFull ? "Paid in full" : "Final balance",
+        amountCents: paidInFull ? total : Math.max(0, total - dep),
+        method: manual ? "Offline" : "Stripe",
+        methodDetail: manual ?? undefined,
+        basis: "Goods",
+        href: `/admin/team-order/${t.id}`,
+      });
     }
   }
   for (const a of addons) {
@@ -79,69 +109,73 @@ export default async function AdminTransactionsPage() {
       (r) => `${r.quantity}x ${r.label} - ${[r.size, r.name?.toUpperCase(), r.number ? `#${r.number}` : null, r.design].filter(Boolean).join(" - ")} - ${money(r.unitPriceCents)}`,
     );
     detail.push(`Goods ${money(goods)}${paid > goods ? ` + tax/shipping ${money(paid - goods)}` : ""} = ${money(paid)}`);
-    txns.push({ at: a.paidAt.toISOString(), customer: t?.teamName.trim() ?? "Add-on", email: t?.contactEmail ?? null, ref: t?.reference ?? "-", kind: "Add-on", amountCents: paid, method: "Stripe", detail });
+    txns.push({ id: `addon-${a.id}`, at: a.paidAt.toISOString(), customer: t?.teamName.trim() ?? "Add-on", email: t?.contactEmail ?? null, ref: t?.reference ?? "-", kind: "Add-on", amountCents: paid, method: "Stripe", basis: "Checkout total", href: t ? `/admin/team-order/${t.id}` : null, detail });
   }
   for (const inv of invoices) {
     if (inv.status === "paid" && inv.paidAt) {
       const detail = (inv.lines ?? []).map((l) => `${l.quantity}x ${l.description ?? l.name ?? "Item"} - ${money(l.unitPriceCents ?? 0)}`);
-      txns.push({ at: inv.paidAt.toISOString(), customer: inv.customerName, email: inv.customerEmail, ref: inv.reference, kind: "Custom invoice", amountCents: inv.totalCents, method: "Stripe", detail: detail.length ? detail : undefined });
+      txns.push({ id: `invoice-${inv.id}`, at: inv.paidAt.toISOString(), customer: inv.customerName, email: inv.customerEmail, ref: inv.reference, kind: "Custom invoice", amountCents: inv.totalCents, method: "Stripe", basis: "Checkout total", href: null, detail: detail.length ? detail : undefined });
     }
   }
   for (const o of shopOrders) {
     if (o.status !== "paid" && o.status !== "fulfilled") continue;
     const customer = o.teamId ? `${storeNameById.get(o.teamId) ?? "Store"}${o.customerName ? ` · ${o.customerName}` : ""}` : (o.customerName ?? "Shop order");
-    txns.push({ at: o.createdAt.toISOString(), customer, ref: o.reference, kind: o.type === "team_store" ? "Team store" : o.type === "buy_in" ? "Buy-in" : "Shop", amountCents: o.totalCents, method: "Stripe" });
+    const detail = (o.addSessionIds?.length ?? 0) > 0
+      ? [`Cumulative order total includes ${o.addSessionIds!.length} later add-on payment${o.addSessionIds!.length === 1 ? "" : "s"}.`]
+      : undefined;
+    txns.push({ id: `order-${o.id}`, at: o.createdAt.toISOString(), customer, email: o.customerEmail, ref: o.reference, kind: o.type === "team_store" ? "Team store" : o.type === "buy_in" ? "Buy-in" : "Shop", amountCents: o.totalCents, method: "Stripe", basis: "Order total", href: `/admin/order/${o.id}`, detail });
   }
   txns.sort((a, b) => +new Date(b.at) - +new Date(a.at));
 
   // Margin roll-up over PAID-IN-FULL team orders: goods revenue vs the actual
   // designer cost recorded so far. Only orders with a recorded cost count toward
   // the margin %, so it fills in as costs get logged.
-  let paidRev = 0, recordedRev = 0, recordedCost = 0, recordedN = 0, paidN = 0;
+  let recordedRev = 0, recordedCost = 0, recordedN = 0, paidN = 0;
   for (const t of torders) {
     if (!t.invoicePaidAt) continue;
     const rev = t.quotedTotalCents ?? 0;
     if (rev <= 0) continue;
-    paidRev += rev; paidN++;
+    paidN++;
     if (t.designerCostCents != null) { recordedRev += rev; recordedCost += t.designerCostCents; recordedN++; }
   }
   const marginCents = recordedRev - recordedCost;
   const marginPct = recordedRev > 0 ? Math.round((marginCents / recordedRev) * 100) : 0;
+  const coveragePct = paidN > 0 ? Math.round((recordedN / paidN) * 100) : 0;
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
       <AdminPageHeader eyebrow="Financials" title="Transactions" />
-      <p className="mt-2 text-muted">Every dollar in - deposits, balances, add-ons, invoices, and store purchases · {txns.length} total</p>
+      <p className="-mt-3 max-w-2xl text-sm leading-6 text-muted">Review recorded payment activity, trace it back to the source order, and export the current view.</p>
 
-      {/* Real margin, as far as costs have been recorded. */}
-      <div className="mt-6 border border-line bg-steel p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="display text-lg text-foreground">Margin (paid team orders)</h2>
-          <span className="text-xs text-muted">{recordedN} of {paidN} orders have a recorded designer cost</span>
-        </div>
-        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-          <div>
-            <div className="text-xs display text-muted uppercase tracking-wide">Goods revenue (paid)</div>
-            <div className="display text-lg text-foreground tabular-nums">{money(paidRev)}</div>
-          </div>
-          <div>
-            <div className="text-xs display text-muted uppercase tracking-wide">Designer cost recorded</div>
-            <div className="display text-lg text-foreground tabular-nums">{money(recordedCost)}</div>
-          </div>
-          <div>
-            <div className="text-xs display text-muted uppercase tracking-wide">Gross margin (recorded)</div>
-            <div className={`display text-lg tabular-nums ${recordedRev > 0 ? (marginPct >= 45 ? "text-green-400" : marginPct >= 30 ? "text-amber-300" : "text-red-400") : "text-muted"}`}>{recordedRev > 0 ? money(marginCents) : "-"}</div>
-          </div>
-          <div>
-            <div className="text-xs display text-muted uppercase tracking-wide">Margin %</div>
-            <div className={`display text-lg tabular-nums ${recordedRev > 0 ? (marginPct >= 45 ? "text-green-400" : marginPct >= 30 ? "text-amber-300" : "text-red-400") : "text-muted"}`}>{recordedRev > 0 ? `${marginPct}%` : "-"}</div>
-          </div>
-        </div>
-        <p className="mt-2 text-[11px] text-muted/70">Goods only (tax + shipping excluded). Margin % covers only orders where you&apos;ve recorded the actual designer cost - open an order&apos;s Payment section to record it. Duty + inbound shipping aren&apos;t in estimates.</p>
+      <div className="mt-7">
+        <AdminTransactions txns={txns} generatedAtISO={new Date().toISOString()} />
       </div>
-      <div className="mt-6">
-        <AdminTransactions txns={txns} />
-      </div>
+
+      {/* Margin stays secondary to the ledger and compares like-for-like data:
+          only orders whose revenue and designer cost are both known. */}
+      <section className="mt-8 rounded-xl border border-line bg-steel/40 p-4 sm:p-5" aria-labelledby="margin-heading">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">Profitability</p>
+            <h2 id="margin-heading" className="mt-1 text-lg font-semibold text-foreground">Paid team-order margin snapshot</h2>
+          </div>
+          <span className={`rounded-full border px-2.5 py-1 text-xs ${coveragePct === 100 ? "border-green-500/30 bg-green-500/10 text-green-300" : "border-amber-500/30 bg-amber-500/10 text-amber-300"}`}>Cost coverage: {recordedN}/{paidN} orders ({coveragePct}%)</span>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[
+            { label: "Revenue with costs", value: recordedRev > 0 ? money(recordedRev) : "—", tone: "text-foreground" },
+            { label: "Designer cost", value: recordedRev > 0 ? money(recordedCost) : "—", tone: "text-foreground" },
+            { label: "Gross margin", value: recordedRev > 0 ? money(marginCents) : "—", tone: recordedRev > 0 ? (marginPct >= 45 ? "text-green-300" : marginPct >= 30 ? "text-amber-300" : "text-red-300") : "text-muted" },
+            { label: "Margin rate", value: recordedRev > 0 ? `${marginPct}%` : "—", tone: recordedRev > 0 ? (marginPct >= 45 ? "text-green-300" : marginPct >= 30 ? "text-amber-300" : "text-red-300") : "text-muted" },
+          ].map((metric) => (
+            <div key={metric.label} className="rounded-lg border border-line bg-ink/30 p-3">
+              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted">{metric.label}</p>
+              <p className={`mt-2 text-lg font-semibold tabular-nums ${metric.tone}`}>{metric.value}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs leading-5 text-muted">Margin compares goods revenue and designer cost only for the {recordedN} paid orders with a recorded cost. Tax, customer shipping, duty, and inbound shipping are excluded.</p>
+      </section>
     </div>
   );
 }

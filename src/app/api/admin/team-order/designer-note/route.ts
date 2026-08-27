@@ -5,6 +5,7 @@ import { teamOrders } from "@/db/schema";
 import { isAdmin } from "@/lib/admin-auth";
 import { getById } from "@/lib/design-requests";
 import { postDesignThreadUpdate } from "@/lib/discord";
+import { ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 
 export const runtime = "nodejs";
 
@@ -30,16 +31,17 @@ export async function POST(req: Request) {
   if (notify && note) {
     try {
       const design = order.designRequestId ? await getById(order.designRequestId) : null;
+      const discordThreadId = await ensureTeamOrderDiscordThread(order.id);
       const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
       // Direct link to the order so the designer can jump straight to it: the
       // design-manage page (print QA + roster) when linked, else the team-order.
       const link = design?.manageToken ? `${SITE}/design/manage/${design.manageToken}` : `${SITE}/team-order/manage/${order.manageToken}`;
       posted = await postDesignThreadUpdate({
-        threadId: design?.discordThreadId,
+        threadId: discordThreadId ?? undefined,
         title: `📝 Designer note - ${order.teamName} (${order.reference})`,
         description: `${note}\n\n🔗 [Open this order](${link})`,
         mention: true,
-        username: "Slugger Team Orders",
+        username: "Slugger Custom Orders",
       });
     } catch (e) {
       console.error("designer note discord post failed:", e);
