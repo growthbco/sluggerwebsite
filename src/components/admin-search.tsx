@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useStatusFilter } from "@/components/admin-filter-store";
+import { useStatusFilter, ORDER_STAGES, stageTitle } from "@/components/admin-filter-store";
 
 // Filters the dashboard's project rows in place. Rows opt in with a
 // data-search attribute (searchable text) and data-status attribute.
@@ -50,23 +50,32 @@ export function AdminSearch({ statuses, initialStatus }: { statuses: string[]; i
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="🔍 Search team, ref, or contact…"
-        className="flex-1 min-w-52 bg-steel border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+        placeholder="Search team, ref, or contact…"
+        className="w-full sm:w-72 bg-steel border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
       />
-      {statuses.length > 0 && (
-      <select
-        value={status}
-        onChange={(e) => setStatus(e.target.value)}
-        className="bg-steel border border-line px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
-      >
-        <option value="">All statuses</option>
-        {statuses.map((s) => (
-          <option key={s} value={s}>
-            {s.replace(/_/g, " ")}
-          </option>
-        ))}
-      </select>
-      )}
+      {statuses.length > 0 && (() => {
+        // Show the six pipeline stages (present ones) in funnel order using the
+        // SAME names as the stage cards, then any leftover statuses (draft /
+        // cancelled). Full names, min-width so nothing clips.
+        const present = new Set(statuses);
+        const staged = ORDER_STAGES.filter((s) => present.has(s.value));
+        const others = statuses.filter((s) => !ORDER_STAGES.some((x) => x.value === s));
+        return (
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="min-w-44 bg-steel border border-line px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
+          >
+            <option value="">All stages</option>
+            {staged.map((s) => (
+              <option key={s.value} value={s.value}>{s.title}</option>
+            ))}
+            {others.map((s) => (
+              <option key={s} value={s}>{stageTitle(s)}</option>
+            ))}
+          </select>
+        );
+      })()}
       {(q || status) && (
         <button
           type="button"

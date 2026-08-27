@@ -82,7 +82,7 @@ export function AdminInvoiceButton({
             <div className="p-4 space-y-4">
               {warnPrintFile && (
                 <div className="border border-brand/50 bg-brand/10 p-3 text-xs text-foreground">
-                  📋 FYI: {teamName}&apos;s print file hasn&apos;t passed AI verification yet - that&apos;s expected. The flow is deposit first; the print file gets verified before anything prints.
+                  FYI: {teamName}&apos;s print file hasn&apos;t passed AI verification yet - that&apos;s expected. The flow is deposit first; the print file gets verified before anything prints.
                 </div>
               )}
 
@@ -103,7 +103,7 @@ export function AdminInvoiceButton({
                     onClick={() => setShip("auto")}
                     className={`w-full text-left border px-3 py-2.5 ${ship === "auto" ? "border-brand bg-brand/10" : "border-line hover:border-brand/50"}`}
                   >
-                    <span className="display text-sm text-foreground">📦 Ship it</span>
+                    <span className="display text-sm text-foreground">Ship it</span>
                     <span className="block text-xs text-muted mt-0.5">Auto-calculated shipping from the roster weight, charged to the customer.</span>
                   </button>
                   <button
@@ -111,7 +111,7 @@ export function AdminInvoiceButton({
                     onClick={() => setShip("pickup")}
                     className={`w-full text-left border px-3 py-2.5 ${ship === "pickup" ? "border-brand bg-brand/10" : "border-line hover:border-brand/50"}`}
                   >
-                    <span className="display text-sm text-foreground">🏬 Free local pickup</span>
+                    <span className="display text-sm text-foreground">Free local pickup</span>
                     <span className="block text-xs text-muted mt-0.5">No shipping charge.</span>
                   </button>
                 </div>

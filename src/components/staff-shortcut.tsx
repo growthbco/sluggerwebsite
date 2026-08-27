@@ -20,7 +20,9 @@ export function StaffShortcut() {
     } catch {}
   }, []);
 
-  if (!show || pathname.startsWith("/admin")) return null;
+  // Never on the admin app, and never on a customer's order pages (a coach's
+  // phone shouldn't see a staff shortcut).
+  if (!show || pathname.startsWith("/admin") || pathname.startsWith("/design/status") || pathname.startsWith("/design/manage") || pathname.startsWith("/store/")) return null;
 
   return (
     <Link

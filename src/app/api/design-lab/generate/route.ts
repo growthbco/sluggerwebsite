@@ -7,6 +7,7 @@ import { getDb, dbEnabled } from "@/db";
 import { designLabVisitors } from "@/db/schema";
 import { getOrCreateVisitor, tierFor, LAB_COOKIE, encryptCleanUrl, FREE_GENS } from "@/lib/design-lab";
 import { watermarkImage, generateJerseyImage, type ImagePart } from "@/lib/jersey-image";
+import { buildProductPrompt, productNoun, productAspect, PRODUCTS, JERSEY_BRANDING, type ProductType } from "@/lib/product-mockups";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -31,6 +32,7 @@ export async function POST(req: Request) {
   let body: {
     key?: string;
     ladder?: boolean;
+    product?: string;
     sport?: string;
     style?: string;
     primaryColor?: string;
@@ -68,15 +70,23 @@ export async function POST(req: Request) {
   const clean = (s: string | undefined, n: number) => (s ?? "").replace(/[\r\n]+/g, " ").trim().slice(0, n);
   const sport = clean(body.sport, 40) || "baseball";
   const style = clean(body.style, 40) || "crew neck";
+  // Which product the Sport -> Item -> Style picker landed on (jersey by
+  // default). Non-jersey items route through the shared buildProductPrompt.
+  const product: ProductType = PRODUCTS.some((p) => p.id === body.product) ? (body.product as ProductType) : "jersey";
+  const noun = productNoun(product);
   const STYLE_SPECS: Record<string, string> = {
     "crew neck": "a round crew-neck collar; NO buttons, NO placket, NO zipper",
+    "v-neck": "a V-neck collar; NO buttons, NO placket, NO zipper",
     "two-button": "a short two-button placket at the neckline with EXACTLY TWO visible buttons and a sport collar; the placket ends at mid-chest",
     "full-button": "a full button-down front: a placket running the ENTIRE length of the jersey with a visible row of buttons top to bottom, classic baseball collar",
     "quarter-zip": "a stand-up quarter-zip collar with a visible ZIPPER from the neck ending at mid-chest; NO buttons",
     "sleeveless / tank": "a sleeveless tank cut with finished armholes; NO sleeves, NO buttons, NO zipper",
     "reversible": "a sleeveless reversible basketball cut with finished armholes and contrasting trim; NO buttons, NO zipper",
   };
-  const styleSpec = STYLE_SPECS[style.toLowerCase()] ?? "";
+  // Normalize the picker's style label ("Standard Crew Neck", "Two Button") to a
+  // STYLE_SPECS key so the construction detail still applies.
+  const styleKey = style.toLowerCase().replace(/^standard\s+/, "").replace(/two button/, "two-button").replace(/full button/, "full-button");
+  const styleSpec = STYLE_SPECS[styleKey] ?? "";
   const teamName = clean(body.teamName, 40);
   const idea = clean(body.idea, 500);
   const refinement = clean(body.refinement, 500);
@@ -92,26 +102,55 @@ export async function POST(req: Request) {
   if (body.previousImage && refinement) {
     const prev = parseDataUrl(body.previousImage);
     if (!prev) return NextResponse.json({ error: "Bad previous image" }, { status: 400 });
-    // Guardrail 1: have Claude turn the customer's loose wording into a precise
-    // edit instruction scoped to design elements ("make it lighter" once faded
-    // the entire product photo instead of the background pattern).
-    let instruction = refinement;
-    const interpreted = (await generateJson(
-      [
-        `A customer is refining an AI mockup of a custom ${sport} jersey (a product photo of the garment on a white background). Their request: "${refinement}"`,
-        "Rewrite this as ONE precise image-edit instruction for an image model. Rules:",
-        "- The request refers to the JERSEY'S DESIGN (patterns, lettering, graphics, trim, colors) unless it explicitly mentions the photo, lighting, or background.",
-        "- Words like lighter/darker/softer/transparent mean the intensity of specific design elements, NOT the exposure of the photo or the whole garment.",
-        "- COLOR CHANGES: if they ask for a different color (of the jersey, a panel, lettering, or the whole scheme), the instruction must say to RECOLOR those parts while keeping every pattern, graphic, texture, stripe, logo, and layout element exactly where and how it is - a recolor never removes or simplifies the design.",
-        "- Name the specific element(s) to change and state that everything else stays identical.",
-        'Return ONLY JSON: { "instruction": string }',
-      ].join("\n"),
-      { type: "OBJECT", properties: { instruction: { type: "STRING" } }, required: ["instruction"] },
-    )) as { instruction?: string } | null;
-    if (interpreted?.instruction) instruction = interpreted.instruction.slice(0, 600);
-    // Guardrail 2: hard rules appended to every refinement.
-    parts.push({ text: `Edit this custom ${sport} jersey product mockup. ${instruction} STRICT RULES: the output must remain a crisp, full-contrast, professional product photo - floating ghost-mannequin, pure white background, normal exposure and saturation, keeping the same front-and-back side-by-side layout as the input image. NEVER fade, wash out, blur, or change the brightness of the whole photo or the whole garment. Change ONLY the specific design elements mentioned; keep the lettering, fit, framing, and photo quality exactly as they are unless explicitly asked. If the change is a COLOR change, recolor while preserving every existing pattern, graphic, and design detail in place - do not remove, simplify, or redraw them.` });
-    parts.push({ inline_data: prev });
+    // A "make it reversible" or "add the back" request CHANGES the layout, which
+    // the normal edit path is deliberately locked against. When that intent is
+    // detected (from the Reversible style pick or the request wording), take a
+    // restructure path instead: keep the EXACT design but re-render it front +
+    // back side by side, and for reversible add the white-based reverse side.
+    const wantsReversible = /revers|reverse side|home and away|both sides/i.test(`${style} ${refinement}`);
+    const wantsBack = /front and back|both (views|sides)|(add|show|include|generate|missing|need|want)\b[^.]{0,25}\bback\b/i.test(refinement);
+    if (wantsReversible || wantsBack) {
+      const reverse = wantsReversible
+        ? " Present it as a REVERSIBLE basketball jersey (sleeveless tank cut): the primary/home side keeps the current colors, and ALSO show the reverse/away side as a white-based version of the SAME design with the same graphics and accents."
+        : " The back shows the same design language as the front with a large centered player number below the shoulders.";
+      parts.push({ text: `Restructure this custom ${sport} ${noun} product mockup. KEEP THIS EXACT design from the input image - the same artwork, graphics, logo, lettering, colors, and pattern - do not redraw or simplify anything. Re-render it as a crisp, full-contrast professional product photo, floating ghost-mannequin, pure white background, studio lighting, showing the FRONT (left) and BACK (right) of the SAME jersey side by side.${reverse} No league logos, no watermark. Customer note: ${refinement}.` });
+      parts.push({ inline_data: prev });
+    } else {
+      // Guardrail 1: have Claude turn the customer's loose wording into a precise
+      // edit instruction scoped to design elements ("make it lighter" once faded
+      // the entire product photo instead of the background pattern).
+      let instruction = refinement;
+      const interpreted = (await generateJson(
+        [
+          `A customer is refining an AI mockup of a custom ${sport} ${noun} (a product photo of the garment on a white background). Their request: "${refinement}"`,
+          "Rewrite this as ONE precise image-edit instruction for an image model. Rules:",
+          "- The request refers to the JERSEY'S DESIGN (patterns, lettering, graphics, trim, colors) unless it explicitly mentions the photo, lighting, or background.",
+          "- Words like lighter/darker/softer/transparent mean the intensity of specific design elements, NOT the exposure of the photo or the whole garment.",
+          "- COLOR CHANGES: if they ask for a different color (of the jersey, a panel, lettering, or the whole scheme), the instruction must say to RECOLOR those parts while keeping every pattern, graphic, texture, stripe, logo, and layout element exactly where and how it is - a recolor never removes or simplifies the design.",
+          "- Name the specific element(s) to change and state that everything else stays identical.",
+          'Return ONLY JSON: { "instruction": string }',
+        ].join("\n"),
+        { type: "OBJECT", properties: { instruction: { type: "STRING" } }, required: ["instruction"] },
+      )) as { instruction?: string } | null;
+      if (interpreted?.instruction) instruction = interpreted.instruction.slice(0, 600);
+      // Guardrail 2: hard rules appended to every refinement.
+      parts.push({ text: `Edit this custom ${sport} ${noun} product mockup. ${instruction} STRICT RULES: the output must remain a crisp, full-contrast, professional product photo - floating ghost-mannequin, pure white background, normal exposure and saturation, keeping the same front-and-back side-by-side layout as the input image. NEVER fade, wash out, blur, or change the brightness of the whole photo or the whole garment. Change ONLY the specific design elements mentioned; keep the lettering, fit, framing, and photo quality exactly as they are unless explicitly asked. If the change is a COLOR change, recolor while preserving every existing pattern, graphic, and design detail in place - do not remove, simplify, or redraw them.` });
+      parts.push({ inline_data: prev });
+    }
+  } else if (!(product === "jersey" && /base|soft/i.test(sport))) {
+    // Everything except a baseball/softball jersey uses the shared product-aware
+    // prompt builder (cheer sets, pants, shorts, hats, socks, chains, AND
+    // basketball/flag-football jerseys - so a basketball jersey renders as a
+    // sleeveless tank, matching the staff studio).
+    const reference = parseDataUrl(body.reference);
+    const logo = parseDataUrl(body.logo);
+    const colorStr = [clean(body.primaryColor, 30), clean(body.secondaryColor, 30), ...extraColors].filter(Boolean).join(", ") || "team colors";
+    const prompt =
+      buildProductPrompt(product, { sport, style, colors: colorStr, teamName, vision: idea, hasRef: !!(reference || logo) }) +
+      " Do NOT add any MLB/NBA/NFL or other league logos, pro-team marks, or brand swooshes - only the team's own name and provided logo. No watermark.";
+    parts.push({ text: prompt });
+    if (reference) { parts.push({ text: "REFERENCE (style inspiration - recreate the vibe as a NEW original design, don't copy logos):" }); parts.push({ inline_data: reference }); }
+    if (logo) { parts.push({ text: "TEAM LOGO (incorporate this naturally):" }); parts.push({ inline_data: logo }); }
   } else {
     const reference = parseDataUrl(body.reference);
     const logo = parseDataUrl(body.logo);
@@ -124,7 +163,8 @@ export async function POST(req: Request) {
       teamName ? `The team name "${teamName}" appears across the chest in bold athletic lettering, spelled exactly: ${teamName}.` : "",
       idea ? `Design direction from the customer: ${idea}.` : "",
       logo ? "A TEAM LOGO image is also provided: incorporate that logo naturally into the design (chest or sleeve), keeping it recognizable." : "",
-      "Make it look like a premium, print-ready team uniform design - tasteful, modern, athletic. No mannequin, no human, no watermark, no extra text besides the jersey design itself. Do NOT add any MLB/NBA/NFL or other league logos, pro-team marks, or brand swooshes - only the team's own name and provided logo.",
+      "Make it look like a premium, print-ready team uniform design - tasteful, modern, athletic. No mannequin, no human, no watermark. Do NOT add any MLB/NBA/NFL or other league logos, pro-team marks, or invented manufacturer swooshes - only the team's own name/logo and the Slugger branding described below.",
+      JERSEY_BRANDING,
     ].filter(Boolean).join(" ");
     parts.push({ text: prompt });
     if (reference) {
@@ -141,7 +181,7 @@ export async function POST(req: Request) {
     // Shared two-vendor engine: OpenAI image-2 primary, Gemini fallback.
     // Medium quality here - the public maker is high-volume and visitors are
     // just exploring; the staff studio uses high quality for client proofs.
-    const result = await generateJerseyImage(parts, "4:3", { quality: "medium" });
+    const result = await generateJerseyImage(parts, productAspect(product), { quality: "medium" });
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
     if (result.usedFallback) console.log("design-lab used fallback vendor");
     const payload: { data: string; mimeType: string } = { data: result.data, mimeType: result.mime };

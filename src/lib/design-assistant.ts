@@ -30,6 +30,9 @@ export type AssistantResult = {
 export type DesignContext = {
   reference: string;
   teamName: string;
+  /** The order's sport (baseball, flag football, etc.) - drives sport-specific
+   *  pricing so the bot never quotes baseball bundles on a flag-football order. */
+  sport?: string | null;
   status: string;
   revisionsUsed: number | null;
   proofCount: number;
@@ -53,7 +56,7 @@ const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
 function statusMeaning(status: string): string {
   const map: Record<string, string> = {
-    pending_payment: "the design fee checkout hasn't been completed yet",
+    pending_payment: "the request hasn't been submitted yet",
     submitted: "the request is in and the designer will start soon",
     in_design: "the designer is working on the mockup now",
     proof_sent: "a proof has been sent and we're waiting on the client to approve it or request changes",
@@ -86,6 +89,7 @@ function buildGrounding(design: DesignContext, order: OrderContext | null, messa
   const projectLines = [
     `Reference: ${design.reference}`,
     `Team: ${design.teamName}`,
+    `Sport: ${design.sport?.trim() || "not specified - do NOT assume baseball/softball; if pricing depends on the sport and it is unclear, escalate or offer a call"}`,
     `Design status: ${design.status} (${statusMeaning(design.status)})`,
     `Revision rounds used: ${design.revisionsUsed ?? 0} of ${MAX_REVISIONS} included`,
     `Proof images sent so far: ${design.proofCount}`,
@@ -128,6 +132,10 @@ function buildGrounding(design: DesignContext, order: OrderContext | null, messa
     "- Slugger Athletics makes custom team uniforms and embroidered hats in Ocala, Florida.",
     "- Contact: text (352) 414-7270, email apparel@sluggerathletics.com.",
     "- EVERYTHING is fully custom and made to order. Features like quarter-zips, collar styles, sleeve length, fonts, a cursive name instead of a number, and color tweaks are all possible - when a client asks IF something can be done, the honest answer is usually yes, it is their call, so ask which way they want it instead of assuming. If a custom feature is not on the price list, say the team will confirm any price difference.",
+    "- Jerseys are fully sublimated cut-and-sew garments that come STANDARD SHORT-SLEEVE by default - they absolutely have sleeves. A print file / proof shows the flat panels (front, back, and the two sleeve panels) laid out the way the fabric is cut before it is sewn together, so do not read sleeve length or 'sleeveless' from how the flat layout looks. If a client asks whether it will have sleeves, simply reassure them yes, it is a standard short-sleeve jersey. Long sleeves or sleeveless are available ONLY if they specifically want that - and only then does it need a Request Changes note. Never tell a client to file a change request just to get the default short sleeves; that is already what they are getting.",
+    "- MATERIAL vs PRACTICE JERSEY - do not confuse these. The standard crew / round-neck game jersey is $28 and comes in the client's choice of MESH or DRY-FIT material; that is the real jersey and the default answer whenever someone asks about a round-neck or crew-neck jersey. 'Dry-fit' by itself refers to the MATERIAL of that $28 jersey, NOT a cheaper product. The separate $20 'Dry-Fit Practice Jersey' is a lighter, thinner practice-weight shirt for practices, coaches, and parents/fans - it is NOT the same as a game jersey. NEVER quote or steer a client to the $20 practice jersey when they ask about a crew/round-neck jersey or say 'dry-fit' - quote the $28 standard crew (available in mesh or dry-fit). Only bring up the $20 practice jersey if the client specifically asks for a cheaper practice-only option.",
+    "- SPORT-SPECIFIC PRODUCTS AND PRICING - always answer using THIS PROJECT'S sport (shown under THIS PROJECT RIGHT NOW). NEVER assume baseball/softball. FLAG FOOTBALL uniforms are their own lightweight stretch-spandex products, priced separately: flag football game shirt $28, matching flag football shorts $28, or the full flag football uniform (shirt + shorts) $56 per player, names and numbers included. Flag football does NOT use baseball/softball pants, and the baseball/softball bundles below (Game Day, Home & Away, etc.) do NOT apply to it - NEVER quote a $40 pant or a baseball/softball bundle on a flag-football order. If a flag-football client asks about matching shorts/bottoms, the answer is the matching spandex flag football shorts at $28 (or the $56 full uniform for shirt + shorts). For ANY sport that is not baseball or softball (flag football, basketball, soccer, volleyball, etc.), do not quote pants or bundles unless that exact product and price is in the facts for that sport - if you are not sure of the price for that sport, say the team will confirm the exact pricing and offer a quick call; do not guess.",
+    "- ORDER STRUCTURE for leagues / multiple teams: EACH team (each roster) is set up as its OWN separate order, even when several teams share the same design. Every team gets its own order number, its own tracking, and its own contact name on the order - that is how Slugger keeps big league orders organized. A shared, approved design CAN be reused across multiple teams, but you must NEVER tell a client to combine several teams' rosters under one order. If a client asks how a multi-team or league order works, or whether to split it, the answer is: yes, each team is its own separate order (own order number + tracking), and we reuse the approved design across them. Do not give logistics/order-structure advice that contradicts this - if unsure, tell them the team will set it up the best way and offer a quick call.",
     "- Discounts: possible, and they depend on the TOTAL number of pieces in the order - more pieces means more room to work. NEVER name a specific discount, percentage, or lower price. The right response: say we can work with them since it depends on piece count, ask what total or per-player number they were hoping to be at, and offer a quick phone call to land on a number - text (352) 414-7270.",
     "- Payment flow: Slugger emails an invoice; a 50% deposit starts production and the balance (plus shipping) is due before the order ships. 7% Florida sales tax applies to goods.",
     "- Production: most orders ship 2-3 weeks after design approval and deposit; rush is about a week. Hats are embroidered in-house and small hat orders are often ready in days.",
@@ -146,7 +154,7 @@ function buildGrounding(design: DesignContext, order: OrderContext | null, messa
     "PRICE LIST (per piece, plus tax, design included; ALL custom orders - INCLUDING embroidered hats - have a 6-piece minimum per design. HAT FEES: the mockup is FREE; creating the stitch-ready embroidery file from a logo carries a one-time digitizing fee - customers who bring their own embroidery file (DST/EMB) skip that fee entirely. Hats are embroidered in-house: when the blank hats are in stock they are usually ready in a COUPLE OF DAYS; if the blanks must be ordered in, about a WEEK or so. The 6-hat minimum always applies):",
     priceList,
     "",
-    "2026 BUNDLES (per player, plus tax - suggest the matching bundle when someone is pricing multiple pieces, especially Home & Away when they only mention jerseys):",
+    "2026 BUNDLES - BASEBALL AND SOFTBALL ONLY (per player, plus tax). Only suggest a matching bundle when THIS PROJECT'S sport is baseball or softball. NEVER apply these bundles - or the pant prices in them - to flag football or any other sport:",
     BUNDLES.map((b) => `${b.name}: ${b.includes.join(" + ")} = $${(b.priceCents / 100).toFixed(0)} (vs $${(b.compareAtCents / 100).toFixed(0)} separately)`).join("\n"),
     BUNDLE_UPGRADE_NOTE,
     "",
@@ -253,7 +261,8 @@ export async function assistDesignThread(input: {
     buildGrounding(input.design, input.order, input.messages, taughtFacts),
     "",
     "Choose exactly one action:",
-    '- "answer": ONLY if the client asked something you can answer completely and confidently from the facts above (order status, what happens next, pricing from the list, turnaround, sizing, revisions, how approval works, whether a custom feature is possible). Write a short, warm, plain-text reply (2-5 sentences, no markdown, no em dashes - use hyphens). Do not promise anything beyond the stated facts. Do not sign a name.',
+    '- HARD RULE - YOU CANNOT SEE THE PROOF OR THE DESIGN. You only have text facts, NOT the image. So NEVER describe, confirm, deny, or guess any visual or construction detail of THIS specific design or its proof: the neck/collar style (crew, v-neck, tie-neck, lace-up), whether a specific detail is sublimated/printed vs a separate sewn/stitched piece, the colors, logos, fonts, numbers, patterns, placement, materials, or sleeve length shown on THIS design, or any "is it X or Y / does it have Z" question about what the mockup actually shows. You do not have the picture and must not invent an answer (the general product facts below are BACKGROUND ONLY - they are NOT permission to assert what this particular design looks like). For ANY such design-specific visual/construction question, choose "escalate" with reason "design-specific question about the proof - needs a human who can see it". Better to hand it to staff than to guess wrong.',
+    '- "answer": ONLY if the client asked something you can answer completely and confidently from the facts above (order status, what happens next, pricing from the list, turnaround, sizing, revisions, how approval works, whether a custom feature is possible) AND it is NOT a design-specific visual/construction question (see the hard rule above). Write a short, warm, plain-text reply (2-5 sentences, no markdown, no em dashes - use hyphens). Do not promise anything beyond the stated facts. Do not sign a name.',
     '- A FIRST-TIME discount ask also gets "answer": use the discount policy above (depends on piece count, ask their target number, offer a call) and set flagStaff true so the team follows up personally. Never name a number.',
     '- "escalate": if the message involves a refund, cancellation, complaint, payment trouble, a callback request, an ongoing back-and-forth negotiation staff is already handling, or anything the facts do not fully cover. Also escalate if you are unsure. Do NOT write a client reply; give a one-line reason instead.',
     '- HARD RULE: when THIS PROJECT\'s design status is approved or ordered, or a deposit/payment has been made, ANY request to change the design (colors, elements, silhouettes, fonts, layout - anything visual) gets "answer" with a HOLDING reply only, plus flagStaff true. The holding reply: apologize briefly, explain the design was already approved and the deposit is in so production starts immediately and the design is locked at that point, and say you will check with the designer and get back to them. NEVER promise the change, never mention revision rounds.',

@@ -1,8 +1,78 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { getDb } from "@/db";
-import { designerInvoices, teamOrders, teamOrderRoster } from "@/db/schema";
-import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
+import { designerInvoices, teamOrders, teamOrderRoster, orders as ordersTable, orderItems, teams, drops } from "@/db/schema";
+
+// Store / shop / buy-in orders the designer also produces. They're paid upfront
+// via Stripe, so any paid/fulfilled one is billable (per individual order).
+const BILLABLE_ORDER_TYPES = ["team_store", "buy_in", "shop"] as const;
+const BILLABLE_ORDER_STATUSES = ["paid", "fulfilled"] as const;
+const ORDER_TYPE_LABEL: Record<string, string> = { team_store: "Team Store", buy_in: "Drop", shop: "Shop" };
+
+// A store/shop line item that's an in-house hat (never the designer's to bill),
+// detected from the snapshot product name.
+function isHatName(name: string): boolean {
+  return /\b(hat|cap|snapback|trucker|beanie)\b/i.test(name || "");
+}
+
+// Non-garment store line items (tax, shipping, fees, discounts) - not something
+// the designer produces, so they never belong on his invoice.
+function isNonGarment(name: string): boolean {
+  return /\b(tax|shipping|ship|fee|discount|credit|donation|fundrais)/i.test(name || "");
+}
+
+// Store item names carry the full customization
+// ("Full-Button Jersey - Red Pinstripe - 2X-Large - SMITH - #32"). The designer
+// bills by GARMENT TYPE, so collapse to the first segment ("Full-Button Jersey")
+// - otherwise every player is a separate one-off line.
+function garmentType(name: string): string {
+  return (name.split(" - ")[0] || name || "").trim() || name;
+}
+import { notDesignerMade, itemLabel } from "@/lib/order-items";
+
+// The garments the DESIGNER actually produces for an order, counted straight
+// from the roster: every piece INCLUDING paid add-ons (he makes those too),
+// but EXCLUDING in-house items (hats - embroidered in Ocala, never his to bill).
+function billableGarmentsFromRoster(
+  order: { jerseyStyle: string | null },
+  roster: { sizes: Record<string, string> | null; size: string | null; quantity: number | null }[],
+): { garment: string; qty: number }[] {
+  const counts = new Map<string, number>();
+  for (const row of roster) {
+    const qty = Math.max(1, row.quantity ?? 1);
+    const sized = Object.entries(row.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
+    if (sized.length) {
+      for (const [key] of sized) counts.set(key, (counts.get(key) ?? 0) + qty);
+    } else if ((row.size ?? "").trim()) {
+      counts.set("jersey", (counts.get("jersey") ?? 0) + qty);
+    }
+  }
+  return Array.from(counts.keys())
+    .filter((k) => !notDesignerMade(k)) // drop hats (in-house) + beanies (outsourced) - not the designer's
+    .sort((a, b) => (a === "jersey" ? -1 : b === "jersey" ? 1 : a.localeCompare(b)))
+    .map((key) => ({
+      garment: key === "jersey" && order.jerseyStyle ? `${order.jerseyStyle} Jersey` : itemLabel(key),
+      qty: counts.get(key)!,
+    }));
+}
+
+/** Estimated designer/factory COGS for an order, from our cost list (pieces x
+ *  per-garment cost). NOTE: duty (~15-19%) and inbound shipping are NOT in this
+ *  - real landed cost runs higher, so prefer the RECORDED actual when set.
+ *  Returns null if no garment cost is known. */
+export function estimatedDesignerCostCents(
+  order: { jerseyStyle: string | null; jerseyMaterial?: string | null },
+  roster: { sizes: Record<string, string> | null; size: string | null; quantity: number | null }[],
+): number | null {
+  const garments = billableGarmentsFromRoster(order, roster);
+  let total = 0;
+  let known = false;
+  for (const g of garments) {
+    const c = designerCostCents(g.garment, order.jerseyMaterial);
+    if (c != null) { total += c * g.qty; known = true; }
+  }
+  return known ? total : null;
+}
 
 /* ------------------------------------------------------------------ */
 /* Private link                                                        */
@@ -45,29 +115,86 @@ export function isDutyOutOfBand(subtotalCents: number, dutyCents: number): boole
 /* Billable orders (what the designer should be billing us for)        */
 /* ------------------------------------------------------------------ */
 
-// Orders that have been sent to the designer and produced. He bills after an
-// order comes in, so these are the candidates for any invoice.
-const BILLABLE_STATUSES = ["in_production", "shipped"] as const;
+// Orders the customer has paid us for and the designer produces. "paid" (paid in
+// full) is billable just like in_production/shipped - an order can sit in "paid"
+// without ever flipping to in_production, and leaving it out hid fully-paid jobs
+// (Vortex, Pin Me Daddy, ...) from the designer's picker. The payment gate below
+// (deposit OR full paid) still guarantees we've been paid before he can bill.
+const BILLABLE_STATUSES = ["paid", "in_production", "shipped"] as const;
 
 export type BillableGarment = { garment: string; qty: number };
 export type BillableOrder = {
   teamOrderId: string;
+  /** Which table the id belongs to, so a "settle" action updates the right row. */
+  kind: "team_order" | "order";
   reference: string;
   teamName: string;
   status: string;
   garments: BillableGarment[];
   pieces: number;
-  /** If this order already appears on a non-void invoice, the ref it's on.
-   *  The designer link disables re-adding it so we can't be billed twice. */
+  /** Our known per-piece cost for this order (from the designer's price list),
+   *  set when the order is a single garment type so the invoice line pre-fills.
+   *  Undefined for mixed-garment orders - he prices those himself. */
+  unitCostCents?: number;
+  /** If this order is FULLY billed (billed pieces >= current pieces) on a
+   *  non-void invoice, the ref it's on. The designer link disables re-adding it
+   *  so we can't be billed twice. Left null when add-on pieces are still owed. */
   alreadyBilledOn?: string | null;
+  /** ISO date it was billed (the invoice's paid/submitted date) - shown as
+   *  "billed Aug 12" instead of a bare struck chip. */
+  alreadyBilledDate?: string | null;
+  /** Pieces already billed on prior non-void invoices. When 0 < billedPieces <
+   *  pieces, add-on pieces were added after billing and are billable as a
+   *  top-up: the chip stays active for just the (pieces - billedPieces) delta. */
+  billedPieces?: number;
+  /** When the order was created - for an "age" column on the admin nudge list. */
+  since?: string | null;
+  /** Section header for grouping the picker ("Team Orders", or a store's name
+   *  like "Mamba Baseball · Team Store" so all its buyers nest under one header). */
+  group: string;
+  /** Compact chip text within the group (team name, or the buyer's name for a
+   *  store order) - avoids repeating the store name on every chip. */
+  chipLabel: string;
 };
 
+// The designer's (Bonans's) per-piece cost by garment, from his Aug 2026 price
+// list, used to PRE-FILL invoice lines so he approves instead of typing. Matched
+// against our garment labels by keyword; order matters (specific before
+// generic). Edit here if his prices change. Returns null when unknown -> the
+// line is left blank for him to fill.
+export function designerCostCents(label: string, material?: string | null): number | null {
+  const s = (label || "").toLowerCase();
+  const microfiber = (material ?? "").toLowerCase() === "microfiber";
+  if (/quarter|1\/4|zip/.test(s)) return 2200; // quarter-zip (not on his list; the $22 he charged for Hammer Time)
+  // Bowling full-button shirts are cut in a pricier microfiber - our cost is $21,
+  // not the $14 of a standard full-button jersey.
+  if (/full[\s-]?button/.test(s)) return microfiber ? 2100 : 1400;
+  if (/two[\s-]?button/.test(s)) return 1300;
+  if (/long[\s-]?sleeve/.test(s)) return 1200;
+  if (/dri[\s-]?fit|dry[\s-]?fit|practice/.test(s)) return 1100;
+  if (/light.*hoodie|lightweight/.test(s)) return 1800; // lightweight hoodie (historical)
+  if (/hoodie/.test(s)) return 2400; // heavyweight hoodie
+  if (/pant|knicker/.test(s)) return 1800; // baseball/softball pants
+  if (/short/.test(s)) return 1200;
+  if (/sock/.test(s)) return 700;
+  if (/snap[\s-]?back/.test(s)) return 1300; // hats normally in-house, covered just in case
+  if (/fitted/.test(s)) return 1500;
+  if (/soccer/.test(s)) return 1200;
+  if (/legging/.test(s)) return 1700;
+  if (/compression/.test(s)) return 1300;
+  if (/hockey/.test(s)) return 2400; // hockey jersey (sweater) - Gary's cost Aug 2026
+  if (/jersey|shirt|crew|v-?neck|round[\s-]?neck/.test(s)) return 1100; // standard round-neck jersey
+  return null;
+}
+
 /** Team-order ids already billed on a submitted or paid invoice → the invoice
- *  ref they first appeared on. Void invoices don't count. */
-export async function getBilledOrderRefs(): Promise<Map<string, string>> {
+ *  ref they first appeared on. Void invoices don't count. Pass excludeInvoiceId
+ *  when editing an invoice so its OWN lines don't flag as double-billed. */
+export async function getBilledOrderRefs(excludeInvoiceId?: string): Promise<Map<string, string>> {
   const db = getDb();
   const rows = await db
     .select({
+      id: designerInvoices.id,
       reference: designerInvoices.reference,
       status: designerInvoices.status,
       lines: designerInvoices.lines,
@@ -76,8 +203,33 @@ export async function getBilledOrderRefs(): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   for (const r of rows) {
     if (r.status === "void") continue;
+    if (excludeInvoiceId && r.id === excludeInvoiceId) continue;
     for (const l of r.lines ?? []) {
       if (l.teamOrderId && !map.has(l.teamOrderId)) map.set(l.teamOrderId, r.reference);
+    }
+  }
+  return map;
+}
+
+/** Per order, the total pieces already billed across non-void invoices plus the
+ *  first invoice ref it appeared on. Used to bill only the DELTA when add-on
+ *  pieces are added to an order that was already partly billed. */
+export async function getBilledPieceCounts(excludeInvoiceId?: string): Promise<Map<string, { ref: string; pieces: number; date: string | null }>> {
+  const db = getDb();
+  const rows = await db
+    .select({ id: designerInvoices.id, reference: designerInvoices.reference, status: designerInvoices.status, lines: designerInvoices.lines, submittedAt: designerInvoices.submittedAt, paidAt: designerInvoices.paidAt })
+    .from(designerInvoices);
+  const map = new Map<string, { ref: string; pieces: number; date: string | null }>();
+  for (const r of rows) {
+    if (r.status === "void") continue;
+    if (excludeInvoiceId && r.id === excludeInvoiceId) continue;
+    const date = (r.paidAt ?? r.submittedAt)?.toISOString() ?? null;
+    for (const l of r.lines ?? []) {
+      if (!l.teamOrderId) continue;
+      const qty = Math.max(0, l.qty ?? 0);
+      const prev = map.get(l.teamOrderId);
+      if (prev) prev.pieces += qty; // keep the first ref + date; accumulate pieces
+      else map.set(l.teamOrderId, { ref: r.reference, pieces: qty, date });
     }
   }
   return map;
@@ -91,7 +243,18 @@ export async function getBillableOrders(): Promise<BillableOrder[]> {
   const orders = await db
     .select()
     .from(teamOrders)
-    .where(inArray(teamOrders.status, [...BILLABLE_STATUSES]))
+    // Billable ONLY once the CUSTOMER has actually paid us (deposit or in full).
+    // Approval / in-production is NOT enough - we never pay the designer for
+    // work we haven't been paid for ourselves. NOTE: settled orders are NOT
+    // excluded in SQL anymore - an order settled directly can still gain add-on
+    // pieces afterward, which are billable. The delta is worked out per order
+    // below (settled pieces + invoiced pieces = accounted; the rest is owed).
+    .where(
+      and(
+        inArray(teamOrders.status, [...BILLABLE_STATUSES]),
+        or(isNotNull(teamOrders.depositPaidAt), isNotNull(teamOrders.invoicePaidAt)),
+      ),
+    )
     .orderBy(desc(teamOrders.createdAt));
 
   if (!orders.length) return [];
@@ -113,36 +276,180 @@ export async function getBillableOrders(): Promise<BillableOrder[]> {
     byOrder.set(r.teamOrderId, list);
   }
 
-  const billed = await getBilledOrderRefs();
+  const billed = await getBilledPieceCounts();
 
-  return orders.map((o) => {
-    const roster = byOrder.get(o.id) ?? [];
-    const quote = computeTeamOrderQuote(
-      {
-        jerseyStyle: o.jerseyStyle,
-        items: o.items,
-        localPricing: o.localPricing,
-        customJerseyCents: o.customJerseyCents,
-        embroideryFeeWaived: o.embroideryFeeWaived,
-      },
-      roster,
-    );
-    // Quote lines carry priced retail items; for reconciliation we only want the
-    // garment label + our quantity (drop the embroidery/rush fee lines).
-    const garments: BillableGarment[] = quote.lines
-      .filter((l) => l.quantity > 0 && !/fee/i.test(l.label))
-      .map((l) => ({ garment: l.label, qty: l.quantity }));
-    const pieces = garments.reduce((s, g) => s + g.qty, 0);
-    return {
-      teamOrderId: o.id,
-      reference: o.reference,
-      teamName: o.teamName,
-      status: o.status,
-      garments,
-      pieces,
-      alreadyBilledOn: billed.get(o.id) ?? null,
-    };
-  });
+  const teamResults: BillableOrder[] = orders
+    .map((o) => {
+      const roster = byOrder.get(o.id) ?? [];
+      // Designer-billable garments straight from the roster: all pieces incl.
+      // paid add-ons, minus in-house hats. (The customer quote excludes add-ons
+      // and includes hats - the opposite of what the designer should bill.)
+      const garments: BillableGarment[] = billableGarmentsFromRoster(o, roster);
+      const pieces = garments.reduce((s, g) => s + g.qty, 0);
+      // Pre-fill the cost only for single-garment orders (one unit price applies).
+      // Mixed orders (jersey + shorts) stay blank - he prices those himself.
+      const unitCostCents = garments.length === 1 ? (designerCostCents(garments[0].garment) ?? undefined) : undefined;
+
+      // Pieces already accounted for = billed on a non-void invoice PLUS pieces
+      // that existed when the order was settled directly (paid the designer
+      // outside the tool). Anything added AFTER a bill/settle - i.e. roster rows
+      // created past the settle time - is the unbilled add-on delta still owed.
+      const invoice = billed.get(o.id);
+      const billedOnInvoice = invoice?.pieces ?? 0;
+      const settledAt = o.designerSettledAt ? new Date(o.designerSettledAt).getTime() : null;
+      const settledPieces = settledAt
+        ? billableGarmentsFromRoster(
+            o,
+            roster.filter((r) => r.createdAt && new Date(r.createdAt).getTime() <= settledAt),
+          ).reduce((s, g) => s + g.qty, 0)
+        : 0;
+      const accounted = Math.min(pieces, billedOnInvoice + settledPieces);
+      const unbilled = pieces - accounted;
+
+      return {
+        teamOrderId: o.id,
+        kind: "team_order" as const,
+        reference: o.reference,
+        teamName: o.teamName,
+        status: o.status,
+        garments,
+        pieces,
+        unitCostCents,
+        billedPieces: accounted,
+        // Struck "billed" only when fully billed ON AN INVOICE (so he still sees
+        // the history). Fully-settled-direct orders with nothing new are dropped
+        // below rather than shown struck.
+        alreadyBilledOn: billedOnInvoice > 0 && billedOnInvoice >= pieces ? (invoice?.ref ?? null) : null,
+        alreadyBilledDate: billedOnInvoice > 0 && billedOnInvoice >= pieces ? (invoice?.date ?? null) : null,
+        since: o.createdAt ? new Date(o.createdAt).toISOString() : null,
+        group: "Team Orders",
+        chipLabel: o.teamName,
+        _settled: settledAt != null,
+        _archived: Boolean(o.archivedAt),
+        _unbilled: unbilled,
+      };
+    })
+    // Nothing left to bill -> drop: archived+done, or settled-direct with no
+    // add-on pieces since. Invoice-billed-in-full stay (struck) so he sees it's
+    // billed; add-on top-ups (unbilled > 0) stay active.
+    .filter((r) => {
+      if (r._archived && r._unbilled <= 0) return false;
+      if (r._settled && r._unbilled <= 0 && !r.alreadyBilledOn) return false;
+      return true;
+    })
+    .map(({ _settled, _archived, _unbilled, ...r }) => { void _settled; void _archived; void _unbilled; return r; });
+
+  // Store / shop / buy-in orders: individual, pre-paid purchases the designer
+  // also produces. One billable entry per order, garments from the line items,
+  // minus in-house hats. Hat-only orders drop out (no garments left).
+  const storeRows = await db
+    .select()
+    .from(ordersTable)
+    .where(and(inArray(ordersTable.type, [...BILLABLE_ORDER_TYPES]), inArray(ordersTable.status, [...BILLABLE_ORDER_STATUSES]), isNull(ordersTable.designerSettledAt)))
+    .orderBy(desc(ordersTable.createdAt));
+  // Same rule for store orders: archived + already billed drops off.
+  const activeStoreRows = storeRows.filter((o) => !(o.archivedAt && billed.get(o.id)));
+  let storeResults: BillableOrder[] = [];
+  if (activeStoreRows.length) {
+    const items = await db.select().from(orderItems).where(inArray(orderItems.orderId, activeStoreRows.map((o) => o.id)));
+    const itemsByOrder = new Map<string, typeof items>();
+    for (const it of items) {
+      const list = itemsByOrder.get(it.orderId) ?? [];
+      list.push(it);
+      itemsByOrder.set(it.orderId, list);
+    }
+    // Resolve WHO each order is for: the team/store name (team_store) or the
+    // drop title (buy_in), so the designer sees "Mamba Baseball", not a bare ref.
+    const teamIds = [...new Set(activeStoreRows.map((o) => o.teamId).filter((x): x is string => Boolean(x)))];
+    const dropIds = [...new Set(activeStoreRows.map((o) => o.dropId).filter((x): x is string => Boolean(x)))];
+    const teamNameById = new Map<string, string>();
+    if (teamIds.length) for (const t of await db.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, teamIds))) teamNameById.set(t.id, t.name);
+    const dropTitleById = new Map<string, string>();
+    if (dropIds.length) for (const d of await db.select({ id: drops.id, title: drops.title }).from(drops).where(inArray(drops.id, dropIds))) dropTitleById.set(d.id, d.title);
+    storeResults = activeStoreRows
+      .map((o) => {
+        const counts = new Map<string, number>();
+        for (const it of itemsByOrder.get(o.id) ?? []) {
+          if (isHatName(it.name) || isNonGarment(it.name)) continue; // hats in-house; tax/shipping/fees aren't his
+          const type = garmentType(it.name);
+          counts.set(type, (counts.get(type) ?? 0) + Math.max(1, it.quantity ?? 1));
+        }
+        const garments: BillableGarment[] = [...counts.entries()].map(([garment, qty]) => ({ garment, qty }));
+        const pieces = garments.reduce((s, g) => s + g.qty, 0);
+        const unitCostCents = garments.length === 1 ? (designerCostCents(garments[0].garment) ?? undefined) : undefined;
+        // Lead with WHO it's for: team/store name or drop title, then the type,
+        // then the buyer if we have one.
+        const type = ORDER_TYPE_LABEL[o.type] ?? "Order";
+        const who = o.type === "team_store" ? (o.teamId ? teamNameById.get(o.teamId) : null)
+          : o.type === "buy_in" ? (o.dropId ? dropTitleById.get(o.dropId) : null)
+          : null;
+        // group = the store/drop header ("Mamba Baseball · Team Store"); chip =
+        // just the buyer, so the header isn't repeated on every row.
+        const group = [who, type].filter(Boolean).join(" · ") || type;
+        const chipLabel = o.customerName?.trim() || `Order ${o.reference}`;
+        const label = [who, type, o.customerName?.trim()].filter(Boolean).join(" · ") || `${type} ${o.reference}`;
+        const b = billed.get(o.id);
+        const billedPieces = b?.pieces ?? 0;
+        return {
+          teamOrderId: o.id,
+          kind: "order" as const,
+          reference: o.reference,
+          teamName: label,
+          status: o.status,
+          garments,
+          pieces,
+          unitCostCents,
+          billedPieces,
+          alreadyBilledOn: billedPieces > 0 && billedPieces >= pieces ? (b?.ref ?? null) : null,
+          alreadyBilledDate: billedPieces > 0 && billedPieces >= pieces ? (b?.date ?? null) : null,
+          since: o.createdAt ? new Date(o.createdAt).toISOString() : null,
+          group,
+          chipLabel,
+        };
+      })
+      .filter((r) => r.garments.length > 0);
+  }
+
+  return [...teamResults, ...storeResults];
+}
+
+/** Mark every currently-produced-but-unbilled order as settled outside the tool
+ *  (paid the designer directly / fully paid up). They drop off the "not yet
+ *  billed" list; future produced orders still accumulate. Returns how many were
+ *  settled. Already-invoiced orders are left alone. */
+/** The vendor marks ONE job as already paid by us (settled outside the tool) so
+ *  it drops off their billable list - e.g. an older order we paid before the
+ *  tool existed. Same mechanism as the admin bulk-settle, one order at a time.
+ *  Returns the order's name + ref for the notification. */
+export async function settleOneBillable(id: string, kind: "team_order" | "order"): Promise<{ ok: boolean; name?: string; reference?: string }> {
+  const db = getDb();
+  const now = new Date();
+  if (kind === "order") {
+    const [o] = await db.select({ ref: ordersTable.reference, name: ordersTable.customerName }).from(ordersTable).where(eq(ordersTable.id, id)).limit(1);
+    if (!o) return { ok: false };
+    await db.update(ordersTable).set({ designerSettledAt: now }).where(eq(ordersTable.id, id));
+    return { ok: true, name: o.name ?? undefined, reference: o.ref };
+  }
+  const [o] = await db.select({ ref: teamOrders.reference, name: teamOrders.teamName }).from(teamOrders).where(eq(teamOrders.id, id)).limit(1);
+  if (!o) return { ok: false };
+  await db.update(teamOrders).set({ designerSettledAt: now }).where(eq(teamOrders.id, id));
+  return { ok: true, name: o.name, reference: o.ref };
+}
+
+export async function settleAllBillable(): Promise<number> {
+  const db = getDb();
+  const now = new Date();
+  const billable = await getBillableOrders();
+  const unbilled = billable.filter((b) => !b.alreadyBilledOn);
+  const teamIds = unbilled.filter((b) => b.kind === "team_order").map((b) => b.teamOrderId);
+  const orderIds = unbilled.filter((b) => b.kind === "order").map((b) => b.teamOrderId);
+  if (teamIds.length) {
+    await db.update(teamOrders).set({ designerSettledAt: now }).where(inArray(teamOrders.id, teamIds));
+  }
+  if (orderIds.length) {
+    await db.update(ordersTable).set({ designerSettledAt: now }).where(inArray(ordersTable.id, orderIds));
+  }
+  return teamIds.length + orderIds.length;
 }
 
 /* ------------------------------------------------------------------ */
@@ -168,40 +475,49 @@ export type CreateDesignerInvoiceInput = {
   dutyCents: number;
   previousBalanceCents?: number;
   notes?: string;
+  /** The vendor's own external invoice number, if they have one. */
+  vendorRef?: string;
+  /** Blob URLs of the vendor's own uploaded invoice file(s). */
+  attachmentUrls?: string[];
 };
 
-/** Persist a submitted invoice. Money is recomputed server-side from the lines
- *  so a tampered client can't inflate the total; `ourQty` is snapshotted now. */
-export async function createDesignerInvoice(input: CreateDesignerInvoiceInput) {
-  const db = getDb();
-
-  // Snapshot our piece counts so a later roster edit can't mask a mismatch.
+/** Shared line processing for create + update: recompute money server-side,
+ *  snapshot our piece counts, and tag double-bills. Pass excludeInvoiceId when
+ *  editing so the invoice's own orders don't flag as already-billed. */
+async function buildInvoiceLines(inputLines: DesignerInvoiceLineInput[], excludeInvoiceId?: string) {
   const billable = await getBillableOrders();
   const ourByOrder = new Map(billable.map((b) => [b.teamOrderId, b]));
-  // Orders already billed on an earlier invoice — the double-billing guard.
-  const alreadyBilled = await getBilledOrderRefs();
-  const seenThisInvoice = new Map<string, number>(); // order id → line index
+  // Pieces billed on OTHER non-void invoices (delta-aware): a re-appearance is
+  // only a real double-bill when the running total would exceed our own count -
+  // legitimate add-on top-ups (order billed once, gained pieces since) are not.
+  const billedBefore = await getBilledPieceCounts(excludeInvoiceId);
+  const runningThisInvoice = new Map<string, number>(); // pieces added on THIS invoice so far
 
-  const lines = input.lines
-    .map((l, idx) => {
+  return inputLines
+    .map((l) => {
       const qty = Math.max(0, Math.round(Number(l.qty) || 0));
       const unitCents = Math.max(0, Math.round(Number(l.unitCents) || 0));
       const matched = l.teamOrderId ? ourByOrder.get(l.teamOrderId) : undefined;
-      // Our count for this order across every garment (piece-level check). A
-      // per-garment check would need the designer to tag garment type; matching
-      // on total pieces per order is the reliable signal we have.
-      const ourQty = matched?.pieces;
-      // Duplicate detection: this order billed on a prior invoice, OR listed
-      // twice within this same submission.
       let alreadyBilledOn: string | undefined;
+      // Default reconciliation target = our full current piece count.
+      let ourQty = matched?.pieces;
       if (l.teamOrderId) {
-        if (alreadyBilled.has(l.teamOrderId)) {
-          alreadyBilledOn = alreadyBilled.get(l.teamOrderId);
-        } else if (seenThisInvoice.has(l.teamOrderId)) {
-          alreadyBilledOn = "this invoice (duplicate line)";
-        } else {
-          seenThisInvoice.set(l.teamOrderId, idx);
+        const prior = billedBefore.get(l.teamOrderId)?.pieces ?? 0;
+        const soFar = runningThisInvoice.get(l.teamOrderId) ?? 0;
+        if (matched?.pieces != null) {
+          // What's still unbilled BEFORE this line - the honest target for it.
+          const remaining = matched.pieces - prior - soFar;
+          ourQty = Math.max(0, remaining);
+          // Over-bill only when this line pushes cumulative billed past what we
+          // actually ordered AND some was already billed (a fresh full bill is fine).
+          if (qty > remaining && (prior > 0 || soFar > 0)) {
+            alreadyBilledOn = billedBefore.get(l.teamOrderId)?.ref ?? "this invoice (over-billed)";
+          }
+        } else if (prior > 0) {
+          // Not in the billable set anymore (settled/removed) but billed before.
+          alreadyBilledOn = billedBefore.get(l.teamOrderId)?.ref;
         }
+        runningThisInvoice.set(l.teamOrderId, soFar + qty);
       }
       return {
         team: String(l.team ?? "").slice(0, 120),
@@ -215,7 +531,13 @@ export async function createDesignerInvoice(input: CreateDesignerInvoiceInput) {
       };
     })
     .filter((l) => l.team || l.garment || l.qty || l.unitCents);
+}
 
+/** Persist a submitted invoice. Money is recomputed server-side from the lines
+ *  so a tampered client can't inflate the total; `ourQty` is snapshotted now. */
+export async function createDesignerInvoice(input: CreateDesignerInvoiceInput) {
+  const db = getDb();
+  const lines = await buildInvoiceLines(input.lines);
   const subtotalCents = lines.reduce((s, l) => s + l.qty * l.unitCents, 0);
   const dutyCents = Math.max(0, Math.round(Number(input.dutyCents) || 0));
   const previousBalanceCents = Math.max(0, Math.round(Number(input.previousBalanceCents) || 0));
@@ -225,6 +547,7 @@ export async function createDesignerInvoice(input: CreateDesignerInvoiceInput) {
     .insert(designerInvoices)
     .values({
       reference: invoiceRef(),
+      viewToken: randomUUID().replace(/-/g, ""),
       designerName: input.designerName?.slice(0, 120) || null,
       lines,
       subtotalCents,
@@ -232,15 +555,94 @@ export async function createDesignerInvoice(input: CreateDesignerInvoiceInput) {
       previousBalanceCents,
       totalCents,
       notes: input.notes?.slice(0, 2000) || null,
+      vendorRef: input.vendorRef?.slice(0, 60) || null,
+      attachmentUrls: (input.attachmentUrls ?? []).filter(Boolean).slice(0, 5),
     })
     .returning();
 
   return row;
 }
 
+/** Remember the Discord forum thread an invoice opened on submission, so its
+ *  PAID confirmation nests in the same thread. */
+export async function setInvoiceThreadId(id: string, threadId: string) {
+  await getDb().update(designerInvoices).set({ discordThreadId: threadId }).where(eq(designerInvoices.id, id));
+}
+
+/** Fetch one invoice by its shareable view token (read-only public link). */
+export async function getDesignerInvoiceByToken(token: string) {
+  if (!token) return null;
+  const db = getDb();
+  const [row] = await db.select().from(designerInvoices).where(eq(designerInvoices.viewToken, token)).limit(1);
+  return row ?? null;
+}
+
+/** Edit an invoice IN PLACE - allowed only while it's still "submitted" (a paid
+ *  or void invoice is locked). Money is recomputed server-side, same as create.
+ *  Returns { locked: true } if it can't be edited, or null if not found. */
+export async function updateDesignerInvoice(id: string, input: CreateDesignerInvoiceInput) {
+  const db = getDb();
+  const [existing] = await db.select().from(designerInvoices).where(eq(designerInvoices.id, id)).limit(1);
+  if (!existing) return null;
+  if (existing.status !== "submitted") return { locked: true as const, status: existing.status };
+
+  const lines = await buildInvoiceLines(input.lines, id);
+  const subtotalCents = lines.reduce((s, l) => s + l.qty * l.unitCents, 0);
+  const dutyCents = Math.max(0, Math.round(Number(input.dutyCents) || 0));
+  const previousBalanceCents = Math.max(0, Math.round(Number(input.previousBalanceCents) || 0));
+  const totalCents = subtotalCents + dutyCents + previousBalanceCents;
+
+  const [row] = await db
+    .update(designerInvoices)
+    .set({
+      designerName: input.designerName?.slice(0, 120) || null,
+      lines,
+      subtotalCents,
+      dutyCents,
+      previousBalanceCents,
+      totalCents,
+      notes: input.notes?.slice(0, 2000) || null,
+      vendorRef: input.vendorRef?.slice(0, 60) || null,
+      attachmentUrls: (input.attachmentUrls ?? []).filter(Boolean).slice(0, 5),
+    })
+    .where(and(eq(designerInvoices.id, id), eq(designerInvoices.status, "submitted")))
+    .returning();
+
+  return row ?? null;
+}
+
+/** Invoices the designer can still edit (unpaid). Returned to his private link
+ *  so he can fix a submission before it's paid. */
+export async function getEditableDesignerInvoices() {
+  const db = getDb();
+  return db
+    .select()
+    .from(designerInvoices)
+    .where(eq(designerInvoices.status, "submitted"))
+    .orderBy(desc(designerInvoices.submittedAt));
+}
+
 export async function listDesignerInvoices() {
   const db = getDb();
   return db.select().from(designerInvoices).orderBy(desc(designerInvoices.submittedAt));
+}
+
+/** Paid invoices, newest first - the vendor's own payment history for the
+ *  billing tool (like a customer's order history in the portal). */
+export async function getPaidDesignerInvoices() {
+  const db = getDb();
+  return db
+    .select({
+      id: designerInvoices.id,
+      reference: designerInvoices.reference,
+      totalCents: designerInvoices.totalCents,
+      submittedAt: designerInvoices.submittedAt,
+      paidAt: designerInvoices.paidAt,
+      lines: designerInvoices.lines,
+    })
+    .from(designerInvoices)
+    .where(eq(designerInvoices.status, "paid"))
+    .orderBy(desc(designerInvoices.paidAt));
 }
 
 export async function getDesignerInvoice(id: string) {
@@ -310,4 +712,92 @@ export function reconcileInvoice(inv: typeof designerInvoices.$inferSelect): Inv
     anyQtyMismatch: lineChecks.some((l) => l.qtyMismatch),
     anyDoubleBill: lineChecks.some((l) => Boolean(l.alreadyBilledOn)),
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Paid-order cross-reference                                          */
+/* ------------------------------------------------------------------ */
+
+type OrderRef = { tokens: string[]; paid: boolean };
+export type OrderPaymentIndex = { paidById: Set<string>; orders: OrderRef[] };
+
+// Noise words to drop when matching a typed team name to an order name.
+const NAME_STOP = new Set(["add", "on", "addon", "the", "and", "of", "dri", "fit", "drifit", "dry", "light", "hoodie", "llc", "inc", "team", "store"]);
+function nameTokens(s: string): string[] {
+  return (s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 2 && !NAME_STOP.has(w));
+}
+// Small Levenshtein for typo-tolerant token matches ("mak" ~ "mac").
+function lev(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const dp = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const tmp = dp[j];
+      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return dp[n];
+}
+function tokenMatch(a: string, b: string): boolean {
+  return a === b || (a.length >= 3 && b.length >= 3 && lev(a, b) <= 1);
+}
+
+/** All team orders with their paid status + name tokens. Powers the invoice
+ *  cross-reference (have we been paid for what he billed?). */
+export async function getOrderPaymentIndex(): Promise<OrderPaymentIndex> {
+  const db = getDb();
+  const rows = await db
+    .select({ id: teamOrders.id, name: teamOrders.teamName, dep: teamOrders.depositPaidAt, inv: teamOrders.invoicePaidAt })
+    .from(teamOrders);
+  const paidById = new Set<string>();
+  const orders: OrderRef[] = [];
+  for (const r of rows) {
+    const paid = Boolean(r.dep || r.inv);
+    if (paid) paidById.add(r.id);
+    if (r.name) orders.push({ tokens: nameTokens(r.name), paid });
+  }
+  // Store / shop / buy-in orders are paid upfront via Stripe, so any paid or
+  // fulfilled one counts as paid for the "did we get paid before paying him"
+  // check - otherwise a legit store line would wrongly flag as unpaid.
+  const storeRows = await db
+    .select({ id: ordersTable.id, name: ordersTable.customerName })
+    .from(ordersTable)
+    .where(and(inArray(ordersTable.type, [...BILLABLE_ORDER_TYPES]), inArray(ordersTable.status, [...BILLABLE_ORDER_STATUSES])));
+  for (const r of storeRows) {
+    paidById.add(r.id);
+    if (r.name) orders.push({ tokens: nameTokens(r.name), paid: true });
+  }
+  return { paidById, orders };
+}
+
+/** Payment status of one billed line vs our orders:
+ *  - "paid": backed by an order the customer paid us for (safe to pay him)
+ *  - "unpaid": matched to an order we were NOT paid for (do NOT pay)
+ *  - "unknown": no confident match (manual line / off-system item) - verify
+ *  Exact via team order id; otherwise a typo-tolerant token match on the team
+ *  name so shorthand like "Jr mak" still matches "Jr Mac & Skis". */
+export function linePaymentStatus(line: { teamOrderId?: string | null; team: string }, idx: OrderPaymentIndex): "paid" | "unpaid" | "unknown" {
+  if (line.teamOrderId) return idx.paidById.has(line.teamOrderId) ? "paid" : "unpaid";
+  const lt = nameTokens(line.team);
+  if (!lt.length) return "unknown";
+  let best: OrderRef | null = null;
+  let bestScore = 0;
+  for (const o of idx.orders) {
+    if (!o.tokens.length) continue;
+    let matched = 0;
+    for (const t of lt) if (o.tokens.some((ot) => tokenMatch(t, ot))) matched++;
+    const score = matched / lt.length;
+    if (score > bestScore) { bestScore = score; best = o; }
+  }
+  if (best && bestScore >= 0.6) return best.paid ? "paid" : "unpaid";
+  return "unknown";
 }

@@ -7,17 +7,24 @@ type Rate = { rateId: string; provider: string; service: string; costCents: numb
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
-/** Estimated arrival = today + N business days (carriers quote business days). */
-function arrivalLabel(days: number | null): string {
+/** Local YYYY-MM-DD for the ship-date input default. */
+function isoToday(): string {
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
+
+/** Estimated arrival = the chosen ship date + N business days (carriers quote
+ *  business days), so the ETA reflects when it actually goes out - not today. */
+function arrivalLabel(days: number | null, shipDateIso: string): string {
   if (days == null) return "delivery estimate varies";
-  const d = new Date();
+  const d = new Date(`${shipDateIso}T12:00:00`);
   let added = 0;
   while (added < days) {
     d.setDate(d.getDate() + 1);
     const dow = d.getDay();
     if (dow !== 0 && dow !== 6) added += 1;
   }
-  const date = d.toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric" });
+  const date = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   return `Arrives ~${date} (${days} ${days === 1 ? "day" : "days"})`;
 }
 
@@ -45,6 +52,7 @@ export function AdminLabelButton({
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"weight" | "rates">("weight");
   const [weightLb, setWeightLb] = useState(String(suggestedLb ?? 2));
+  const [shipDate, setShipDate] = useState(isoToday());
   const [rates, setRates] = useState<Rate[]>([]);
   const [confirming, setConfirming] = useState<Rate | null>(null);
   const [busy, setBusy] = useState(false);
@@ -157,6 +165,17 @@ export function AdminLabelButton({
                   <p className="text-xs text-muted">
                     Weighing {weightLb} lb. Pick a service - the label buys at cost; the customer already paid shipping on their invoice.
                   </p>
+                  <label className="flex items-center justify-between gap-3 border border-line px-3 py-2">
+                    <span className="text-sm text-foreground">Shipping out on</span>
+                    <input
+                      type="date"
+                      value={shipDate}
+                      min={isoToday()}
+                      onChange={(e) => setShipDate(e.target.value || isoToday())}
+                      className="bg-steel border border-line px-2 py-1 text-sm text-foreground"
+                    />
+                  </label>
+                  <p className="text-[11px] text-muted -mt-1">Arrival dates below are estimated from this ship date.</p>
                   {rates.map((r) => (
                     <button
                       key={r.rateId}
@@ -166,7 +185,7 @@ export function AdminLabelButton({
                     >
                       <span>
                         <span className="display text-sm text-foreground">{r.provider} {r.service}</span>
-                        <span className="block text-xs text-muted mt-0.5">{arrivalLabel(r.estimatedDays)}</span>
+                        <span className="block text-xs text-muted mt-0.5">{arrivalLabel(r.estimatedDays, shipDate)}</span>
                       </span>
                       <span className="display text-base text-foreground shrink-0">{money(r.costCents)}</span>
                     </button>
@@ -182,7 +201,7 @@ export function AdminLabelButton({
                 <>
                   <div className="border border-brand/40 bg-brand/5 p-4">
                     <p className="display text-foreground">{confirming.provider} {confirming.service}</p>
-                    <p className="text-xs text-muted mt-0.5">{arrivalLabel(confirming.estimatedDays)}</p>
+                    <p className="text-xs text-muted mt-0.5">{arrivalLabel(confirming.estimatedDays, shipDate)}</p>
                     <p className="display text-2xl text-foreground mt-2">{money(confirming.costCents)}</p>
                     <p className="text-xs text-muted mt-1">{additional ? "Charges your Shippo account and emails the customer this tracking right away as a second package." : "Charges your Shippo account and saves the label + tracking. The customer isn\u2019t emailed until you hit \u201cMark shipped.\u201d"}</p>
                   </div>

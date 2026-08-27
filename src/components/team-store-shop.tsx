@@ -109,17 +109,23 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
   // Per-item draft state, keyed by item key.
   const [drafts, setDrafts] = useState<Record<string, { size: string; playerName: string; playerNumber: string; designs?: string[] }>>({});
 
-  const draft = (k: string, sizes: string[]) => drafts[k] ?? { size: sizes[0], playerName: "", playerNumber: "" };
+  // Size starts EMPTY - the buyer must pick one (no silent Youth Small default
+  // that ships the wrong size).
+  const draft = (k: string, _sizes: string[]) => drafts[k] ?? { size: "", playerName: "", playerNumber: "" };
   const setDraft = (k: string, patch: Partial<{ size: string; playerName: string; playerNumber: string; designs: string[] }>) =>
     setDrafts((d) => ({ ...d, [k]: { ...draft(k, items.find((i) => i.key === k)?.sizes ?? []), ...patch } }));
 
   function add(item: StoreItem) {
     const d = draft(item.key, item.sizes);
+    if (!d.size) {
+      setError("Pick a size first.");
+      return;
+    }
     const number = (item.nameNumber || item.numberAddOnCents) && d.playerNumber.trim() ? d.playerNumber.trim() : undefined;
-    // One entry can add several colorways at once - a set per selected design,
-    // all sharing the same size/name/number. Defaults to the first design.
+    // Single-select: ONE set per add, for the one chosen colorway (or the first
+    // if none picked). A second colorway means pick another and add again.
     const chosen = item.designs?.length
-      ? (d.designs && d.designs.length ? d.designs : [item.designs[0].label])
+      ? [(d.designs && d.designs[0]) || item.designs[0].label]
       : [undefined];
     const newSels = chosen.map((designLabel) => ({
       key: item.key,
@@ -207,12 +213,12 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
             <strong>Adding to your order {addToRef}.</strong> Pick the extra pieces below - they&apos;ll ship in the same box as your existing order, so you only pay for the new items (plus any shipping increase, if the added weight bumps it).
           </div>
         )}
-        <details className="bg-steel border border-brand/30 group">
-          <summary className="cursor-pointer px-4 py-3 list-none flex items-center justify-between">
-            <span className="display text-sm text-foreground">⚡ Ordering for the whole team? Paste your list</span>
-            <span className="text-brand transition-transform group-open:rotate-45">+</span>
+        <details className="group">
+          <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-sm text-brand hover:underline">
+            Ordering for the whole team? Paste a list
+            <span className="transition-transform group-open:rotate-45">+</span>
           </summary>
-          <div className="px-4 pb-4">
+          <div className="mt-3 border border-line bg-steel p-4">
             <RosterImport
               itemKeys={items.map((i) => i.key)}
               itemDefs={items.map((i) => ({ key: i.key, label: i.label, sizes: i.sizes }))}
@@ -245,12 +251,11 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
               </div>
               <div className="p-3 flex-1 flex flex-col">
                 <h3 className="display text-sm sm:text-base text-foreground leading-tight">{item.label}</h3>
-                <div className="mt-auto pt-2 flex items-center justify-between gap-2">
-                  <p className="display text-lg text-brand">{money(item.priceCents)}</p>
-                  <span className="display text-[11px] tracking-wide text-muted group-hover:text-brand transition-colors">
-                    {justAdded === item.key ? "✓ ADDED" : "CUSTOMIZE →"}
-                  </span>
-                </div>
+                <p className="display text-lg text-brand mt-1">{money(item.priceCents)}</p>
+                {/* Big team-colored Customize (the whole card is the button). */}
+                <span className="mt-3 block w-full text-center bg-brand text-on-brand display text-sm py-2 group-hover:bg-brand-dark transition-colors">
+                  {justAdded === item.key ? "✓ Added" : "Customize"}
+                </span>
               </div>
             </button>
           );
@@ -402,73 +407,53 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
         const selectedDesigns = d.designs ?? (item.designs?.[0] ? [item.designs[0].label] : []);
         const previewImg = item.designs?.find((dz) => dz.label === selectedDesigns[0])?.image ?? item.designs?.[0]?.image ?? item.image;
         return (
-          <div className="fixed inset-0 z-[70] bg-black/75 grid place-items-center p-3 sm:p-6" onClick={() => setActiveKey(null)}>
-            <div
-              className="w-full max-w-lg max-h-[92vh] overflow-y-auto bg-ink border border-brand/60 rounded-lg shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-line bg-steel sticky top-0">
-                <h3 className="display text-lg text-foreground">{item.label}</h3>
-                <div className="flex items-center gap-3">
+          // Full-screen focused CUSTOMIZE panel - not a small modal over the
+          // busy shop. Fills the viewport; the store is hidden behind it.
+          <div className="fixed inset-0 z-[70] bg-ink overflow-y-auto">
+            <div className="mx-auto max-w-3xl min-h-full px-4 sm:px-6 py-5">
+              <div className="flex items-center justify-between gap-3 pb-4 border-b border-line">
+                <button type="button" onClick={() => setActiveKey(null)} className="text-sm display text-foreground hover:text-brand inline-flex items-center gap-1.5">← Back to store</button>
+                <div className="flex items-baseline gap-3">
+                  <h3 className="display text-lg text-foreground">{item.label}</h3>
                   <p className="display text-xl text-brand">{money(item.priceCents)}</p>
-                  <button type="button" onClick={() => setActiveKey(null)} aria-label="Close" className="h-8 w-8 grid place-items-center border border-line text-foreground hover:bg-foreground/10 rounded">✕</button>
                 </div>
               </div>
               {previewImg && (
-                <button type="button" onClick={() => setZoom(previewImg)} className="relative block w-full bg-white group" title="Tap to enlarge">
+                <button type="button" onClick={() => setZoom(previewImg)} className="relative block w-full bg-white group mt-4 rounded overflow-hidden" title="Tap to enlarge">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={previewImg} alt={item.label} className="w-full max-h-56 object-contain" />
-                  <span className="absolute bottom-1 right-2 text-[11px] bg-ink/80 text-foreground px-1.5 py-0.5 rounded">🔍 tap to enlarge</span>
+                  <img src={previewImg} alt={item.label} className="w-full max-h-[52vh] object-contain" />
+                  <span className="absolute bottom-2 right-2 text-[11px] bg-ink/80 text-foreground px-1.5 py-0.5 rounded">🔍 tap to enlarge</span>
                 </button>
               )}
-              <div className="p-4 space-y-3">
+              <div className="py-4 space-y-3">
                 {(item.designs?.length ?? 0) > 1 && (
                   <div>
-                    <p className="display text-xs text-muted tracking-wide mb-1.5">
-                      PICK YOUR DESIGN{selectedDesigns.length > 1 ? ` (${selectedDesigns.length} selected)` : ""}
-                      <span className="text-muted/70 font-normal"> · tap more than one to get multiple sets</span>
-                    </p>
-                    <div className="flex gap-2 overflow-x-auto pb-1">
-                      {item.designs!.map((dz) => {
-                        const active = selectedDesigns.includes(dz.label);
-                        return (
-                          <button
-                            key={dz.label}
-                            type="button"
-                            onClick={() => {
-                              const next = active ? selectedDesigns.filter((x) => x !== dz.label) : [...selectedDesigns, dz.label];
-                              setDraft(item.key, { designs: next });
-                            }}
-                            className={`relative shrink-0 w-24 text-left border-2 rounded overflow-hidden ${active ? "border-brand" : "border-line opacity-75 hover:opacity-100"}`}
-                            aria-pressed={active}
-                          >
-                            {active && <span className="absolute top-1 right-1 z-10 h-5 w-5 grid place-items-center rounded-full bg-brand text-on-brand text-xs">✓</span>}
-                            {/* Magnify: view this colorway large without toggling selection. */}
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              onClick={(e) => { e.stopPropagation(); setZoom(dz.image); }}
-                              onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setZoom(dz.image); } }}
-                              className="absolute top-1 left-1 z-10 h-5 w-5 grid place-items-center rounded-full bg-ink/80 text-foreground text-[11px] hover:bg-ink cursor-pointer"
-                              title={`Enlarge ${dz.label}`}
-                            >🔍</span>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={dz.image} alt={dz.label} className="h-16 w-full object-contain bg-white" />
-                            <span className={`block px-1.5 py-1 text-[11px] leading-tight ${active ? "text-brand" : "text-muted"}`}>{dz.label}{dz.sku ? <span className="block font-mono text-[10px] opacity-70">{dz.sku}</span> : null}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                    {/* One design per set: a plain dropdown, not multi-tap. The
+                        preview above updates to the chosen colorway. Want a
+                        second colorway? Add this one, then pick another and add
+                        again. */}
+                    <label className="display text-xs text-muted tracking-wide mb-1.5 block uppercase">Design</label>
+                    <select
+                      value={selectedDesigns[0] ?? ""}
+                      onChange={(e) => setDraft(item.key, { designs: e.target.value ? [e.target.value] : [] })}
+                      className="w-full bg-steel border border-line px-3 py-2.5 text-base sm:text-sm text-foreground focus:border-brand focus:outline-none"
+                      aria-label={`${item.label} design`}
+                    >
+                      {item.designs!.map((dz) => (
+                        <option key={dz.label} value={dz.label}>{dz.label}{dz.sku ? ` (${dz.sku})` : ""}</option>
+                      ))}
+                    </select>
                   </div>
                 )}
                 <select
                   value={d.size}
                   onChange={(e) => setDraft(item.key, { size: e.target.value })}
-                  className="w-full bg-steel border border-line px-3 py-2.5 text-base sm:text-sm text-foreground focus:border-brand focus:outline-none"
+                  className={`w-full bg-steel border px-3 py-2.5 text-base sm:text-sm focus:border-brand focus:outline-none ${d.size ? "border-line text-foreground" : "border-brand/50 text-muted"}`}
                   aria-label={`${item.label} size`}
                 >
+                  <option value="" disabled>Pick a size</option>
                   {item.sizes.map((sz) => (
-                    <option key={sz} value={sz}>Size: {sz}</option>
+                    <option key={sz} value={sz}>{sz}</option>
                   ))}
                 </select>
                 {item.nameNumber ? (
@@ -517,28 +502,28 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
                   </>
                 )}
                 {(() => {
-                  const hasDesigns = (item.designs?.length ?? 0) > 0;
-                  const count = hasDesigns ? selectedDesigns.length : 1;
                   const mine = selections.filter((s) => s.key === item.key);
                   const addedOfThis = mine.length;
                   const addedTotal = mine.reduce((sum, s) => sum + s.priceCents, 0);
                   return (
                     <>
+                      {/* Always ONE set at the item price - single-select design. */}
                       <button
                         type="button"
                         onClick={() => add(item)}
-                        disabled={hasDesigns && count === 0}
+                        disabled={!d.size}
+                        title={!d.size ? "Pick a size first" : undefined}
                         className="w-full clip-slant bg-brand text-on-brand display text-lg px-5 py-3 hover:bg-brand-dark disabled:opacity-50"
                       >
-                        {justAdded === item.key ? "Added ✓" : count > 1 ? `Add ${count} sets - ${money(item.priceCents * count)}` : `Add to order - ${money(item.priceCents)}`}
+                        {justAdded === item.key ? "Added ✓" : `Add to order - ${money(item.priceCents)}`}
                       </button>
-                      {/* Running tally as you keep adding player after player. */}
+                      {/* Running tally + how to add a second colorway. */}
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-sm text-foreground">
                           {addedOfThis > 0 ? (
-                            <>Added <strong>{addedOfThis}</strong> {addedOfThis === 1 ? "set" : "sets"} · <strong className="text-brand">{money(addedTotal)}</strong></>
+                            <>Added <strong>{addedOfThis}</strong> {addedOfThis === 1 ? "set" : "sets"} · <strong className="text-brand">{money(addedTotal)}</strong>{(item.designs?.length ?? 0) > 1 ? <span className="text-muted"> · want another color? pick it above and add again</span> : null}</>
                           ) : (
-                            <span className="text-muted">Add name after name, then hit Done.</span>
+                            <span className="text-muted">Pick a design and size, then add to order.</span>
                           )}
                         </span>
                         <button

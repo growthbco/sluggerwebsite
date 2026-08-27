@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Image from "next/image";
+import { ExpandableImage } from "@/components/expandable-image";
 import { galleryPhotos } from "@/lib/gallery";
 
 export const metadata: Metadata = {
@@ -25,17 +25,9 @@ export default function GalleryPage() {
         {galleryPhotos.map((m) => (
           <div
             key={m.id}
-            className="mb-3 break-inside-avoid overflow-hidden bg-steel border border-line group"
+            className="mb-3 break-inside-avoid overflow-hidden bg-steel border border-line"
           >
-            <Image
-              src={m.file}
-              alt={m.alt || "Slugger Athletics custom gear"}
-              width={600}
-              height={600}
-              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-              unoptimized
-            />
+            <ExpandableImage src={m.file} alt={m.alt || "Slugger Athletics custom gear"} block imgClassName="object-cover" />
           </div>
         ))}
       </div>

@@ -9,17 +9,47 @@ export const APPAREL_SIZES = [
 
 export const SOCK_SIZES = ["Youth S/M", "Youth L/XL", "Adult S/M", "Adult L/XL"];
 
+// Cheer sizing runs its own youth->adult scale (not the youth-to-5XL apparel
+// scale). NOTE: the measurement CHART (inches) still needs to come from the
+// supplier - these are the selectable size labels.
+// Slugger's official cheer size run (chart in size-charts.tsx CHEER_SET). No
+// Youth X-Large - the scale jumps from Youth Large to Adult XS.
+export const CHEER_SIZES = [
+  "Youth XS", "Youth Small", "Youth Medium", "Youth Large",
+  "Adult XS", "Adult Small", "Adult Medium", "Adult Large", "Adult X-Large", "Adult 2X-Large",
+];
+
+// Flag football uniforms are SLEEVELESS COMPRESSION - their own youth-to-3XL
+// scale (chart in size-charts.tsx FLAG_FOOTBALL). A looser fit = a standard
+// crew-neck jersey instead.
+export const FLAG_FOOTBALL_SIZES = [
+  "Youth XS", "Youth Small", "Youth Medium", "Youth Large", "Youth X-Large",
+  "XS", "Small", "Medium", "Large", "X-Large", "2X-Large", "3X-Large",
+];
+
 // Flexfit i8503 size range; snapbacks are one size fits most.
 export const FITTED_HAT_SIZES = ["XS", "S/M", "L/XL", "XXL"];
 export const SNAPBACK_HAT_SIZES = ["One Size"];
 
-// inHouse: embroidered in the Ocala shop, NOT produced by the overseas
-// designer/factory. In-house items are kept out of everything designer-facing
-// (Discord roster posts, print-file QA) and surfaced on the admin page instead.
-export type ItemType = { key: string; label: string; sizes: string[]; inHouse?: boolean };
+// inHouse: embroidered in the Ocala shop. outsourced: bought finished from an
+// outside supplier (e.g. Cap America custom knit beanies). BOTH are produced
+// OUTSIDE the overseas jersey factory, so both are kept out of everything
+// designer-facing (Discord roster posts, print-file QA) and off the designer's
+// invoice. The difference is only WHO makes them - us (inHouse) vs a supplier
+// (outsourced) - which the admin surfaces so staff know to place the order.
+// minPieces: per-design order minimum for this item (default 6). Cheer sets
+// require 12 - a squad orders together, not one at a time.
+// noNames: this item doesn't carry a player name on the back (cheer sets), so a
+// fresh order of only these items defaults the "names on back?" survey to No.
+export type ItemType = { key: string; label: string; sizes: string[]; inHouse?: boolean; outsourced?: boolean; minPieces?: number; noNames?: boolean };
 
 export const ITEM_TYPES: ItemType[] = [
   { key: "jersey", label: "Jersey", sizes: APPAREL_SIZES },
+  // Ice-hockey jersey (sublimated sweater) - a premium, pricier garment than
+  // the standard jersey; label keeps "Hockey" so the designer-cost lookup hits.
+  { key: "hockey_jersey", label: "Hockey Jersey", sizes: APPAREL_SIZES },
+  // Flag football game shirt: sleeveless compression, its own size scale.
+  { key: "flag_football_jersey", label: "Flag Football Jersey", sizes: FLAG_FOOTBALL_SIZES },
   { key: "practice_jersey", label: "Practice Jersey", sizes: APPAREL_SIZES },
   { key: "knickers", label: "Knickers", sizes: APPAREL_SIZES },
   { key: "long_pants", label: "Long Pants", sizes: APPAREL_SIZES },
@@ -27,19 +57,83 @@ export const ITEM_TYPES: ItemType[] = [
   { key: "hoodie", label: "Heavyweight Hoodie", sizes: APPAREL_SIZES },
   { key: "lightweight_hoodie", label: "Lightweight Hoodie", sizes: APPAREL_SIZES },
   { key: "pullover", label: "1/4-Zip Pullover", sizes: APPAREL_SIZES },
+  { key: "cheer_uniform", label: "Cheer Uniform (Set)", sizes: CHEER_SIZES, minPieces: 12, noNames: true },
+  { key: "cheer_uniform_rhinestone", label: "Cheer Uniform (Rhinestone)", sizes: CHEER_SIZES, minPieces: 12, noNames: true },
   { key: "socks", label: "Socks", sizes: SOCK_SIZES },
   { key: "fitted_hat", label: "Fitted Hat", sizes: FITTED_HAT_SIZES, inHouse: true },
   { key: "snapback_hat", label: "Snapback Hat", sizes: SNAPBACK_HAT_SIZES, inHouse: true },
+  // Cap America i8540: water-resistant, moisture-wicking performance cap, OSFM.
+  // Limited stock colors (black, white, gray). Embroidered in-house like the
+  // other caps; priced as the premium hat.
+  { key: "performance_hat", label: "Performance Cap", sizes: SNAPBACK_HAT_SIZES, inHouse: true },
+  // Custom knit beanie (Cap America Elite Knit style): SPECIAL-ORDERED finished
+  // from Cap America - not made in-house and not by the overseas designer. OSFM.
+  { key: "beanie", label: "Beanie", sizes: SNAPBACK_HAT_SIZES, outsourced: true },
 ];
 
-// Apparel a team can add as an add-on in their existing design, even when the
-// original order didn't include that piece (a coach ordering jerseys can still
-// add hoodies later, same design). Kept to same-design-friendly upper-body
-// pieces. Priced via itemPriceCents; must exist in ITEM_TYPES + the price map.
-export const EXTRA_ADDON_KEYS = ["hoodie", "lightweight_hoodie", "pullover"];
+// Apparel a team can add as an add-on to their existing order, even when the
+// original order didn't include that piece - a coach who ordered jerseys can
+// still add hats, hoodies, pants, or socks later on the same team design. The
+// full set of common team gear so nobody is stuck with jersey-only. Excludes
+// the sport-locked jerseys (hockey/flag-football), cheer sets (min 12), and the
+// special-order beanie. Each MUST exist in ITEM_TYPES + the price map.
+export const EXTRA_ADDON_KEYS = [
+  "hoodie",
+  "lightweight_hoodie",
+  "pullover",
+  "fitted_hat",
+  "snapback_hat",
+  "performance_hat",
+  "knickers",
+  "long_pants",
+  "shorts",
+  "socks",
+];
 
 export function isInHouseItem(key: string): boolean {
   return Boolean(ITEM_TYPES.find((t) => t.key === key)?.inHouse);
+}
+
+// Hats/caps - ordered by size, never personalized with a player name or number.
+export const HAT_ITEM_KEYS = ["fitted_hat", "snapback_hat", "performance_hat", "beanie"];
+
+/** Whether this item takes a per-piece player name/number. Hats and cheer sets
+ *  don't - they're sized, not personalized - so their entry forms hide those
+ *  fields. */
+export function itemTakesName(key: string): boolean {
+  if (HAT_ITEM_KEYS.includes(key)) return false;
+  return !ITEM_TYPES.find((t) => t.key === key)?.noNames;
+}
+
+/** The per-design order minimum for an order, given its item keys. Defaults to
+ *  6; cheer sets require 12. Returns the highest minimum among the items. */
+export function minPiecesForItems(itemKeys: string[] | null | undefined): number {
+  let min = 6;
+  for (const k of itemKeys ?? []) {
+    const m = ITEM_TYPES.find((t) => t.key === k)?.minPieces;
+    if (m && m > min) min = m;
+  }
+  return min;
+}
+
+/** Whether a fresh order for these items should default to requiring names on
+ *  the back. Cheer sets (noNames) default to No; any name-bearing item flips it
+ *  to Yes. The coach can still override via the roster survey toggle. */
+export function defaultRequiresNames(itemKeys: string[] | null | undefined): boolean {
+  const keys = itemKeys?.length ? itemKeys : ["jersey"];
+  return keys.some((k) => !ITEM_TYPES.find((t) => t.key === k)?.noNames);
+}
+
+export function isOutsourcedItem(key: string): boolean {
+  return Boolean(ITEM_TYPES.find((t) => t.key === key)?.outsourced);
+}
+
+/** True for items the overseas jersey designer does NOT produce - in-house
+ *  (hats) OR outsourced (beanies). Use this for every designer-facing filter
+ *  (roster posts, print QA, billing) so neither ever reaches him. */
+export function notDesignerMade(key: string): boolean {
+  const t = ITEM_TYPES.find((x) => x.key === key);
+  return Boolean(t?.inHouse || t?.outsourced);
 }
 
 /** Map design-request product labels ("Hoodie", "Jersey / Shirt", free-typed
@@ -52,7 +146,10 @@ export function itemKeysFromDesignProducts(productTypes?: string[] | null): stri
   const push = (k: string) => { if (!keys.includes(k)) keys.push(k); };
   for (const raw of productTypes ?? []) {
     const p = raw.toLowerCase();
-    if (/jersey|shirt/.test(p)) push("jersey");
+    // Cheer FIRST - "cheerleading uniform shell and shirt" contains "shirt",
+    // which would otherwise map to a jersey.
+    if (/cheer/.test(p)) push("cheer_uniform");
+    else if (/jersey|shirt/.test(p)) push("jersey");
     else if (/hoodie|sweat/.test(p)) push("hoodie");
     else if (/knicker/.test(p)) push("knickers");
     else if (/pant/.test(p)) push("long_pants");
@@ -65,8 +162,17 @@ export function itemKeysFromDesignProducts(productTypes?: string[] | null): stri
 }
 
 // Jersey fabric options with plain-language descriptions for shoppers.
-export type JerseyMaterial = { key: string; label: string; description: string };
+export type JerseyMaterial = { key: string; label: string; description: string; recommended?: boolean };
+// Mesh is our recommended default: most breathable and durable, best for hot
+// Florida play. Listed first and flagged so the order form pre-selects it.
 export const JERSEY_MATERIALS: JerseyMaterial[] = [
+  {
+    key: "mesh",
+    label: "Mesh (Birdseye)",
+    recommended: true,
+    description:
+      "A lightweight knit with tiny textured holes (birdseye) for maximum airflow. Extra breathable and durable - a great pick for hot Florida game days.",
+  },
   {
     key: "dry-fit",
     label: "Dry-Fit",
@@ -74,12 +180,40 @@ export const JERSEY_MATERIALS: JerseyMaterial[] = [
       "A smooth, soft, moisture-wicking fabric - like a performance dry-fit shirt. Sleek next-to-skin feel that pulls sweat away to keep players dry and cool.",
   },
   {
-    key: "mesh",
-    label: "Mesh (Birdseye)",
+    key: "polyester",
+    label: "Polyester",
     description:
-      "A lightweight knit with tiny textured holes (birdseye) for maximum airflow. Extra breathable and durable - a great pick for hot Florida game days.",
+      "A structured smooth polyester used for button-front and pro-style jerseys - holds its shape and prints crisp, not open-weave like mesh.",
+  },
+  {
+    key: "microfiber",
+    label: "Microfiber",
+    description:
+      "A soft, lightweight microfiber used for our bowling shirts - drapes like a camp shirt, prints vivid, and wears comfortably off the lanes too.",
   },
 ];
+
+/** The fabric a jersey style is actually made in, so an order never defaults to
+ *  Mesh when the style implies otherwise. Button-front and quarter-zip jerseys
+ *  are smooth polyester, not birdseye mesh; crew / v-neck stay mesh (the
+ *  breathable default). Returns a JERSEY_MATERIALS key. */
+export function fabricForStyle(style?: string | null): string {
+  const s = (style ?? "").toLowerCase();
+  if (s.includes("full") || s.includes("two") || s.includes("zip")) return "polyester";
+  return "mesh";
+}
+
+/** True when a design/order is a bowling shirt. Bowling uses a distinct
+ *  microfiber fabric (and full-button bowling shirts carry their own price). */
+export function isBowling(...hints: (string | null | undefined)[]): boolean {
+  return hints.some((h) => (h ?? "").toLowerCase().includes("bowl"));
+}
+
+/** Fabric for an order, aware that bowling shirts are microfiber regardless of
+ *  style. Falls back to the style-based default for every other sport. */
+export function fabricFor(style?: string | null, ...sportHints: (string | null | undefined)[]): string {
+  return isBowling(...sportHints) ? "microfiber" : fabricForStyle(style);
+}
 
 export function itemLabel(key: string): string {
   return ITEM_TYPES.find((t) => t.key === key)?.label ?? key;
@@ -92,6 +226,16 @@ export function sizesFor(key: string): string[] {
 /** Tally an ordered roster into a per-item size breakdown (e.g. Fitted Hat:
  *  5 S/M, 2 L/XL, 3 XXL). Sizes come out in the item's canonical size order,
  *  with any stray sizes appended. Only items that have at least one size go in. */
+// Bare adult apparel sizes read ambiguously next to "Youth Medium" (is plain
+// "Medium" adult or youth?). For DISPLAY only, prefix them with "Adult" so
+// staff, customers, and print sheets can't confuse them. Stored values stay
+// bare ("Medium") so print-file size matching is unaffected.
+const ADULT_APPAREL_SIZES = new Set(["Small", "Medium", "Large", "X-Large", "2X-Large", "3X-Large", "4X-Large", "5X-Large"]);
+export function formatSize(size?: string | null): string {
+  const s = (size ?? "").trim();
+  return ADULT_APPAREL_SIZES.has(s) ? `Adult ${s}` : s;
+}
+
 export function sizeBreakdown(
   roster: { size?: string | null; sizes?: Record<string, string> | null; quantity?: number | null }[],
   items: string[],
@@ -104,8 +248,8 @@ export function sizeBreakdown(
         if (v) counts[v] = (counts[v] ?? 0) + Math.max(1, r.quantity ?? 1);
       }
       const canonical = sizesFor(k);
-      const parts = canonical.filter((s) => counts[s]).map((s) => ({ size: s, n: counts[s] }));
-      for (const s of Object.keys(counts)) if (!canonical.includes(s)) parts.push({ size: s, n: counts[s] });
+      const parts = canonical.filter((s) => counts[s]).map((s) => ({ size: formatSize(s), n: counts[s] }));
+      for (const s of Object.keys(counts)) if (!canonical.includes(s)) parts.push({ size: formatSize(s), n: counts[s] });
       return { key: k, label: itemLabel(k), parts, total: parts.reduce((a, b) => a + b.n, 0) };
     })
     .filter((x) => x.total > 0);

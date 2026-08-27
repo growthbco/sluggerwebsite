@@ -5,6 +5,7 @@ import { dbEnabled, getDb } from "@/db";
 import { orders, orderItems } from "@/db/schema";
 import { getStoreByHandle, shippingCentsFor, applyFundraise, fundraisePortionCents } from "@/lib/team-stores";
 import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
+import { recordOperationalFailure } from "@/lib/operational-events";
 
 export const runtime = "nodejs";
 
@@ -112,6 +113,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     return NextResponse.json({ url: session.url });
   } catch (e) {
     console.error("store add-checkout error:", e);
+    await recordOperationalFailure({
+      fingerprint: `checkout:store-add:${store.id}`,
+      kind: "checkout_failed",
+      title: `${store.name} add-on checkout could not start`,
+      error: e,
+      href: "/admin/shop-orders",
+      context: { route: "/api/store/[token]/add-checkout", teamId: store.id, orderReference: addToRef, itemCount: items.length },
+    });
     return NextResponse.json({ error: "Could not start checkout" }, { status: 500 });
   }
 }

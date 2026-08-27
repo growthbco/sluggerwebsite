@@ -3,8 +3,9 @@ import { waitUntil } from "@vercel/functions";
 import { autoInvoiceOnSubmit } from "@/lib/team-order-invoicing";
 import { dbEnabled } from "@/db";
 import { getByManageToken, getRoster, submitTeamOrder } from "@/lib/team-orders";
+import { minPiecesForItems } from "@/lib/order-items";
 import { postTeamOrderToDiscord } from "@/lib/discord";
-import { markOrdered, getById } from "@/lib/design-requests";
+import { markOrdered, getById, approvedMockupImages } from "@/lib/design-requests";
 import { setThreadStageTag } from "@/lib/discord-bot";
 
 export const runtime = "nodejs";
@@ -27,12 +28,37 @@ export async function POST(_req: Request, { params }: { params: Promise<{ token:
   if (roster.length === 0) {
     return NextResponse.json({ error: "Add at least one player before submitting." }, { status: 400 });
   }
+  // Elevated per-item minimums (e.g. cheer sets require 12). Default-6 items
+  // aren't hard-blocked here, preserving existing jersey flows.
+  const minPieces = minPiecesForItems(order.items);
+  if (minPieces > 6 && roster.length < minPieces) {
+    return NextResponse.json(
+      { error: `This order has a ${minPieces}-piece minimum. You have ${roster.length} - add ${minPieces - roster.length} more to submit.` },
+      { status: 400 },
+    );
+  }
+
+  const design = order.designRequestId ? await getById(order.designRequestId) : null;
+  const hasApprovedDesign = Boolean(
+    order.approvedDesignUrl ||
+      (design &&
+        (design.status === "approved" || design.status === "ordered") &&
+        (design.approvedDesignUrls?.length || design.approvedDesignUrl)),
+  );
+  if (!hasApprovedDesign) {
+    return NextResponse.json(
+      {
+        code: "DESIGN_REQUIRED",
+        error: "An approved design is required before you can submit this order. You can keep building the roster while the design is finished.",
+      },
+      { status: 409 },
+    );
+  }
 
   try {
     await submitTeamOrder(order.id);
     // Linked orders post into the design's existing thread (one project, one
     // thread); standalone orders go to #team-orders.
-    const design = order.designRequestId ? await getById(order.designRequestId) : null;
     await postTeamOrderToDiscord(
       {
         reference: order.reference,
@@ -43,11 +69,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ token:
         jerseyStyle: order.jerseyStyle ?? undefined,
         jerseyMaterial: order.jerseyMaterial ?? undefined,
         items: order.items ?? ["jersey"],
+        designImages: design ? approvedMockupImages(design) : undefined,
+        whiteLabel: order.whiteLabel,
         roster: roster.map((r) => ({
           name: r.playerName ?? undefined,
           number: r.playerNumber ?? undefined,
           size: r.size ?? undefined,
           sizes: r.sizes ?? undefined,
+          design: r.design ?? undefined,
           notes: r.notes ?? undefined,
         })),
       },

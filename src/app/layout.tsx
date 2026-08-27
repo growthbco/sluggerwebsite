@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { HideOnAdmin } from "@/components/hide-on-admin";
+import { HideOnStore } from "@/components/hide-on-store";
 import { SiteFooter } from "@/components/site-footer";
 import { StaffShortcut } from "@/components/staff-shortcut";
 import { SiteChat } from "@/components/site-chat";
@@ -132,15 +133,21 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <CartProvider>
           <HideOnAdmin>
-            <SiteHeader />
+            <HideOnStore>
+              <SiteHeader />
+            </HideOnStore>
           </HideOnAdmin>
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(LOCAL_BUSINESS_JSONLD) }} />
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(WEBSITE_JSONLD) }} />
           <main className="flex-1">{children}</main>
           <HideOnAdmin>
-            <SiteFooter />
-            <StaffShortcut />
-            <SiteChat />
+            {/* Private team stores render their own minimal footer, so the
+                marketing footer/chat/staff shortcut are hidden there too. */}
+            <HideOnStore>
+              <SiteFooter />
+              <StaffShortcut />
+              <SiteChat />
+            </HideOnStore>
           </HideOnAdmin>
           <AttributionCapture />
         </CartProvider>

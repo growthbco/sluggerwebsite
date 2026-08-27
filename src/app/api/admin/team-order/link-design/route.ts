@@ -4,7 +4,7 @@ import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
 import { isAdmin } from "@/lib/admin-auth";
 import { getRoster } from "@/lib/team-orders";
-import { getById, markOrdered } from "@/lib/design-requests";
+import { getById, markOrdered, approvedMockupImages } from "@/lib/design-requests";
 import { postTeamOrderToDiscord } from "@/lib/discord";
 import { setThreadStageTag } from "@/lib/discord-bot";
 
@@ -52,11 +52,14 @@ export async function POST(req: Request) {
         jerseyStyle: order.jerseyStyle ?? undefined,
         jerseyMaterial: order.jerseyMaterial ?? undefined,
         items: order.items ?? ["jersey"],
+        designImages: approvedMockupImages(design),
+        whiteLabel: order.whiteLabel,
         roster: roster.map((r) => ({
           name: r.playerName ?? undefined,
           number: r.playerNumber ?? undefined,
           size: r.sizes?.jersey ?? r.size ?? undefined,
           sizes: r.sizes ?? undefined,
+          design: r.design ?? undefined,
           notes: r.notes ?? undefined,
         })),
       },

@@ -1,0 +1,1 @@
+ALTER TABLE "designer_invoices" ADD COLUMN "discord_thread_id" text;

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AdminPageHeader } from "@/components/admin-page-header";
 import { redirect } from "next/navigation";
 import { desc, isNotNull, sql } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
@@ -58,45 +59,56 @@ export default async function AdminStoresPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 py-14">
-      <Link href="/admin" className="text-sm text-muted hover:text-foreground">← Back to dashboard</Link>
-      <h1 className="display text-4xl text-foreground mt-3">🏪 Team Stores ({stores.length})</h1>
+      <AdminPageHeader eyebrow="Operations" title={`Team Stores (${stores.length})`} />
       <p className="mt-2 text-muted">
         Every team storefront: share links, sales totals, and per-store orders. Open a standalone store
         below for repeat customers who just need a link.
       </p>
 
       <details className="mt-6 group">
-        <summary className="cursor-pointer text-sm display text-brand hover:underline list-none">
-          ➕ Open a standalone store (no design needed)
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 clip-slant bg-brand text-on-brand display text-sm px-4 py-2 hover:bg-brand-dark">
+          Open a standalone store (no design needed)
+          <span className="opacity-70 transition-transform group-open:rotate-90">›</span>
         </summary>
         <AdminNewStore presets={STORE_ITEM_PRESETS.map((p) => ({ key: p.key, label: p.label, priceCents: p.priceCents }))} />
       </details>
 
-      <div className="mt-6 border border-line divide-y divide-[color:var(--line)]">
+      <div className="mt-6 border border-line">
+        {/* Column headers, so the list reads as a real table. */}
+        <div className="hidden sm:grid grid-cols-[2fr_5.5rem_5rem_7rem_auto] items-center gap-3 bg-steel px-3 py-2 text-xs text-muted uppercase tracking-wide">
+          <span>Store</span>
+          <span>Status</span>
+          <span>Orders</span>
+          <span>Sales</span>
+          <span className="text-right">Link</span>
+        </div>
+        <div className="divide-y divide-[color:var(--line)]">
         {stores.length === 0 && <p className="px-3 py-4 text-sm text-muted">No stores yet.</p>}
         {stores.map((s) => {
           const myOrders = storeOrders.filter((o) => o.teamId === s.id);
+          const n = aggMap.get(s.id)?.n ?? 0;
+          const sales = Number(aggMap.get(s.id)?.sum ?? 0);
           return (
             <details key={s.id} className="group">
-              <summary className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm cursor-pointer list-none">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted text-xs transition-transform group-open:rotate-90">▶</span>
-                  <Link href={`/store/${s.storeToken}`} className="text-brand hover:underline">{s.name}</Link>
-                  <span className={`text-xs display ${s.storeActive ? "text-green-400" : "text-muted"}`}>
-                    {s.storeActive ? "OPEN" : "CLOSED"}
-                  </span>
-                </div>
-                <p className="text-muted shrink-0">
-                  {aggMap.get(s.id)?.n ?? 0} orders · {money(Number(aggMap.get(s.id)?.sum ?? 0))}
-                </p>
+              <summary className="grid grid-cols-[2fr_5.5rem_5rem_7rem_auto] items-center gap-3 px-3 py-2.5 text-sm cursor-pointer list-none hover:bg-steel/40">
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="text-muted text-xs transition-transform group-open:rotate-90 shrink-0">›</span>
+                  <Link href={`/store/${s.storeToken}`} className="text-brand hover:underline truncate">{s.name}</Link>
+                </span>
+                <span className={`inline-block w-fit border px-2 py-0.5 text-[11px] display uppercase tracking-wide rounded ${s.storeActive ? "border-green-500/50 text-green-400 bg-green-500/10" : "border-line text-muted/70"}`}>
+                  {s.storeActive ? "Open" : "Closed"}
+                </span>
+                <span className={n > 0 ? "text-foreground tabular-nums" : "text-muted/40 tabular-nums"}>{n}</span>
+                <span className={sales > 0 ? "display text-foreground tabular-nums" : "text-muted/40 tabular-nums"}>{money(sales)}</span>
+                <span className="text-right text-xs text-muted/70 group-open:text-brand">details</span>
               </summary>
               <div className="bg-ink/40 border-t border-line/50 px-3 py-3 space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   {(s.storeItems?.length ?? 0) > 0 && (
                     <details className="group/designs w-full">
                       <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs display bg-brand text-on-brand px-3 py-1.5 hover:bg-brand-dark">
-                        🎨 Manage colors &amp; photos
-                        <span className="opacity-70 transition-transform group-open/designs:rotate-90">▶</span>
+                        Manage colors &amp; photos
+                        <span className="opacity-70 transition-transform group-open/designs:rotate-90"></span>
                       </summary>
                       <div className="mt-3">
                         <AdminStoreDesigns
@@ -106,8 +118,8 @@ export default async function AdminStoresPage() {
                       </div>
                     </details>
                   )}
-                  <Link href={`/store/${s.storeToken}/verify`} className="text-xs display border border-line px-3 py-1.5 text-brand hover:border-brand/50">🔍 Print-file QA</Link>
-                  <Link href={`/store/${s.storeToken}`} className="text-xs display border border-line px-3 py-1.5 text-muted hover:text-foreground hover:border-brand/50">View store ↗</Link>
+                  <Link href={`/store/${s.storeToken}/verify`} className="text-xs display border border-line px-3 py-1.5 text-brand hover:border-brand/50">Print-file QA</Link>
+                  <Link href={`/store/${s.storeToken}`} className="text-xs display border border-line px-3 py-1.5 text-muted hover:text-foreground hover:border-brand/50">View store </Link>
                 </div>
                 {myOrders.length === 0 ? (
                   <p className="text-xs text-muted">No orders yet. Share the store link so families can order.</p>
@@ -121,7 +133,7 @@ export default async function AdminStoresPage() {
                         </span>
                         <span className="text-foreground whitespace-nowrap">
                           {money(o.totalCents)} <span className="text-muted">{fmtDate(o.createdAt)}</span>
-                          {o.shippedAt ? <span className="ml-1 text-green-400">🚚</span> : null}
+                          {o.shippedAt ? <span className="ml-1 text-green-400 text-[10px] uppercase tracking-wide">shipped</span> : null}
                         </span>
                       </li>
                     ))}
@@ -131,6 +143,7 @@ export default async function AdminStoresPage() {
             </details>
           );
         })}
+        </div>
       </div>
     </div>
   );

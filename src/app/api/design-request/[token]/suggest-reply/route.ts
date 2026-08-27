@@ -28,6 +28,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       design: {
         reference: request.reference,
         teamName: request.teamName,
+        sport: request.sport,
         status: request.status,
         revisionsUsed: request.revisionsUsed,
         proofCount: request.proofImages?.length ?? 0,

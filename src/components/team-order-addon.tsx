@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { itemLabel, sizesFor } from "@/lib/order-items";
+import { itemLabel, sizesFor, itemTakesName } from "@/lib/order-items";
 
 type Line = { key: string; size: string; name: string; number: string; design: string; quantity: number };
 
@@ -13,21 +13,28 @@ export function TeamOrderAddon({
   prices,
   designs = [],
   shipped,
+  embedded = false,
 }: {
   token: string;
   items: string[];
   prices: Record<string, number>;
   designs?: { label: string; image: string; sku?: string | null }[];
   shipped?: boolean;
+  /** Rendered inside the "Add to this order" block on the roster tab: drop the
+   *  own card chrome + header, the block above already sets the context. */
+  embedded?: boolean;
 }) {
   const first = items[0] ?? "jersey";
   const firstDesign = designs.length === 1 ? designs[0].label : "";
   const [lines, setLines] = useState<Line[]>([]);
-  const [draft, setDraft] = useState<Line>({ key: first, size: sizesFor(first)[0], name: "", number: "", design: firstDesign, quantity: 1 });
+  // Size starts empty ("Pick a size") so nobody ships a silent Youth Small.
+  const [draft, setDraft] = useState<Line>({ key: first, size: "", name: "", number: "", design: firstDesign, quantity: 1 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [zoom, setZoom] = useState<string | null>(null);
   const needsDesign = designs.length > 1;
+  // Hats/caps are sized, not personalized - hide the name/# fields for them.
+  const needsName = itemTakesName(draft.key);
   // Preview the currently-selected design (or the only one) so they see it.
   const previewDesign = designs.find((d) => d.label === draft.design) ?? (designs.length === 1 ? designs[0] : undefined);
 
@@ -35,9 +42,12 @@ export function TeamOrderAddon({
   const total = lines.reduce((s, l) => s + (prices[l.key] ?? 0) * l.quantity, 0);
 
   function add() {
+    if (!draft.size) { setError("Pick a size for this piece."); return; }
     if (needsDesign && !draft.design) { setError("Pick a design for this piece."); return; }
     setError("");
     setLines((ls) => [...ls, draft]);
+    // Keep the chosen size + design for the next piece (convenient for a run of
+    // the same size); clear name + number.
     setDraft({ key: draft.key, size: draft.size, name: "", number: "", design: draft.design, quantity: 1 });
   }
 
@@ -60,19 +70,26 @@ export function TeamOrderAddon({
   }
 
   return (
-    <div className="bg-steel border border-line p-5">
-      <h2 className="display text-lg text-foreground">Need more gear?</h2>
-      <p className="text-sm text-muted mt-1">
-        Add extra pieces to this order anytime - pay for just what you add, and they join
-        your roster automatically. No new order needed.
-      </p>
+    <div className={embedded ? "" : "bg-steel border border-line p-5"}>
+      {!embedded && (
+        <>
+          <h2 className="display text-lg text-foreground">Need more gear?</h2>
+          <p className="text-sm text-muted mt-1">
+            Add extra pieces to this order anytime - pay for just what you add, and they join
+            your roster automatically. No new order needed.
+          </p>
+        </>
+      )}
 
-      <div className="mt-3 flex flex-wrap gap-2 items-center">
+      <div className={`${embedded ? "" : "mt-3 "}flex flex-wrap gap-2 items-center`}>
         <select
           value={draft.key}
           onChange={(e) => {
             const key = e.target.value;
-            setDraft((d) => ({ ...d, key, size: sizesFor(key)[0] }));
+            // New item type -> its sizes differ, so re-pick. Hats carry no
+            // name/#, so drop any personalization when switching to one.
+            const keep = itemTakesName(key);
+            setDraft((d) => ({ ...d, key, size: "", name: keep ? d.name : "", number: keep ? d.number : "" }));
           }}
           className="bg-ink border border-line px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
           aria-label="Item"
@@ -100,35 +117,40 @@ export function TeamOrderAddon({
           className="bg-ink border border-line px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
           aria-label="Size"
         >
+          <option value="">Pick a size</option>
           {sizesFor(draft.key).map((s) => (
             <option key={s}>{s}</option>
           ))}
         </select>
-        {/* Keep name + # together so the number never drops to its own line. */}
-        <div className="flex gap-2 items-center flex-1 min-w-48">
-          <input
-            value={draft.name}
-            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-            placeholder="Name (optional)"
-            maxLength={30}
-            className="flex-1 min-w-0 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-          />
-          <input
-            value={draft.number}
-            onChange={(e) => setDraft((d) => ({ ...d, number: e.target.value }))}
-            placeholder="#"
-            maxLength={4}
-            className="w-14 shrink-0 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={add}
-            className="clip-slant bg-brand text-on-brand display text-sm px-4 py-2 hover:bg-brand-dark shrink-0"
-          >
-            Add
-          </button>
-        </div>
+        {/* Keep name + # together so the number never drops to its own line.
+            Hidden for hats/caps - they're sized, not personalized. */}
+        {needsName && (
+          <div className="flex gap-2 items-center flex-1 min-w-48">
+            <input
+              value={draft.name}
+              onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+              placeholder="Player name"
+              maxLength={30}
+              className="flex-1 min-w-0 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+            />
+            <input
+              value={draft.number}
+              onChange={(e) => setDraft((d) => ({ ...d, number: e.target.value }))}
+              placeholder="#"
+              maxLength={4}
+              className="w-14 shrink-0 bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+            />
+          </div>
+        )}
       </div>
+
+      <button
+        type="button"
+        onClick={add}
+        className="mt-3 w-full sm:w-auto clip-slant bg-brand text-on-brand display px-8 py-3 hover:bg-brand-dark"
+      >
+        Add to list
+      </button>
 
       {previewDesign?.image && (
         <button

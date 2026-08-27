@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { dbEnabled } from "@/db";
 import { getByStatusToken, MAX_REVISIONS } from "@/lib/design-requests";
+import { getByDesignRequestId } from "@/lib/team-orders";
 import { DesignStatusPanel } from "@/components/design-status-panel";
 import { DesignMessages } from "@/components/design-messages";
+import { TeamOrderManageSection } from "@/components/team-order-manage-section";
+import { OrderStageTracker, type Stage } from "@/components/order-stage-tracker";
+import { trackingUrlFor } from "@/lib/tracking";
 
-export const metadata: Metadata = { title: "Your Design Request", robots: { index: false } };
+export const metadata: Metadata = { title: "Your Order", robots: { index: false } };
 
 function Centered({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -22,33 +27,46 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
   const request = await getByStatusToken(token);
   if (!request) return <Centered title="Link not found">This link is invalid or has expired.</Centered>;
 
-  // Surface the design-fee state above the status panel so the customer
-  // always knows where they stand on the $35 (paid / waived / pending).
-  const feeState: { label: string; tone: "good" | "warn" } = request.designFeeWaivedReason
-    ? {
-        label:
-          request.designFeeWaivedReason === "returning_customer"
-            ? "✓ Design fee waived - returning customer"
-            : "✓ Design fee waived",
-        tone: "good",
-      }
-    : request.designFeePaidAt
-    ? { label: "✓ $35 design fee paid - credited 100% to your final order", tone: "good" }
-    : request.status === "pending_payment"
-    ? { label: "⏳ Awaiting payment - your designer starts once the $35 lands", tone: "warn" }
-    : { label: `$35 design fee on file (${request.status})`, tone: "good" };
+  const isApproved = request.status === "approved" || request.status === "ordered";
+  // The order this design turned into (auto-provisioned on approval). Drives the
+  // roster / deposit / tracking stages of the hub.
+  const order = isApproved ? await getByDesignRequestId(request.id) : null;
+
+  // Lifecycle flags off the team order.
+  const submitted = order ? !["draft", "collecting"].includes(order.status) : false;
+  const depositDone = Boolean(order?.depositPaidAt || order?.invoicePaidAt) || ["in_production", "shipped"].includes(order?.status ?? "");
+  const shipped = order?.status === "shipped" || Boolean(order?.shippedAt);
+  const inProduction = order?.status === "in_production";
+  // A deposit invoice can be sent from admin before the coach formally submits
+  // the roster - the pay link must show on this page the moment it exists, or
+  // the "Deposit" step is a dead end.
+  const hasDepositInvoice = Boolean(order?.invoiceUrl);
+  const depositReady = submitted || hasDepositInvoice || depositDone;
+
+  // Build the four-stage tracker.
+  const st = (done: boolean, active: boolean): Stage["state"] => (done ? "done" : active ? "active" : "todo");
+  const stages: Stage[] = [
+    { label: "Approve design", state: st(isApproved, !isApproved) },
+    { label: "Roster & sizes", state: st(submitted, Boolean(isApproved && !submitted)) },
+    { label: "Deposit", state: st(depositDone, Boolean(depositReady && !depositDone)) },
+    { label: shipped ? "Shipped" : "Track", state: st(shipped, Boolean(depositDone && !shipped)) },
+  ];
+
+  const feeLabel =
+    request.designFeeWaivedReason === "returning_customer"
+      ? "Free design - welcome back, the mockup is on us"
+      : "Free design - the mockup is on us";
 
   return (
-    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14 space-y-4">
-      <div
-        className={`text-sm px-4 py-2 border ${
-          feeState.tone === "good"
-            ? "border-brand/40 bg-brand/5 text-foreground"
-            : "border-amber-500/40 bg-amber-500/5 text-foreground"
-        }`}
-      >
-        {feeState.label}
+    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14 space-y-6">
+      {/* One link, whole order: the progress tracker orients the customer no
+          matter which stage they land on. */}
+      <div className="border border-line bg-foreground/[0.02] px-4 py-4">
+        <OrderStageTracker stages={stages} />
       </div>
+
+      <div className="text-sm px-4 py-2 border border-brand/40 bg-brand/5 text-foreground">{feeLabel}</div>
+
       {request.rush && (
         <div className={`text-sm px-4 py-3 border ${request.rushApprovedAt ? "border-brand/40 bg-brand/5" : "border-amber-500/40 bg-amber-500/5"} text-foreground`}>
           {request.rushApprovedAt ? (
@@ -71,6 +89,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
           )}
         </div>
       )}
+
       <DesignStatusPanel
         token={token}
         reference={request.reference}
@@ -79,10 +98,78 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
         proofImages={request.proofImages ?? []}
         proofLabels={request.proofLabels ?? {}}
         initialApprovedUrl={request.approvedDesignUrl}
-        teamOrderUrl={`/team-order?design=${token}`}
+        approvedUrls={request.approvedDesignUrls ?? []}
+        teamOrderUrl={order ? "#roster" : `/team-order?design=${token}`}
         revisionsUsed={request.revisionsUsed ?? 0}
         maxRevisions={MAX_REVISIONS}
       />
+
+      {/* STAGE 2 - Roster & sizes, on the same link once the design is approved. */}
+      {isApproved && order && (
+        <section id="roster" className="pt-6 border-t border-line space-y-6 scroll-mt-6">
+          <h2 className="display text-2xl text-foreground">Your roster &amp; sizes</h2>
+          <TeamOrderManageSection order={order} />
+        </section>
+      )}
+
+      {/* STAGE 3 - Deposit. Visible the moment a deposit invoice exists (even
+          before the coach formally submits the roster), so the pay link never
+          dies into email. */}
+      {isApproved && order && depositReady && (
+        <section className="pt-6 border-t border-line">
+          <h2 className="display text-2xl text-foreground">Deposit</h2>
+          {depositDone ? (
+            <p className="mt-2 text-sm text-foreground bg-brand/10 border border-brand/40 px-4 py-3">
+              ✓ {order.invoicePaidAt ? "Paid in full" : "Deposit received"} - thank you! We&apos;re moving your order into production.
+            </p>
+          ) : order.invoiceUrl ? (
+            <div className="mt-2 space-y-3">
+              <p className="text-sm text-muted">A 50% deposit gets your order into production. Balance is due before we ship.</p>
+              <Link
+                href={order.invoiceUrl}
+                className="inline-block clip-slant bg-brand text-on-brand display text-lg px-8 py-4 hover:bg-brand-dark transition-colors"
+              >
+                Pay your deposit →
+              </Link>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-muted">Once your roster is finalized, we&apos;ll email your deposit invoice - it will show up here too.</p>
+          )}
+        </section>
+      )}
+
+      {/* STAGE 4 - Track. */}
+      {isApproved && order && (shipped || inProduction) && (
+        <section className="pt-6 border-t border-line">
+          <h2 className="display text-2xl text-foreground">{shipped ? "Shipment" : "Production"}</h2>
+          {shipped ? (
+            <div className="mt-2 space-y-2 text-sm">
+              <p className="text-foreground">
+                📦 Shipped
+                {order.shippedAt ? ` on ${new Date(order.shippedAt).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric" })}` : ""}
+                {order.shipCarrier ? ` via ${order.shipCarrier}` : ""}.
+              </p>
+              {order.trackingNumber && (
+                <p>
+                  <a href={trackingUrlFor(order.trackingNumber)} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
+                    Track {order.trackingNumber} →
+                  </a>
+                </p>
+              )}
+              {(order.additionalShipments ?? []).map((s) => (
+                <p key={s.trackingNumber}>
+                  <a href={trackingUrlFor(s.trackingNumber)} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
+                    Track {s.trackingNumber}{s.carrier ? ` (${s.carrier})` : ""} →
+                  </a>
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-muted">Your order is in production. We&apos;ll post tracking here (and email it) the moment it ships.</p>
+          )}
+        </section>
+      )}
+
       <div className="pt-6 border-t border-line">
         <DesignMessages token={token} role="client" initialMessages={request.messages ?? []} />
       </div>

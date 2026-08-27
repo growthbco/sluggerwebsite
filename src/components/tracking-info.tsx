@@ -41,7 +41,7 @@ export function TrackingInfo({
         title="Copy tracking number"
         className="text-[10px] display text-muted border border-line px-1.5 py-0.5 hover:border-brand/50 hover:text-foreground"
       >
-        {copied ? "✓ copied" : "⧉ copy"}
+        {copied ? "copied" : "⧉ copy"}
       </button>
       {labelUrl && (
         <a
@@ -51,7 +51,7 @@ export function TrackingInfo({
           title="Reprint the shipping label"
           className="text-[10px] display text-brand border border-brand/40 px-1.5 py-0.5 hover:bg-brand/10"
         >
-          🖨 Label
+          Label
         </a>
       )}
     </span>

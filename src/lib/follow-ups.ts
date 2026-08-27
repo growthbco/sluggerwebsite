@@ -2,14 +2,17 @@
 // client has gone quiet (no approval, no change request, no message since the
 // proof), and we haven't exhausted the reminder cap.
 
-import { eq, and, isNull, isNotNull, lt, gt } from "drizzle-orm";
+import { eq, ne, and, isNull, isNotNull, lt, gt, notInArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { designRequests, teamOrders, designLabVisitors, smsMessages, orders } from "@/db/schema";
 import { toE164 } from "@/lib/sms";
 
-export const MAX_FOLLOW_UPS = 2;
-const FIRST_AFTER_DAYS = 2; // proof sent -> first nudge
-const NEXT_AFTER_DAYS = 4; // first nudge -> second nudge
+// Daily proof follow-ups: once a design is sent and the client goes quiet, we
+// text them every day until they act or we hit the cap. Env-overridable so the
+// cadence can be tuned without a deploy.
+export const MAX_FOLLOW_UPS = Number(process.env.PROOF_FOLLOWUP_MAX) || 10;
+const FIRST_AFTER_DAYS = 1; // proof sent -> first nudge (next day)
+const NEXT_AFTER_DAYS = 1; // then once every day after
 const STALE_AFTER_DAYS = 60; // too old to auto-nudge; needs a human
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -18,6 +21,7 @@ export type FollowUpCandidate = {
   id: string;
   reference: string;
   teamName: string;
+  contactName: string;
   contactEmail: string;
   contactPhone: string | null;
   smsOptInAt: Date | null;
@@ -52,11 +56,16 @@ export async function findProofFollowUpCandidates(now = new Date()): Promise<Fol
     // proof disables nudges forever - silently killed all follow-ups once the
     // AI chat launched, because nearly every client now sends messages.)
     const msgs = r.messages ?? [];
+    const base = sent === 0 ? r.proofSentAt : r.lastFollowUpAt ?? r.proofSentAt;
     const lastMsg = msgs[msgs.length - 1];
-    if (lastMsg && lastMsg.from === "client") continue;
+    // Stand down ONLY if the client's last message is unanswered AND arrived
+    // AFTER our last touch (the proof, or our last nudge) - that's a real
+    // question a human should answer. A happy pre-proof comment ("sounds
+    // great!") must NOT freeze the nudges forever (that's what stranded Dona
+    // Lemoine / DR-V3FQOW with zero follow-ups since Aug 16).
+    if (lastMsg && lastMsg.from === "client" && new Date(lastMsg.at) > base) continue;
     const lastClientMsg = [...msgs].reverse().find((m) => m.from === "client");
 
-    const base = sent === 0 ? r.proofSentAt : r.lastFollowUpAt ?? r.proofSentAt;
     const clientAt = lastClientMsg ? new Date(lastClientMsg.at) : null;
     const since = clientAt && clientAt > base ? clientAt : base;
     const waitDays = sent === 0 ? FIRST_AFTER_DAYS : NEXT_AFTER_DAYS;
@@ -66,6 +75,7 @@ export async function findProofFollowUpCandidates(now = new Date()): Promise<Fol
       id: r.id,
       reference: r.reference,
       teamName: r.teamName,
+      contactName: r.contactName,
       contactEmail: r.contactEmail,
       contactPhone: r.contactPhone,
       smsOptInAt: r.smsOptInAt,
@@ -233,16 +243,17 @@ export async function recordFollowUp(id: string, now = new Date()) {
  * Someone used the AI design tool, gave a phone to unlock their design, but
  * never ordered. A gentle 2-step "can we help?" text (day ~1, then day ~4 if
  * they never replied). Skips leads who already became a real design request. */
-export const MAX_AI_LEAD_FOLLOW_UPS = 2;
+export const MAX_AI_LEAD_FOLLOW_UPS = 3;
 const AI_FIRST_AFTER_HOURS = 20;
-const AI_NEXT_AFTER_DAYS = 3;
-const AI_STALE_AFTER_DAYS = 30; // older than this: don't cold-text, needs a human
+const AI_NEXT_AFTER_DAYS = 3; // round 2: a few days after round 1
+const AI_THIRD_AFTER_DAYS = 14; // round 3: two weeks after round 2, spaced out
+const AI_STALE_AFTER_DAYS = 45; // older than this: the seasonal track takes over
 
 export type AiLeadCandidate = {
   id: string;
   firstName: string | null;
   phone: string;
-  round: number; // 1 or 2
+  round: number; // 1, 2, or 3
 };
 
 export async function findAiLeadFollowUpCandidates(now = new Date()): Promise<AiLeadCandidate[]> {
@@ -268,13 +279,14 @@ export async function findAiLeadFollowUpCandidates(now = new Date()): Promise<Ai
       if (now.getTime() - +v.createdAt < AI_FIRST_AFTER_HOURS * 60 * 60 * 1000) continue;
       out.push({ id: v.id, firstName: v.firstName, phone, round: 1 });
     } else {
-      // Round 2: wait a few days, and skip if they've replied since round 1
-      // (a human is now handling that conversation).
-      if (!v.lastFollowUpAt || now.getTime() - +v.lastFollowUpAt < AI_NEXT_AFTER_DAYS * DAY_MS) continue;
+      // Rounds 2 & 3: space them out (3 days, then 14), and skip if they've
+      // replied since the last one (a human is now handling that conversation).
+      const waitDays = sent === 1 ? AI_NEXT_AFTER_DAYS : AI_THIRD_AFTER_DAYS;
+      if (!v.lastFollowUpAt || now.getTime() - +v.lastFollowUpAt < waitDays * DAY_MS) continue;
       const msgs = await db.select({ direction: smsMessages.direction, createdAt: smsMessages.createdAt }).from(smsMessages).where(eq(smsMessages.phone, phone));
       const repliedSince = msgs.some((m) => m.direction === "in" && +m.createdAt > +v.lastFollowUpAt!);
       if (repliedSince) continue;
-      out.push({ id: v.id, firstName: v.firstName, phone, round: 2 });
+      out.push({ id: v.id, firstName: v.firstName, phone, round: sent + 1 });
     }
   }
   return out;
@@ -313,7 +325,10 @@ export async function findReviewRequestCandidates(now = new Date()): Promise<Rev
     .from(teamOrders)
     .where(
       and(
-        eq(teamOrders.status, "shipped"),
+        // Keyed off shippedAt, NOT status - an order can ship while still
+        // marked "paid" (paid in full) or "in_production", and those still
+        // deserve a review. Only a cancelled order is excluded.
+        ne(teamOrders.status, "cancelled"),
         isNull(teamOrders.reviewRequestedAt),
         isNotNull(teamOrders.shippedAt),
         lt(teamOrders.shippedAt, cutoff),
@@ -342,7 +357,9 @@ export async function findOrderReviewCandidates(now = new Date()): Promise<Revie
     .from(orders)
     .where(
       and(
-        eq(orders.status, "fulfilled"),
+        // Shipped is the real signal (a store order can ship while still
+        // "paid"); only cancelled/refunded are excluded.
+        notInArray(orders.status, ["cancelled", "refunded"]),
         isNull(orders.reviewRequestedAt),
         isNotNull(orders.shippedAt),
         lt(orders.shippedAt, cutoff),
@@ -434,4 +451,60 @@ export async function recordAiLeadFollowUp(id: string, now = new Date()) {
     .update(designLabVisitors)
     .set({ smsFollowUpsSent: (row?.n ?? 0) + 1, lastFollowUpAt: now })
     .where(eq(designLabVisitors.id, id));
+}
+
+/* ── Season-aware re-engagement ─────────────────────────────────────
+ *
+ * Cold leads (used the AI lab, gave a phone, never ordered) get one nudge
+ * ahead of each busy ordering season, when teams are actually forming and
+ * gearing up. Florida-tuned windows (baseball/softball skew earlier and warmer
+ * here): teams order ~4-6 weeks before the season, so the SELL window is:
+ *   - Spring baseball/softball: Nov 1 - Jan 31
+ *   - Fall ball:                Jun 15 - Aug 15
+ * Capped once per window (cooldown) so a lead hears from us each new season
+ * without being spammed. Complements the ~1-year reorder win-back for past
+ * customers - this targets the interested-but-never-bought pool. */
+export type SeasonCampaign = { key: string; label: string };
+const SEASONAL_MIN_AGE_DAYS = 45; // past the regular AI-lead cadence
+const SEASONAL_MAX_AGE_DAYS = 550; // ~18 months; older leads are truly cold
+const SEASONAL_COOLDOWN_DAYS = 120; // at most one seasonal ping per ~4-month window
+
+export function currentSeasonCampaign(now = new Date()): SeasonCampaign | null {
+  const [mm, dd] = now
+    .toLocaleDateString("en-US", { timeZone: "America/New_York", month: "2-digit", day: "2-digit" })
+    .split("/")
+    .map(Number);
+  const mmdd = mm * 100 + dd;
+  if (mmdd >= 1101 || mmdd <= 131) return { key: "spring", label: "Spring baseball and softball" };
+  if (mmdd >= 615 && mmdd <= 815) return { key: "fall", label: "Fall ball" };
+  return null;
+}
+
+export type SeasonalCandidate = { id: string; firstName: string | null; phone: string; campaignLabel: string };
+
+export async function findSeasonalReengagementCandidates(now = new Date()): Promise<SeasonalCandidate[]> {
+  const campaign = currentSeasonCampaign(now);
+  if (!campaign) return []; // not in a sell window - nothing to send
+  const db = getDb();
+  const visitors = await db.select().from(designLabVisitors);
+  const drRows = await db.select({ email: designRequests.contactEmail }).from(designRequests);
+  const converted = new Set(drRows.map((r) => (r.email ?? "").trim().toLowerCase()).filter(Boolean));
+
+  const out: SeasonalCandidate[] = [];
+  for (const v of visitors) {
+    if (v.paidAt) continue; // already a customer
+    if ((v.generations ?? 0) < 1) continue; // never actually designed
+    const phone = toE164(v.phone);
+    if (!phone) continue;
+    if (v.email && converted.has(v.email.trim().toLowerCase())) continue; // became a real design request
+    const ageDays = (now.getTime() - +v.createdAt) / DAY_MS;
+    if (ageDays < SEASONAL_MIN_AGE_DAYS || ageDays > SEASONAL_MAX_AGE_DAYS) continue;
+    if (v.lastSeasonalPromptAt && now.getTime() - +v.lastSeasonalPromptAt < SEASONAL_COOLDOWN_DAYS * DAY_MS) continue;
+    out.push({ id: v.id, firstName: v.firstName, phone, campaignLabel: campaign.label });
+  }
+  return out;
+}
+
+export async function recordSeasonalPrompt(id: string, now = new Date()) {
+  await getDb().update(designLabVisitors).set({ lastSeasonalPromptAt: now }).where(eq(designLabVisitors.id, id));
 }

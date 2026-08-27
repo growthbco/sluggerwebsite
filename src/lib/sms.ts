@@ -40,8 +40,10 @@ export async function sendSms(
   // fetches and forwards them; larger sends are capped by the carrier.
   for (const u of mediaUrls.slice(0, 10)) params.append("MediaUrl", u);
   if (channel === "whatsapp") {
+    // Dedicated WhatsApp sender if set, else the same number as SMS.
+    const waFrom = process.env.WHATSAPP_FROM || process.env.TWILIO_FROM;
     params.set("To", `whatsapp:${toNum}`);
-    params.set("From", `whatsapp:${process.env.TWILIO_FROM}`);
+    params.set("From", `whatsapp:${waFrom}`);
   } else {
     params.set("To", toNum);
     if (process.env.TWILIO_MESSAGING_SERVICE_SID) {
@@ -95,11 +97,36 @@ async function logOutboundSms(phone: string, body: string, sid: string | undefin
   }
 }
 
+/** True if we already texted this phone something containing `needle` within
+ *  the last `minutes`. Used to DEBOUNCE the "new reply" nudge so a burst of
+ *  replies (e.g. the AI answering two questions in a row) sends one text, not
+ *  one per message. Best-effort: on any error, returns false (send proceeds). */
+export async function textedRecently(phone: string | null | undefined, needle: string, minutes: number): Promise<boolean> {
+  try {
+    const to = toE164(phone);
+    if (!to) return false;
+    const { getDb } = await import("@/db");
+    const { smsMessages } = await import("@/db/schema");
+    const { and, eq, gt, ilike } = await import("drizzle-orm");
+    const since = new Date(Date.now() - minutes * 60_000);
+    const rows = await getDb()
+      .select({ id: smsMessages.id })
+      .from(smsMessages)
+      .where(and(eq(smsMessages.phone, to), eq(smsMessages.direction, "out"), gt(smsMessages.createdAt, since), ilike(smsMessages.body, `%${needle}%`)))
+      .limit(1);
+    return rows.length > 0;
+  } catch (e) {
+    console.error("textedRecently check failed:", e);
+    return false;
+  }
+}
+
 /** Text a customer an order update ONLY if they actively opted in on a form
  *  (smsOptInAt) and left a phone. Fire-and-forget: failures just log, they
  *  never break the flow that triggered them. */
 export async function smsIfConsented(opts: { phone?: string | null; optInAt?: Date | null; body: string }): Promise<boolean> {
   if (!opts.optInAt || !opts.phone) return false;
+  if (!withinTextingHours()) return false; // automated texts stay within 8am-7pm ET
   const r = await sendSms(opts.phone, opts.body);
   if (r.ok) await logOutboundSms(opts.phone, opts.body, r.sid);
   return r.ok;
@@ -110,8 +137,17 @@ export async function smsIfConsented(opts: { phone?: string | null; optInAt?: Da
  *  Twilio's Advanced Opt-Out on the Messaging Service refuses to deliver to a
  *  number that texted STOP, so opt-outs are honored automatically. Bodies
  *  should still end with "Reply STOP to opt out." Fire-and-forget. */
+// Quiet hours for AUTOMATED texting: never send outside 8am-7pm Eastern, so
+// follow-ups/reminders don't land on customers late at night. Manual staff
+// replies from the inbox are not gated by this.
+export function withinTextingHours(now = new Date()): boolean {
+  const hour = Number(now.toLocaleString("en-US", { timeZone: "America/New_York", hour: "2-digit", hour12: false }));
+  return hour >= 8 && hour < 19; // [8:00, 19:00) ET
+}
+
 export async function sendFollowUpSms(opts: { phone?: string | null; body: string }): Promise<boolean> {
   if (!opts.phone) return false;
+  if (!withinTextingHours()) return false; // hold automated texts until daytime
   const r = await sendSms(opts.phone, opts.body);
   if (r.ok) await logOutboundSms(opts.phone, opts.body, r.sid, "Auto follow-up");
   return r.ok;
@@ -131,8 +167,16 @@ export async function rehostTwilioMedia(urls: string[]): Promise<string[]> {
   const out: string[] = [];
   for (const url of urls.slice(0, 10)) {
     try {
-      const res = await fetch(url, { headers: { Authorization: auth }, signal: AbortSignal.timeout(12000) });
-      if (!res.ok) { console.error("twilio media fetch failed:", res.status, url); continue; }
+      // Twilio sometimes fires the inbound webhook before the media has
+      // finished processing, so a fetch right away 404s. Retry a couple of
+      // times with a short backoff before giving up.
+      let res: Response | null = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        res = await fetch(url, { headers: { Authorization: auth }, signal: AbortSignal.timeout(12000) });
+        if (res.ok) break;
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 1500));
+      }
+      if (!res || !res.ok) { console.error("twilio media fetch failed:", res?.status, url); continue; }
       const type = res.headers.get("content-type") || "image/jpeg";
       const ext = type.includes("png") ? "png" : type.includes("gif") ? "gif" : type.includes("webp") ? "webp" : "jpg";
       const bytes = Buffer.from(await res.arrayBuffer());

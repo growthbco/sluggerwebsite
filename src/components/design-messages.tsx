@@ -18,7 +18,7 @@ function linkify(text: string) {
   return parts.map((part, i) =>
     /^https?:\/\//.test(part) ? (
       <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-brand underline underline-offset-2 break-all hover:opacity-80">
-        {part.length > 60 ? `${new URL(part).hostname} link ↗` : part}
+        {part.length > 60 ? `${new URL(part).hostname} link ` : part}
       </a>
     ) : (
       part
@@ -280,7 +280,7 @@ export function DesignMessages({
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1.5 text-xs display text-brand border border-brand/40 px-2 py-1 hover:bg-brand/10 max-w-[12rem]"
                         >
-                          📎 <span className="truncate">{fileLabel(url)}</span>
+                          <span className="truncate">{fileLabel(url)}</span>
                         </a>
                       ),
                     )}
@@ -305,7 +305,7 @@ export function DesignMessages({
               ? "AI finishes and polishes what you started - your words set the direction"
               : "AI drafts a reply from the conversation and order details - edit before sending"}
           >
-            {busy === "suggesting" ? "✨ Drafting..." : draft.trim() ? "✨ Finish my reply" : "✨ Suggest reply"}
+            {busy === "suggesting" ? "Drafting..." : draft.trim() ? "Finish my reply" : "Suggest reply"}
           </button>
           {[...(QUICK_REPLIES[status ?? ""] ?? []), ...QUICK_REPLIES.default].map((q) => (
             <button
@@ -315,7 +315,7 @@ export function DesignMessages({
               className="text-xs display text-muted border border-line px-3 py-1.5 hover:border-brand/50 hover:text-foreground"
               title="Fills the message box - edit before sending"
             >
-              💬 {q.label}
+              {q.label}
             </button>
           ))}
         </div>
@@ -340,7 +340,7 @@ export function DesignMessages({
         <div className="mt-3 flex flex-wrap gap-2">
           {pending.map((p, i) => (
             <span key={i} className="inline-flex items-center gap-1.5 bg-steel border border-line px-2 py-1 text-xs text-foreground">
-              📎 <span className="max-w-[10rem] truncate">{p.name}</span>
+              <span className="max-w-[10rem] truncate">{p.name}</span>
               <button
                 type="button"
                 onClick={() => setPending((prev) => prev.filter((_, idx) => idx !== i))}
@@ -363,8 +363,8 @@ export function DesignMessages({
         />
         <label
           title="Attach a photo or file"
-          className={`grid place-items-center border border-line px-3 py-3 text-lg ${
-            uploading || busy === "sending" ? "opacity-50" : "cursor-pointer hover:border-brand/50"
+          className={`inline-flex items-center gap-1.5 border border-line px-3 py-3 text-sm text-foreground shrink-0 ${
+            uploading || busy === "sending" ? "opacity-50" : "cursor-pointer hover:border-brand/50 hover:text-brand"
           }`}
         >
           <input
@@ -378,7 +378,12 @@ export function DesignMessages({
               e.target.value = "";
             }}
           />
-          {uploading ? "…" : "📎"}
+          {/* Paperclip icon so the attach control is actually visible (it used
+              to render as a blank square, so nobody could find it). */}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21.44 11.05l-9.19 9.19a5.5 5.5 0 01-7.78-7.78l9.19-9.19a3.5 3.5 0 014.95 4.95l-9.2 9.19a1.5 1.5 0 01-2.12-2.12l8.49-8.49" />
+          </svg>
+          <span className="display">{uploading ? "Uploading…" : "Photo"}</span>
         </label>
         <button
           type="button"
@@ -390,7 +395,7 @@ export function DesignMessages({
           {busy === "sending" ? "Sending..." : "Send"}
         </button>
       </DropZone>
-      <p className="mt-1.5 text-xs text-muted">📎 Attach photos or PDFs (up to 25MB each) - or drag &amp; drop them onto the message box.</p>
+      <p className="mt-1.5 text-xs text-muted">Attach photos or PDFs (up to 25MB each) - or drag &amp; drop them onto the message box.</p>
       {error && <p className="mt-2 text-sm text-brand">{error}</p>}
     </section>
   );

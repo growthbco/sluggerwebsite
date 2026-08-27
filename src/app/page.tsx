@@ -4,13 +4,18 @@ import { categories } from "@/lib/sample-data";
 import { SPORT_PAGES } from "@/lib/sport-pages";
 import { heroPhoto } from "@/lib/gallery";
 import { ElevateSection, SystemSection, Reviews, SocialGrid, AboutBand, FaqTeaser } from "@/components/home-extras";
-import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
+import { RecentDesigns } from "@/components/recent-designs";
 
 export const metadata = {
   description:
-    "Custom team uniforms for every sport, embroidered hats made in-house in Ocala FL, and free team stores. Free design mockups, 2-3 week turnaround, 1-week rush.",
+    "Custom team uniforms and jerseys for every sport - baseball, softball, flag football, football, basketball and more - plus embroidered hats, made in Ocala FL. Design any uniform with a free AI mockup in minutes. 2-3 week turnaround, ships nationwide.",
   alternates: { canonical: "/" },
 };
+
+// ISR: the Recent Designs strip pulls approved mockups from the DB. Re-render
+// at most every 10 min so newly approved designs surface without going fully
+// dynamic on every request.
+export const revalidate = 600;
 
 export default function Home() {
   return (
@@ -71,9 +76,7 @@ export default function Home() {
                 <span className="display text-[11px] tracking-wider opacity-80">NEW CUSTOMER</span>
                 <p className="display text-xl sm:text-2xl mt-1">Get a Free Design →</p>
                 <p className="text-sm opacity-90 mt-1">
-                  {DESIGN_FEE_WAIVED
-                    ? "No design fee right now - free to start, no commitment."
-                    : "$35 to start, credited 100% to your final order."}
+                  Free design, no commitment - see your team&apos;s mockup on us.
                 </p>
               </Link>
               <Link
@@ -116,6 +119,10 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* Auto-updating showcase of recently approved mockups - up high as
+          social proof, right after the hero + trust strip */}
+      <RecentDesigns />
 
       {/* Elevate Your Game - feature section */}
       <ElevateSection />
@@ -168,7 +175,9 @@ export default function Home() {
             </Link>
           </div>
           <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {SPORT_PAGES.map((p) => (
+            {[...SPORT_PAGES]
+              .sort((a, b) => (a.slug === "custom-flag-football-uniforms" ? -1 : b.slug === "custom-flag-football-uniforms" ? 1 : 0))
+              .map((p) => (
               <Link key={p.slug} href={`/${p.slug}`} className="group bg-ink border border-line hover:border-brand/60 transition-colors">
                 <div className="relative aspect-square bg-white overflow-hidden">
                   <Image src={p.mockup} alt={p.h1} fill sizes="(max-width: 1024px) 50vw, 20vw" className="object-cover transition-transform duration-300 group-hover:scale-105" />

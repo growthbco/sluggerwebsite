@@ -215,7 +215,7 @@ export function PrintFileQA({ token, basePath, group, rosterCount, roster = [], 
                     className="absolute inset-0 grid place-items-center hover:bg-foreground/5"
                   >
                     <span className="text-center">
-                      <span className="block text-2xl">📄</span>
+                      <span className="block text-2xl"></span>
                       <span className="text-xs text-brand underline">Open PDF (sheet {i + 1})</span>
                     </span>
                   </a>
@@ -249,7 +249,7 @@ export function PrintFileQA({ token, basePath, group, rosterCount, roster = [], 
         </div>
       )}
 
-      {error && <p className="text-sm text-red-400">⚠ {error}</p>}
+      {error && <p className="text-sm text-red-400">{error}</p>}
 
       {/* Result */}
       {result &&
@@ -264,7 +264,7 @@ export function PrintFileQA({ token, basePath, group, rosterCount, roster = [], 
               }`}
             >
               <p className="display text-foreground">
-                {effectiveOk ? "✅ " : "⚠️ "}
+                {effectiveOk ? "" : ""}
                 {clearedByOverride
                   ? `All ${result.mismatches.length} flagged item${result.mismatches.length === 1 ? "" : "s"} reviewed and marked OK - clear for production.`
                   : unresolved > 0 && dismissed.length > 0

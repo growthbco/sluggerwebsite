@@ -3,6 +3,7 @@ import { getStripe, stripeEnabled } from "@/lib/stripe";
 import { getProduct, primaryImage } from "@/lib/catalog";
 import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 import { refCodeFromCookie } from "@/lib/referral-cookie";
+import { recordOperationalFailure } from "@/lib/operational-events";
 
 export const runtime = "nodejs";
 
@@ -120,6 +121,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: session.url });
   } catch (e) {
     console.error("Stripe checkout error:", e);
+    await recordOperationalFailure({
+      fingerprint: "checkout:shop",
+      kind: "checkout_failed",
+      title: "Shop checkout could not start",
+      error: e,
+      href: "/admin/shop-orders",
+      context: { route: "/api/checkout", itemCount: items.length },
+    });
     return NextResponse.json({ error: "Could not start checkout" }, { status: 500 });
   }
 }

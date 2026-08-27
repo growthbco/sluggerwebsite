@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { eq, and, ne, asc, isNull, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrders, teamOrderRoster, designRequests } from "@/db/schema";
-import { isInHouseItem } from "@/lib/order-items";
+import { notDesignerMade, defaultRequiresNames, fabricForStyle } from "@/lib/order-items";
 
 export type JerseyLine = {
   id: string;
@@ -27,6 +27,8 @@ export type NewTeamOrder = {
   rushShipping?: boolean;
   // Active SMS opt-in checked on the order form.
   smsOptIn?: boolean;
+  // "Names on the back?" - defaults from the items (cheer -> No) when omitted.
+  requiresNames?: boolean;
 };
 
 export type RosterInput = {
@@ -60,10 +62,13 @@ export async function createTeamOrder(input: NewTeamOrder) {
       contactEmail: input.contactEmail,
       contactPhone: input.contactPhone,
       jerseyStyle: input.jerseyStyle,
-      jerseyMaterial: input.jerseyMaterial,
+      // Never blanket-default to Mesh: if no fabric was chosen, derive it from
+      // the style (button-front / zip = polyester, else mesh).
+      jerseyMaterial: input.jerseyMaterial ?? fabricForStyle(input.jerseyStyle),
       items: input.items?.length ? input.items : ["jersey"],
       designRequestId: input.designRequestId,
       rushShipping: input.rushShipping ?? false,
+      requiresNames: input.requiresNames ?? defaultRequiresNames(input.items),
       smsOptInAt: input.smsOptIn ? new Date() : undefined,
       selfEntryToken,
       manageToken,
@@ -72,6 +77,13 @@ export async function createTeamOrder(input: NewTeamOrder) {
     .returning();
 
   return { id: row.id, reference, selfEntryToken, manageToken };
+}
+
+/** Coach's "names on the back?" survey answer. Controls whether the roster
+ *  form shows the player-name field. */
+export async function setRequiresNames(orderId: string, requiresNames: boolean) {
+  const db = getDb();
+  await db.update(teamOrders).set({ requiresNames }).where(eq(teamOrders.id, orderId));
 }
 
 export async function getBySelfEntryToken(token: string) {
@@ -150,15 +162,26 @@ export async function findRelatedOrdersByContact(opts: {
   return out.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
 }
 
+const ORDER_STAGE_RANK = ["draft", "collecting", "submitted", "quoted", "in_production", "paid", "shipped"];
+
 export async function getByDesignRequestId(designRequestId: string) {
   const db = getDb();
-  const [row] = await db
+  const rows = await db
     .select()
     .from(teamOrders)
-    .where(eq(teamOrders.designRequestId, designRequestId))
-    .orderBy(asc(teamOrders.createdAt))
-    .limit(1);
-  return row ?? null;
+    .where(and(eq(teamOrders.designRequestId, designRequestId), isNull(teamOrders.archivedAt)));
+  if (!rows.length) return null;
+  // A design can accidentally have more than one linked order (e.g. a stray
+  // early duplicate + the real one). Return the order FURTHEST along - by
+  // pipeline stage, then by having an invoice, then most recent - so a
+  // collecting duplicate never hides the invoiced order on the customer's page.
+  return [...rows].sort((a, b) => {
+    const r = ORDER_STAGE_RANK.indexOf(b.status) - ORDER_STAGE_RANK.indexOf(a.status);
+    if (r) return r;
+    const inv = Number(Boolean(b.invoiceUrl)) - Number(Boolean(a.invoiceUrl));
+    if (inv) return inv;
+    return (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0);
+  })[0];
 }
 
 export async function getRoster(teamOrderId: string) {
@@ -176,12 +199,12 @@ export async function getPrintableJerseys(teamOrderId: string): Promise<JerseyLi
   const rows = await getRoster(teamOrderId);
   return rows
     .filter((r) => {
-      const hasPrinted = (r.size ?? "").trim() || Object.entries(r.sizes ?? {}).some(([k, v]) => !isInHouseItem(k) && (v ?? "").trim());
+      const hasPrinted = (r.size ?? "").trim() || Object.entries(r.sizes ?? {}).some(([k, v]) => !notDesignerMade(k) && (v ?? "").trim());
       const personalized = (r.playerName ?? "").trim() || (r.playerNumber ?? "").trim();
       return hasPrinted && personalized;
     })
     .map((r) => {
-      const sized = Object.entries(r.sizes ?? {}).find(([k, v]) => !isInHouseItem(k) && (v ?? "").trim());
+      const sized = Object.entries(r.sizes ?? {}).find(([k, v]) => !notDesignerMade(k) && (v ?? "").trim());
       return {
         id: r.id,
         name: (r.playerName ?? "").trim(),

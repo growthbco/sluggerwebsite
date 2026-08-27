@@ -88,7 +88,7 @@ export function PortalRequestForm() {
           disabled={busy || !email.trim() || (usePassword && !password)}
           className="rounded bg-brand hover:bg-brand-dark text-on-brand display px-6 py-2.5 disabled:opacity-50"
         >
-          {busy ? (usePassword ? "Logging in…" : "Sending…") : usePassword ? "Log in" : "Email me my orders"}
+          {busy ? (usePassword ? "Logging in…" : "Sending…") : usePassword ? "Log in" : "Access my portal"}
         </button>
       </div>
       {err && <p className="mt-2 text-sm text-red-400">{err}</p>}

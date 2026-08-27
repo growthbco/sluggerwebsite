@@ -5,12 +5,9 @@ import {
   setDiscordThreadId,
   findReturningCustomerRef,
   formatProducts,
-  DESIGN_FEE_CENTS,
 } from "@/lib/design-requests";
-import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
 import { postDesignRequestToDiscord } from "@/lib/discord";
 import { emailDesignRequestToDesigner, emailDesignRequestConfirmation } from "@/lib/email";
-import { getStripe, stripeEnabled } from "@/lib/stripe";
 import { refCodeFromCookie } from "@/lib/referral-cookie";
 import { attributionFromCookie } from "@/lib/attribution";
 
@@ -73,20 +70,15 @@ export async function POST(req: Request) {
     );
   }
 
-  // Auto-bypass the $35 fee for returning customers (matched by email against
-  // any prior approved design or submitted team order). When the promo flag is
-  // on, waive for everyone (campaign mode) - returning customers still get
-  // tagged as such for reporting.
+  // Design is free (the $35 fee was retired). Still tag returning customers
+  // for reporting; everyone else is simply "no_fee". Both go straight into the
+  // designer pipeline - there's no payment step anymore.
   const priorRef = await findReturningCustomerRef(body.contactEmail);
-  const feeWaivedReason = priorRef
-    ? "returning_customer"
-    : DESIGN_FEE_WAIVED
-    ? "promo_campaign"
-    : null;
+  const feeWaivedReason = priorRef ? "returning_customer" : "no_fee";
   const feeWaivedRef = priorRef ?? null;
 
   try {
-    const { id: requestId, reference, statusToken, manageToken, rush, neededBy, waived } = await createDesignRequest({
+    const { id: requestId, reference, statusToken, manageToken, rush, neededBy } = await createDesignRequest({
       teamName: body.teamName,
       sport: body.sport,
       contactName: body.contactName,
@@ -143,8 +135,9 @@ export async function POST(req: Request) {
     const statusUrl = `${SITE}/design/status/${statusToken}`;
     const manageUrl = `${SITE}/design/manage/${manageToken}`;
 
-    // ─── PATH A: fee waived → notify designer + client immediately ────────
-    if (waived) {
+    // Design is free: notify the designer + client immediately. (`waived` is
+    // always true now - there's no payment path.)
+    {
       const discordResult = await postDesignRequestToDiscord({
         reference,
         teamName: body.teamName,
@@ -194,49 +187,6 @@ export async function POST(req: Request) {
         priorRef,
       });
     }
-
-    // ─── PATH B: needs to pay → create Stripe Checkout, hold notifications ─
-    if (!stripeEnabled()) {
-      // Without Stripe configured, fail safe by treating like a waiver but
-      // logging the unbilled state. Should never hit in production.
-      console.error("Stripe not configured but fee required for", reference);
-      return NextResponse.json({ error: "Payments not configured" }, { status: 503 });
-    }
-    const stripe = getStripe();
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      payment_method_types: ["card"],
-      customer_email: body.contactEmail,
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: "Custom Design - Slugger Athletics",
-              description: `Design brief for ${body.teamName}. Fully credited to your final team order.`,
-            },
-            unit_amount: DESIGN_FEE_CENTS,
-          },
-          quantity: 1,
-        },
-      ],
-      allow_promotion_codes: true, // staff-created codes (REPEAT, VIP, etc.)
-      metadata: {
-        designRequestId: requestId,
-        designReference: reference,
-        kind: "design_fee",
-      },
-      success_url: `${statusUrl}?paid=true`,
-      cancel_url: `${SITE}/design?cancelled=${reference}`,
-    });
-
-    return NextResponse.json({
-      ok: true,
-      reference,
-      statusUrl,
-      checkoutUrl: session.url,
-      waived: false,
-    });
   } catch (e) {
     console.error("createDesignRequest failed:", e);
     return NextResponse.json({ error: "Could not save your design request" }, { status: 500 });

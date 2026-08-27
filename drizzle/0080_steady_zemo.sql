@@ -1,0 +1,1 @@
+ALTER TABLE "design_lab_visitors" ADD COLUMN "last_seasonal_prompt_at" timestamp with time zone;

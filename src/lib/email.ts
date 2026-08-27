@@ -148,6 +148,33 @@ export async function emailDesignRequestConfirmation(args: {
   });
 }
 
+/** Email the client that we received their payment, pointing them to the portal
+ *  to track the order from here on. Fires on deposit or full/balance payment. */
+export async function emailPaymentReceived(args: {
+  to: string;
+  teamName: string;
+  reference: string;
+  stage: "deposit" | "balance";
+}): Promise<boolean> {
+  const dep = args.stage === "deposit";
+  return sendEmail({
+    to: args.to,
+    subject: `Payment received - ${args.teamName} (${args.reference})`,
+    html: brandedEmail({
+      preheader: dep ? "Deposit received - your order is in production." : "Payment received - thank you.",
+      heading: `Thank you, ${esc(args.teamName)}!`,
+      intro: `Reference: <strong>${esc(args.reference)}</strong>`,
+      bodyHtml: `
+        <p style="margin:0 0 12px;">We received your ${dep ? "50% deposit" : "payment"} for <strong>${esc(args.teamName)}</strong>. ${dep ? "Your order is now in production." : "Your order is paid in full."}</p>
+        <p style="margin:0;">From your order portal you can check status and tracking, pay a balance, update your shipping address, or add players anytime.</p>
+      `,
+      ctaText: "View my orders",
+      ctaUrl: `${SITE}/portal`,
+      footerNote: "Track everything at sluggerathletics.com/portal · Text us at (352) 414-7270",
+    }),
+  });
+}
+
 /** Email the client that a proof is ready to review. */
 export async function emailProofReady(args: {
   to: string;
@@ -182,6 +209,9 @@ export type TeamOrderInvoiceContent = {
   taxDueCents: number;
   taxExempt?: boolean;
   shipCents?: number;
+  /** Number of parcels this order ships in. When >1 (hats ship in their own
+   *  box), the shipping line notes it so the charge is self-explanatory. */
+  shipBoxes?: number;
   roster?: { name: string; number: string; size: string; item?: string; color?: string }[];
   payUrl: string;
   payFullUrl?: string;
@@ -238,7 +268,7 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
           </tr>
           ${
             args.shipCents && args.shipCents > 0
-              ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;">${money(args.shipCents)}</td></tr>`
+              ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping${args.shipBoxes && args.shipBoxes > 1 ? ` <span style="color:#8a8570;">(${args.shipBoxes} boxes - hats ship separately)</span>` : ""}</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;">${money(args.shipCents)}</td></tr>`
               : args.localPickup
                 ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;color:#8a8570;">free local pickup in Ocala</td></tr>`
                 : isDeposit

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { FooterStaffLink } from "@/components/footer-staff-link";
 
 const cols = [
   {
@@ -8,6 +9,7 @@ const cols = [
       { href: "/custom-sublimated-jerseys", label: "Custom Jerseys" },
       { href: "/team-uniforms", label: "Team Uniforms" },
       { href: "/custom-hats", label: "Custom Embroidered Hats" },
+      { href: "/custom-beanies", label: "Custom Beanies" },
       { href: "/embroidery", label: "Embroidery - Ocala, FL" },
       { href: "/hype-chains", label: "Hype Chains" },
     ],
@@ -91,7 +93,7 @@ export function SiteFooter() {
             <a href="https://www.facebook.com/sluggerathletics/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Facebook</a>
             <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
             <Link href="/terms" className="hover:text-foreground">Terms</Link>
-            <Link href="/admin" className="hover:text-foreground">Staff</Link>
+            <FooterStaffLink />
           </div>
         </div>
       </div>

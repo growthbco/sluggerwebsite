@@ -42,7 +42,7 @@ export function AdminPendingAddons({ teamOrderId, pending }: { teamOrderId: stri
   return (
     <div className="border border-amber-500/40 bg-amber-500/5 p-4">
       <div className="flex items-center justify-between gap-2">
-        <p className="display text-amber-300">💸 Unpaid add-on invoices ({pending.length})</p>
+        <p className="display text-amber-300">Unpaid add-on invoices ({pending.length})</p>
         {pending.length > 1 && (
           <button
             type="button"
@@ -57,7 +57,7 @@ export function AdminPendingAddons({ teamOrderId, pending }: { teamOrderId: stri
 
       {combined && (
         <div className="mt-2 flex items-center gap-2 text-sm">
-          <span className="text-green-400 display">✓ Combined:</span>
+          <span className="text-green-400 display">Combined:</span>
           <input readOnly value={combined} className="flex-1 bg-ink border border-line px-2 py-1 text-xs text-foreground" />
           <button type="button" onClick={() => navigator.clipboard.writeText(combined)} className="text-xs display border border-brand/50 text-brand px-2 py-1 hover:bg-brand/10">Copy</button>
         </div>

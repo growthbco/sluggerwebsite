@@ -33,7 +33,7 @@ export function brandedEmail(opts: {
         <!-- Header / logo -->
         <tr>
           <td style="background:${COLORS.ink};padding:24px 28px;text-align:center;">
-            <img src="https://www.sluggerathletics.com/slugger-logo.png" alt="Slugger Athletics" width="200" style="width:200px;max-width:70%;height:auto;display:inline-block;" />
+            <img src="https://sluggerathletics.com/slugger-logo.png" alt="Slugger Athletics" width="200" style="width:200px;max-width:70%;height:auto;display:inline-block;" />
             <div style="color:#bdbab0;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-top:8px;">Custom Team Gear · Ocala, FL</div>
           </td>
         </tr>

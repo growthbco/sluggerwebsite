@@ -34,7 +34,7 @@ export function LabLeadConvertButton({ visitorId }: { visitorId: string }) {
         className="text-xs display border border-brand/60 text-brand px-2 py-0.5 hover:bg-brand/10 disabled:opacity-50"
         title="Create a design request from this lead's designs and open the AI studio"
       >
-        {busy ? "Opening…" : "🎨 Open in design studio"}
+        {busy ? "Opening…" : "Open in design studio"}
       </button>
       {error && <span className="text-[11px] text-[#e5533c]">{error}</span>}
     </span>

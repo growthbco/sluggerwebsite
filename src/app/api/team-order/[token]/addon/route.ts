@@ -55,17 +55,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     // the webhook's addon handling is unchanged.
     const makePrice = async (name: string, unitAmount: number) =>
       (await stripe.prices.create({ currency: "usd", unit_amount: unitAmount, product_data: { name } })).id;
-    const lineItems: { price: string; quantity: number }[] = [];
+    // Group identical pieces (same item / design / size / name / number / price)
+    // into ONE Stripe line, so a large same-size add-on (e.g. 20 fitted hats)
+    // stays under Stripe Payment Links' 20-line-item cap - it was 400ing at
+    // checkout when every hat became its own line item.
+    const grouped = new Map<string, { label: string; unit: number; qty: number }>();
     for (const r of rows) {
-      lineItems.push({
-        quantity: r.quantity,
-        price: await makePrice(
-          `${r.label} - ${[r.design, r.size, r.name?.toUpperCase(), r.number ? `#${r.number}` : null].filter(Boolean).join(" - ")} (add-on ${order.reference})`,
-          r.unitPriceCents,
-        ),
-      });
+      const label = `${r.label} - ${[r.design, r.size, r.name?.toUpperCase(), r.number ? `#${r.number}` : null].filter(Boolean).join(" - ")} (add-on ${order.reference})`;
+      const gkey = `${label}|${r.unitPriceCents}`;
+      const g = grouped.get(gkey);
+      if (g) g.qty += r.quantity;
+      else grouped.set(gkey, { label, unit: r.unitPriceCents, qty: r.quantity });
     }
     const addonTax = taxCents(totalCents);
+    const lineItems: { price: string; quantity: number }[] = [];
+    // Stripe Payment Links allow at most 20 line items. If even the grouped
+    // goods (plus a tax line) would still exceed that, fold the goods into a
+    // single summary line so checkout works; the roster keeps the full detail.
+    if (grouped.size + (addonTax > 0 ? 1 : 0) > 20) {
+      const pieces = rows.reduce((s, r) => s + r.quantity, 0);
+      lineItems.push({ quantity: 1, price: await makePrice(`${pieces} add-on pieces (add-on ${order.reference})`, totalCents) });
+    } else {
+      for (const g of grouped.values()) lineItems.push({ quantity: g.qty, price: await makePrice(g.label, g.unit) });
+    }
     if (addonTax > 0) lineItems.push({ quantity: 1, price: await makePrice(SALES_TAX_LABEL, addonTax) });
 
     // Payment links only accept saved shipping rates (no inline rate data).

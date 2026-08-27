@@ -1,6 +1,7 @@
 // Mini-CRM lookups shared by the Texts inbox API and the SMS draft-reply AI.
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { getDb } from "@/db";
 import { customers, teamOrders, designRequests, teamOrderAddons, smsContacts, designLabVisitors } from "@/db/schema";
 
@@ -12,14 +13,45 @@ const last10 = (p: string | null | undefined) => (p ?? "").replace(/\D/g, "").sl
 export async function customerContext(phone: string) {
   const db = getDb();
   const key = last10(phone);
-  const [orders, designs, custs] = await Promise.all([
-    db.select().from(teamOrders),
-    db.select().from(designRequests),
-    db.select().from(customers),
+  // Match on the last 10 digits in SQL (numbers are stored in mixed formats),
+  // and pull ONLY the columns the panel uses - not whole rows of every table.
+  const phoneMatch = (col: AnyPgColumn) =>
+    sql`right(regexp_replace(coalesce(${col}, ''), '[^0-9]', '', 'g'), 10) = ${key}`;
+  const [myOrders, myDesigns, myCustomers] = await Promise.all([
+    db
+      .select({
+        id: teamOrders.id,
+        reference: teamOrders.reference,
+        teamName: teamOrders.teamName,
+        status: teamOrders.status,
+        contactEmail: teamOrders.contactEmail,
+        quotedTotalCents: teamOrders.quotedTotalCents,
+        invoicePaidAt: teamOrders.invoicePaidAt,
+        depositPaidAt: teamOrders.depositPaidAt,
+        depositCents: teamOrders.depositCents,
+        createdAt: teamOrders.createdAt,
+      })
+      .from(teamOrders)
+      .where(phoneMatch(teamOrders.contactPhone)),
+    db
+      .select({
+        id: designRequests.id,
+        reference: designRequests.reference,
+        teamName: designRequests.teamName,
+        status: designRequests.status,
+        contactEmail: designRequests.contactEmail,
+        manageToken: designRequests.manageToken,
+        designFeePaymentId: designRequests.designFeePaymentId,
+        designFeeAmountCents: designRequests.designFeeAmountCents,
+        createdAt: designRequests.createdAt,
+      })
+      .from(designRequests)
+      .where(phoneMatch(designRequests.contactPhone)),
+    db
+      .select({ email: customers.email })
+      .from(customers)
+      .where(phoneMatch(customers.phone)),
   ]);
-  const myOrders = orders.filter((o) => last10(o.contactPhone) === key);
-  const myDesigns = designs.filter((d) => last10(d.contactPhone) === key);
-  const myCustomers = custs.filter((c) => last10(c.phone) === key);
 
   // Approximate lifetime spend: paid-in-full orders at their quoted total,
   // deposit-only orders at the deposit, plus paid add-on batches and paid
@@ -31,7 +63,10 @@ export async function customerContext(phone: string) {
     const addons = await db.select().from(teamOrderAddons).where(eq(teamOrderAddons.teamOrderId, o.id));
     for (const a of addons) if (a.status === "paid") spendCents += a.totalCents;
   }
-  for (const d of myDesigns) if (d.designFeePaidAt) spendCents += d.designFeeAmountCents;
+  // Only a REAL Stripe payment counts as spend - a waived fee sets
+  // designFeePaidAt just to mark it handled, so gate on designFeePaymentId
+  // or every waived $35 shows as phantom spend the customer never paid.
+  for (const d of myDesigns) if (d.designFeePaymentId) spendCents += d.designFeeAmountCents;
 
   const emails = [...new Set([...myOrders.map((o) => o.contactEmail), ...myDesigns.map((d) => d.contactEmail), ...myCustomers.map((c) => c.email)].filter(Boolean).map((e) => e!.toLowerCase()))];
 

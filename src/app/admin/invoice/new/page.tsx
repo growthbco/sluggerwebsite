@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AdminPageHeader } from "@/components/admin-page-header";
 import { adminEnabled, getAdminSession, canAccess } from "@/lib/admin-auth";
 import { AdminCustomInvoiceForm } from "@/components/admin-custom-invoice-form";
 
@@ -15,8 +15,7 @@ export default async function NewCustomInvoicePage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14">
-      <Link href="/admin" className="text-sm text-muted hover:text-foreground">← Back to dashboard</Link>
-      <h1 className="display text-4xl text-foreground mt-3">New Custom Invoice</h1>
+      <AdminPageHeader eyebrow="Financials" title="New Custom Invoice" />
       <p className="mt-2 text-muted">
         Build an invoice from scratch - name the items, price them, and send. The customer gets a
         branded email with a secure Stripe payment link. Use the AI buttons for help writing

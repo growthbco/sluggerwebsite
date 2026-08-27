@@ -2,7 +2,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { galleryPhotos, allMedia } from "@/lib/gallery";
 import { ReviewsSection } from "@/components/reviews-section";
-import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
 
 /* "Elevate Your Game" - feature section carried over from the current site. */
 const ELEVATE_BENEFITS = [
@@ -201,14 +200,25 @@ const FAQS = [
   { q: "Is there a minimum order?", a: "Custom orders start at 6 pieces per design - including embroidered hats. Every design takes real mockup and setup work, so 6 is the floor." },
   { q: "How long does production take?", a: "Most orders ship in 2-3 weeks after you approve your design. Need it sooner? Rush gets you there in about a week (specialty items may add a few days)." },
   { q: "How does sizing work?", a: "Our signature jerseys have a relaxed fit and run slightly large. Each product page has a size guide, and players pick their own size on team orders to cut down on returns." },
-  { q: "Do you really design for free?", a: DESIGN_FEE_WAIVED
-      ? "Yes - and right now there's no fee at all. We're waiving the usual $35 design fee for a limited time, so you can start a custom design completely free, see a proof, and approve it with no commitment."
-      : "Yes - with one small step. We charge $35 upfront to start the design, then credit 100% of it back to your final team order, so the design is free with purchase. The $35 just keeps us from designing for people who shop our artwork elsewhere. Returning Slugger customers get it waived automatically." },
+  { q: "Do you really design for free?", a: "Yes, genuinely free. There's no design fee. Start a custom design, our in-house designer works up a mockup, and you see a proof and approve it with no commitment. You only pay when you place your order." },
 ];
+
+// FAQPage schema so Google AI Overviews / ChatGPT / Perplexity can pull these
+// Q&As directly from the homepage (a top AI-search landing page).
+const FAQ_JSONLD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+};
 
 export function FaqTeaser() {
   return (
     <section className="mx-auto max-w-3xl px-4 sm:px-6 py-16 sm:py-20">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_JSONLD) }} />
       <div className="text-center">
         <span className="display text-brand text-sm">Questions?</span>
         <h2 className="display text-3xl sm:text-4xl text-foreground mt-1">Frequently Asked</h2>

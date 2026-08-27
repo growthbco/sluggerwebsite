@@ -56,6 +56,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Team name, your name, and email are required." }, { status: 400 });
   }
 
+  // Don't spawn a duplicate job: if this design already has an OPEN, unpaid order,
+  // hand back THAT order's links instead of starting a second one. A brand new TO
+  // is only right once the prior job is in production, shipped, or paid.
+  if (designRequestId) {
+    const { getByDesignRequestId } = await import("@/lib/team-orders");
+    const existing = await getByDesignRequestId(designRequestId);
+    const OPEN_UNPAID = ["draft", "collecting", "submitted", "quoted"];
+    if (existing && OPEN_UNPAID.includes(existing.status) && !existing.depositPaidAt && !existing.invoicePaidAt) {
+      const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+      return NextResponse.json({
+        reference: existing.reference,
+        shareUrl: `${SITE}/team-order/join/${existing.selfEntryToken}`,
+        manageUrl: `${SITE}/team-order/manage/${existing.manageToken}`,
+      });
+    }
+  }
+
   try {
     const { reference, selfEntryToken, manageToken } = await createTeamOrder({
       teamName,

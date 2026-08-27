@@ -8,6 +8,7 @@ import { getAdminSession, canAccess } from "@/lib/admin-auth";
 import { AdminArchiveButton } from "@/components/admin-archive-button";
 import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
+import { AdminPickupButton } from "@/components/admin-pickup-button";
 import { TrackingInfo } from "@/components/tracking-info";
 
 export const metadata: Metadata = { title: "Order Detail", robots: { index: false } };
@@ -19,7 +20,7 @@ const fmtDate = (d: Date | string | null | undefined) =>
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section className="bg-steel border border-line p-5">
+    <section className="bg-steel border border-line rounded-xl p-5">
       <h2 className="display text-lg text-foreground">{title}</h2>
       {hint && <p className="text-sm text-muted mt-0.5">{hint}</p>}
       <div className="mt-4">{children}</div>
@@ -52,13 +53,20 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
     o.teamId ? db.select({ name: teams.name, token: teams.storeToken }).from(teams).where(eq(teams.id, o.teamId)).limit(1).then((r) => r[0] ?? null) : null,
   ]);
 
+  // Tax is stored as a line item (from Stripe checkout), but it isn't a
+  // product - keep it out of the item count and pull it into its own total row.
+  const isTaxLine = (name: string) => /\btax\b/i.test(name);
+  const products = items.filter((it) => !isTaxLine(it.name));
+  const taxCents = items.filter((it) => isTaxLine(it.name)).reduce((s, it) => s + it.quantity * it.unitPriceCents, 0);
+  const productSubtotalCents = products.reduce((s, it) => s + it.quantity * it.unitPriceCents, 0);
+
   const paid = o.status === "paid" || o.status === "fulfilled" || Boolean(o.shippedAt);
   const typeLabel = o.type === "team_store" ? "Team Store" : o.type === "buy_in" ? "Buy-In" : "Shop";
 
   const nextStep = o.archivedAt
     ? { text: "Archived", tone: "text-muted" }
     : o.shippedAt
-      ? { text: "Shipped - nothing left to do 🎉", tone: "text-green-400" }
+      ? { text: "Shipped - nothing left to do", tone: "text-green-400" }
       : paid
         ? o.trackingNumber
           ? { text: "Label ready - mark it shipped to email the customer tracking", tone: "text-amber-300" }
@@ -95,17 +103,17 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
           <Field label="Email">{o.customerEmail ? <a href={`mailto:${o.customerEmail}`} className="text-brand hover:underline break-all">{o.customerEmail}</a> : "-"}</Field>
           <Field label="Source">{o.source ?? "unknown (pre-tracking)"}</Field>
         </dl>
-        {o.customerNote && <p className="mt-3 text-sm text-muted border-l-2 border-brand/60 pl-3">📝 {o.customerNote}</p>}
+        {o.customerNote && <p className="mt-3 text-sm text-muted border-l-2 border-brand/60 pl-3">{o.customerNote}</p>}
         {team?.token && (
-          <p className="mt-3 text-sm"><a href={`/store/${team.token}`} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">Open team store ↗</a></p>
+          <p className="mt-3 text-sm"><a href={`/store/${team.token}`} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">Open team store </a></p>
         )}
       </Section>
 
-      <Section title={`Items (${items.length})`}>
+      <Section title={`Items (${products.length})`}>
         <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <tbody>
-            {items.map((it) => (
+            {products.map((it) => (
               <tr key={it.id} className="border-b border-line/50">
                 <td className="py-1.5 pr-2 text-foreground">{it.name}</td>
                 <td className="py-1.5 px-2 text-right text-muted whitespace-nowrap">{it.quantity} × {money(it.unitPriceCents)}</td>
@@ -114,7 +122,10 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
             ))}
           </tbody>
           <tfoot>
-            <tr className="text-muted"><td className="pt-2" colSpan={2}>Subtotal</td><td className="pt-2 text-right">{money(o.subtotalCents)}</td></tr>
+            <tr className="text-muted"><td className="pt-2" colSpan={2}>Subtotal</td><td className="pt-2 text-right">{money(productSubtotalCents)}</td></tr>
+            {taxCents > 0 && (
+              <tr className="text-muted"><td colSpan={2}>Sales tax</td><td className="text-right">{money(taxCents)}</td></tr>
+            )}
             <tr className="text-muted"><td colSpan={2}>Shipping</td><td className="text-right">{o.shippingCents ? money(o.shippingCents) : "Free / pickup"}</td></tr>
             {o.fundraiseCents > 0 && (
               <tr className="text-muted"><td colSpan={2}>Team fundraising portion</td><td className="text-right text-brand">{money(o.fundraiseCents)}</td></tr>
@@ -126,8 +137,9 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
         {(o.addSessionIds?.length ?? 0) > 0 && (
           <p className="mt-3 text-xs text-muted">Includes {o.addSessionIds!.length} self-serve add-on payment{o.addSessionIds!.length === 1 ? "" : "s"} merged into this order.</p>
         )}
-        <p className="mt-3 text-sm">
-          <a href={`/api/admin/order-view?id=${o.id}`} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">View printable order ↗</a>
+        <p className="mt-3 text-sm flex flex-wrap gap-4">
+          <a href={`/api/admin/order-packing?id=${o.id}`} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">Packing sheet (check off as you pack) </a>
+          <a href={`/api/admin/order-view?id=${o.id}`} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">View printable order </a>
         </p>
       </Section>
 
@@ -143,17 +155,20 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
               "Pickup / no address"
             )}
           </Field>
-          <Field label="Shipped">{o.shippedAt ? `✓ ${fmtDate(o.shippedAt)}` : "not yet"}</Field>
+          <Field label="Shipped">{o.shippedAt ? `${fmtDate(o.shippedAt)}` : "not yet"}</Field>
           <Field label="Tracking">{o.trackingNumber ?? "-"}</Field>
         </dl>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {paid && !o.shippedAt && !o.trackingNumber && <AdminLabelButton kind="order" id={o.id} who={o.customerName ?? o.reference} />}
           {paid && !o.shippedAt && (
             o.trackingNumber
-              ? <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email customer" />
+              ? <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} existingTracking={o.trackingNumber} label="Mark shipped + email customer" />
               : <AdminShipButton kind="order" id={o.id} who={o.customerName ?? o.reference} label="Add tracking manually" />
           )}
           {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
+          {/* One ship flow: after the label exists, schedule the USPS pickup
+              right here instead of a separate page. */}
+          {(o.shipTransactionId || o.trackingNumber) && !o.shippedAt && <AdminPickupButton kind="order" id={o.id} />}
         </div>
       </Section>
     </div>

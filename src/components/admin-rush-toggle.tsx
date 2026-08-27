@@ -36,7 +36,7 @@ export function AdminRushToggle({ teamOrderId, rush }: { teamOrderId: string; ru
         rush ? "border-red-500/70 text-red-400 bg-red-500/10" : "border-line text-muted hover:border-brand/40"
       }`}
     >
-      {busy ? "..." : rush ? "🚨 $100 rush fee ON" : "Add $100 rush fee"}
+      {busy ? "..." : rush ? "$100 rush fee ON" : "Add $100 rush fee"}
     </button>
   );
 }

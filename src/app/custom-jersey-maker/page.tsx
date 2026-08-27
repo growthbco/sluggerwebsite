@@ -3,10 +3,10 @@ import Link from "next/link";
 import { DesignLab } from "@/components/design-lab";
 
 const FAQS = [
-  { q: "Is the custom jersey maker free?", a: "Yes - generating and previewing concepts is completely free to try, with no obligation. You only pay when you place a real order, and if a design fee applies it's credited toward that order, so the design is effectively free with your purchase." },
+  { q: "Is the custom jersey maker free?", a: "Your first concept is free, and adding your email unlocks several more. If you want to keep designing, a one-time $10 session lets you generate as much as you like - and that $10 credits toward your order. There's no separate design fee, and you only pay when you place a real order." },
   { q: "How accurate is the AI mockup?", a: "The mockup is a concept to spark ideas and show your colors and layout front and back. Once you like a direction, our in-house designer redraws it into a clean, production-ready proof. What you approve on that proof is exactly what we produce." },
   { q: "What happens after I generate a design?", a: "Save or share your concept, then start a free design request. A real Slugger Athletics designer refines it, sends you a proof to approve (revisions included), and only then do we go to production." },
-  { q: "Do I have to place an order to use it?", a: "No. Try as many concepts as you want - it's free and there's no commitment. Reach out whenever you're ready to turn a concept into real uniforms." },
+  { q: "Do I have to place an order to use it?", a: "No purchase required. Your first concept is free, and adding your email unlocks several more. If you want to keep going, a one-time $10 design session lets you design as much as you like - and that $10 comes right off your order when you're ready. Either way there's no commitment to buy; reach out whenever a concept is ready to become real uniforms." },
   { q: "What sports and jersey styles can I design?", a: "Any sport - baseball, softball, basketball, soccer, flag football, volleyball, and more - in crew neck, two-button, full-button, and quarter-zip styles. Jerseys start at $28 with names, numbers, and unlimited colors included." },
   { q: "Can I upload my own logo or sketch?", a: "Yes. Drop in a logo file or even a hand-drawn sketch and the tool works it into the concept. Our designer then cleans it up for print." },
 ];

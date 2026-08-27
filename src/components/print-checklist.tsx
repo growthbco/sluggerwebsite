@@ -9,7 +9,7 @@ type Jersey = { id: string; name: string; number: string; size: string; color: s
 type Mismatch = { kind: string; detail: string };
 type VerifyResult = { ok: boolean; summary: string; extracted: { name: string; number: string; size: string }[]; mismatches: Mismatch[] };
 
-/** Per-jersey print-file QA: every jersey is a line with its own ✓. Select the
+/** Per-jersey print-file QA: every jersey is a line with its own . Select the
  *  jerseys on a sheet, upload it, and verify just those - already-verified ones
  *  stay verified and aren't re-checked. */
 export function PrintChecklist({ token, jerseys }: { token: string; jerseys: Jersey[] }) {
@@ -76,7 +76,7 @@ export function PrintChecklist({ token, jerseys }: { token: string; jerseys: Jer
           <span className="text-sm text-muted">{verifiedCount} of {jerseys.length} verified</span>
         </div>
         <p className="text-sm text-muted mt-1">
-          Check the jerseys that are on the sheet you&apos;re uploading, then verify. Already-verified jerseys keep their ✓ and aren&apos;t re-checked - so new pieces are just the ones still unchecked.
+          Check the jerseys that are on the sheet you&apos;re uploading, then verify. Already-verified jerseys keep their and aren&apos;t re-checked - so new pieces are just the ones still unchecked.
         </p>
       </header>
 
@@ -90,7 +90,7 @@ export function PrintChecklist({ token, jerseys }: { token: string; jerseys: Jer
                   <input type="checkbox" checked={selected.has(j.id)} onChange={() => toggle(j.id)} className="accent-[color:var(--brand-gold)]" />
                   <span className="flex-1 text-sm text-foreground uppercase">{j.name || "-"} <span className="text-muted normal-case">#{j.number || "-"} · {j.size || "-"}</span></span>
                   {j.verifiedAt ? (
-                    <span className="text-xs display text-emerald-400 border border-emerald-400/40 px-2 py-0.5 rounded whitespace-nowrap">✓ Verified</span>
+                    <span className="text-xs display text-emerald-400 border border-emerald-400/40 px-2 py-0.5 rounded whitespace-nowrap">Verified</span>
                   ) : (
                     <span className="text-xs text-muted whitespace-nowrap">not verified</span>
                   )}
@@ -124,7 +124,7 @@ export function PrintChecklist({ token, jerseys }: { token: string; jerseys: Jer
       {error && <p className="text-sm text-red-400">{error}</p>}
       {result && (
         <div className={`border p-4 ${result.ok ? "border-emerald-400/40 bg-emerald-400/5" : "border-amber-400/40 bg-amber-400/5"}`}>
-          <p className={`display ${result.ok ? "text-emerald-400" : "text-amber-400"}`}>{result.ok ? "✅ " : "⚠️ "}{result.summary}</p>
+          <p className={`display ${result.ok ? "text-emerald-400" : "text-amber-400"}`}>{result.ok ? "" : ""}{result.summary}</p>
           {!result.ok && result.mismatches.length > 0 && (
             <ul className="mt-2 space-y-1 text-sm text-muted">
               {result.mismatches.slice(0, 12).map((m, i) => (<li key={i}><span className="text-amber-400 uppercase text-xs">{m.kind.replace("_", " ")}</span> - {m.detail}</li>))}

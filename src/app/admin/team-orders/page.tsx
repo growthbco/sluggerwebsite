@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AdminPageHeader } from "@/components/admin-page-header";
 import { redirect } from "next/navigation";
 import { desc, sql, eq, isNotNull, isNull } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { designRequests, teamOrders, teams, orders, teamOrderAddons, assistantFacts, customInvoices, designLabVisitors } from "@/db/schema";
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
 import { getRoster } from "@/lib/team-orders";
-import { computeTeamOrderQuote, estimateOrderWeightOz } from "@/lib/team-order-pricing";
+import { computeTeamOrderQuote, estimateOrderWeightOz, estimateOrderParcelsOz } from "@/lib/team-order-pricing";
 import { sizeBreakdown, ITEM_TYPES } from "@/lib/order-items";
 import { shippingCentsFor } from "@/lib/team-stores";
 import { getLiveTracking, type LiveTracking } from "@/lib/shippo";
@@ -74,7 +75,7 @@ const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 // the full string stays in the hover tooltip.
 const srcShort = (s: string | null | undefined) => (s ? s.split(" → ")[0] : "-");
 
-export default async function AdminTeamOrdersPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+export default async function AdminTeamOrdersPage({ searchParams }: { searchParams: Promise<{ status?: string; sort?: string }> }) {
   if (!adminEnabled()) {
     return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Set ADMIN_PASSWORD to enable the dashboard.</div>;
   }
@@ -84,7 +85,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
   }
 
   const db = getDb();
-  const { status: initialStatus } = await searchParams;
+  const { status: initialStatus, sort } = await searchParams;
 
   const [designs, torders, stores, recentOrders, paidAddons] = await Promise.all([
     db
@@ -202,6 +203,22 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
   const linkableDesigns = activeDesigns.map((d) => ({ id: d.id, teamName: d.teamName, reference: d.reference }));
   const archivedDesigns = designs.filter((d) => d.archivedAt);
   const activeOrders = torders.filter((o) => !o.archivedAt);
+  // Sort by who made a deposit: orders with a deposit paid float to the top,
+  // most recent deposit first; orders with no deposit fall to the bottom.
+  if (sort === "deposit") {
+    activeOrders.sort((a, b) => {
+      const ad = a.depositPaidAt ? new Date(a.depositPaidAt).getTime() : 0;
+      const bd = b.depositPaidAt ? new Date(b.depositPaidAt).getTime() : 0;
+      return bd - ad;
+    });
+  }
+  const sortHref = (s?: string) => {
+    const p = new URLSearchParams();
+    if (initialStatus) p.set("status", initialStatus);
+    if (s) p.set("sort", s);
+    const qs = p.toString();
+    return `/admin/team-orders${qs ? `?${qs}` : ""}#team-orders`;
+  };
   const archivedOrders = torders.filter((o) => o.archivedAt);
 
   // Price each unpaid team order from its roster so "Send invoice" can show
@@ -214,6 +231,10 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
   // this keeps the expected charge visible up front. Pickup = $0.
   const shipEstimates = new Map<string, number>();
   const inHouseWork = new Map<string, string>(); // order id -> "11× Snapback Hat"
+  // Pre-fill the shipping-label weight from the roster so the label dialog never
+  // falls back to its 2 lb default. Hats ship in their own box, so the primary
+  // label suggests the apparel weight and the second label the hat weight.
+  const labelWeights = new Map<string, { primaryLb: number; hatLb?: number }>();
   // Orders with any name/number on the roster need print-file QA before
   // production; plain-gear orders skip that gate entirely.
   const personalizedOrders = new Set<string>();
@@ -223,6 +244,14 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
       if (!roster.length) continue;
       if (roster.some((r) => (r.playerName ?? "").trim() || (r.playerNumber ?? "").trim())) {
         personalizedOrders.add(o.id);
+      }
+      const parcels = estimateOrderParcelsOz(roster);
+      if (parcels.apparelOz + parcels.hatOz > 0) {
+        const twoBoxes = parcels.apparelOz > 0 && parcels.hatOz > 0;
+        labelWeights.set(o.id, {
+          primaryLb: Math.max(1, Math.round(((parcels.apparelOz || parcels.hatOz) / 16) * 10) / 10),
+          hatLb: twoBoxes ? Math.max(1, Math.round((parcels.hatOz / 16) * 10) / 10) : undefined,
+        });
       }
       if (!(o.status === "paid" || o.invoicePaidAt)) {
         orderEstimates.set(o.id, computeTeamOrderQuote(o, roster).totalCents);
@@ -260,8 +289,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
-      <Link href="/admin" className="text-sm text-muted hover:text-foreground">← Dashboard</Link>
-      <h1 className="display text-4xl text-foreground mt-3">📦 Team Orders ({activeOrders.length})</h1>
+      <AdminPageHeader eyebrow="Operations" title={`Team Orders (${activeOrders.length})`} />
       <p className="mt-2 text-muted">Quote-first team orders through the whole pipeline: roster → invoice → production → shipped.</p>
 
       <div className="mt-6">
@@ -275,9 +303,14 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
 
       <AdminSearch statuses={Array.from(new Set(activeOrders.map((o) => o.status)))} initialStatus={initialStatus} />
 
-      <section className="mt-6 scroll-mt-16" id="team-orders">
-        <h2 className="display text-xl text-foreground">Team orders ({activeOrders.length})</h2>
-        <div className="mt-3 overflow-x-auto border border-line">
+      <div className="mt-4 flex items-center gap-3 text-xs">
+        <span className="text-muted">Sort:</span>
+        <Link href={sortHref(undefined)} className={sort !== "deposit" ? "text-brand display" : "text-muted hover:text-foreground"}>Recent</Link>
+        <Link href={sortHref("deposit")} className={sort === "deposit" ? "text-brand display" : "text-muted hover:text-foreground"}>Deposit made</Link>
+      </div>
+
+      <section className="mt-4 scroll-mt-16" id="team-orders">
+        <div className="overflow-x-auto border border-line">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-steel text-left text-xs text-muted uppercase">
@@ -309,9 +342,9 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                         {o.reference}
                       </Link>
                     </td>
-                    <td className="px-3 py-2 text-foreground">
+                    <td className="px-3 py-2 text-foreground max-w-[16rem]">
                       <span className="flex flex-wrap items-center gap-2">
-                        <Link href={`/admin/team-order/${o.id}`} className="hover:text-brand hover:underline" title="Open the full order detail page">{o.teamName}</Link>
+                        <Link href={`/admin/team-order/${o.id}`} className="hover:text-brand hover:underline line-clamp-2" title="Open the full order detail page">{o.teamName}</Link>
                         {addonsByOrder.has(o.id) && (
                           <AdminAddonDetails addons={addonsByOrder.get(o.id)!} teamName={o.teamName} />
                         )}
@@ -333,7 +366,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                             className="text-xs text-amber-300 whitespace-nowrap hover:underline"
                             title={`Roster now prices at ${money(orderEstimates.get(o.id)!)} but the locked quote is ${money(o.quotedTotalCents)} - open to update`}
                           >
-                            ⚠️ requote
+                            requote
                           </Link>
                         ) : null}
                         {/* Shipping rides on the FINAL invoice: show the
@@ -375,7 +408,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                             title="Embroidered in-house in Ocala - not part of the factory shipment"
                             className="text-xs display text-amber-300 border border-amber-300/40 px-1.5 py-0.5 whitespace-nowrap"
                           >
-                            🧢 IN-HOUSE: {inHouseWork.get(o.id)}
+                            IN-HOUSE: {inHouseWork.get(o.id)}
                           </span>
                         )}
                         {/* Inbound leg (factory -> shop). Always shown while
@@ -389,7 +422,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                             title={`Inbound from production${o.inboundTrackingAddedAt ? ` - entered ${fmtDate(o.inboundTrackingAddedAt)}` : ""} - click for live carrier tracking`}
                             className="text-xs display text-violet-400 underline decoration-dotted underline-offset-2 hover:text-violet-300 whitespace-nowrap"
                           >
-                            ✈ INBOUND · {o.inboundCarrier ?? "?"} {o.inboundTrackingNumber}
+                            INBOUND · {o.inboundCarrier ?? "?"} {o.inboundTrackingNumber}
                           </a>
                         )}
                         {inboundLive.has(o.id) && (
@@ -404,31 +437,31 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                         )}
                         {o.paymentNote && (
                           <span className="text-xs text-emerald-300/90 whitespace-nowrap" title={o.paymentNote}>
-                            💵 {o.paymentNote.split(";").pop()?.trim()}
+                            {o.paymentNote.split(";").pop()?.trim()}
                           </span>
                         )}
                         {/* ONE primary action per state - everything else
                             lives in the ⋯ menu so rows stay scannable. */}
                         {o.shippedAt ? (
                           <>
-                            <span className="text-xs display text-green-400 whitespace-nowrap">🚚 SHIPPED</span>
+                            <span className="text-xs display text-green-400 whitespace-nowrap">SHIPPED</span>
                             {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
                           </>
                         ) : paid ? (
                           o.trackingNumber ? (
                             <>
                               <span className="text-xs display text-amber-400 whitespace-nowrap" title="Label/tracking ready - customer not emailed yet">READY TO SHIP</span>
-                              <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email" />
+                              <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="Mark shipped + email" />
                             </>
                           ) : (
                             <>
                               <span className="text-xs display text-green-400 whitespace-nowrap">PAID</span>
-                              <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />
+                              <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} suggestedLb={labelWeights.get(o.id)?.primaryLb} />
                             </>
                           )
                         ) : o.depositPaidAt && estimate ? (
                           <>
-                            <span className="text-xs display text-sky-400 whitespace-nowrap">DEPOSIT ✓</span>
+                            <span className="text-xs display text-sky-400 whitespace-nowrap">DEPOSIT </span>
                             <AdminInvoiceButton
                               teamOrderId={o.id}
                               teamName={o.teamName}
@@ -494,7 +527,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                                 </>
                               ) : (
                                 <>
-                                  <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />
+                                  <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} suggestedLb={labelWeights.get(o.id)?.primaryLb} />
                                   <AdminShipButton kind="team_order" id={o.id} who={o.teamName} label="Add tracking" />
                                 </>
                               )
@@ -515,7 +548,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                             {/* Buy an extra parcel's label once the primary one
                                 exists - emails the customer that tracking. */}
                             {paid && o.trackingNumber && (
-                              <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} additional label="🏷 Buy another label + email" />
+                              <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} additional suggestedLb={labelWeights.get(o.id)?.hatLb} label="Buy another label + email" />
                             )}
                             <AdminArchiveButton kind="team_order" id={o.id} archived={false} />
                         </AdminRowMenu>

@@ -44,10 +44,22 @@ export async function GET(req: Request) {
     .groupBy(smsMessages.phone)
     .orderBy(desc(sql`max(${smsMessages.createdAt})`))
     .limit(150);
-  const latest = await db.select().from(smsMessages).orderBy(desc(smsMessages.createdAt)).limit(400);
+  // Only the preview fields (not media/provider metadata) for the last-message
+  // snippet, and only the contact-state columns - this list route is polled
+  // often, so trimming the row width matters.
+  const latest = await db
+    .select({ phone: smsMessages.phone, body: smsMessages.body, direction: smsMessages.direction, channel: smsMessages.channel })
+    .from(smsMessages)
+    .orderBy(desc(smsMessages.createdAt))
+    .limit(400);
   const lastBody = new Map<string, { body: string; direction: string; channel: string }>();
   for (const m of latest) if (!lastBody.has(m.phone)) lastBody.set(m.phone, { body: m.body, direction: m.direction, channel: m.channel });
-  const [names, contacts] = await Promise.all([namesByPhone(), db.select().from(smsContacts)]);
+  const [names, contacts] = await Promise.all([
+    namesByPhone(),
+    db
+      .select({ phone: smsContacts.phone, starredAt: smsContacts.starredAt, archivedAt: smsContacts.archivedAt, lastReadAt: smsContacts.lastReadAt })
+      .from(smsContacts),
+  ]);
   const meta = new Map(contacts.map((c) => [c.phone, c]));
   const conversations = rows.map((r) => {
     const c = meta.get(r.phone);

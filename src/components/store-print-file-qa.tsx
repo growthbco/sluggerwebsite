@@ -29,7 +29,7 @@ export function StorePrintFileQA({ token, groups, rosters, qa }: Props) {
       <div className="mt-2 flex flex-wrap gap-2">
         {groups.map((g) => {
           const done = qa[g.key];
-          const state = done ? (done.ok || (done.dismissed?.length ?? 0) >= done.mismatches.length ? "✅" : "⚠️") : "";
+          const state = done ? (done.ok || (done.dismissed?.length ?? 0) >= done.mismatches.length ? "" : "") : "";
           return (
             <button
               key={g.key}

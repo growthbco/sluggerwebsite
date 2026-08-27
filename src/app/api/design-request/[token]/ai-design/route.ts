@@ -35,9 +35,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     style?: string;
     colors?: string[];
     refImage?: string; // staff-uploaded reference, as a data URL
-    product?: string;  // jersey | hat | hype-chain | hoodie | pants | socks
+    product?: string;  // jersey | cheer | hat | hype-chain | hoodie | pants | shorts | socks
+    sport?: string;    // selected in the studio's Sport -> Item -> Style picker
   } = {};
   try { body = await req.json(); } catch {}
+  // Sport the studio picked (baseball, basketball, cheer, flag football) drives
+  // the prompt; falls back to the design request's own sport.
+  const sport = (body.sport ?? "").trim() || undefined;
   const action = body.action === "refine" ? "refine" : "generate";
   const instruction = (body.instruction ?? "").trim().slice(0, 800);
   // Colors the staff typed in override the customer's on-file colors.
@@ -55,9 +59,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     // Base = the current mockup (keep it). The explicitly chosen version, else latest.
     const baseUrl = body.baseUrl || state.versions[state.versions.length - 1]?.url;
     if (!baseUrl) return NextResponse.json({ error: "Nothing to revise yet - generate a mockup first." }, { status: 400 });
+    // The team's real palette (staff override, else the customer's on-file
+    // colors), named so the model can recolor when the change is about color.
+    const refineColorList = (staffColors.length ? staffColors : (request.colorHexes ?? [])).map(colorName);
+    const refineColors = refineColorList.length ? refineColorList.join(", ") : (request.colors || "");
     try {
       const buf = Buffer.from(await (await fetch(baseUrl)).arrayBuffer());
-      parts.push({ text: buildRefinePrompt(product, request.sport, instruction, !!refImage) });
+      parts.push({ text: buildRefinePrompt(product, request.sport, instruction, !!refImage, refineColors) });
       parts.push({ inline_data: { mime_type: "image/png", data: buf.toString("base64") } });
     } catch {
       return NextResponse.json({ error: "Could not load the base image." }, { status: 502 });
@@ -89,7 +97,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       // Pendant logo = staff upload, else the customer's first uploaded logo.
       const pendantLogo = refImage ?? (await fetchImage((request.inspirationImages ?? [])[0] ?? ""));
       parts.push({ text: buildProductPrompt(product, {
-        sport: request.sport, style, colors, teamName: request.teamName,
+        sport: sport ?? request.sport, style, colors, teamName: request.teamName,
         vision: request.vision, instruction,
         hasRef: !!(chainRef || pendantLogo), hasPendantLogo: !!pendantLogo,
       }) });
@@ -119,7 +127,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         if (s) seeds.push(s);
       }
       parts.push({ text: buildProductPrompt(product, {
-        sport: request.sport, style, colors, teamName: request.teamName,
+        sport: sport ?? request.sport, style, colors, teamName: request.teamName,
         vision: request.vision, instruction, hasRef: seeds.length > 0,
       }) });
       for (const s of seeds.slice(0, 3)) parts.push({ inline_data: s });
@@ -136,9 +144,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       if (tagStrip && saScript) {
         parts.push({
           text:
-            "BRANDING (required, appears on every real Slugger jersey): the next two images are brand marks to reproduce exactly. " +
+            "BRANDING (both marks are REQUIRED and appear on every real Slugger jersey - do not omit either one): the next two images are brand marks to reproduce exactly. " +
             "Mark 1 (white size-tag strip with barcode): place SMALL at the bottom-center of the FRONT, just above the hem, subtle like a real garment tag. " +
-            "Mark 2 ('SA' script logo): place at the top-center of the BACK, just above the player name - prominent and clearly readable, about half the height of the player-name lettering. " +
+            "Mark 2 ('SA' script logo): this MUST appear on the BACK of the jersey, centered in the upper-back yoke area just below the collar - above the player name AND/OR number (place it there even when there is only a number and no name). Prominent and clearly readable, roughly half the height of the back number. Never leave the upper back blank. " +
             "The SA mark may be recolored to match the design's palette so it blends with the overall style.",
         });
         parts.push({ inline_data: tagStrip });
@@ -170,7 +178,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     at: new Date().toISOString(),
   };
   const nextState = {
-    sport: request.sport ?? undefined,
+    sport: sport ?? request.sport ?? undefined,
     style: (body.style ?? request.jerseyStyle) ?? undefined,
     primaryColor: request.colorHexes?.[0],
     secondaryColor: request.colorHexes?.[1],

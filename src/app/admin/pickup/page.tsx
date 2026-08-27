@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AdminPageHeader } from "@/components/admin-page-header";
 import { redirect } from "next/navigation";
 import { desc, isNotNull } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders, orders } from "@/db/schema";
 import { adminEnabled, getAdminSession, canAccess } from "@/lib/admin-auth";
-import { AdminPickupButton } from "@/components/admin-pickup-button";
+import { carrierFor } from "@/lib/tracking";
+import { AdminPickupBatch } from "@/components/admin-pickup-batch";
 
 export const metadata: Metadata = { title: "Schedule Pickup", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -35,8 +37,32 @@ export default async function AdminPickupPage() {
 
   const db = getDb();
   const [torders, shopOrders] = await Promise.all([
-    db.select().from(teamOrders).where(isNotNull(teamOrders.shipTransactionId)).orderBy(desc(teamOrders.updatedAt)),
-    db.select().from(orders).where(isNotNull(orders.shipTransactionId)).orderBy(desc(orders.createdAt)),
+    db
+      .select({
+        id: teamOrders.id,
+        reference: teamOrders.reference,
+        teamName: teamOrders.teamName,
+        contactName: teamOrders.contactName,
+        status: teamOrders.status,
+        archivedAt: teamOrders.archivedAt,
+        shipCarrier: teamOrders.shipCarrier,
+        trackingNumber: teamOrders.trackingNumber,
+      })
+      .from(teamOrders)
+      .where(isNotNull(teamOrders.shipTransactionId))
+      .orderBy(desc(teamOrders.updatedAt)),
+    db
+      .select({
+        id: orders.id,
+        reference: orders.reference,
+        customerName: orders.customerName,
+        status: orders.status,
+        shipCarrier: orders.shipCarrier,
+        trackingNumber: orders.trackingNumber,
+      })
+      .from(orders)
+      .where(isNotNull(orders.shipTransactionId))
+      .orderBy(desc(orders.createdAt)),
   ]);
 
   const waiting: Waiting[] = [];
@@ -49,7 +75,9 @@ export default async function AdminPickupPage() {
       id: o.id,
       reference: o.reference,
       who: o.teamName.trim() || o.contactName,
-      carrier: o.shipCarrier,
+      // Fall back to the tracking-number pattern so a label always shows a
+      // carrier (no more "carrier unconfirmed").
+      carrier: o.shipCarrier ?? (o.trackingNumber ? carrierFor(o.trackingNumber) : null),
       tracking: o.trackingNumber,
       href: `/admin/team-order/${o.id}`,
     });
@@ -62,7 +90,7 @@ export default async function AdminPickupPage() {
       id: o.id,
       reference: o.reference,
       who: o.customerName ?? "Shop order",
-      carrier: o.shipCarrier,
+      carrier: o.shipCarrier ?? (o.trackingNumber ? carrierFor(o.trackingNumber) : null),
       tracking: o.trackingNumber,
       href: `/admin/order/${o.id}`,
     });
@@ -73,15 +101,20 @@ export default async function AdminPickupPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 py-10">
-      <Link href="/admin" className="text-sm text-muted hover:text-foreground">← Dashboard</Link>
-      <h1 className="display text-4xl text-foreground mt-3">📮 Schedule Pickup</h1>
+      <AdminPageHeader eyebrow="Operations" title="Schedule Pickup" />
       <p className="mt-2 text-muted text-sm">
         Book a <strong>free USPS pickup</strong> at the shop for any order with a label already bought. USPS collects with your
         regular mail - next business day is the default. (UPS &amp; FedEx charge for pickups, so those aren&apos;t offered here.)
       </p>
 
+      {usps.length > 0 && (
+        <div className="mt-6">
+          <AdminPickupBatch count={usps.length} />
+        </div>
+      )}
+
       <div className="mt-6">
-        <p className="display text-sm text-muted uppercase tracking-wide mb-2">Ready for USPS pickup ({usps.length})</p>
+        <p className="display text-sm text-muted uppercase tracking-wide mb-2">In this pickup ({usps.length})</p>
         <div className="border border-line divide-y divide-[color:var(--line)]">
           {usps.length === 0 && <p className="px-4 py-5 text-sm text-muted">Nothing waiting. Buy a USPS label on an order and it shows up here.</p>}
           {usps.map((w) => (
@@ -93,7 +126,6 @@ export default async function AdminPickupPage() {
                   {w.carrier ? `${w.carrier} · ` : "carrier unconfirmed · "}{w.tracking ? `#${w.tracking}` : "no tracking"}
                 </span>
               </span>
-              <AdminPickupButton kind={w.kind} id={w.id} />
             </div>
           ))}
         </div>

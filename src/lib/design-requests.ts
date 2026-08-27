@@ -3,10 +3,6 @@ import { eq, ne, and, or, asc, desc, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { designRequests, teamOrders, designLabVisitors, designLabRenders } from "@/db/schema";
 
-// Default design fee (env override: DESIGN_FEE_CENTS). Filters out customers
-// who would otherwise shop our designs elsewhere. Credited to the final order.
-export const DESIGN_FEE_CENTS = Number(process.env.DESIGN_FEE_CENTS) || 3500;
-
 /** Human-readable "what to mock up" line: "Jersey (Two-button), Shorts, Hat".
  *  The jersey cut rides along on the jersey/shirt entry. */
 export function formatProducts(productTypes?: string[] | null, jerseyStyle?: string | null): string {
@@ -44,6 +40,58 @@ export type NewDesignRequest = {
 
 const RUSH_DAYS = 14;
 export const RUSH_FEE_NOTE = "Anything needed within 2 weeks incurs a rush fee of $5 per item.";
+
+/** The approved mockup graphic(s) for a design, in priority order: the approved
+ *  set, then the single approved URL, then the latest proof as a fallback. Used
+ *  to attach the artwork to production posts so the designer always sees what to
+ *  build - whether the customer approved it or staff processed the order. */
+export function approvedMockupImages(design: {
+  approvedDesignUrls?: string[] | null;
+  approvedDesignUrl?: string | null;
+  proofImages?: string[] | null;
+}): string[] {
+  if (design.approvedDesignUrls?.length) return design.approvedDesignUrls;
+  if (design.approvedDesignUrl) return [design.approvedDesignUrl];
+  const proofs = design.proofImages ?? [];
+  return proofs.length ? [proofs[proofs.length - 1]] : [];
+}
+
+const DESIGN_DONE_STATUSES = new Set(["approved", "ordered", "cancelled"]);
+
+/** Whether a design still needs an action FROM US on the admin dashboard: it's
+ *  not archived or finished, and either it's a fresh/changes-requested request
+ *  or the customer spoke last. A staff "followed up" mark (set when we reach out
+ *  by text/call outside the thread) clears it - until the customer messages
+ *  again AFTER that mark, which re-flags it. */
+export function designNeedsAction(d: {
+  status: string;
+  archivedAt?: Date | null;
+  followedUpAt?: Date | null;
+  messages?: { from?: string; at?: string }[] | null;
+  /** The last thread message alone - lets list pages avoid loading the whole
+   *  `messages` array just to check who spoke last. Takes precedence when set. */
+  lastMessage?: { from?: string; at?: string } | null;
+}): boolean {
+  if (d.archivedAt) return false;
+  if (DESIGN_DONE_STATUSES.has(d.status)) return false;
+  const lastMsg = d.lastMessage ?? d.messages?.[d.messages.length - 1];
+  const flagged = d.status === "changes_requested" || d.status === "submitted" || lastMsg?.from === "client";
+  if (!flagged) return false;
+  if (d.followedUpAt) {
+    const lastAt = lastMsg?.at ? new Date(lastMsg.at) : null;
+    if (!lastAt || lastAt <= new Date(d.followedUpAt)) return false;
+  }
+  return true;
+}
+
+/** Record that staff followed up on a design (clears the "waiting on us" flag
+ *  until the customer replies again). Pass null to un-mark. */
+export async function markFollowedUp(id: string, at: Date | null = new Date()) {
+  const { getDb } = await import("@/db");
+  const { designRequests } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  await getDb().update(designRequests).set({ followedUpAt: at, updatedAt: new Date() }).where(eq(designRequests.id, id));
+}
 
 /** Returns true if a deadline date is within the rush window (< 14 days away). */
 export function isRush(neededBy?: Date | string | null): boolean {
@@ -110,24 +158,6 @@ export async function findActiveDesignByEmail(email: string) {
   return rows.length === 1 ? rows[0] : null;
 }
 
-/** Mark the design fee as paid (via Stripe webhook) and flip status to
- *  submitted so the designer pipeline kicks in. */
-export async function markDesignFeePaid(
-  designRequestId: string,
-  paymentId: string,
-) {
-  const db = getDb();
-  await db
-    .update(designRequests)
-    .set({
-      designFeePaidAt: new Date(),
-      designFeePaymentId: paymentId,
-      status: "submitted",
-      updatedAt: new Date(),
-    })
-    .where(eq(designRequests.id, designRequestId));
-}
-
 /** Client submits the intake form -> create a request, mint tokens. */
 export async function createDesignRequest(input: NewDesignRequest) {
   const db = getDb();
@@ -138,16 +168,16 @@ export async function createDesignRequest(input: NewDesignRequest) {
   const neededByDate = input.neededBy ? new Date(input.neededBy) : null;
   const rush = isRush(neededByDate);
 
-  // If the fee is waived (returning customer / promo applied server-side),
-  // jump straight to 'submitted' so the designer pipeline kicks in. Otherwise
-  // hold at 'pending_payment' until Stripe confirms via webhook.
-  const waived = Boolean(input.feeWaivedReason);
+  // Design is free (the $35 fee was retired), so every request goes straight
+  // to 'submitted' and the designer pipeline kicks in immediately. `waived` is
+  // kept true for callers that branch on it.
+  const waived = true;
 
   const [row] = await db
     .insert(designRequests)
     .values({
       reference,
-      status: waived ? "submitted" : "pending_payment",
+      status: "submitted",
       teamName: input.teamName,
       sport: input.sport,
       contactName: input.contactName,
@@ -166,9 +196,9 @@ export async function createDesignRequest(input: NewDesignRequest) {
       delaysAckAt: input.delaysAck ? new Date() : null,
       statusToken,
       manageToken,
-      designFeeAmountCents: DESIGN_FEE_CENTS,
-      designFeePaidAt: waived ? new Date() : null,
-      designFeeWaivedReason: input.feeWaivedReason ?? null,
+      designFeeAmountCents: 0,
+      designFeePaidAt: new Date(),
+      designFeeWaivedReason: input.feeWaivedReason ?? "no_fee",
       designFeeWaivedRef: input.feeWaivedRef ?? null,
     })
     .returning();
@@ -224,12 +254,15 @@ export async function convertLeadToDesignRequest(
       // note), so carry that consent over - otherwise proof/notification texts
       // silently skip them and never reach the Texts inbox.
       smsOptInAt: v.phone ? new Date() : null,
-      source: "AI Design Lab",
+      // Keep the lab as the origin, but carry the first-touch traffic source so
+      // "AI Design Lab" also shows HOW they reached it (e.g.
+      // "AI Design Lab · Instagram (ad)").
+      source: v.source ? `AI Design Lab · ${v.source}` : "AI Design Lab",
       productTypes: ["Jersey / Shirt"],
       aiDesignState: { versions },
       statusToken,
       manageToken,
-      designFeeAmountCents: DESIGN_FEE_CENTS,
+      designFeeAmountCents: 0,
       designFeePaidAt: new Date(),
       designFeeWaivedReason: "design_lab_lead",
     })

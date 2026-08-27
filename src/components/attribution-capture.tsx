@@ -10,6 +10,11 @@ export function AttributionCapture() {
   useEffect(() => {
     try {
       if (document.cookie.includes("slugger_attr=")) return; // first touch wins
+      // Private / functional links (a portal magic link, a design status page, a
+      // team-order manage link, a store, checkout) are NOT marketing sources - a
+      // customer following one is not a fresh lead, and the link's token must
+      // never end up recorded as their attribution.
+      if (/^\/(portal|design|team-order|store|admin|checkout|r)\//.test(window.location.pathname)) return;
       const p = new URLSearchParams(window.location.search);
       let refHost = "";
       try {

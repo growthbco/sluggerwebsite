@@ -6,7 +6,6 @@ import { SmsConsentNote } from "@/components/sms-consent";
 import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
 import Image from "next/image";
 import { upload } from "@vercel/blob/client";
-import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
 
 type Uploaded = { url: string; pathname: string };
 
@@ -128,14 +127,7 @@ export function DesignIntakeForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not submit your design request.");
-      // Three outcomes:
-      //  - waived (returning customer): show success + status URL
-      //  - needs payment: redirect to Stripe Checkout
-      //  - misconfigured: fall back to showing the status URL
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
-        return;
-      }
+      // Design is free: always land on the success screen with the status URL.
       setStatus("done");
       setStatusUrl(data.statusUrl);
       saveRememberedContact({ name: contactName, email: contactEmail, phone: contactPhone });
@@ -156,11 +148,11 @@ export function DesignIntakeForm() {
         </h2>
         <p className="mt-3 text-muted">
           {returning
-            ? "Your $35 design fee was automatically waived as a returning Slugger customer. Our designer is already on it."
+            ? "Welcome back - our in-house designer is already on your mockup. Track its progress here:"
             : "Our in-house designer will get started on your mockup. You can track its progress here:"}
         </p>
-        {!returning && DESIGN_FEE_WAIVED && message === "promo_campaign" && (
-          <p className="mt-2 text-sm text-brand">No design fee - it&apos;s on us right now. 🎉</p>
+        {!returning && (
+          <p className="mt-2 text-sm text-brand">The design is on us - always free.</p>
         )}
         {statusUrl && (
           <div className="mt-4">
@@ -466,24 +458,12 @@ export function DesignIntakeForm() {
         disabled={!canSubmit || status === "sending"}
         className="w-full clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg py-3.5 transition-colors disabled:opacity-60"
       >
-        {status === "sending"
-          ? "Submitting..."
-          : DESIGN_FEE_WAIVED
-          ? "Submit Design Request"
-          : "Submit & Pay $35"}
+        {status === "sending" ? "Submitting..." : "Submit Design Request"}
       </button>
-      {DESIGN_FEE_WAIVED ? (
-        <p className="text-xs text-muted text-center">
-          No design fee right now &mdash; it&apos;s on us. Our in-house designer starts as
-          soon as you submit, free to see, no commitment.
-        </p>
-      ) : (
-        <p className="text-xs text-muted text-center">
-          $35 starts the design &mdash; credited 100% to your final order, so the design is free with purchase.
-          <br />
-          Returning customer? We&apos;ll waive it automatically when you submit.
-        </p>
-      )}
+      <p className="text-xs text-muted text-center">
+        No design fee &mdash; the design is on us. Our in-house designer starts as
+        soon as you submit, free to see, no commitment.
+      </p>
     </div>
   );
 }

@@ -3,13 +3,13 @@ import { waitUntil } from "@vercel/functions";
 import { postTeamOrderToDiscord } from "@/lib/discord";
 import { setThreadStageTag } from "@/lib/discord-bot";
 import { dbEnabled } from "@/db";
-import { getByStatusToken, findActiveDesignByEmail, markOrdered } from "@/lib/design-requests";
+import { getByStatusToken, findActiveDesignByEmail, markOrdered, approvedMockupImages } from "@/lib/design-requests";
 import { createTeamOrder, addRosterRow, submitTeamOrder } from "@/lib/team-orders";
 import { autoInvoiceOnSubmit } from "@/lib/team-order-invoicing";
 
 export const runtime = "nodejs";
 
-type RosterRow = { name?: string; number?: string; size?: string; sizes?: Record<string, string>; notes?: string; quantity?: number };
+type RosterRow = { name?: string; number?: string; size?: string; sizes?: Record<string, string>; design?: string; notes?: string; quantity?: number };
 
 // Manual-roster team order submission (coach typed/imported the full roster).
 // Persists to the DB first - Discord is a notification, not the datastore.
@@ -75,22 +75,55 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Ordering isn't configured yet." }, { status: 503 });
   }
 
+  // A roster can be prepared before artwork is ready, but it cannot become a
+  // real submitted order until an approved mockup is attached. Keep this check
+  // server-side so a stale page or direct API call cannot bypass the rule.
+  const hasApprovedDesign = Boolean(
+    design &&
+      (design.status === "approved" || design.status === "ordered") &&
+      (design.approvedDesignUrls?.length || design.approvedDesignUrl),
+  );
+  if (!hasApprovedDesign) {
+    return NextResponse.json(
+      {
+        code: "DESIGN_REQUIRED",
+        error: "An approved design is required before you can submit this order. Start or finish your free design first.",
+      },
+      { status: 409 },
+    );
+  }
+
   const items = body.items?.length ? body.items : ["jersey"];
 
   try {
     // 1. Persist: order + roster rows, then lock it as submitted.
-    const created = await createTeamOrder({
-      teamName,
-      contactName,
-      contactEmail,
-      contactPhone,
-      jerseyStyle: body.jerseyStyle,
-      jerseyMaterial: body.jerseyMaterial,
-      items,
-      designRequestId: design?.id,
-      rushShipping: design?.rush ?? false,
-      smsOptIn: (body.smsConsent === true && Boolean(contactPhone)) || Boolean(design?.smsOptInAt),
-    });
+    // ONE roster per open job: a second submission for a design that already has
+    // an OPEN, unpaid order (a coach adding themselves, a re-entered failed
+    // submit, a single extra jersey) must add to THAT order, not spawn a second
+    // job. A NEW order is only correct once the prior job is in production,
+    // shipped, or paid - i.e. a genuine new batch. Anything before that
+    // (draft/collecting/submitted/quoted, unpaid) reuses the current TO.
+    const OPEN_UNPAID = ["draft", "collecting", "submitted", "quoted"];
+    const { getByDesignRequestId } = await import("@/lib/team-orders");
+    const existing = design ? await getByDesignRequestId(design.id) : null;
+    const reuse =
+      existing && OPEN_UNPAID.includes(existing.status) && !existing.depositPaidAt && !existing.invoicePaidAt
+        ? existing
+        : null;
+    const created = reuse
+      ? { id: reuse.id, reference: reuse.reference, selfEntryToken: reuse.selfEntryToken!, manageToken: reuse.manageToken! }
+      : await createTeamOrder({
+          teamName,
+          contactName,
+          contactEmail,
+          contactPhone,
+          jerseyStyle: body.jerseyStyle,
+          jerseyMaterial: body.jerseyMaterial,
+          items,
+          designRequestId: design?.id,
+          rushShipping: design?.rush ?? false,
+          smsOptIn: (body.smsConsent === true && Boolean(contactPhone)) || Boolean(design?.smsOptInAt),
+        });
     for (const r of roster.slice(0, 200)) {
       await addRosterRow(
         created.id,
@@ -99,6 +132,7 @@ export async function POST(req: Request) {
           playerNumber: r.number,
           size: r.size,
           sizes: r.sizes,
+          design: r.design,
           notes: r.notes,
           quantity: r.quantity,
         },
@@ -113,7 +147,16 @@ export async function POST(req: Request) {
     // contacts would be a phishing relay. Tokenless/email-matched submissions
     // wait for a staff click ("Send invoice") instead.
     if (body.designToken && design) {
-      waitUntil(autoInvoiceOnSubmit(created.id));
+      if (reuse) {
+        // Added pieces to an existing open job: (re)send the deposit invoice so
+        // it reflects the FULL roster including the just-added pieces. The
+        // on-submit auto-invoice skips an order that already has an invoice link,
+        // which would otherwise leave the new pieces unbilled.
+        const { sendTeamOrderInvoice } = await import("@/lib/team-order-invoicing");
+        waitUntil(sendTeamOrderInvoice({ teamOrderId: created.id, stage: "deposit" }));
+      } else {
+        waitUntil(autoInvoiceOnSubmit(created.id));
+      }
     }
     // First-touch attribution: where this coach originally came from.
     try {
@@ -146,11 +189,13 @@ export async function POST(req: Request) {
       jerseyStyle: body.jerseyStyle,
       jerseyMaterial: body.jerseyMaterial,
       items,
+        designImages: design ? approvedMockupImages(design) : undefined,
         roster: roster.map((r) => ({
           name: r.name,
           number: r.number,
           size: r.sizes?.jersey ?? r.size,
           sizes: r.sizes,
+          design: r.design,
           notes: r.notes,
         })),
         manageUrl: design?.manageToken

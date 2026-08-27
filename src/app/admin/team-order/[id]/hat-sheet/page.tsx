@@ -124,7 +124,7 @@ export default async function HatSheetPage({ params }: { params: Promise<{ id: s
           </p>
           {neededStr && (
             <p className={`mt-2 text-sm font-bold ${urgent ? "text-[#a3271f]" : "text-black"}`}>
-              {urgent ? "🚨 " : ""}Needed by {neededStr}
+              {urgent ? "" : ""}Needed by {neededStr}
               {design?.rush ? " (RUSH)" : ""}
               {daysOut !== null && daysOut >= 0 ? ` - ${daysOut === 0 ? "TODAY" : `${daysOut} day${daysOut === 1 ? "" : "s"} out`}` : ""}
             </p>

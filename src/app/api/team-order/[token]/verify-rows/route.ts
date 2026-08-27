@@ -28,8 +28,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const selected = all.filter((j) => rowIds.includes(j.id));
   const roster: RosterEntry[] = selected
     .map((j) => ({ name: j.name, number: j.number, size: j.size }))
-    .filter((r) => r.name && r.number);
-  if (roster.length === 0) return NextResponse.json({ error: "The selected jerseys have no name/number to verify." }, { status: 400 });
+    // A jersey is verifiable with a name OR a number - many teams (bowling,
+    // rec, adult league) run names with no numbers.
+    .filter((r) => r.name || r.number);
+  if (roster.length === 0) return NextResponse.json({ error: "The selected jerseys have no name or number to verify." }, { status: 400 });
 
   try {
     const result = await verifyPrintFiles(printFileUrls, roster);

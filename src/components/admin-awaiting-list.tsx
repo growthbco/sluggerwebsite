@@ -79,7 +79,7 @@ export function AdminAwaitingList({ items }: { items: Unpaid[] }) {
   if (items.length === 0) {
     return (
       <div className="border border-line p-6">
-        <p className="text-sm text-muted">Nothing outstanding - everyone&apos;s paid up. 🎉</p>
+        <p className="text-sm text-muted">Nothing outstanding - everyone&apos;s paid up. </p>
       </div>
     );
   }
@@ -93,7 +93,7 @@ export function AdminAwaitingList({ items }: { items: Unpaid[] }) {
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`inline-block border px-2 py-0.5 text-[11px] display uppercase tracking-wide ${KIND_TONE[it.kind]}`}>{it.kind}</span>
                 <span className="font-mono text-xs text-muted">{it.ref}</span>
-                {it.href && <span className="text-[11px] text-muted/70 group-hover/row:text-brand">open ↗</span>}
+                {it.href && <span className="text-[11px] text-muted/70 group-hover/row:text-brand">open </span>}
               </div>
               <p className="text-foreground display leading-tight">{it.customer}</p>
               {it.email && <p className="text-xs text-muted break-all">{it.email}</p>}
@@ -102,37 +102,40 @@ export function AdminAwaitingList({ items }: { items: Unpaid[] }) {
             </div>
             <div className="flex flex-col items-end justify-between gap-2 shrink-0">
               <span className="display text-lg text-foreground tabular-nums whitespace-nowrap">{money(it.amountCents)}</span>
-              <div className="flex items-center gap-2">
-                {it.sendInvoice && (
+              <div className="flex flex-col items-end gap-1">
+                {/* ONE action per card so the list scans: if it still needs an
+                    invoice, that's the button; otherwise the pay link is. */}
+                {it.sendInvoice ? (
                   <button
                     type="button"
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); sendFinalInvoice(it); }}
                     disabled={sending === it.key}
-                    className="text-[11px] display text-on-brand bg-brand px-2 py-1 hover:bg-brand-dark disabled:opacity-50 whitespace-nowrap"
+                    className="text-xs display text-on-brand bg-brand px-3 py-1.5 hover:bg-brand-dark disabled:opacity-50 whitespace-nowrap"
                   >
-                    {sending === it.key ? "Sending…" : "Send final invoice"}
+                    {sending === it.key ? "Sending…" : "Send invoice"}
                   </button>
-                )}
-                {it.invoiceId && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); voidInvoice(it.invoiceId!); }}
-                    disabled={voiding === it.invoiceId}
-                    className="text-[11px] display text-red-400/80 border border-red-500/40 px-2 py-1 hover:bg-red-500/10 disabled:opacity-50"
-                  >
-                    {voiding === it.invoiceId ? "…" : "Void"}
-                  </button>
-                )}
-                {it.payUrl && (
+                ) : it.payUrl ? (
                   <a
                     href={it.payUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="text-[11px] display text-brand border border-brand/50 px-2 py-1 hover:bg-brand/10 whitespace-nowrap"
+                    className="text-xs display text-on-brand bg-brand px-3 py-1.5 hover:bg-brand-dark whitespace-nowrap"
                   >
-                    Pay link ↗
+                    Pay link
                   </a>
+                ) : null}
+                {/* Void is a rare cleanup action - kept subordinate so it never
+                    competes with the primary. */}
+                {it.invoiceId && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); voidInvoice(it.invoiceId!); }}
+                    disabled={voiding === it.invoiceId}
+                    className="text-[10px] text-muted/70 hover:text-red-400 disabled:opacity-50"
+                  >
+                    {voiding === it.invoiceId ? "voiding…" : "void"}
+                  </button>
                 )}
               </div>
             </div>

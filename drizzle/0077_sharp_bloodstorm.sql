@@ -1,0 +1,1 @@
+ALTER TABLE "design_requests" ADD COLUMN "gallery_hidden" boolean DEFAULT false NOT NULL;

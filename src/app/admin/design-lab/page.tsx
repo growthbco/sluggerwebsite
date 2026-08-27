@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { AdminPageHeader } from "@/components/admin-page-header";
 import { redirect } from "next/navigation";
 import { desc, eq, inArray } from "drizzle-orm";
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
 import { dbEnabled, getDb } from "@/db";
 import { designLabVisitors, designLabRenders, designRequests } from "@/db/schema";
-import { ZoomableImage } from "@/components/zoomable-image";
-import { AdminLeadDelete } from "@/components/admin-lead-delete";
 import { AdminBulkLeadDelete } from "@/components/admin-bulk-lead-delete";
 import { LabLeadConvertButton } from "@/components/lab-lead-convert-button";
+import { AdminLabFilter } from "@/components/admin-lab-filter";
+import { LabConcepts } from "@/components/lab-concepts";
+import { LabRowMenu } from "@/components/lab-row-menu";
 
 export const metadata: Metadata = { title: "Design Lab Leads", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ export default async function DesignLabLeadsPage() {
   const emails = visitors.map((v) => v.email?.toLowerCase()).filter((e): e is string => Boolean(e));
   const requests = emails.length
     ? await db
-        .select({ ref: designRequests.reference, email: designRequests.contactEmail, status: designRequests.status, manageToken: designRequests.manageToken })
+        .select({ id: designRequests.id, ref: designRequests.reference, email: designRequests.contactEmail, status: designRequests.status })
         .from(designRequests)
         .where(inArray(designRequests.contactEmail, emails))
     : [];
@@ -55,11 +56,16 @@ export default async function DesignLabLeadsPage() {
     return b.createdAt.getTime() - a.createdAt.getTime();
   });
   const junkCount = visitors.filter((v) => !(v.firstName ?? "").trim() && !(v.lastName ?? "").trim() && !v.paidAt).length;
+  const filterCounts = {
+    all: visitors.length,
+    paid: visitors.filter((v) => v.paidAt).length,
+    converted: visitors.filter((v) => v.email && reqByEmail.has(v.email.toLowerCase())).length,
+    noname: visitors.filter((v) => !(v.firstName ?? "").trim() && !(v.lastName ?? "").trim()).length,
+  };
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-14">
-      <Link href="/admin" className="text-sm text-muted hover:text-foreground">← Back to dashboard</Link>
-      <h1 className="display text-4xl text-foreground mt-3">🧪 Design Lab Leads</h1>
+      <AdminPageHeader eyebrow="Operations" title="Design Lab Leads" />
       <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
         <p className="text-muted max-w-2xl">
           Everyone who used the AI jersey maker - what they made, how to reach them, and whether they
@@ -68,83 +74,75 @@ export default async function DesignLabLeadsPage() {
         <AdminBulkLeadDelete count={junkCount} />
       </div>
 
-      <div className="mt-8 space-y-8">
-        {sorted.length === 0 && <p className="text-muted">No lab visitors yet.</p>}
-        {sorted.map((v) => {
-          const gallery = v.id ? byVisitor.get(v.id) ?? [] : [];
-          const req = v.email ? reqByEmail.get(v.email.toLowerCase()) : undefined;
-          const name = [v.firstName, v.lastName].filter(Boolean).join(" ") || "(no name yet)";
-          return (
-            <section key={v.id} className="bg-steel border border-line p-5">
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                <h2 className="display text-xl text-foreground">{name}</h2>
-                {v.paidAt ? (
-                  <span className="text-[11px] display bg-brand text-on-brand px-2 py-0.5">💰 PAID $10 SESSION</span>
-                ) : v.email ? (
-                  <span className="text-[11px] display border border-line text-muted px-2 py-0.5">FREE TIER LEAD</span>
-                ) : (
-                  <span className="text-[11px] display border border-line text-muted px-2 py-0.5">ANONYMOUS</span>
-                )}
-                {req ? (
-                  <a href={`/design/manage/${req.manageToken}`} className="text-xs display text-sky-400 underline decoration-dotted underline-offset-2">
-                    → became {req.ref} ({req.status})
-                  </a>
-                ) : v.email ? (
-                  <LabLeadConvertButton visitorId={v.id} />
-                ) : null}
-                <AdminLeadDelete id={v.id} name={name} />
-              </div>
-              <p className="mt-1 text-sm text-muted">
-                {v.email && (
-                  <>
-                    <a href={`mailto:${v.email}`} className="text-foreground hover:text-brand">{v.email}</a>
-                    {" · "}
-                  </>
-                )}
-                {v.phone && (
-                  <>
-                    <a href={`tel:${v.phone}`} className="text-foreground hover:text-brand">{v.phone}</a>
-                    {" · "}
-                  </>
-                )}
-                {v.generations} concepts · first seen {fmt(v.createdAt)}
-                {v.paidAt ? ` · paid ${fmt(v.paidAt)}` : ""}
-              </p>
-              {/* Follow-up automation status: shows the "can we help?" texts. */}
-              <p className="mt-1.5 text-xs">
-                {req ? (
-                  <span className="text-green-400">✓ Converted - no follow-ups needed</span>
-                ) : !v.phone ? (
-                  <span className="text-muted">No phone on file - can&apos;t auto-text</span>
-                ) : v.paidAt ? (
-                  <span className="text-muted">Paid session - not in the &quot;didn&apos;t order&quot; follow-up</span>
-                ) : (v.smsFollowUpsSent ?? 0) > 0 ? (
-                  <span className="text-brand">📱 Followed up {v.smsFollowUpsSent}× {v.lastFollowUpAt ? `(last ${fmt(v.lastFollowUpAt)})` : ""}{(v.smsFollowUpsSent ?? 0) >= 2 ? " · done" : " · 1 more if no reply"}</span>
-                ) : (
-                  <span className="text-amber-300">⏳ Auto follow-up text pending (~a day after they designed)</span>
-                )}
-              </p>
-              {gallery.length > 0 ? (
-                <details className="mt-3 group/gallery">
-                  <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs display text-brand border border-brand/40 px-2.5 py-1 hover:bg-brand/10">
-                    🖼 View {gallery.length} concept{gallery.length === 1 ? "" : "s"}
-                    <span className="opacity-70 transition-transform group-open/gallery:rotate-90">▶</span>
-                  </summary>
-                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {gallery.map((r) => (
-                      <figure key={r.id}>
-                        <ZoomableImage src={r.url} alt={r.note ?? "AI concept"} />
-                        {r.note && <figcaption className="mt-1 text-[11px] text-muted line-clamp-2">{r.note}</figcaption>}
-                      </figure>
-                    ))}
-                  </div>
-                </details>
-              ) : (
-                <p className="mt-3 text-xs text-muted">No saved concepts for this visitor.</p>
-              )}
-            </section>
-          );
-        })}
+      <AdminLabFilter counts={filterCounts} />
+
+      <div className="mt-6 overflow-x-auto border border-line">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-steel text-left text-xs text-muted uppercase tracking-wide">
+              <th className="px-3 py-2">Name</th>
+              <th className="px-3 py-2">Contact</th>
+              <th className="px-3 py-2 whitespace-nowrap">Concepts</th>
+              <th className="px-3 py-2">Paid</th>
+              <th className="px-3 py-2 whitespace-nowrap">Converted / DR</th>
+              <th className="px-3 py-2 whitespace-nowrap">First seen</th>
+              <th className="px-3 py-2"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[color:var(--line)]">
+            {sorted.length === 0 && (
+              <tr><td colSpan={7} className="px-3 py-4 text-muted">No lab visitors yet.</td></tr>
+            )}
+            {sorted.map((v) => {
+              const gallery = v.id ? byVisitor.get(v.id) ?? [] : [];
+              const req = v.email ? reqByEmail.get(v.email.toLowerCase()) : undefined;
+              const displayName = [v.firstName, v.lastName].filter(Boolean).join(" ").trim();
+              const noName = !displayName;
+              const paid = Boolean(v.paidAt);
+              return (
+                <tr
+                  key={v.id}
+                  className="hover:bg-steel/40 align-top"
+                  data-section="lab"
+                  data-search={`${displayName} ${v.email ?? ""} ${v.phone ?? ""}`.toLowerCase()}
+                  data-paid={paid ? "1" : "0"}
+                  data-converted={req ? "1" : "0"}
+                  data-noname={noName ? "1" : "0"}
+                >
+                  <td className="px-3 py-2">
+                    {displayName ? <span className="text-foreground">{displayName}</span> : <span className="text-muted/60 italic">No name</span>}
+                  </td>
+                  <td className="px-3 py-2">
+                    {v.email ? <a href={`mailto:${v.email}`} className="text-foreground hover:text-brand break-all">{v.email}</a> : <span className="text-muted/50">no email</span>}
+                    {v.phone && <div className="text-xs text-muted"><a href={`tel:${v.phone}`} className="hover:text-brand">{v.phone}</a></div>}
+                  </td>
+                  <td className="px-3 py-2"><LabConcepts concepts={gallery.map((r) => ({ url: r.url, note: r.note }))} /></td>
+                  <td className="px-3 py-2">
+                    {paid ? (
+                      <span className="inline-block border border-brand bg-brand text-on-brand px-2 py-0.5 text-[11px] display uppercase tracking-wide rounded">Paid</span>
+                    ) : v.email ? (
+                      <span className="inline-block border border-line text-muted px-2 py-0.5 text-[11px] display uppercase tracking-wide rounded">Free</span>
+                    ) : (
+                      <span className="inline-block border border-line text-muted/60 px-2 py-0.5 text-[11px] display uppercase tracking-wide rounded">Anon</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {req ? (
+                      <a href={`/admin/design-requests/${req.id}`} className="text-sky-400 hover:underline whitespace-nowrap">{req.ref} <span className="text-muted">({req.status})</span></a>
+                    ) : v.email ? (
+                      <LabLeadConvertButton visitorId={v.id} />
+                    ) : (
+                      <span className="text-muted/40">-</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-muted whitespace-nowrap">{fmt(v.createdAt)}</td>
+                  <td className="px-3 py-2"><LabRowMenu id={v.id} name={displayName || v.email || "this lead"} /></td>
+                </tr>
+              );
+            })}
+            <tr data-empty-for="lab" style={{ display: "none" }}><td colSpan={7} className="px-3 py-4 text-muted">No leads match.</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );

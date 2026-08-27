@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import { ExpandableImage } from "@/components/expandable-image";
 import { SPORT_PAGES, type SportPage } from "@/lib/sport-pages";
 import { SERVICE_AREAS } from "@/lib/service-areas";
 import { galleryPhotos } from "@/lib/gallery";
@@ -9,10 +9,15 @@ import { BUNDLES, formatDollars } from "@/lib/pricing";
 // sport-specific copy, pricing, bundles, FAQs (with FAQPage schema), and the
 // two funnel CTAs. Shared by all /custom-<sport>-* pages.
 export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; photoOffset?: number }) {
-  // Real product shots of this sport's gear come first; the rotating gallery
-  // pool fills the remaining cells so each page still shows different shots.
+  // Real product shots of THIS sport come first. The general gallery pool is
+  // untagged and is almost entirely baseball/softball team photos, so we only
+  // fill from it on baseball/softball pages where it's on-topic. Every other
+  // sport shows just its own mockup + realPhotos - no mismatched-sport images.
   const real = page.realPhotos ?? [];
-  const photos = [...galleryPhotos.slice(photoOffset), ...galleryPhotos.slice(0, photoOffset)].slice(0, Math.max(0, 5 - real.length));
+  const galleryOnTopic = ["Baseball", "Softball"].includes(page.sport);
+  const photos = galleryOnTopic
+    ? [...galleryPhotos.slice(photoOffset), ...galleryPhotos.slice(0, photoOffset)].slice(0, Math.max(0, 5 - real.length))
+    : [];
 
   const jsonLd = [
     {
@@ -71,19 +76,19 @@ export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; 
         <h2 className="display text-3xl text-foreground">Real Uniforms, Real Teams</h2>
         <p className="mt-2 text-muted">Our Slugger-styled {page.sport.toLowerCase()} mockup - and real gear we have produced.</p>
         <div className="mt-5 grid grid-cols-2 md:grid-cols-3 gap-3">
-          <div className="relative aspect-square bg-white border border-brand/60">
-            <Image src={page.mockup} alt={`${page.h1} - Slugger Athletics mockup`} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover" />
-            <span className="absolute top-2 left-2 bg-brand text-on-brand display text-[10px] px-2 py-0.5">SLUGGER STYLE</span>
+          <div className="relative aspect-square bg-white border border-brand/60 overflow-hidden">
+            <ExpandableImage src={page.mockup} alt={`${page.h1} - Slugger Athletics mockup`} />
+            <span className="absolute top-2 left-2 bg-brand text-on-brand display text-[10px] px-2 py-0.5 pointer-events-none">SLUGGER STYLE</span>
           </div>
           {real.map((rp) => (
             <div key={rp.src} className="relative aspect-square bg-white border border-brand/60 overflow-hidden">
-              <Image src={rp.src} alt={rp.alt} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover" />
-              <span className="absolute top-2 left-2 bg-brand text-on-brand display text-[10px] px-2 py-0.5">MADE BY US</span>
+              <ExpandableImage src={rp.src} alt={rp.alt} />
+              <span className="absolute top-2 left-2 bg-brand text-on-brand display text-[10px] px-2 py-0.5 pointer-events-none">MADE BY US</span>
             </div>
           ))}
           {photos.map((ph) => (
             <div key={ph.id} className="relative aspect-square bg-steel border border-line overflow-hidden">
-              <Image src={ph.file} alt={`${ph.alt} - custom ${page.sport.toLowerCase()} gear by Slugger Athletics`} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover" unoptimized />
+              <ExpandableImage src={ph.file} alt={`${ph.alt} - custom ${page.sport.toLowerCase()} gear by Slugger Athletics`} unoptimized />
             </div>
           ))}
         </div>
@@ -132,7 +137,7 @@ export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; 
           ))}
         </div>
         <p className="mt-3 text-xs text-muted">
-          Design included · names & numbers included · same price youth to 5XL · 6-piece minimum per design (hats included)
+          {page.priceNote ?? "Design included · names & numbers included · same price youth to 5XL · 6-piece minimum per design (hats included)"}
         </p>
       </section>
 

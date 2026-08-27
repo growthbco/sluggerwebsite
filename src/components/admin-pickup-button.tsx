@@ -30,7 +30,11 @@ export function AdminPickupButton({ kind, id }: { kind: "team_order" | "order"; 
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not schedule");
-      setMsg(`✓ USPS pickup scheduled for ${new Date(date + "T12:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}. Confirmation: ${data.confirmation}`);
+      if (data.alreadyScheduled) {
+        setMsg("A USPS pickup is already booked - just leave these by the door and they'll be collected too.");
+      } else {
+        setMsg(`USPS pickup scheduled for ${new Date(date + "T12:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}. Confirmation: ${data.confirmation}`);
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -47,7 +51,7 @@ export function AdminPickupButton({ kind, id }: { kind: "team_order" | "order"; 
         onClick={() => setOpen((v) => !v)}
         className="text-xs display text-foreground border border-brand/50 px-2.5 py-1 hover:bg-brand/10 whitespace-nowrap"
       >
-        📮 Schedule free USPS pickup
+        Schedule free USPS pickup
       </button>
       {open && (
         <span className="inline-flex items-center gap-1.5">

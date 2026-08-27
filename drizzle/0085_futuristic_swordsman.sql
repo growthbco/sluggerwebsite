@@ -1,0 +1,1 @@
+ALTER TABLE "team_orders" ADD COLUMN "white_label" boolean DEFAULT false NOT NULL;

@@ -37,7 +37,12 @@ export async function attributionFromCookie(): Promise<string | null> {
     const src = base ? pretty(base) : "Direct";
     // Ad-click markers and utm medium/campaign add useful nuance.
     const extras = [d.g ? "ad" : d.f ? "ad" : "", d.m?.trim() ?? "", d.c?.trim() ?? ""].filter(Boolean).join(" / ");
-    const landing = d.l ? ` → ${d.l === "/" ? "homepage" : d.l}` : "";
+    // Private / functional landing pages (a portal magic link, a design status
+    // or team-order manage link, a store, checkout) are never a real source and
+    // must never surface their token. Drop the landing for those, even if an
+    // older cookie captured one before we stopped recording them.
+    const isPrivate = d.l ? /^\/(portal|design|team-order|store|admin|checkout|r)\//.test(d.l) : false;
+    const landing = d.l && !isPrivate ? ` → ${d.l === "/" ? "homepage" : d.l}` : "";
     return `${src}${extras ? ` (${extras})` : ""}${landing}`.slice(0, 200);
   } catch {
     return null;

@@ -9,6 +9,7 @@ type IncomingRow = {
   number?: string;
   sizes?: Record<string, string>;
   notes?: string;
+  design?: string;
 };
 
 // Coach bulk-adds reviewed roster rows (authed by the private manage token).
@@ -43,6 +44,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
               .map(([k, v]) => [String(k).slice(0, 20), String(v).trim().slice(0, 30)]),
           ),
           notes: String(r.notes ?? "").trim().slice(0, 200) || undefined,
+          design: String(r.design ?? "").trim().slice(0, 60) || undefined,
         },
         "coach",
       );

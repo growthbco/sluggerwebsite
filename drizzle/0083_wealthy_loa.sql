@@ -1,0 +1,1 @@
+ALTER TABLE "design_requests" ADD COLUMN "followed_up_at" timestamp with time zone;

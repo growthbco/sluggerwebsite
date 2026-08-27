@@ -23,6 +23,10 @@ type Prefill = {
    *  accidentally ordered as crew-neck jerseys). */
   items: string[];
   designJerseyStyle: string | null;
+  /** Every approved colorway/design a player can pick from. When there's more
+   *  than one (e.g. "Pin Daddy" / "Pin Mommy"), the roster form shows a design
+   *  picker per row so each size ties to the right artwork. */
+  designs: { label: string; image: string; sku: string | null }[];
 };
 
 export default async function TeamOrderPage({
@@ -38,16 +42,33 @@ export default async function TeamOrderPage({
   if (design && dbEnabled()) {
     const req = await getByStatusToken(design);
     if (req && (req.status === "approved" || req.status === "ordered")) {
-      prefill = {
-        designToken: design,
-        teamName: req.teamName,
-        contactName: req.contactName,
-        contactEmail: req.contactEmail,
-        contactPhone: req.contactPhone ?? "",
-        approvedDesignUrl: req.approvedDesignUrl,
-        items: itemKeysFromDesignProducts(req.productTypes),
-        designJerseyStyle: req.jerseyStyle,
-      };
+      // Every approved colorway players can pick from, labeled from proofLabels
+      // when set (matches how the "Add to this order" flow builds its picker).
+      const approvedList = req.approvedDesignUrls?.length
+        ? req.approvedDesignUrls
+        : req.approvedDesignUrl
+          ? [req.approvedDesignUrl]
+          : [];
+      if (approvedList.length > 0) {
+        const labels = req.proofLabels ?? {};
+        const skuMap = req.designSkus ?? {};
+        const designs = approvedList.map((url, i) => ({
+          label: (labels[url] || `Design ${i + 1}`).trim(),
+          image: url,
+          sku: skuMap[url] ?? null,
+        }));
+        prefill = {
+          designToken: design,
+          teamName: req.teamName,
+          contactName: req.contactName,
+          contactEmail: req.contactEmail,
+          contactPhone: req.contactPhone ?? "",
+          approvedDesignUrl: req.approvedDesignUrl,
+          items: itemKeysFromDesignProducts(req.productTypes),
+          designJerseyStyle: req.jerseyStyle,
+          designs,
+        };
+      }
     }
   }
 
@@ -57,9 +78,8 @@ export default async function TeamOrderPage({
         <span className="display text-brand text-sm">For Coaches &amp; Teams</span>
         <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">Start a Team Order</h1>
         <p className="mt-3 text-muted">
-          Pick your style and add your roster. We only need each player&apos;s
-          name, number, and size - we handle the rest. Free design proof, then
-          your gear ships in 2-3 weeks.
+          Start with a free design, then build your roster once the artwork is approved.
+          We only need each player&apos;s name, number, and size - we handle the rest.
         </p>
         {prefill && (
           <div className="mt-5 bg-steel border border-brand/60 p-4 text-sm">

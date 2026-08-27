@@ -7,19 +7,25 @@ type Profile = { name: string | null; phone: string | null; referralCode: string
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
-export function PortalAccount({ token, profile, referralUrl }: { token: string; profile: Profile; referralUrl: string }) {
+export function PortalAccount({ token, profile, referralUrl, address }: { token: string; profile: Profile; referralUrl: string; address: Address }) {
   return (
     <div className="space-y-8">
-      <ContactCard token={token} name={profile.name} phone={profile.phone} />
+      <ContactCard token={token} name={profile.name} phone={profile.phone} address={address} />
       <ReferralCard referralUrl={referralUrl} creditCents={profile.referralCreditCents} />
-      <PasswordCard token={token} hasPassword={profile.hasPassword} />
     </div>
   );
 }
 
-function ContactCard({ token, name, phone }: { token: string; name: string | null; phone: string | null }) {
+type Address = { line1: string; line2: string; city: string; state: string; postalCode: string } | null;
+
+export function ContactCard({ token, name, phone, address }: { token: string; name: string | null; phone: string | null; address: Address }) {
   const [n, setN] = useState(name ?? "");
   const [p, setP] = useState(phone ?? "");
+  const [a1, setA1] = useState(address?.line1 ?? "");
+  const [a2, setA2] = useState(address?.line2 ?? "");
+  const [city, setCity] = useState(address?.city ?? "");
+  const [st, setSt] = useState(address?.state ?? "");
+  const [zip, setZip] = useState(address?.postalCode ?? "");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -30,19 +36,19 @@ function ContactCard({ token, name, phone }: { token: string; name: string | nul
     try {
       const r = await fetch("/api/portal/contact", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, name: n.trim(), phone: p.trim() }),
+        body: JSON.stringify({ token, name: n.trim(), phone: p.trim(), address: { line1: a1.trim(), line2: a2.trim(), city: city.trim(), state: st.trim(), postalCode: zip.trim() } }),
       });
       const d = await r.json();
       if (!r.ok) { setErr(d.error || "Couldn't save"); return; }
-      setMsg("Saved. Your info is updated on every order.");
+      setMsg("Saved. Your details and shipping address are updated on your open orders.");
     } catch { setErr("Connection problem - try again."); }
     finally { setBusy(false); }
   }
 
   return (
     <section className="border border-line bg-steel p-5">
-      <h2 className="display text-lg text-foreground">Your details</h2>
-      <p className="text-sm text-muted mt-1">Update once and it applies to all your orders.</p>
+      <h2 className="display text-lg text-foreground">{address?.line1 ? "Shipping & contact" : "Add your shipping address"}</h2>
+      <p className="text-sm text-muted mt-1">Save once and it applies to your open orders. You can override it on a single order later.</p>
       <div className="mt-4 grid sm:grid-cols-2 gap-3">
         <div>
           <label className="text-xs display text-muted">Name</label>
@@ -53,6 +59,25 @@ function ContactCard({ token, name, phone }: { token: string; name: string | nul
           <label className="text-xs display text-muted">Phone</label>
           <input value={p} onChange={(e) => setP(e.target.value)} placeholder="(352) 555-0000" inputMode="tel"
             className="mt-1 w-full bg-ink border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none" />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="text-xs display text-muted">Shipping address</label>
+          <input value={a1} onChange={(e) => setA1(e.target.value)} placeholder="Street address"
+            className="mt-1 w-full bg-ink border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none" />
+        </div>
+        <div className="sm:col-span-2">
+          <input value={a2} onChange={(e) => setA2(e.target.value)} placeholder="Apt / unit (optional)"
+            className="w-full bg-ink border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none" />
+        </div>
+        <div>
+          <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City"
+            className="w-full bg-ink border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <input value={st} onChange={(e) => setSt(e.target.value)} placeholder="State" maxLength={20}
+            className="w-full bg-ink border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none" />
+          <input value={zip} onChange={(e) => setZip(e.target.value)} placeholder="ZIP" inputMode="numeric" maxLength={10}
+            className="w-full bg-ink border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none" />
         </div>
         <div className="sm:col-span-2">
           <SmsConsentNote />
@@ -68,7 +93,7 @@ function ContactCard({ token, name, phone }: { token: string; name: string | nul
   );
 }
 
-function ReferralCard({ referralUrl, creditCents }: { referralUrl: string; creditCents: number }) {
+export function ReferralCard({ referralUrl, creditCents }: { referralUrl: string; creditCents: number }) {
   const [copied, setCopied] = useState(false);
   async function copy() {
     try { await navigator.clipboard.writeText(referralUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
@@ -82,7 +107,7 @@ function ReferralCard({ referralUrl, creditCents }: { referralUrl: string; credi
         )}
       </div>
       <p className="text-sm text-muted mt-1">
-        Share your link. When a new team places their first order, you both get a credit toward your next Slugger order.
+        Share your link. When a new team places their first order, you both get a <span className="text-foreground">$25 store credit</span> toward your next Slugger order.
       </p>
       <div className="mt-4 flex flex-col sm:flex-row gap-2">
         <input readOnly value={referralUrl} onFocus={(e) => e.currentTarget.select()}

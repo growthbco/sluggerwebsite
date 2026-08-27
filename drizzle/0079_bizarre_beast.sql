@@ -1,0 +1,1 @@
+ALTER TABLE "design_lab_visitors" ADD COLUMN "source" text;

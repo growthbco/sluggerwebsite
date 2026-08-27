@@ -3,7 +3,7 @@ import Image from "next/image";
 import { dbEnabled } from "@/db";
 import { getBySelfEntryToken, getLinkedDesignPreview } from "@/lib/team-orders";
 import { SelfEntryForm } from "@/components/self-entry-form";
-import { AllSizeCharts } from "@/components/size-charts";
+import { SizeChartsFor } from "@/components/size-charts";
 import { ZoomableImage } from "@/components/zoomable-image";
 
 export const metadata: Metadata = { title: "Add Yourself to the Roster", robots: { index: false } };
@@ -68,7 +68,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
       )}
 
       <div className="mt-6">
-        <SelfEntryForm token={token} items={order.items ?? ["jersey"]} designs={design?.designs ?? []} />
+        <SelfEntryForm token={token} items={order.items ?? ["jersey"]} designs={design?.designs ?? []} requiresNames={order.requiresNames} />
       </div>
 
       <details className="mt-6 border border-line bg-steel group">
@@ -78,7 +78,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
         </summary>
         <div className="px-4 pb-5">
           <p className="text-sm text-muted mb-4">All measurements in inches. Jerseys run slightly large - when in doubt, size down.</p>
-          <AllSizeCharts />
+          <SizeChartsFor items={order.items ?? ["jersey"]} />
         </div>
       </details>
 

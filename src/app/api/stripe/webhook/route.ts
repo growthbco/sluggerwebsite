@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { eq } from "drizzle-orm";
-import { postOrderToDiscord, postStoreOrderToDiscord, postDesignRequestToDiscord, postTeamOrderPaidToDiscord, postAddonToDesignerDiscord, postDesignThreadUpdate } from "@/lib/discord";
+import { postOrderToDiscord, postStoreOrderToDiscord, postTeamOrderPaidToDiscord, postAddonToDesignerDiscord, postDesignThreadUpdate } from "@/lib/discord";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders, teams } from "@/db/schema";
-import { getById, markDesignFeePaid, setDiscordThreadId, formatProducts } from "@/lib/design-requests";
-import { emailDesignRequestToDesigner, emailDesignRequestConfirmation, emailOrderConfirmation } from "@/lib/email";
+import { getById } from "@/lib/design-requests";
+import { emailOrderConfirmation } from "@/lib/email";
 import { persistPaidOrder } from "@/lib/orders";
+import { creditCustomer } from "@/lib/customers";
+import { recordOperationalFailure } from "@/lib/operational-events";
 
 export const runtime = "nodejs";
 
@@ -36,12 +38,30 @@ export async function POST(req: Request) {
     if (session.metadata?.kind === "design_lab" && session.metadata?.visitorId && dbEnabled()) {
       const { designLabVisitors } = await import("@/db/schema");
       const { eq } = await import("drizzle-orm");
+      // Read prior state first so we credit the $10 exactly once (on the FIRST
+      // payment), not again on Stripe event retries.
+      const [prior] = await getDb()
+        .select({ paidAt: designLabVisitors.paidAt, email: designLabVisitors.email })
+        .from(designLabVisitors)
+        .where(eq(designLabVisitors.id, session.metadata.visitorId))
+        .limit(1);
       const [v] = await getDb()
         .update(designLabVisitors)
         .set({ paidAt: new Date(), stripeRef: session.id })
         .where(eq(designLabVisitors.id, session.metadata.visitorId))
         .returning();
       console.log("design lab session paid:", session.metadata.visitorId);
+      // The design center promises "the full $10 comes off your order." Bank it
+      // as store credit on their customer profile so it auto-applies to the
+      // first team-order invoice (sendTeamOrderInvoice reads referralCreditCents).
+      if (!prior?.paidAt && prior?.email) {
+        try {
+          await creditCustomer(prior.email, 1000);
+          console.log("design lab $10 credit banked for", prior.email);
+        } catch (e) {
+          console.error("design lab credit grant failed:", e);
+        }
+      }
       // Paid = hottest lead we have. Ping the design channel with a link to
       // their concept gallery (best effort).
       const hook = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
@@ -91,67 +111,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ received: true });
     }
 
-    // Design fee checkout: payment confirms the intake. Mark paid + fire the
-    // designer notifications now (we held them until payment so the designer
-    // queue doesn't fill with unpaid leads).
-    if (session.metadata?.kind === "design_fee" && session.metadata?.designRequestId && dbEnabled()) {
-      try {
-        const designRequestId = session.metadata.designRequestId;
-        await markDesignFeePaid(designRequestId, session.id);
-        const request = await getById(designRequestId);
-        if (request) {
-          const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
-          const statusUrl = `${SITE}/design/status/${request.statusToken}`;
-          const manageUrl = `${SITE}/design/manage/${request.manageToken}`;
-          const products = formatProducts(request.productTypes, request.jerseyStyle);
-          const colorsForDesigner =
-            [(request.colorHexes ?? []).join(", "), request.colors?.trim()].filter(Boolean).join(" · ") || undefined;
-          const discordResult = await postDesignRequestToDiscord({
-            reference: request.reference,
-            teamName: request.teamName,
-            sport: request.sport ?? undefined,
-            products,
-            vision: request.vision ?? undefined,
-            colors: colorsForDesigner,
-            inspirationImages: request.inspirationImages ?? [],
-            manageUrl,
-            neededBy: request.neededBy ?? undefined,
-            rush: request.rush,
-            estimatedPieces: request.estimatedPieces,
-            source: request.source,
-          });
-          if (discordResult.threadId) {
-            try { await setDiscordThreadId(designRequestId, discordResult.threadId); } catch (e) { console.error("setDiscordThreadId failed:", e); }
-          }
-          await Promise.allSettled([
-            emailDesignRequestToDesigner({
-              reference: request.reference,
-              teamName: request.teamName,
-              sport: request.sport ?? undefined,
-              contactName: request.contactName,
-              contactEmail: request.contactEmail,
-              contactPhone: request.contactPhone ?? undefined,
-              products,
-              vision: request.vision ?? undefined,
-              colors: colorsForDesigner,
-              inspirationImages: request.inspirationImages ?? [],
-              manageUrl,
-              neededBy: request.neededBy ?? undefined,
-              rush: request.rush,
-            }),
-            emailDesignRequestConfirmation({
-              to: request.contactEmail,
-              teamName: request.teamName,
-              reference: request.reference,
-              statusUrl,
-            }),
-          ]);
-        }
-      } catch (e) {
-        console.error("Design fee webhook failed:", e);
-      }
-      return NextResponse.json({ received: true });
-    }
+    // (The old design_fee checkout branch was removed Aug 2026 - design is free
+    // now, so intake notifications fire immediately on submit, not on payment.)
 
     // Post-submission add-on paid: append the pieces to the roster, tell the
     // team channel, and email the coach a receipt.
@@ -292,6 +253,14 @@ export async function POST(req: Request) {
           });
           const { setThreadStageTag } = await import("@/lib/discord-bot");
           await setThreadStageTag(design?.discordThreadId, isDeposit ? "💰 Deposit Paid" : "💸 Paid in Full");
+          // Confirm payment to the customer and point them to their portal so
+          // they know where to track the order from here.
+          if (row.contactEmail) {
+            try {
+              const { emailPaymentReceived } = await import("@/lib/email");
+              await emailPaymentReceived({ to: row.contactEmail, teamName: row.teamName, reference: row.reference, stage: isDeposit ? "deposit" : "balance" });
+            } catch (e) { console.error("payment-received email failed:", e); }
+          }
         }
         // The deposit and pay-in-full links are siblings: paying one kills the
         // other so nobody can double-pay.
@@ -334,11 +303,10 @@ export async function POST(req: Request) {
           if (res.merged && res.teamId) {
             // Note the add in the BUYER's own thread and re-open print-file QA
             // for any affected design groups (the file now needs the new piece).
-            const [team] = await getDb().select({ name: teams.name, thread: teams.storeThreadId, custThreads: teams.storeCustomerThreads, qa: teams.storePrintFileQa }).from(teams).where(eq(teams.id, res.teamId)).limit(1);
+            const [team] = await getDb().select({ name: teams.name, thread: teams.storeThreadId, qa: teams.storePrintFileQa }).from(teams).where(eq(teams.id, res.teamId)).limit(1);
             const { parseStoreLine } = await import("@/lib/store-print-file");
-            // Route into the buyer's per-customer thread; fall back to the store thread.
-            const addEmailKey = (session.customer_details?.email ?? "").trim().toLowerCase();
-            const buyerThread = (addEmailKey && team?.custThreads?.[addEmailKey]) || team?.thread;
+            // Route into the team's one store thread.
+            const buyerThread = team?.thread;
             if (buyerThread) {
               await postDesignThreadUpdate({
                 threadId: buyerThread,
@@ -433,19 +401,17 @@ export async function POST(req: Request) {
         const teamId = session.metadata?.teamId || undefined;
 
         if (isStore && teamId && dbEnabled()) {
-          // Team-store orders post into a per-CUSTOMER thread (keyed by email)
-          // so each buyer's orders + later add-ons stay together, instead of
-          // every buyer piling into one store thread.
+          // Every team-store order posts into the team's ONE store thread
+          // (🏪 <Team> Store, in the design forum), opened once and reused, so
+          // all of a team's orders (all buyers, all add-ons) stay together
+          // instead of scattering into a thread per customer.
           try {
             const [team] = await getDb()
-              .select({ name: teams.name, slug: teams.slug, token: teams.storeToken, design: teams.approvedDesignUrl, custThreads: teams.storeCustomerThreads })
+              .select({ name: teams.name, slug: teams.slug, token: teams.storeToken, design: teams.approvedDesignUrl, storeThreadId: teams.storeThreadId })
               .from(teams).where(eq(teams.id, teamId)).limit(1);
             const garmentLines = lines.filter((l) => !/tax/i.test(l.name));
             const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
-            const buyerEmailKey = (session.customer_details?.email ?? "").trim().toLowerCase();
-            const custThreads = team?.custThreads ?? {};
-            const existingThread = buyerEmailKey ? custThreads[buyerEmailKey] : undefined;
-            const buyerName = session.customer_details?.name ?? buyerEmailKey ?? "Customer";
+            const teamThread = team?.storeThreadId ?? null;
             const posted = await postStoreOrderToDiscord({
               reference,
               teamName: team?.name ?? session.metadata?.teamName ?? "Team",
@@ -457,12 +423,13 @@ export async function POST(req: Request) {
               items: garmentLines.map((l) => ({ quantity: l.quantity, label: l.name })),
               storeUrl: team?.slug ? `${SITE}/store/${team.slug}` : undefined,
               verifyUrl: team?.token ? `${SITE}/store/${team.token}/verify` : undefined,
-              existingThreadId: existingThread ?? null,
-              threadName: `🛒 ${buyerName} - ${team?.name ?? "Store"}`,
+              existingThreadId: teamThread,
+              threadName: `🏪 ${team?.name ?? "Team"} Team Store`,
             });
-            // First order from this buyer: remember their thread for next time.
-            if (!existingThread && posted.threadId && buyerEmailKey) {
-              await getDb().update(teams).set({ storeCustomerThreads: { ...custThreads, [buyerEmailKey]: posted.threadId } }).where(eq(teams.id, teamId));
+            // No thread on file yet: remember the one we just opened so the next
+            // order reuses it (only when there's no design thread to defer to).
+            if (!teamThread && posted.threadId) {
+              await getDb().update(teams).set({ storeThreadId: posted.threadId }).where(eq(teams.id, teamId));
             }
 
             // A new order for a design invalidates that design's prior print-file
@@ -532,6 +499,18 @@ export async function POST(req: Request) {
       }
     } catch (e) {
       console.error("Failed to process completed checkout:", e);
+      await recordOperationalFailure({
+        fingerprint: `webhook:checkout:${session.metadata?.kind ?? session.metadata?.orderType ?? "unknown"}`,
+        kind: "webhook_failed",
+        title: "A completed Stripe payment needs review",
+        error: e,
+        href: "/admin/payments",
+        context: {
+          eventId: event.id,
+          sessionId: session.id,
+          paymentKind: session.metadata?.kind ?? session.metadata?.orderType ?? "unknown",
+        },
+      });
       // Return 200 so Stripe doesn't retry forever on our internal errors.
     }
   }

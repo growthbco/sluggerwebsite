@@ -1,6 +1,16 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // `sharp` is a native module (image watermarking in the AI studio + jersey
+  // maker). Keep it external, and force its platform binaries + libvips shared
+  // lib into the two functions that use it - the turbopack build otherwise
+  // externalizes sharp but doesn't trace the `.so`, so it fails at runtime with
+  // "Could not load the sharp module / libvips-cpp.so: cannot open".
+  serverExternalPackages: ["sharp"],
+  outputFileTracingIncludes: {
+    "/api/design-request/\\[token\\]/ai-design": ["./node_modules/@img/**/*"],
+    "/api/design-lab/generate": ["./node_modules/@img/**/*"],
+  },
   // The individual-item shop is retired (zero orders; the business is team
   // orders). Old URLs 301 to the team hub; /product/* and /drops stay live.
   async redirects() {

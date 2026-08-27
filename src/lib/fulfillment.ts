@@ -11,7 +11,7 @@ import { teamOrders, orders, designRequests } from "@/db/schema";
 import { emailOrderShipped, emailAdditionalShipment } from "@/lib/email";
 import { sendFollowUpSms } from "@/lib/sms";
 import { archiveDiscordThread } from "@/lib/discord-bot";
-import { trackingUrlFor } from "@/lib/tracking";
+import { trackingUrlFor, carrierFor } from "@/lib/tracking";
 
 export { trackingUrlFor };
 
@@ -100,7 +100,7 @@ export async function markShipped(
     if (!tracking) return null;
     const [row] = await db
       .update(teamOrders)
-      .set({ status: "shipped", trackingNumber: tracking, labelUrl: labelUrl ?? existing?.label ?? null, shippedAt: now, updatedAt: now })
+      .set({ status: "shipped", trackingNumber: tracking, shipCarrier: carrierFor(tracking), labelUrl: labelUrl ?? existing?.label ?? null, shippedAt: now, updatedAt: now })
       .where(eq(teamOrders.id, id))
       .returning({
         reference: teamOrders.reference,
@@ -144,7 +144,7 @@ export async function markShipped(
   if (!tracking) return null;
   const [row] = await db
     .update(orders)
-    .set({ status: "fulfilled", trackingNumber: tracking, labelUrl: labelUrl ?? existing?.label ?? null, shippedAt: now })
+    .set({ status: "fulfilled", trackingNumber: tracking, shipCarrier: carrierFor(tracking), labelUrl: labelUrl ?? existing?.label ?? null, shippedAt: now })
     .where(eq(orders.id, id))
     .returning({ reference: orders.reference, email: orders.customerEmail, name: orders.customerName, phone: orders.customerPhone });
   if (!row) return null;

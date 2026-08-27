@@ -13,16 +13,22 @@ import { SPORT_PAGES } from "@/lib/sport-pages";
 const nav = [
   { href: "/", label: "Home" },
   { href: "/team-uniforms", label: "Uniforms" },
+  // Flag football is our fastest-growing search source, so it gets its own
+  // top-level link (a site-wide internal link into that page).
+  { href: "/custom-flag-football-uniforms", label: "Flag Football" },
   { href: "/custom-hats", label: "Custom Hats" },
   { href: "/pricing", label: "Pricing" },
   { href: "/gallery", label: "Gallery" },
   { href: "/contact", label: "Contact" },
 ];
 
-// "Uniforms" expands into every sport page (plus the hub itself).
+// "Uniforms" expands into every sport page (plus the hub itself). Flag football
+// floats to the top of the list.
 const UNIFORM_LINKS = [
   { href: "/team-uniforms", label: "All Team Uniforms" },
-  ...SPORT_PAGES.map((s) => ({ href: `/${s.slug}`, label: s.sport })),
+  ...[...SPORT_PAGES]
+    .sort((a, b) => (a.slug === "custom-flag-football-uniforms" ? -1 : b.slug === "custom-flag-football-uniforms" ? 1 : 0))
+    .map((s) => ({ href: `/${s.slug}`, label: s.sport })),
 ];
 
 export function SiteHeader() {
@@ -41,6 +47,10 @@ export function SiteHeader() {
       return () => { document.body.style.overflow = ""; };
     }
   }, [open]);
+
+  // Private team stores are NOT the marketing site: no promo bar, category nav,
+  // funnel buttons, or cart badge. The store page renders its own minimal header.
+  if (pathname.startsWith("/store/")) return null;
 
   return (
     <header className="sticky top-0 z-50">

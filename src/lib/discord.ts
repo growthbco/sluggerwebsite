@@ -1,8 +1,12 @@
 // Posts new orders to Discord via an incoming webhook (no bot to host).
 // Used for paid Shop/Buy-In orders (#orders) and team orders (#team-orders).
-import { itemLabel, isInHouseItem } from "@/lib/order-items";
+import { itemLabel, notDesignerMade } from "@/lib/order-items";
 
 const GOLD = 0xb8a36c;
+
+// Bonans (bonans_sports123) - our print vendor. Production-facing posts tag him
+// directly instead of pinging the whole server with @here. Override via env.
+const DESIGNER_USER_ID = process.env.DISCORD_DESIGNER_USER_ID || "1257751481700843531";
 
 type OrderLine = {
   name: string;
@@ -180,6 +184,10 @@ type RosterRow = {
   size?: string;
   // Per-item sizes, e.g. { jersey: "L", pants: "32", socks: "Adult S/M" }.
   sizes?: Record<string, string>;
+  // Which approved design this row gets, when a team has more than one
+  // (e.g. "Pin Daddy" / "Pin Mommy"). Rendered up-front so production ties the
+  // right artwork to the right size without hunting through notes.
+  design?: string;
   notes?: string;
 };
 
@@ -195,6 +203,12 @@ type TeamOrderPayload = {
   roster: RosterRow[];
   /** Direct link to open this order (design-manage page). */
   manageUrl?: string;
+  /** Approved mockup graphic(s) for this order, so the designer sees WHAT to
+   *  produce right on the roster post - not just when a customer approved via
+   *  their own link. Up to a few are shown. */
+  designImages?: string[];
+  /** Paid white-label order: production must OMIT the SA back-logo + neck label. */
+  whiteLabel?: boolean;
 };
 
 /** Announce an invoice payment - into the design's thread when linked,
@@ -262,7 +276,7 @@ export async function postAddonToDesignerDiscord(args: {
 }): Promise<boolean> {
   // In-house pieces (hats) are the shop's work, not the designer's - drop
   // them, and skip the ping entirely if that's all the add-on contained.
-  const printRows = args.rows.filter((r) => !r.key || !isInHouseItem(r.key));
+  const printRows = args.rows.filter((r) => !r.key || !notDesignerMade(r.key));
   if (printRows.length === 0) return true;
   const designUrl = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
   // Prefer the project's thread; fall back to the design channel, then the
@@ -324,7 +338,7 @@ export async function postTeamOrderToDiscord(
   // In-house items (hats) are embroidered at the shop, not by the factory -
   // the designer never needs to see them, so they're filtered out of this
   // production-facing post entirely.
-  const itemKeys = (order.items?.length ? order.items : ["jersey"]).filter((k) => !isInHouseItem(k));
+  const itemKeys = (order.items?.length ? order.items : ["jersey"]).filter((k) => !notDesignerMade(k));
 
   // Production only needs: name / number / sizes per item (+ optional note). No prices.
   const rows = order.roster
@@ -338,7 +352,8 @@ export async function postTeamOrderToDiscord(
         .filter(Boolean)
         .join(" · ");
       const note = r.notes ? ` - ${r.notes}` : "";
-      return `${i + 1}. **${r.name || "-"}** · #${r.number || "-"} · ${sizeStr || "-"}${note}`;
+      const designTag = r.design ? `**${r.design}** · ` : "";
+      return `${i + 1}. ${designTag}${r.name || "-"} · #${r.number || "-"} · ${sizeStr || "-"}${note}`;
     })
     .join("\n");
 
@@ -351,16 +366,34 @@ export async function postTeamOrderToDiscord(
     { name: "Material", value: order.jerseyMaterial || "-", inline: true },
     { name: "Items", value: itemKeys.map(itemLabel).join(", ") || "-", inline: true },
     { name: "Players", value: String(order.roster.filter((r) => r.name || r.number || r.size || (r.sizes && Object.keys(r.sizes).length)).length), inline: true },
-    { name: "Roster", value: rows.slice(0, 1024) || "-", inline: false },
   ];
+  if (order.whiteLabel) {
+    fields.push({ name: "⚠️ WHITE-LABEL", value: "Remove the SA back-logo and the Slugger Athletics neck label - this order ships unbranded.", inline: false });
+  }
+  fields.push({ name: "Roster", value: rows.slice(0, 1024) || "-", inline: false });
   if (order.manageUrl) fields.push({ name: "🔗 Open order", value: order.manageUrl, inline: false });
+
+  // Attach the approved mockup(s) so the designer builds from the right art.
+  // Discord shows one image per embed, so extra graphics become image-only
+  // embeds stacked under the roster.
+  const imgs = (order.designImages ?? []).filter(Boolean).slice(0, 4);
+  const embeds: Record<string, unknown>[] = [
+    {
+      title: `📋 ${order.teamName}`,
+      color: GOLD,
+      fields,
+      timestamp: new Date().toISOString(),
+      ...(imgs[0] ? { image: { url: imgs[0] } } : {}),
+    },
+    ...imgs.slice(1).map((url) => ({ color: GOLD, image: { url } })),
+  ];
 
   const body: Record<string, unknown> = {
     username: "Slugger Team Orders",
-    // Money moment: a submitted roster needs eyes, so actually ping the team.
-    content: "@here 📋 New roster submitted",
-    allowed_mentions: { parse: ["everyone"] },
-    embeds: [{ title: `📋 ${order.teamName}`, color: GOLD, fields, timestamp: new Date().toISOString() }],
+    // A submitted roster is production work - tag Bonans directly, not @here.
+    content: `<@${DESIGNER_USER_ID}> 📋 New roster submitted`,
+    allowed_mentions: { parse: [], users: [DESIGNER_USER_ID] },
+    embeds,
   };
 
   // Standalone orders in a Forum #team-orders channel get their own thread;
@@ -531,7 +564,7 @@ export async function postInvoiceToDiscord(inv: {
   anyDoubleBill: boolean;
   lineCount: number;
   adminUrl: string;
-}): Promise<boolean> {
+}): Promise<{ ok: boolean; threadId?: string }> {
   // Prefer a dedicated invoice channel; fall back to team-orders, then orders.
   // Track whether the chosen channel is a Forum, because forum webhooks 400
   // unless the post carries a thread_name.
@@ -549,7 +582,7 @@ export async function postInvoiceToDiscord(inv: {
   }
   if (!url) {
     console.warn("No invoice/orders webhook set - skipping invoice Discord post");
-    return false;
+    return { ok: false };
   }
 
   const money = (c: number) => `$${(c / 100).toFixed(2)}`;
@@ -591,6 +624,53 @@ export async function postInvoiceToDiscord(inv: {
     ],
   };
 
+  // On a forum, capture the created thread id so the PAID confirmation can
+  // nest in THIS same thread later instead of opening a new one.
+  if (isForum) {
+    const msg = await sendAndReturn(url, body);
+    return { ok: Boolean(msg), threadId: msg?.channel_id };
+  }
+  return { ok: await send(url, body) };
+}
+
+/** Post a "PAID" confirmation to the invoice channel when a designer invoice is
+ *  marked paid (via Wise or manually), so the record reflects payment. */
+export async function postInvoicePaidToDiscord(inv: {
+  reference: string;
+  totalCents: number;
+  method: string;
+  detail?: string;
+  threadId?: string | null; // the invoice's submission thread - nest the PAID note here
+}): Promise<boolean> {
+  let baseUrl: string | undefined;
+  let isForum = false;
+  if (process.env.DISCORD_INVOICES_WEBHOOK_URL) {
+    baseUrl = process.env.DISCORD_INVOICES_WEBHOOK_URL;
+    isForum = process.env.DISCORD_INVOICES_FORUM === "true";
+  } else if (process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL) {
+    baseUrl = process.env.DISCORD_TEAM_ORDERS_WEBHOOK_URL;
+    isForum = process.env.DISCORD_TEAM_ORDERS_FORUM === "true";
+  } else if (process.env.DISCORD_ORDERS_WEBHOOK_URL) {
+    baseUrl = process.env.DISCORD_ORDERS_WEBHOOK_URL;
+    isForum = process.env.DISCORD_ORDERS_FORUM === "true";
+  }
+  if (!baseUrl) return false;
+  const fmt = (c: number) => `$${(c / 100).toFixed(2)}`;
+  // If we know the invoice's thread, post the PAID note INTO it. Otherwise, on
+  // a forum, open a new thread (thread_name); on a text channel, just post.
+  const url = inv.threadId ? `${baseUrl}?thread_id=${inv.threadId}` : baseUrl;
+  const body: Record<string, unknown> = {
+    username: "Slugger Invoices",
+    ...(!inv.threadId && isForum ? { thread_name: `Invoice ${inv.reference} - PAID` } : {}),
+    embeds: [
+      {
+        title: `💸 Invoice ${inv.reference} - PAID`,
+        description: `${fmt(inv.totalCents)} paid ${inv.method}${inv.detail ? ` - ${inv.detail}` : ""}.`,
+        color: 0x2ecc71,
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  };
   return send(url, body);
 }
 

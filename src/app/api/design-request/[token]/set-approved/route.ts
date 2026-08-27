@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { designRequests } from "@/db/schema";
 import { getByManageToken, toggleApprovedDesign } from "@/lib/design-requests";
+import { generateAssetSheets, hasAssetSheets } from "@/lib/design-lab-assets";
 import { postDesignThreadUpdate } from "@/lib/discord";
 import { setThreadStageTag } from "@/lib/discord-bot";
 
@@ -65,6 +67,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       mention: approved,
     });
     await setThreadStageTag(request.discordThreadId, "✅ Approved");
+
+    // Parity with the AI lab: on approval, generate the individual trace-ready
+    // asset sheets (pattern / wordmark / emblem) from the approved artwork and
+    // drop them into the thread - so designs approved manually here get the same
+    // files, not just the mockup. Backgrounded (image model is slow); guarded so
+    // it only runs the first time a design gets an approved image.
+    if (approved && !hasAssetSheets(request.inspirationImages)) {
+      waitUntil(
+        generateAssetSheets({
+          designId: request.id,
+          reference: request.reference,
+          teamName: request.teamName,
+          sport: request.sport,
+          style: request.jerseyStyle,
+          threadId: request.discordThreadId,
+          currentImages: request.inspirationImages ?? [],
+          sourceImageUrl: url,
+        }).catch((e) => console.error("generateAssetSheets (set-approved) failed:", e)),
+      );
+    }
     return NextResponse.json({ ok: true, urls: result.urls });
   } catch (e) {
     console.error("toggleApprovedDesign failed:", e);

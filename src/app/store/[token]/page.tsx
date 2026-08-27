@@ -4,8 +4,7 @@ import { dbEnabled } from "@/db";
 import { getStoreByHandle, applyFundraise } from "@/lib/team-stores";
 import { getById as getDesignById } from "@/lib/design-requests";
 import { TeamStoreShop } from "@/components/team-store-shop";
-import { ProofGallery } from "@/components/proof-gallery";
-import { AllSizeCharts } from "@/components/size-charts";
+import { SizeChartsFor } from "@/components/size-charts";
 
 export const metadata: Metadata = { title: "Team Store", robots: { index: false } };
 
@@ -84,6 +83,18 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
     designs: (it.designs ?? []).map((d) => ({ label: labelMap[d.image] || d.label, image: d.image, sku: skuMap[d.image] ?? null })),
   }));
 
+  // An open store with no products yet must not render blank tiles - show a
+  // simple "not open yet" instead of a broken-looking shop.
+  if (resolvedItems.length === 0) {
+    return (
+      <div className="mx-auto max-w-lg px-4 sm:px-6 py-24 text-center" style={themeVars(store.primaryColor)}>
+        <h1 className="display text-3xl text-foreground">{store.name}</h1>
+        <p className="mt-3 text-muted">This team store isn&apos;t open yet - check back soon, or reach out to your coach.</p>
+        <p className="mt-10 text-xs text-muted/60">Powered by Slugger Athletics</p>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 py-14" style={themeVars(store.primaryColor)}>
       <header className="text-center">
@@ -92,11 +103,13 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
             <Image src={store.logoUrl} alt={`${store.name} logo`} fill sizes="96px" className="object-contain" unoptimized />
           </div>
         )}
-        <span className="display text-brand text-sm">Official Team Store</span>
-        <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">{store.name}</h1>
-        <p className="mt-3 text-muted max-w-xl mx-auto">
-          This is your team&apos;s private gear shop. Order your own gear, in your team&apos;s
-          custom design, delivered to your door.
+        <span className="display text-muted text-sm uppercase tracking-wide">Official team store</span>
+        <h1 className="display text-4xl sm:text-5xl text-brand mt-1">{store.name}</h1>
+        <p className="mt-3 text-sm text-muted max-w-xl mx-auto">
+          Your team&apos;s gear, in your team&apos;s design. Pay here, we make it.
+        </p>
+        <p className="mt-2 text-xs text-muted/70">
+          Private team link · <a href="#size-charts" className="text-brand hover:underline">Size chart</a>
         </p>
       </header>
 
@@ -106,24 +119,6 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
           <p className="text-sm text-muted mt-0.5">A portion of each purchase goes straight to the team as a fundraiser. Thanks for chipping in!</p>
         </div>
       )}
-
-      {/* How it works - most buyers land here cold from a text message. */}
-      <div className="mt-8 grid sm:grid-cols-3 gap-3">
-        {[
-          { n: "1", t: "Pick your gear", d: "Choose items and sizes below - every piece is made in the team design you see here." },
-          { n: "2", t: "Make it yours", d: "Add the name and number you want printed. Double-check spelling - it prints exactly as typed." },
-          { n: "3", t: "Pay & relax", d: "Pay by card. Your gear is custom-made (2-3 weeks) and ships to you, or pick it up free in Ocala." },
-        ].map((s) => (
-          <div key={s.n} className="bg-steel border border-line p-4">
-            <div className="flex items-center gap-2">
-              <span className="grid place-items-center h-7 w-7 clip-slant bg-brand text-on-brand display text-sm shrink-0">{s.n}</span>
-              <h2 className="display text-foreground">{s.t}</h2>
-            </div>
-            <p className="mt-2 text-sm text-muted">{s.d}</p>
-          </div>
-        ))}
-      </div>
-
 
       <section className="mt-10">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -141,10 +136,14 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
 
       {galleryImages.length > 0 && (
         <section className="mt-10">
-          <h2 className="display text-xl text-foreground text-center">The full design collection</h2>
-          <p className="text-sm text-muted text-center mt-1">Every piece is made in your team&apos;s custom designs. Tap to view up close.</p>
-          <div className="mt-4">
-            <ProofGallery images={galleryImages} teamName={store.name} />
+          <h3 className="display text-sm text-muted uppercase tracking-wide text-center">Design collection</h3>
+          {/* Slim thumbnail strip, not a second full gallery. Tap to enlarge. */}
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:justify-center">
+            {galleryImages.map((img, i) => (
+              <a key={i} href={img} target="_blank" rel="noopener noreferrer" className="shrink-0 h-20 w-20 bg-white border border-line rounded overflow-hidden block">
+                <Image src={img} alt={`${store.name} design ${i + 1}`} width={80} height={80} sizes="80px" className="h-full w-full object-contain p-0.5" unoptimized />
+              </a>
+            ))}
           </div>
         </section>
       )}
@@ -159,7 +158,7 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
             All measurements in inches. Jerseys have a relaxed fit and run slightly large -
             when in doubt, size down or text us at (352) 414-7270.
           </p>
-          <AllSizeCharts />
+          <SizeChartsFor items={(store.storeItems ?? []).map((it) => it.key)} />
         </div>
       </details>
 
@@ -169,6 +168,11 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
         or email{" "}
         <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a>
         . You&apos;ll get an email confirmation the moment you order.
+      </p>
+
+      {/* The only Slugger branding on a private store: a small credit line. */}
+      <p className="mt-10 pt-6 border-t border-line text-center text-xs text-muted/60">
+        Powered by Slugger Athletics
       </p>
     </div>
   );

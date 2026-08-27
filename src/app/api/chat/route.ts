@@ -46,7 +46,7 @@ async function lookupOrder(reference: string, email: string): Promise<string> {
       if (!d || !emailMatches(d.contactEmail)) return FAILED;
       const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
       const meanings: Record<string, string> = {
-        pending_payment: "waiting on the design fee checkout",
+        pending_payment: "not submitted yet",
         submitted: "in the designer's queue",
         in_design: "being designed right now",
         proof_sent: "proof sent - waiting on their review/approval",

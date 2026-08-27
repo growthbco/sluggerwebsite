@@ -37,6 +37,10 @@ type Props = {
   neededBy: string | null;
   rushApprovedAt: string | null;
   rushApprovedBy: string | null;
+  // Which slice of this panel to render, so the admin page can put the brief in
+  // an "Overview" tab and the proof workflow in a "Proofs" tab from the SAME
+  // markup. Omit to render everything (legacy single-scroll).
+  view?: "overview" | "proofs";
 };
 
 export function DesignManagePanel({
@@ -64,7 +68,10 @@ export function DesignManagePanel({
   neededBy,
   rushApprovedAt,
   rushApprovedBy,
+  view,
 }: Props) {
+  const showOverview = view !== "proofs";
+  const showProofs = view !== "overview";
   const [proofs, setProofs] = useState<string[]>(proofImages);
   const [labels, setLabels] = useState<Record<string, string>>(proofLabels);
   const [skus, setSkus] = useState<Record<string, string>>(designSkus);
@@ -164,7 +171,8 @@ export function DesignManagePanel({
       setProofs((p) => [...p, ...pending]);
       setPending([]);
       setPendingLabels([]);
-      setMessage("Proof sent! Client has been emailed.");
+      // Show the REAL delivery outcome (email/text/failed), not a fixed message.
+      setMessage(data.notice ? `Proof uploaded. ${data.notice}` : "Proof sent to the client.");
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
@@ -225,15 +233,15 @@ export function DesignManagePanel({
 
   return (
     <div className="space-y-8">
-      {rush && (
+      {showOverview && rush && (
         <div className="border-2 border-red-500 bg-red-500/10 p-5">
-          <p className="display text-2xl sm:text-3xl text-red-400">🚨 RUSH ORDER{neededStr ? ` - NEEDED BY ${neededStr.toUpperCase()}` : ""}</p>
+          <p className="display text-2xl sm:text-3xl text-red-400">RUSH ORDER{neededStr ? ` - NEEDED BY ${neededStr.toUpperCase()}` : ""}</p>
           <p className="mt-2 text-sm text-foreground">
             $100 rush order fee is on the quote and the order ships direct.{" "}
             {rushOk ? "Timeline is confirmed - this design is priority." : <strong>Do NOT promise this date to the client until it&apos;s approved below.</strong>}
           </p>
           {rushOk ? (
-            <p className="mt-3 display text-green-400">✅ Timeline approved by {rushOk.by}</p>
+            <p className="mt-3 display text-green-400">Timeline approved by {rushOk.by}</p>
           ) : (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <select
@@ -257,13 +265,15 @@ export function DesignManagePanel({
           )}
         </div>
       )}
+      {showOverview && (
+      <>
       <header>
         <span className="display text-brand text-sm">{reference} · {status.replace(/_/g, " ")}</span>
         <h1 className="display text-3xl sm:text-4xl text-foreground mt-1">{teamName}</h1>
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           {rush && (
             <span className="inline-block clip-slant bg-brand text-on-brand display px-3 py-1">
-              🚨 RUSH {neededBy ? `· needed by ${new Date(neededBy).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" })}` : ""}
+              RUSH {neededBy ? `· needed by ${new Date(neededBy).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" })}` : ""}
             </span>
           )}
           {!rush && neededBy && (
@@ -291,7 +301,7 @@ export function DesignManagePanel({
         </div>
         {products && (
           <div className="sm:col-span-2">
-            <div className="display text-foreground text-xs">🎨 Mock up</div>
+            <div className="display text-foreground text-xs">Mock up</div>
             <div className="text-foreground">{products}</div>
           </div>
         )}
@@ -328,13 +338,15 @@ export function DesignManagePanel({
           <div className="flex gap-2">
             <input readOnly value={statusUrl} className="flex-1 bg-ink border border-line px-3 py-2 text-xs text-foreground/80" />
             <button onClick={copyStatus} className="clip-slant bg-brand text-on-brand display text-xs px-4 py-2 hover:bg-brand-dark">
-              {copied ? "Copied ✓" : "Copy"}
+              {copied ? "Copied " : "Copy"}
             </button>
           </div>
         </div>
       </section>
+      </>
+      )}
 
-      {inspirationImages.length > 0 && (
+      {showProofs && inspirationImages.length > 0 && (
         <section>
           <h2 className="display text-xl text-foreground">Inspiration from client</h2>
           <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2">
@@ -351,7 +363,7 @@ export function DesignManagePanel({
         </section>
       )}
 
-      {changeRequests.length > 0 && (
+      {showProofs && changeRequests.length > 0 && (
         <section>
           <h2 className="display text-xl text-foreground">Change requests ({changeRequests.length})</h2>
           <p className="text-sm text-muted mt-1">Latest first. Pins are tied to specific spots on the proof.</p>
@@ -407,9 +419,9 @@ export function DesignManagePanel({
         </section>
       )}
 
-      {approved.length > 0 && (
+      {showProofs && approved.length > 0 && (
         <section>
-          <h2 className="display text-xl text-green-400">✓ Approved designs ({approved.length})</h2>
+          <h2 className="display text-xl text-green-400">Approved designs ({approved.length})</h2>
           <p className="text-sm text-muted mt-1">
             Name each one - the <strong className="text-foreground">name + SKU</strong> is what players see when picking a design and what a team store uses, so there&apos;s no confusion which jersey is which. Edit anytime, like inventory.
           </p>
@@ -418,7 +430,7 @@ export function DesignManagePanel({
               <div key={u} className="border border-green-500 bg-steel">
                 <a href={u} target="_blank" rel="noopener noreferrer" className="relative aspect-[4/3] bg-white overflow-hidden block">
                   <Image src={u} alt={labels[u] || `Approved design ${i + 1}`} fill sizes="33vw" className="object-contain p-1" unoptimized />
-                  <span className="absolute top-1 left-1 bg-green-600 text-white display text-[10px] px-1.5 py-0.5">✓ APPROVED</span>
+                  <span className="absolute top-1 left-1 bg-green-600 text-white display text-[10px] px-1.5 py-0.5">APPROVED</span>
                 </a>
                 <div className="p-2 space-y-2">
                   <div>
@@ -459,7 +471,7 @@ export function DesignManagePanel({
         </section>
       )}
 
-      {proofs.length > 0 && (
+      {showProofs && proofs.length > 0 && (
         <section>
           <h2 className="display text-xl text-foreground">Sent proofs</h2>
           <p className="text-sm text-muted mt-1">
@@ -475,7 +487,7 @@ export function DesignManagePanel({
                 <input
                   value={labels[u] ?? ""}
                   onChange={(e) => setLabels((l) => ({ ...l, [u]: e.target.value }))}
-                  placeholder="Name this design (required to approve)"
+                  placeholder="Name this design (optional - only if multiple)"
                   maxLength={60}
                   className="w-full bg-ink border-t border-line px-2 py-1.5 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
                 />
@@ -483,9 +495,9 @@ export function DesignManagePanel({
                   <button
                     type="button"
                     onClick={() => toggleApproved(u, true)}
-                    disabled={settingApproved !== null || removing !== null || !(labels[u] ?? "").trim()}
+                    disabled={settingApproved !== null || removing !== null}
                     className="flex-1 text-[11px] display text-muted px-1 py-1.5 hover:text-foreground hover:bg-steel disabled:opacity-50"
-                    title={!(labels[u] ?? "").trim() ? "Name it first" : "Approve this design"}
+                    title="Approve this design"
                   >
                     {settingApproved === u ? "Saving..." : "Mark approved"}
                   </button>
@@ -509,6 +521,7 @@ export function DesignManagePanel({
         </section>
       )}
 
+      {showProofs && (
       <section>
         <h2 className="display text-xl text-foreground">Upload a proof</h2>
         <p className="text-sm text-muted mt-1">Add one or more proof images. When you click "Send to Client", they're emailed a link to approve.</p>
@@ -552,6 +565,7 @@ export function DesignManagePanel({
           {posting ? "Sending..." : `Send ${pending.length || ""} Proof${pending.length === 1 ? "" : "s"} to Client`}
         </button>
       </section>
+      )}
     </div>
   );
 }

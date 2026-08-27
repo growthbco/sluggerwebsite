@@ -1,8 +1,6 @@
 // Single source of truth for customer FAQs: rendered on /faq (with JSON-LD)
 // and fed to the AI assistant on design-request message threads so both give
 // the same answers.
-import { DESIGN_FEE_WAIVED } from "@/lib/design-fee";
-
 export type Faq = { q: string; a: string; link?: { href: string; label: string } };
 
 export const FAQS: Faq[] = [
@@ -11,9 +9,7 @@ export const FAQS: Faq[] = [
   { q: "Is there a minimum order?", a: "Custom orders start at 6 pieces per design - every design takes real mockup and production setup, so 6 is the floor on custom gear. That includes custom embroidered hats: 6 hats per design, embroidered in-house so they turn around fast." },
   { q: "How long does production take?", a: "Most orders ship in 2-3 weeks after you approve your design. Need it sooner? Rush gets you there in about a week. Specialty items like hoodies, pants, or long-sleeve jerseys may add a few days." },
   { q: "How does sizing work?", a: "Our signature jerseys have a relaxed fit and run slightly large. Every product page has a size guide, and on team orders each player picks their own size to cut down on returns." },
-  { q: "Do you really design for free?", a: DESIGN_FEE_WAIVED
-      ? "Yes - and right now there's no fee at all. We're waiving the usual $35 design fee for a limited time, so you can start a custom design completely free, see a proof, and approve it with no commitment."
-      : "Yes - with one small step. We charge $35 upfront to start the design, then credit 100% of it back to your final team order, so the design is free with purchase. The $35 just keeps us from designing for people who shop our artwork elsewhere. Returning Slugger customers get it waived automatically." },
+  { q: "Do you really design for free?", a: "Yes, genuinely free. There's no design fee. Start a custom design, our in-house designer works up a mockup, and you see a proof and approve it with no commitment. You only pay when you place your order." },
   { q: "Can I customize name and number?", a: "Absolutely. Jerseys and apparel let you add a player name and number right on the product page, and team orders capture them per player." },
   { q: "Do you make custom embroidered hats?", a: "Yes - fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo. Snapbacks and truckers are $25, fitted hats are $30, and an embroidered number on the back adds $5. The mockup is free; a one-time digitizing fee applies if we create the embroidery file (bring your own DST/EMB file and skip it). Hats are embroidered in-house, so smaller orders turn around in just days.", link: { href: "/custom-hats", label: "See custom embroidered hats" } },
   { q: "Is there a minimum for custom hats?", a: "Custom embroidered hats start at 6 hats per design. The mockup is free; creating the stitch-ready embroidery file carries a one-time digitizing fee - or bring your own embroidery file (DST/EMB) and skip it. Same flat $25-30 per hat from 6 to 60.", link: { href: "/custom-hats", label: "Custom embroidered hats" } },

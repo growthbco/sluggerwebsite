@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { AdminPageHeader } from "@/components/admin-page-header";
 import { redirect } from "next/navigation";
 import { and, desc, eq, ne } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
@@ -23,7 +23,27 @@ export default async function AdminAwaitingPaymentPage() {
 
   const db = getDb();
   const [torders, pendingAddons, invoices] = await Promise.all([
-    db.select().from(teamOrders),
+    // Only the fields this page reads - not the full order rows (which carry
+    // heavy print-file / roster JSON we don't need here).
+    db
+      .select({
+        id: teamOrders.id,
+        reference: teamOrders.reference,
+        teamName: teamOrders.teamName,
+        contactName: teamOrders.contactName,
+        contactEmail: teamOrders.contactEmail,
+        archivedAt: teamOrders.archivedAt,
+        invoicePaidAt: teamOrders.invoicePaidAt,
+        invoiceUrl: teamOrders.invoiceUrl,
+        balanceInvoiceUrl: teamOrders.balanceInvoiceUrl,
+        quotedTotalCents: teamOrders.quotedTotalCents,
+        depositCents: teamOrders.depositCents,
+        depositPaidAt: teamOrders.depositPaidAt,
+        taxExempt: teamOrders.taxExempt,
+        localPickup: teamOrders.localPickup,
+        updatedAt: teamOrders.updatedAt,
+      })
+      .from(teamOrders),
     db.select().from(teamOrderAddons).where(eq(teamOrderAddons.status, "pending")),
     db
       .select()
@@ -111,11 +131,9 @@ export default async function AdminAwaitingPaymentPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 py-10">
-      <Link href="/admin" className="text-sm text-muted hover:text-foreground">← Dashboard</Link>
-      <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
-        <h1 className="display text-4xl text-foreground">💸 Awaiting Payment ({items.length})</h1>
+      <AdminPageHeader eyebrow="Financials" title={`Awaiting Payment (${items.length})`}>
         <p className="display text-2xl text-amber-300 tabular-nums">{money(total)} <span className="text-sm text-muted">due</span></p>
-      </div>
+      </AdminPageHeader>
       <p className="mt-2 text-muted text-sm">Every invoice that&apos;s out the door with money still due - team-order deposits &amp; balances, add-on invoices, and custom invoices. Click a row to open it.</p>
 
       <div className="mt-6">

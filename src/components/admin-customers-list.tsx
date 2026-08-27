@@ -70,7 +70,7 @@ export function AdminCustomersList({ rows }: { rows: CustomerRow[] }) {
                       href={`/admin/texts?to=${encodeURIComponent(r.phone)}&name=${encodeURIComponent(r.name)}`}
                       className="text-xs display border border-brand/50 text-brand px-2 py-1 hover:bg-brand/10"
                     >
-                      💬 Text
+                      Text
                     </Link>
                   )}
                   {r.latestOrderId && (

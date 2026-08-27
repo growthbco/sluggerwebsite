@@ -7,7 +7,7 @@ import { getDb } from "@/db";
 import { teamOrderAddons, teamOrders } from "@/db/schema";
 import { addRosterRow } from "@/lib/team-orders";
 import { itemPriceCents } from "@/lib/team-order-pricing";
-import { itemLabel, sizesFor, isInHouseItem, EXTRA_ADDON_KEYS } from "@/lib/order-items";
+import { itemLabel, sizesFor, notDesignerMade, EXTRA_ADDON_KEYS } from "@/lib/order-items";
 
 // Approx shipping weight per piece in ounces - used when an add-on comes in
 // AFTER the main order shipped (it can't ride with the batch anymore).
@@ -64,7 +64,7 @@ export async function pendingAddonRoster(teamOrderId: string): Promise<{ name: s
   const batches = await unverifiedPaidAddonBatches(teamOrderId);
   return batches
     .flatMap((b) => b.rows)
-    .filter((r) => !isInHouseItem(r.key))
+    .filter((r) => !notDesignerMade(r.key))
     .flatMap((r) =>
       Array.from({ length: Math.max(1, r.quantity) }, () => ({
         name: (r.name ?? "").trim(),
@@ -114,7 +114,7 @@ export async function latestAddonBatchRoster(teamOrderId: string): Promise<{ nam
     .limit(1);
   if (!latest) return [];
   return latest.rows
-    .filter((r) => !isInHouseItem(r.key))
+    .filter((r) => !notDesignerMade(r.key))
     .flatMap((r) =>
       Array.from({ length: Math.max(1, r.quantity) }, () => ({
         name: (r.name ?? "").trim(),
@@ -169,7 +169,7 @@ export type AddonRow = {
 
 /** Validate + price requested add-on rows against the order's item types. */
 export function priceAddonRows(
-  order: { jerseyStyle?: string | null; items?: string[] | null; localPricing?: boolean | null; customJerseyCents?: number | null },
+  order: { jerseyStyle?: string | null; jerseyMaterial?: string | null; items?: string[] | null; localPricing?: boolean | null; customJerseyCents?: number | null },
   inputs: AddonRowInput[],
 ): { rows: AddonRow[]; totalCents: number } {
   // The order's own items, plus the always-available add-on apparel (hoodies
@@ -181,7 +181,7 @@ export function priceAddonRows(
     const unit =
       r.key === "jersey" && order.customJerseyCents
         ? order.customJerseyCents
-        : itemPriceCents(r.key, order.jerseyStyle, order.localPricing);
+        : itemPriceCents(r.key, order.jerseyStyle, order.localPricing, order.jerseyMaterial);
     if (!unit) continue;
     const sizes = sizesFor(r.key);
     rows.push({
@@ -248,7 +248,7 @@ export async function markAddonPaid(addonId: string, sessionId: string, paidTota
   // pieces as missing instead of silently passing. In-house pieces (hats) are
   // embroidered at the shop and never touch the print file, so a hat-only
   // add-on leaves the QA alone.
-  if (addon.rows.some((r) => !isInHouseItem(r.key))) {
+  if (addon.rows.some((r) => !notDesignerMade(r.key))) {
     await db
       .update(teamOrders)
       .set({ printFileVerifiedAt: null, printFileVerification: null, updatedAt: new Date() })

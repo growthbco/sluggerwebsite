@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { designLabVisitors } from "@/db/schema";
+import { attributionFromCookie } from "@/lib/attribution";
 
 // The monetization ladder for the AI design lab:
 //   0    generation:  free, anonymous (one free design to hook them)
@@ -25,7 +26,10 @@ export async function getOrCreateVisitor(): Promise<{ visitor: LabVisitor; setCo
     if (row) return { visitor: row };
   }
   const key = crypto.randomUUID();
-  const [row] = await db.insert(designLabVisitors).values({ visitorKey: key }).returning();
+  // First-touch: capture HOW they got to the lab (search / social / ad / direct)
+  // at the moment the visitor is created, from the site-wide attribution cookie.
+  const source = await attributionFromCookie();
+  const [row] = await db.insert(designLabVisitors).values({ visitorKey: key, source: source ?? undefined }).returning();
   return { visitor: row, setCookie: key };
 }
 

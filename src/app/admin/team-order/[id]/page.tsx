@@ -8,8 +8,8 @@ import { teamOrders, designRequests, teamOrderAddons } from "@/db/schema";
 import { getAdminSession, canAccess } from "@/lib/admin-auth";
 import { getRoster, getPrintableJerseys, getSiblingPrintOrders, findRelatedOrdersByContact } from "@/lib/team-orders";
 import { computeTeamOrderQuote, estimateOrderParcelsOz } from "@/lib/team-order-pricing";
-import { itemLabel, sizeBreakdown } from "@/lib/order-items";
-import { shippingCentsFor } from "@/lib/team-stores";
+import { itemLabel, sizeBreakdown, formatSize } from "@/lib/order-items";
+import { quoteShippingCents } from "@/lib/ship-quote";
 import { taxCents } from "@/lib/pricing";
 import { inboundTrackingUrlFor } from "@/lib/tracking";
 import { AdminInvoiceButton } from "@/components/admin-invoice-button";
@@ -20,6 +20,9 @@ import { AdminLocalToggle } from "@/components/admin-local-toggle";
 import { AdminEmbroideryToggle } from "@/components/admin-embroidery-toggle";
 import { AdminRushToggle } from "@/components/admin-rush-toggle";
 import { AdminTaxToggle } from "@/components/admin-tax-toggle";
+import { AdminWhiteLabel } from "@/components/admin-white-label";
+import { AdminMargin } from "@/components/admin-margin";
+import { estimatedDesignerCostCents } from "@/lib/designer-invoices";
 import { AdminPickupToggle } from "@/components/admin-pickup-toggle";
 import { AdminDesignerNote } from "@/components/admin-designer-note";
 import { AdminLinkDesign } from "@/components/admin-link-design";
@@ -41,7 +44,7 @@ const fmtDate = (d: Date | string | null | undefined) =>
 /** One clearly-labeled section card. */
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section className="bg-steel border border-line p-5">
+    <section className="bg-steel border border-line rounded-xl p-5">
       <h2 className="display text-lg text-foreground">{title}</h2>
       {hint && <p className="text-sm text-muted mt-0.5">{hint}</p>}
       <div className="mt-4">{children}</div>
@@ -104,6 +107,12 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
   const design = o.designRequestId
     ? (await db.select().from(designRequests).where(eq(designRequests.id, o.designRequestId)).limit(1))[0] ?? null
     : null;
+  const hasApprovedDesign = Boolean(
+    o.approvedDesignUrl ||
+      (design &&
+        (design.status === "approved" || design.status === "ordered") &&
+        (design.approvedDesignUrls?.length || design.approvedDesignUrl)),
+  );
 
   // Duplicate guard: other non-cancelled orders sharing this contact.
   const relatedOrders = await findRelatedOrdersByContact({ excludeId: o.id, email: o.contactEmail, phone: o.contactPhone, teamName: o.teamName });
@@ -112,13 +121,23 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
   const estimate = o.quotedTotalCents ?? (quote.totalCents > 0 ? quote.totalCents : null);
   const deposit = o.depositCents ?? (estimate ? Math.round(estimate / 2) : 0);
   const paid = Boolean(o.invoicePaidAt) || o.status === "paid" || o.status === "shipped";
+  const designBlocksOrder = !hasApprovedDesign && !paid && !o.depositPaidAt;
   const parcels = estimateOrderParcelsOz(roster);
   const weightOz = parcels.apparelOz + parcels.hatOz;
   const twoBoxes = parcels.apparelOz > 0 && parcels.hatOz > 0;
   // Hats ship in their own box: a mixed order is two parcels, charged twice.
+  // Match what the invoice actually charges: a live carrier quote per parcel
+  // for the ship-to ZIP (falls back to the weight formula when no ZIP on file),
+  // so the admin estimate no longer under-reads far-away/heavy orders.
   const shipEstimate = o.localPickup
     ? 0
-    : (parcels.apparelOz > 0 ? shippingCentsFor(parcels.apparelOz) : 0) + (parcels.hatOz > 0 ? shippingCentsFor(parcels.hatOz) : 0);
+    : (
+        await Promise.all(
+          [parcels.apparelOz, parcels.hatOz]
+            .filter((w) => w > 0)
+            .map((w) => quoteShippingCents(o.shippingAddress?.postalCode ?? "", w)),
+        )
+      ).reduce((sum, q) => sum + q.chargedCents, 0);
   const verified = jerseys.filter((j) => j.verifiedAt).length;
   const breakdown = sizeBreakdown(roster, o.items ?? ["jersey"]);
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
@@ -127,16 +146,45 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
   const nextStep = o.archivedAt
     ? { text: `Archived${o.archivedNote ? ` - ${o.archivedNote}` : ""}`, tone: "text-muted" }
     : o.shippedAt
-      ? { text: "Shipped - nothing left to do 🎉", tone: "text-green-400" }
+      ? { text: "Shipped - nothing left to do", tone: "text-green-400" }
       : paid
         ? o.trackingNumber
           ? { text: "Label ready - mark it shipped to email the customer tracking", tone: "text-amber-300" }
           : { text: "Paid in full - buy the shipping label", tone: "text-green-400" }
+        : designBlocksOrder
+          ? {
+              text: design
+                ? "Do not invoice - this design still needs approval"
+                : "Do not invoice - link or create an approved design first",
+              tone: "text-amber-300",
+            }
         : o.depositPaidAt
           ? { text: "Deposit paid, in production - send the final invoice when it's ready", tone: "text-sky-400" }
           : estimate
             ? { text: o.invoiceUrl ? "Deposit invoice sent - waiting on payment" : "Roster in - send the 50% deposit invoice", tone: "text-amber-300" }
             : { text: "No roster yet - share the join link with the coach", tone: "text-muted" };
+
+  // The ONE primary action for the current stage, surfaced in the Next step
+  // banner so staff never hunt for it. The same components render here; the
+  // sections below keep only secondary / edge controls to avoid a second big
+  // button for the same stage.
+  const nextAction =
+    o.archivedAt || o.shippedAt ? null
+      : designBlocksOrder
+        ? design
+          ? <Link href={`/admin/design-requests/${design.id}`} className="clip-slant bg-brand text-on-brand display text-sm px-5 py-2.5 hover:bg-brand-dark whitespace-nowrap">Open design</Link>
+          : null
+      : paid
+        ? o.trackingNumber
+          ? <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="Mark shipped + email customer" />
+          : <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} suggestedLb={Math.max(1, Math.round(((parcels.apparelOz || parcels.hatOz) / 16) * 10) / 10)} />
+        : o.depositPaidAt
+          ? (estimate ? <AdminInvoiceButton teamOrderId={o.id} teamName={o.teamName} dueCents={estimate - deposit} stage="balance" resend={Boolean(o.balanceInvoiceUrl)} localPickup={o.localPickup} /> : null)
+          : estimate
+            ? o.invoiceUrl
+              ? <AdminRecordPayment teamOrderId={o.id} teamName={o.teamName} depositPaid={false} suggestedDepositCents={deposit} />
+              : <AdminInvoiceButton teamOrderId={o.id} teamName={o.teamName} dueCents={deposit} stage="deposit" resend={false} warnPrintFile={false} />
+            : <a href={`/team-order/manage/${o.manageToken}`} target="_blank" rel="noopener noreferrer" className="clip-slant bg-brand text-on-brand display text-sm px-5 py-2.5 hover:bg-brand-dark whitespace-nowrap">Open coach&apos;s page</a>;
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 py-10 space-y-6">
@@ -157,10 +205,14 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
             <AdminArchiveButton kind="team_order" id={o.id} archived={Boolean(o.archivedAt)} />
           </div>
         </div>
-        {/* Next step - always visible, always one thing. */}
-        <div className="mt-4 border border-brand/40 bg-brand/5 px-4 py-3">
-          <span className="text-xs display text-brand uppercase tracking-wide">Next step</span>
-          <p className={`display mt-0.5 ${nextStep.tone}`}>{nextStep.text}</p>
+        {/* Next step - always visible, always one thing, with the single big
+            button for this stage right here so it's never hunted for. */}
+        <div className="mt-4 border border-brand/40 bg-brand/5 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <span className="text-xs display text-brand uppercase tracking-wide">Next step</span>
+            <p className={`display mt-0.5 ${nextStep.tone}`}>{nextStep.text}</p>
+          </div>
+          {nextAction && <div className="shrink-0">{nextAction}</div>}
         </div>
       </header>
 
@@ -169,7 +221,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
       {relatedOrders.length > 0 && (
         <div className={`border px-4 py-3 ${relatedOrders.some((r) => r.likelyDuplicate) ? "border-[#e5533c]/50 bg-[#e5533c]/5" : "border-amber-300/40 bg-amber-300/5"}`}>
           <div className="text-xs display uppercase tracking-wide text-foreground">
-            {relatedOrders.some((r) => r.likelyDuplicate) ? "⚠ Possible duplicate order" : "Other orders from this contact"}
+            {relatedOrders.some((r) => r.likelyDuplicate) ? "Possible duplicate order" : "Other orders from this contact"}
           </div>
           <p className="text-sm text-muted mt-0.5">
             This customer has {relatedOrders.length} other {relatedOrders.length === 1 ? "order" : "orders"} on file. If any is an accidental restart, delete it so this team stays as one order.
@@ -204,7 +256,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
                   className="text-xs display border border-brand/50 text-brand px-2 py-0.5 hover:bg-brand/10 whitespace-nowrap"
                   title="Open this customer in the Texts inbox"
                 >
-                  💬 Text client
+                  Text client
                 </a>
               </span>
             ) : (
@@ -223,6 +275,11 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
 
       {/* What they ordered */}
       <Section title={`What they ordered (${roster.length} ${roster.length === 1 ? "row" : "rows"})`}>
+        {roster.length > 0 && (
+          <p className="mb-4 text-sm">
+            <a href={`/api/admin/team-order/packing-view?id=${o.id}`} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">Printable packing sheet (check off as you pack) </a>
+          </p>
+        )}
         <dl className="grid sm:grid-cols-3 gap-4">
           <Field label="Jersey style">{o.jerseyStyle ?? "-"}</Field>
           <Field label="Material">{o.jerseyMaterial ?? "-"}</Field>
@@ -242,7 +299,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
               <span className="text-foreground uppercase truncate">{r.playerName || "-"}</span>
               <span className="text-muted">#{r.playerNumber || "-"}</span>
               <span className="text-muted col-start-2 sm:col-start-auto">
-                {Object.entries(r.sizes ?? {}).map(([k, v]) => `${itemLabel(k)}: ${v}`).join(" · ") || r.size || "-"}
+                {Object.entries(r.sizes ?? {}).map(([k, v]) => `${itemLabel(k)}: ${formatSize(v)}`).join(" · ") || formatSize(r.size) || "-"}
                 {r.quantity && r.quantity > 1 ? ` ×${r.quantity}` : ""}
               </span>
               <span className="text-muted col-start-2 sm:col-start-auto">{[r.design, r.notes].filter(Boolean).join(" · ")}</span>
@@ -266,19 +323,33 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
         )}
         <dl className="grid sm:grid-cols-4 gap-4">
           <Field label="Order total">{estimate ? money(estimate) : "-"}{estimate && !o.quotedTotalCents ? <span className="text-xs text-muted"> est.</span> : null}</Field>
-          <Field label="Deposit (50%)">{deposit ? money(deposit) : "-"} {o.depositPaidAt ? <span className="text-green-400">✓ paid {fmtDate(o.depositPaidAt)}</span> : <span className="text-muted">not paid</span>}</Field>
-          <Field label="Balance">{estimate ? money(Math.max(0, estimate - (o.depositPaidAt ? deposit : 0))) : "-"} {paid ? <span className="text-green-400">✓ paid</span> : null}</Field>
+          <Field label="Deposit (50%)">{deposit ? money(deposit) : "-"} {o.depositPaidAt ? <span className="text-green-400">paid {fmtDate(o.depositPaidAt)}</span> : <span className="text-muted">not paid</span>}</Field>
+          <Field label="Balance">{estimate ? money(Math.max(0, estimate - (o.depositPaidAt ? deposit : 0))) : "-"} {paid ? <span className="text-green-400">paid</span> : null}</Field>
           <Field label="Shipping">{paid || o.depositPaidAt ? (o.shippingChargedCents != null ? money(o.shippingChargedCents) : o.localPickup ? "pickup" : "on final invoice") : o.localPickup ? "free pickup" : `~${money(shipEstimate)} est.`}</Field>
         </dl>
-        {o.paymentNote && <p className="mt-3 text-sm text-emerald-300/90">💵 {o.paymentNote}</p>}
+        {/* True per-order margin: goods revenue minus the designer cost you
+            actually paid (record it to replace the estimate). */}
+        {estimate ? (
+          <div className="mt-4">
+            <AdminMargin
+              teamOrderId={o.id}
+              goodsCents={estimate}
+              recordedCostCents={o.designerCostCents ?? null}
+              estimatedCostCents={estimatedDesignerCostCents(o, roster)}
+            />
+          </div>
+        ) : null}
+        {o.paymentNote && <p className="mt-3 text-sm text-emerald-300/90">{o.paymentNote}</p>}
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          {!paid && !o.depositPaidAt && estimate ? (
-            <AdminInvoiceButton teamOrderId={o.id} teamName={o.teamName} dueCents={deposit} stage="deposit" resend={Boolean(o.invoiceUrl)} warnPrintFile={false} />
-          ) : null}
-          {!paid && o.depositPaidAt && estimate ? (
-            <AdminInvoiceButton teamOrderId={o.id} teamName={o.teamName} dueCents={estimate - deposit} stage="balance" resend={Boolean(o.balanceInvoiceUrl)} localPickup={o.localPickup} />
-          ) : null}
-          {!paid && <AdminRecordPayment teamOrderId={o.id} teamName={o.teamName} depositPaid={Boolean(o.depositPaidAt)} suggestedDepositCents={estimate ? deposit : null} />}
+          {/* The primary invoice/payment action for this stage lives in the
+              Next step banner above. Secondary here: record an offline balance
+              payment, resend the deposit invoice, and view the invoice/receipt. */}
+          {!paid && o.depositPaidAt && estimate && (
+            <AdminRecordPayment teamOrderId={o.id} teamName={o.teamName} depositPaid suggestedDepositCents={deposit} />
+          )}
+          {!paid && !o.depositPaidAt && o.invoiceUrl && estimate && (
+            <AdminInvoiceButton teamOrderId={o.id} teamName={o.teamName} dueCents={deposit} stage="deposit" resend warnPrintFile={false} />
+          )}
           {(o.invoiceUrl || estimate) && (
             <a href={`/api/admin/team-order/invoice-view?id=${o.id}`} target="_blank" rel="noopener noreferrer" className="text-sm display text-muted border border-line px-3 py-1.5 hover:border-brand/50 hover:text-foreground">
               {paid ? "View receipt" : "View invoice"}
@@ -286,7 +357,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
           )}
           {roster.some((r) => Object.entries(r.sizes ?? {}).some(([k, v]) => (k === "fitted_hat" || k === "snapback_hat") && (v ?? "").trim())) && (
             <a href={`/admin/team-order/${o.id}/hat-sheet`} target="_blank" rel="noopener noreferrer" className="text-sm display text-muted border border-line px-3 py-1.5 hover:border-brand/50 hover:text-foreground">
-              🧢 Hat sheet
+              Hat sheet
             </a>
           )}
         </div>
@@ -298,6 +369,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
             <AdminCustomPrice teamOrderId={o.id} currentCents={o.customJerseyCents} />
             <AdminLocalToggle teamOrderId={o.id} local={o.localPricing} />
             <AdminTaxToggle teamOrderId={o.id} exempt={o.taxExempt} />
+            <AdminWhiteLabel teamOrderId={o.id} whiteLabel={o.whiteLabel} />
             <AdminRushToggle teamOrderId={o.id} rush={o.rushShipping} />
             {roster.some((r) => Object.entries(r.sizes ?? {}).some(([k, v]) => (k === "fitted_hat" || k === "snapback_hat") && (v ?? "").trim())) && (
               <AdminEmbroideryToggle teamOrderId={o.id} waived={o.embroideryFeeWaived} />
@@ -322,7 +394,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
               <Field label="Design">
                 {design ? (
                   <a href={`/design/manage/${design.manageToken}`} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
-                    {design.teamName} ({design.reference}) ↗
+                    {design.teamName} ({design.reference}) 
                   </a>
                 ) : (
                   "Not linked to a design"
@@ -330,7 +402,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
               </Field>
               <Field label="Print-file QA">
                 {jerseys.length === 0 ? "No printable jerseys" : verified === jerseys.length ? (
-                  <span className="text-green-400">✓ All {jerseys.length} jerseys verified</span>
+                  <span className="text-green-400">All {jerseys.length} jerseys verified</span>
                 ) : (
                   <span className="text-amber-300">{verified} of {jerseys.length} jerseys verified</span>
                 )}
@@ -338,7 +410,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
             </dl>
             {siblingPrintOrders.length > 0 && (
               <div className="border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
-                <p className="display text-amber-300">🧢 Same design, other orders that also need print-file QA</p>
+                <p className="display text-amber-300">Same design, other orders that also need print-file QA</p>
                 <p className="text-xs text-muted mt-0.5">This team&apos;s pieces are split across more than one order (e.g. coaches ordered separately). Verify each one so nothing on the shared print sheet gets missed.</p>
                 <ul className="mt-2 space-y-1">
                   {siblingPrintOrders.map((s) => (
@@ -347,14 +419,14 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
                         <span className="font-mono text-xs">{s.reference}</span> · {s.label}
                       </a>
                       <span className={s.verified === s.total ? "text-green-400 text-xs" : "text-amber-300 text-xs"}>
-                        {s.verified === s.total ? `✓ all ${s.total} verified` : `${s.verified}/${s.total} verified`}
+                        {s.verified === s.total ? `all ${s.total} verified` : `${s.verified}/${s.total} verified`}
                       </span>
                     </li>
                   ))}
                 </ul>
               </div>
             )}
-            {o.designerNote && <p className="text-sm text-muted border-l-2 border-brand/60 pl-3">📝 {o.designerNote}</p>}
+            {o.designerNote && <p className="text-sm text-muted border-l-2 border-brand/60 pl-3">{o.designerNote}</p>}
             <div className="flex flex-wrap items-center gap-2">
               <AdminDesignerNote teamOrderId={o.id} current={o.designerNote} />
               {!o.designRequestId && <AdminLinkDesign teamOrderId={o.id} designs={activeDesigns} />}
@@ -391,20 +463,23 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
             )}
           </Field>
           <Field label="Est. weight">{weightOz > 0 ? `${(weightOz / 16).toFixed(1)} lb${twoBoxes ? " · 2 boxes (hats ship separately)" : ""}` : "-"}</Field>
-          <Field label="Shipped">{o.shippedAt ? `✓ ${fmtDate(o.shippedAt)}` : "not yet"}</Field>
+          <Field label="Shipped">{o.shippedAt ? `${fmtDate(o.shippedAt)}` : "not yet"}</Field>
         </dl>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {!o.balanceInvoiceUrl && !paid && <AdminPickupToggle teamOrderId={o.id} pickup={o.localPickup} />}
-          {(paid || o.depositPaidAt) && !o.shippedAt && !o.trackingNumber && <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} />}
-          {paid && !o.shippedAt && o.trackingNumber && (
-            <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="🚚 Mark shipped + email customer" />
+          {/* One ship flow: the primary Buy label + Mark shipped for a paid order
+              live in the Next step banner. The same label button stays here for
+              production-stage (deposit paid) pickup-first orders. After a label
+              exists, Schedule pickup appears below - label, then pickup. */}
+          {o.depositPaidAt && !paid && !o.shippedAt && !o.trackingNumber && (
+            <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} suggestedLb={Math.max(1, Math.round(((parcels.apparelOz || parcels.hatOz) / 16) * 10) / 10)} />
           )}
           {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
           {/* Once a primary label exists, allow buying MORE parcels - a second
               box, a reship, or the hats going out separately. Each one emails
               the customer its tracking right away. */}
           {paid && o.trackingNumber && (
-            <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} additional label="🏷 Buy another label + email" />
+            <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} additional suggestedLb={twoBoxes ? Math.max(1, Math.round((parcels.hatOz / 16) * 10) / 10) : undefined} label="Buy another label + email" />
           )}
           {(o.shipTransactionId || (o.additionalShipments ?? []).some((s) => s.transactionId)) && (
             <AdminPickupButton kind="team_order" id={o.id} />
@@ -418,7 +493,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
                 <li key={i} className="flex flex-wrap items-center gap-2 text-sm">
                   <span className="text-muted">#{i + 2}</span>
                   <TrackingInfo trackingNumber={s.trackingNumber} labelUrl={s.labelUrl ?? null} />
-                  <span className="text-xs text-muted">{fmtDate(s.at)} · customer emailed ✓</span>
+                  <span className="text-xs text-muted">{fmtDate(s.at)} · customer emailed </span>
                 </li>
               ))}
             </ul>

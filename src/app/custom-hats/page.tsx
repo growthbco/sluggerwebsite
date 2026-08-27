@@ -2,17 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { byCategory, primaryImage } from "@/lib/catalog";
+import { ExpandableImage } from "@/components/expandable-image";
 
 export const metadata: Metadata = {
   // Keep the pre-template title under ~45 chars: the layout appends
   // "| Slugger Athletics" and Google truncates around 60.
   title: "Custom Embroidered Hats - In-House in Ocala",
   description:
-    "Custom embroidered hats from $25 - Flexfit caps, snapbacks, and truckers stitched in-house in Ocala for quick turnaround. 6-hat minimum per design.",
+    "Custom embroidered hats from $30 - Flexfit caps, snapbacks, and truckers stitched in-house in Ocala for quick turnaround. 6-hat minimum per design.",
   openGraph: {
     title: "Custom Embroidered Hats - In-House in Ocala",
     description:
-      "Fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo - from $25, stitched in-house for fast turnaround.",
+      "Fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo - from $30, stitched in-house for fast turnaround.",
     type: "website",
     url: "/custom-hats",
   },
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Custom Embroidered Hats - In-House in Ocala",
     description:
-      "Fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo - from $25, stitched in-house for fast turnaround.",
+      "Fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo - from $30, stitched in-house for fast turnaround.",
   },
   keywords: [
     "custom embroidered hats",
@@ -36,7 +37,7 @@ export const metadata: Metadata = {
 };
 
 // Styles come straight from the real price list (src/lib/pricing.ts): fitted
-// Flexfit $30 XS-XXL, snapback trucker $25 OSFM, +$5 embroidered back number.
+// Flexfit $30 XS-XXL, snapback/trucker $30 OSFM, performance $38, +$5 embroidered back number.
 const STYLES = [
   {
     t: "Custom Fitted Hats",
@@ -44,13 +45,18 @@ const STYLES = [
     d: "Cap America and Pacific Headwear performance caps with Flexfit stretch. True fitted feel in sizes XS through XXL, embroidered with your logo front and center.",
   },
   {
+    t: "Performance Caps",
+    price: "$38",
+    d: "Our premium cap: a moisture-wicking, water-resistant performance shell that sheds rain and pulls sweat away. Built for game day in any weather. One size fits most, in limited colors - black, white, and gray.",
+  },
+  {
     t: "Custom Snapback Hats",
-    price: "$25",
+    price: "$30",
     d: "Premium trucker-style snapbacks with a structured front panel and breathable mesh back. One size fits most - perfect for teams, fans, and businesses.",
   },
   {
     t: "Custom Trucker Hats",
-    price: "$25",
+    price: "$30",
     d: "Classic mesh-back truckers embroidered with your design. Great for leagues, tournaments, and giveaways where everyone wants one look.",
   },
   {
@@ -63,11 +69,11 @@ const STYLES = [
 const FAQS = [
   {
     q: "Is there a minimum order for custom embroidered hats?",
-    a: "Custom embroidered hats start at 6 hats per design - same as the rest of our custom gear, since every design takes real digitizing and setup. The price stays a flat $25-30 per hat whether you order 6 or 60.",
+    a: "Custom embroidered hats start at 6 hats per design - same as the rest of our custom gear, since every design takes real digitizing and setup. The price stays flat per hat whether you order 6 or 60.",
   },
   {
     q: "How much do custom embroidered hats cost?",
-    a: "Snapback and trucker hats are $25, fitted Flexfit hats are $30, and an embroidered number on the back adds $5. Mockups are free; a one-time digitizing fee applies if we create the embroidery file from your logo - bring your own stitch file and there is no fee.",
+    a: "Fitted Flexfit caps, snapbacks, and trucker hats are $30, and our water-resistant performance caps are $38. An embroidered number on the back adds $5. Mockups are free; a one-time digitizing fee applies if we create the embroidery file from your logo - bring your own stitch file and there is no fee.",
   },
   {
     q: "Do you charge a digitizing or setup fee?",
@@ -106,8 +112,8 @@ export default function CustomHatsPage() {
       brand: { "@type": "Brand", name: "Slugger Athletics" },
       offers: {
         "@type": "AggregateOffer",
-        lowPrice: "25.00",
-        highPrice: "30.00",
+        lowPrice: "30.00",
+        highPrice: "38.00",
         priceCurrency: "USD",
         availability: "https://schema.org/InStock",
         seller: { "@type": "LocalBusiness", name: "Slugger Athletics" },
@@ -130,13 +136,13 @@ export default function CustomHatsPage() {
 
       {/* Hero */}
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-16 text-center">
-        <span className="display text-brand text-sm">Stitched In-House · Free Mockups · From $25</span>
+        <span className="display text-brand text-sm">Stitched In-House · Free Mockups · From $30</span>
         <h1 className="display text-4xl sm:text-6xl text-foreground mt-2">
           Custom Embroidered Hats
         </h1>
         <p className="mt-5 text-lg text-muted max-w-2xl mx-auto">
           Fitted Flexfit caps, snapbacks, and trucker hats embroidered with your logo - flat
-          pricing at <strong className="text-foreground">$25-30 per hat</strong> with a{" "}
+          pricing at <strong className="text-foreground">$30-38 per hat</strong> with a{" "}
           <strong className="text-foreground">6-hat minimum per design</strong>. Your mockup is
           free. If we create the stitch-ready embroidery file from your logo there is a one-time
           digitizing fee - or bring your own embroidery file and skip it. Every hat is embroidered
@@ -187,9 +193,9 @@ export default function CustomHatsPage() {
           </p>
           <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
             {manualHats.map((m) => (
-              <div key={m.src} className="bg-white p-3 border border-line group">
+              <div key={m.src} className="bg-white p-3 border border-line">
                 <div className="relative aspect-square">
-                  <Image src={m.src} alt={m.alt} fill sizes="25vw" className="object-contain p-2 transition-transform group-hover:scale-105" unoptimized />
+                  <ExpandableImage src={m.src} alt={m.alt} imgClassName="object-contain p-2" sizes="25vw" unoptimized />
                 </div>
               </div>
             ))}
@@ -255,8 +261,10 @@ export default function CustomHatsPage() {
           <h2 className="display text-3xl sm:text-4xl text-foreground">Hats for Teams, Businesses & Fans</h2>
           <p className="mt-4 text-muted max-w-2xl mx-auto">
             We embroider baseball and softball team hats with matching player numbers, business
-            caps with your company logo, and one-off personalized hats for fans and gifts. Hats
-            pair perfectly with our{" "}
+            caps with your company logo, and one-off personalized hats for fans and gifts. For
+            colder days, check out our{" "}
+            <Link href="/custom-beanies" className="text-brand hover:underline">custom beanies</Link>{" "}
+            too. Hats pair perfectly with our{" "}
             <Link href="/team-uniforms" className="text-brand hover:underline">custom team uniforms</Link> -
             one order, one look, head to toe. Local to Central Florida? We also offer full{" "}
             <Link href="/embroidery" className="text-brand hover:underline">custom embroidery in Ocala, FL</Link>{" "}

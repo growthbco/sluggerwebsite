@@ -11,13 +11,16 @@ export const PRICE_LIST: PriceGroup[] = [
   {
     group: "Jerseys & Shirts",
     rows: [
-      { item: "Round-Neck Jersey (any sport)", priceCents: 2800, note: "Baseball, softball, soccer, pickleball & more - dry-fit included" },
-      { item: "Dry-Fit Practice Jersey", priceCents: 2000, note: "Quality performance dry-fit with your team print - practice sets, coaches, parents & fans" },
+      { item: "Round-Neck Jersey (any sport)", priceCents: 2800, note: "Baseball, softball, soccer, pickleball & more - your choice of mesh or dry-fit material" },
+      { item: "Dry-Fit Practice Jersey", priceCents: 2000, note: "Lightweight practice-weight shirt (not a game jersey) - practice sets, coaches, parents & fans" },
       { item: "Long-Sleeve Shirt", priceCents: 3200 },
       { item: "Two-Button Jersey", priceCents: 3200 },
       { item: "Full-Button Jersey", priceCents: 3500 },
+      { item: "Bowling Shirt (full-button)", priceCents: 4200, note: "Camp-collar / full-button bowling shirt in premium microfiber. Crew-cut bowling shirts start at $28." },
       { item: "Quarter-Zip Jersey", priceCents: 3800, note: "Premium quarter-zip pullover in full custom sublimation" },
       { item: "Reversible Basketball Uniform", priceCents: 8500, note: "Two looks in one - home & away" },
+      { item: "Hockey Jersey", priceCents: 5500, note: "Fully sublimated ice-hockey jersey (sweater) - standard or lace-up collar" },
+      { item: "Cheer Uniform (Set)", priceCents: 12000, note: "Simple sublimated cheer set; rhinestone sets are $175. Same price youth to adult. Accessories: crop top $48, brief $35, pom-poms $40, bow $25, socks $20, team bag $90" },
     ],
   },
   {
@@ -32,7 +35,8 @@ export const PRICE_LIST: PriceGroup[] = [
     group: "Headwear",
     rows: [
       { item: "Fitted Hat", priceCents: 3000, note: "Cap America / Pacific Headwear performance cap with Flexfit, XS-XXL - add a number on the back for $5" },
-      { item: "Snapback Hat", priceCents: 2500, note: "Cap America / Pacific Headwear premium trucker, one size fits most - add a number on the back for $5" },
+      { item: "Snapback Hat", priceCents: 3000, note: "Cap America / Pacific Headwear premium trucker, one size fits most - add a number on the back for $5" },
+      { item: "Performance Cap", priceCents: 3800, note: "Water-resistant, moisture-wicking performance shell, one size fits most, limited colors (black, white, gray) - add a number on the back for $5" },
     ],
   },
   {
@@ -86,7 +90,7 @@ export const BUNDLES: Bundle[] = [
 ];
 
 export const BUNDLE_UPGRADE_NOTE =
-  "Bundle prices are estimated for crew-style (over-the-head) jerseys with a snapback hat. Button styles add the usual difference per jersey - two-button add $4, full-button add $7, quarter-zip add $10 - and a fitted hat instead of a snapback adds $5.";
+  "Bundle prices are estimated for crew-style (over-the-head) jerseys with a snapback hat. Button styles add the usual difference per jersey - two-button add $4, full-button add $7, quarter-zip add $10 - and a water-resistant performance cap instead of a snapback adds $8.";
 
 export function formatDollars(cents: number) {
   return `$${(cents / 100).toFixed(0)}`;

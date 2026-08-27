@@ -50,6 +50,9 @@ const initials = (name: string | null, phone: string) =>
 export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: string; initialName?: string } = {}) {
   const [convos, setConvos] = useState<Conversation[]>([]);
   const [active, setActive] = useState<string | null>(null);
+  // Mobile is master-detail: the list OR the open thread, never both cramped
+  // onto one screen. Desktop (lg+) shows them side by side regardless.
+  const [mobileView, setMobileView] = useState<"list" | "thread">("list");
   const [messages, setMessages] = useState<Message[]>([]);
   const [context, setContext] = useState<Context | null>(null);
   const [draft, setDraft] = useState("");
@@ -103,7 +106,7 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
   }
 
   // Attach images to an outgoing MMS: upload each to our public Blob store,
-  // then send with the message. Drag/drop, paste, or the 📎 button all feed
+  // then send with the message. Drag/drop, paste, or the button all feed
   // this. Notes stay text-only (nothing goes to the customer).
   async function uploadImages(files: FileList | File[]) {
     if (mode === "note") { setError("Switch to SMS or WhatsApp to attach an image."); return; }
@@ -226,6 +229,7 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
     loadThread(active);
     loadContext(active);
     setEditingName(false);
+    setMobileView("thread");
     setState(active, { markRead: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
@@ -292,7 +296,7 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
       key={f}
       type="button"
       onClick={() => setFilter(f)}
-      className={`text-xs display px-2.5 py-1 border ${filter === f ? "bg-brand text-on-brand border-brand" : "border-line text-muted hover:text-foreground hover:border-brand/40"}`}
+      className={`text-xs display px-3 min-h-[44px] lg:min-h-0 py-1 inline-flex items-center border ${filter === f ? "bg-brand text-on-brand border-brand" : "border-line text-muted hover:text-foreground hover:border-brand/40"}`}
     >
       {label}
     </button>
@@ -306,9 +310,9 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
   };
 
   return (
-    <div className="grid lg:grid-cols-[19rem_1fr] xl:grid-cols-[19rem_1fr_17rem] gap-4 min-h-[34rem]">
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[19rem_1fr] xl:grid-cols-[19rem_1fr_17rem] lg:min-h-[34rem]">
       {/* ── Conversations ─────────────────────────────────────────── */}
-      <aside className="bg-steel border border-line flex flex-col max-h-[42rem]">
+      <aside className={`bg-steel border border-line flex-col w-full min-w-0 overflow-hidden h-[68dvh] lg:h-auto lg:max-h-[42rem] ${mobileView === "thread" ? "hidden lg:flex" : "flex"}`}>
         <div className="p-3 border-b border-line space-y-2">
           <div className="flex gap-2">
             <input
@@ -319,7 +323,7 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
             />
             <button
               type="button"
-              onClick={() => { setActive(null); setMessages([]); setContext(null); }}
+              onClick={() => { setActive(null); setMessages([]); setContext(null); setMobileView("thread"); }}
               title="New text"
               className={`display text-lg leading-none px-3 border ${active === null ? "bg-brand text-on-brand border-brand" : "border-line text-muted hover:text-foreground"}`}
             >
@@ -333,27 +337,26 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
             {chip("archived", "Archived")}
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {visible.length === 0 && (
             <p className="px-4 py-6 text-sm text-muted">
               {convos.length === 0 ? "No conversations yet. Texts to (352) 414-7270 land here." : "Nothing matches this view."}
             </p>
           )}
           {visible.map((c) => (
-            <div key={c.phone} className={`flex items-stretch border-b border-line ${active === c.phone ? "bg-brand/10" : "hover:bg-background/40"}`}>
+            <div key={c.phone} className={`flex items-stretch border-b border-line min-w-0 ${active === c.phone ? "bg-brand/10" : "hover:bg-background/40"}`}>
               <button type="button" onClick={() => setActive(c.phone)} className="flex-1 min-w-0 text-left px-3 py-3">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className={`text-sm truncate ${c.unread ? "text-foreground font-bold" : "text-foreground"}`}>
+                <div className="flex items-baseline justify-between gap-2 min-w-0">
+                  <span className={`min-w-0 truncate text-sm ${c.unread ? "text-foreground font-bold" : "text-foreground"}`}>
                     {c.unread && <span className="inline-block h-2 w-2 rounded-full bg-brand mr-1.5 align-middle" />}
                     {c.name ?? prettyPhone(c.phone)}
                   </span>
-                  <span className="text-[10px] text-muted whitespace-nowrap">{fmt(c.lastAt)}</span>
+                  <span className="shrink-0 text-[10px] text-muted whitespace-nowrap">{fmt(c.lastAt)}</span>
                 </div>
-                {c.name && <div className="text-xs text-muted">{prettyPhone(c.phone)}</div>}
+                {c.name && <div className="text-xs text-muted truncate">{prettyPhone(c.phone)}</div>}
                 {c.last && (
                   <div className={`mt-0.5 text-xs truncate ${c.unread ? "text-foreground/90" : "text-muted"}`}>
-                    {c.last.direction === "out" ? "You: " : c.last.direction === "note" ? "📝 " : ""}
-                    {c.last.channel === "whatsapp" ? "🟢 " : ""}
+                    {c.last.direction === "out" ? "You: " : ""}
                     {c.last.body}
                   </div>
                 )}
@@ -362,7 +365,7 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
                 type="button"
                 onClick={() => setState(c.phone, { star: !c.starred })}
                 title={c.starred ? "Unstar" : "Star"}
-                className={`px-3 py-2 text-base leading-none ${c.starred ? "text-brand" : "text-line hover:text-muted"}`}
+                className={`shrink-0 min-w-[44px] flex items-center justify-center text-lg leading-none ${c.starred ? "text-brand" : "text-line hover:text-muted"}`}
               >
                 ★
               </button>
@@ -372,8 +375,26 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
       </aside>
 
       {/* ── Thread ────────────────────────────────────────────────── */}
-      <section className="bg-steel border border-line flex flex-col max-h-[42rem]">
-        <div className="px-4 py-3 border-b border-line flex flex-wrap items-center gap-3">
+      <section className={`bg-steel border border-line flex-col w-full min-w-0 h-[68dvh] lg:h-auto lg:max-h-[42rem] ${mobileView === "list" ? "hidden lg:flex" : "flex"}`}>
+        <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-line flex flex-wrap items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={() => setMobileView("list")}
+            className="lg:hidden display text-sm text-foreground border border-line px-3 min-h-[44px] inline-flex items-center hover:border-brand/50"
+            aria-label="Back to conversations"
+          >
+            ‹ Inbox
+          </button>
+          {active && (
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("slugger-dial", { detail: { phone: active } }))}
+              className="lg:hidden display text-sm text-brand border border-brand/50 px-3 min-h-[44px] inline-flex items-center gap-1.5 hover:bg-brand/10"
+              aria-label="Call this contact"
+            >
+              📞 Call
+            </button>
+          )}
           {active ? (
             editingName ? (
               <span className="flex items-center gap-2 flex-1 min-w-[14rem]">
@@ -461,7 +482,7 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
                 title={activeConvo.archived ? "Unarchive" : "Archive"}
                 className="text-xs display text-muted border border-line px-2 py-1 hover:border-brand/40 hover:text-foreground"
               >
-                {activeConvo.archived ? "Unarchive" : "🗄 Archive"}
+                {activeConvo.archived ? "Unarchive" : "Archive"}
               </button>
             </span>
           )}
@@ -474,7 +495,7 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
             m.direction === "note" ? (
               <div key={m.id} className="mx-auto max-w-[90%] text-center">
                 <div className="inline-block px-3 py-1.5 text-xs text-amber-200/90 bg-amber-500/10 border border-amber-500/30 rounded whitespace-pre-wrap break-words">
-                  📝 {m.body}
+                  {m.body}
                 </div>
                 <div className="mt-0.5 text-[10px] text-muted">Internal note · {fmt(m.createdAt)}</div>
               </div>
@@ -485,14 +506,14 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
                   {m.mediaUrls && m.mediaUrls.length > 0 && (
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {m.mediaUrls.map((u, j) => (
-                        <a key={j} href={u} target="_blank" rel="noopener noreferrer" className="block">
-                          <Image src={u} alt="attachment" width={140} height={140} unoptimized className="max-h-40 w-auto rounded border border-black/10 object-cover" />
+                        <a key={j} href={u} target="_blank" rel="noopener noreferrer" title="Tap to open full size" className="block">
+                          <Image src={u} alt="attachment" width={240} height={240} unoptimized className="w-40 sm:w-32 h-40 sm:h-32 rounded border border-black/10 object-cover" />
                         </a>
                       ))}
                     </div>
                   )}
                   {m.mediaCount > 0 && (!m.mediaUrls || m.mediaUrls.length === 0) && (
-                    <div className="text-xs opacity-70 mt-1">📎 {m.mediaCount} attachment{m.mediaCount === 1 ? "" : "s"}</div>
+                    <div className="text-xs opacity-70 mt-1">{m.mediaCount} attachment{m.mediaCount === 1 ? "" : "s"}</div>
                   )}
                 </div>
                 <div className={`mt-0.5 text-[10px] text-muted ${m.direction === "out" ? "text-right" : ""}`}>
@@ -505,14 +526,14 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
 
         <div className="p-3 border-t border-line">
           {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
-          <div className="mb-2 flex items-center gap-1.5 text-xs">
+          <div className="mb-2 flex flex-wrap items-center gap-1.5 text-xs">
             <span className="text-muted display mr-1">Send via:</span>
-            {([["sms", "SMS"], ["whatsapp", "WhatsApp"], ["note", "📝 Note"]] as const).map(([m, label]) => (
+            {([["sms", "SMS"], ["whatsapp", "WhatsApp"], ["note", "Note"]] as const).map(([m, label]) => (
               <button
                 key={m}
                 type="button"
                 onClick={() => setMode(m)}
-                className={`display px-2.5 py-1 border ${mode === m ? (m === "note" ? "bg-amber-500/20 border-amber-500/50 text-amber-200" : "bg-brand text-on-brand border-brand") : "border-line text-muted hover:text-foreground"}`}
+                className={`display px-3 py-2 lg:py-1 inline-flex items-center border ${mode === m ? (m === "note" ? "bg-amber-500/20 border-amber-500/50 text-amber-200" : "bg-brand text-on-brand border-brand") : "border-line text-muted hover:text-foreground"}`}
               >
                 {label}
               </button>
@@ -524,9 +545,9 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
                 onClick={draftReply}
                 disabled={drafting}
                 title="AI reads this conversation and the customer's orders, then drafts a reply for you to edit"
-                className="ml-auto display px-2.5 py-1 border border-brand/50 text-brand hover:bg-brand/10 disabled:opacity-50"
+                className="ml-auto display px-3 py-2 lg:py-1 inline-flex items-center border border-brand/50 text-brand hover:bg-brand/10 disabled:opacity-50"
               >
-                {drafting ? "Drafting…" : "✨ Draft reply"}
+                {drafting ? "Drafting…" : "Draft reply"}
               </button>
             )}
           </div>
@@ -546,7 +567,7 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
               {uploading && <span className="h-14 w-14 grid place-items-center text-xs text-muted border border-line rounded">…</span>}
             </div>
           )}
-          <DropZone onFiles={uploadImages} disabled={uploading || mode === "note"} className="flex gap-2 rounded">
+          <DropZone onFiles={uploadImages} disabled={uploading || mode === "note"} className="flex flex-col lg:flex-row gap-2 rounded">
             <textarea
               ref={composerRef}
               value={draft}
@@ -557,14 +578,14 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
                 if (imgs.length) { e.preventDefault(); uploadImages(imgs); }
               }}
               rows={2}
-              placeholder={mode === "note" ? "Internal note… (Enter to save)" : "Type a message, or drop/paste an image… (Enter to send)"}
-              className="flex-1 min-h-[2.75rem] bg-background border border-line px-3 py-2 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none resize-y overflow-y-auto"
+              placeholder={mode === "note" ? "Internal note…" : "Type a message…"}
+              className="flex-1 w-full min-w-0 min-h-[44px] bg-background border border-line px-3 py-2 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none resize-y overflow-y-auto"
             />
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-row lg:flex-col gap-2">
               {mode !== "note" && (
                 <label
                   title="Attach an image (MMS)"
-                  className={`grid place-items-center border border-line px-3 py-2 text-base cursor-pointer hover:border-brand/50 ${uploading ? "opacity-50" : ""}`}
+                  className={`grid place-items-center border border-line min-h-[44px] px-4 text-base cursor-pointer hover:border-brand/50 ${uploading ? "opacity-50" : ""}`}
                 >
                   <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files) uploadImages(e.target.files); e.target.value = ""; }} />
                   📎
@@ -574,7 +595,7 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
                 type="button"
                 onClick={send}
                 disabled={busy || uploading || (!draft.trim() && pendingImages.length === 0) || (!active && !newPhone.trim())}
-                className="flex-1 clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-5 disabled:opacity-50"
+                className="flex-1 min-h-[44px] clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-5 disabled:opacity-50"
               >
                 {busy ? "…" : mode === "note" ? "Save" : "Send"}
               </button>
@@ -600,7 +621,7 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
                 onClick={() => window.dispatchEvent(new CustomEvent("slugger-dial", { detail: { phone: active } }))}
                 className="mt-2 text-xs display border border-brand/50 text-brand px-3 py-1 hover:bg-brand/10"
               >
-                📞 Call
+                Call
               </button>
               {context?.emails.map((e) => (
                 <p key={e} className="text-xs text-muted truncate"><a href={`mailto:${e}`} className="hover:text-foreground">{e}</a></p>
@@ -628,7 +649,7 @@ export function AdminTextsInbox({ initialPhone, initialName }: { initialPhone?: 
                           </div>
                           <div className="text-[11px] text-muted">
                             {o.reference} · {STATUS_LABEL[o.status] ?? o.status}
-                            {o.paid ? " · paid ✓" : o.depositPaid ? " · deposit ✓" : ""}
+                            {o.paid ? " · paid " : o.depositPaid ? " · deposit " : ""}
                           </div>
                         </Link>
                       ))}

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { AdminPageHeader } from "@/components/admin-page-header";
 import { redirect } from "next/navigation";
 import { adminEnabled, getAdminSession } from "@/lib/admin-auth";
 import { AdminUsersPanel } from "@/components/admin-users-panel";
@@ -16,8 +16,7 @@ export default async function AdminSettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
-      <Link href="/admin" className="text-sm text-muted hover:text-foreground">← Dashboard</Link>
-      <h1 className="display text-4xl text-foreground mt-3">⚙️ Settings</h1>
+      <AdminPageHeader eyebrow="Settings" title="Users & Settings" />
       <p className="mt-2 text-muted">
         Give each person their own login and role. Designers see design work only - no money, customer,
         or store pages.

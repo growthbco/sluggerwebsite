@@ -14,6 +14,7 @@ type Props = {
   proofImages: string[];
   proofLabels?: Record<string, string>;
   initialApprovedUrl: string | null;
+  approvedUrls?: string[];
   teamOrderUrl: string;
   revisionsUsed: number;
   maxRevisions: number;
@@ -37,6 +38,7 @@ export function DesignStatusPanel({
   proofImages,
   proofLabels = {},
   initialApprovedUrl,
+  approvedUrls = [],
   teamOrderUrl,
   revisionsUsed,
   maxRevisions,
@@ -66,6 +68,12 @@ export function DesignStatusPanel({
 
   const copy = STATUS_COPY[currentStatus] ?? { label: currentStatus, blurb: "" };
   const isApproved = currentStatus === "approved" || currentStatus === "ordered";
+  // When the roster lives on this same page (the unified hub passes a "#roster"
+  // anchor), the post-approval CTA scrolls down instead of sending them to a
+  // separate team-order form.
+  const rosterInline = teamOrderUrl.startsWith("#");
+  // Which design(s) the client approved, to show on the approved screen.
+  const approvedShown = approvedUrls.length ? approvedUrls : initialApprovedUrl ? [initialApprovedUrl] : [];
   const hasProof = proofImages.length > 0;
   const revisionsLeft = Math.max(0, maxRevisions - used);
   const maxedOut = revisionsLeft === 0;
@@ -90,6 +98,12 @@ export function DesignStatusPanel({
       if (!res.ok) throw new Error(data.error || "Could not approve");
       setCurrentStatus("approved");
       setConfirming(false);
+      // Reveal the next stage (roster & sizes) on this SAME page - the server
+      // renders it once the order is provisioned, so reload to bring it in.
+      if (rosterInline && typeof window !== "undefined") {
+        window.location.reload();
+        return;
+      }
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
@@ -210,12 +224,30 @@ export function DesignStatusPanel({
         <section className="bg-steel border border-line p-6 text-center">
           <div className="mx-auto h-12 w-12 grid place-items-center clip-slant bg-brand text-on-brand display text-xl">✓</div>
           <h2 className="display text-2xl text-foreground mt-4">Design approved!</h2>
-          <p className="mt-2 text-muted">Next step: submit your team order. Your approved design and contact details are already attached.</p>
+          {approvedShown.length > 0 && (
+            <>
+              <p className="mt-4 text-xs display uppercase tracking-wide text-muted">
+                {approvedShown.length === 1 ? "Your approved design" : `Your ${approvedShown.length} approved designs`}
+              </p>
+              <div className={`mt-2 grid gap-3 ${approvedShown.length === 1 ? "grid-cols-1 max-w-md mx-auto" : "grid-cols-1 sm:grid-cols-2"}`}>
+                {approvedShown.map((u) => (
+                  <button key={u} type="button" onClick={() => setExpanded(u)} className="relative block aspect-[4/3] bg-white border-2 border-brand rounded overflow-hidden cursor-zoom-in">
+                    <Image src={u} alt="Approved design" fill unoptimized className="object-contain" />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          <p className="mt-4 text-muted">
+            {rosterInline
+              ? "Next step: fill out your roster and sizes below. Your design and contact details are already attached."
+              : "Next step: submit your team order. Your approved design and contact details are already attached."}
+          </p>
           <Link
             href={teamOrderUrl}
             className="inline-block mt-6 clip-slant bg-brand text-on-brand display text-lg px-8 py-4 hover:bg-brand-dark transition-colors"
           >
-            Submit Your Team Order →
+            {rosterInline ? "Fill out your roster ↓" : "Submit Your Team Order →"}
           </Link>
         </section>
       ) : hasProof ? (

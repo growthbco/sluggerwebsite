@@ -1,0 +1,1 @@
+ALTER TABLE "designer_invoices" ADD COLUMN "view_token" text;

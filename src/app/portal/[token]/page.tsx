@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { readPortalToken, getCustomerOrders } from "@/lib/portal";
-import { trackingUrlFor } from "@/lib/tracking";
-import { PortalAccount } from "@/components/portal-account";
+import { readPortalToken, getCustomerOrdersCached, type PortalData } from "@/lib/portal";
+import { carrierFor, trackingUrlFor } from "@/lib/tracking";
+import { PortalOrderList, type OrderRow } from "@/components/portal-order-list";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,149 +12,109 @@ const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 const titleCase = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 const shortDate = (d: Date) => new Date(d).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" });
 
-function Receipt({ items, subtotalCents, shippingCents, totalCents }: { items: { name: string; quantity: number; unitPriceCents: number }[]; subtotalCents: number; shippingCents: number; totalCents: number }) {
-  if (!items.length) return null;
-  return (
-    <details className="mt-3 border-t border-line pt-3 group/receipt">
-      <summary className="flex cursor-pointer items-center justify-between list-none text-sm text-brand">
-        <span className="underline underline-offset-2">View receipt</span>
-        <span className="transition-transform group-open/receipt:rotate-45">+</span>
-      </summary>
-      <table className="mt-3 w-full text-sm">
-        <tbody>
-          {items.map((it, i) => (
-            <tr key={i} className="text-muted">
-              <td className="py-1 pr-2">{it.name}</td>
-              <td className="py-1 px-2 text-right whitespace-nowrap">{it.quantity} &times; {money(it.unitPriceCents)}</td>
-              <td className="py-1 pl-2 text-right whitespace-nowrap text-foreground">{money(it.quantity * it.unitPriceCents)}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot className="border-t border-line">
-          <tr className="text-muted"><td className="pt-2" colSpan={2}>Subtotal</td><td className="pt-2 text-right">{money(subtotalCents)}</td></tr>
-          <tr className="text-muted"><td colSpan={2}>Shipping</td><td className="text-right">{shippingCents ? money(shippingCents) : "Free"}</td></tr>
-          <tr className="display text-foreground"><td className="pt-1" colSpan={2}>Total</td><td className="pt-1 text-right">{money(totalCents)}</td></tr>
-        </tfoot>
-      </table>
-    </details>
-  );
+type TeamOrder = PortalData["teamOrders"][number];
+
+// Outstanding balance = remaining goods + shipping, once a balance invoice is
+// out and the order isn't paid in full.
+function balanceDueCents(o: TeamOrder): number {
+  if (o.invoicePaidAt || !o.depositPaidAt || !o.balanceInvoiceUrl) return 0;
+  const dep = o.depositCents ?? Math.round(o.totalCents / 2);
+  return Math.max(0, o.totalCents - dep) + o.shippingCents;
 }
 
-function Row({ title, sub, status, href, cta, track }: { title: string; sub?: string; status: string; href?: string; cta?: string; track?: string | null }) {
+function statusFor(o: TeamOrder): { label: string; tone: "green" | "amber" | "gold" } {
+  if (o.invoicePaidAt) return { label: "Paid", tone: "green" };
+  if (balanceDueCents(o) > 0) return { label: "Balance due", tone: "amber" };
+  if (o.depositPaidAt) return { label: "In production", tone: "gold" };
+  if (o.status === "quoted") return { label: "Quoted · unpaid", tone: "amber" };
+  if (o.status === "shipped") return { label: "Shipped", tone: "green" };
+  if (o.status === "submitted") return { label: "Awaiting invoice", tone: "amber" };
+  return { label: titleCase(o.status), tone: "gold" };
+}
+
+function Expired() {
   return (
-    <div className="border border-line bg-steel p-4 flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <p className="display text-foreground">{title}</p>
-        {sub && <p className="text-sm text-muted mt-0.5">{sub}</p>}
-        {track && (
-          <a href={trackingUrlFor(track)} target="_blank" rel="noopener noreferrer" className="text-sm text-brand underline underline-offset-2 mt-1 inline-block">
-            Track shipment ({track})
-          </a>
-        )}
-      </div>
-      <div className="flex items-center gap-3">
-        <span className="text-xs display text-brand border border-brand/40 px-2.5 py-1 rounded whitespace-nowrap">{titleCase(status)}</span>
-        {href && cta && (
-          <Link href={href} className="text-sm display text-on-brand bg-brand hover:bg-brand-dark px-4 py-2 rounded whitespace-nowrap">{cta}</Link>
-        )}
-      </div>
+    <div className="mx-auto max-w-xl px-4 sm:px-6 py-20 text-center">
+      <h1 className="display text-3xl text-foreground">This link expired</h1>
+      <p className="mt-3 text-muted">Portal links are valid for a short time for your security. Request a fresh one.</p>
+      <Link href="/portal" className="inline-block mt-6 rounded bg-brand text-on-brand display px-6 py-3 hover:bg-brand-dark">Get a new link</Link>
     </div>
   );
 }
 
-export default async function PortalTokenPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function PortalOrdersPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const email = readPortalToken(token);
+  if (!email) return <Expired />;
 
-  if (!email) {
-    return (
-      <div className="mx-auto max-w-xl px-4 sm:px-6 py-20 text-center">
-        <h1 className="display text-3xl text-foreground">This link expired</h1>
-        <p className="mt-3 text-muted">Portal links are valid for 45 minutes for your security. Request a fresh one.</p>
-        <Link href="/portal" className="inline-block mt-6 rounded bg-brand text-on-brand display px-6 py-3 hover:bg-brand-dark">Get a new link</Link>
-      </div>
-    );
-  }
+  const data = await getCustomerOrdersCached(email);
 
-  const data = await getCustomerOrders(email);
-  const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
-  const referralUrl = `${SITE}/r/${data.profile.referralCode}`;
+  // Needs-your-money first: unpaid deposits and outstanding balances lead.
+  const rank = (o: TeamOrder) => ((!o.depositPaidAt && !o.invoicePaidAt && ["quoted", "submitted"].includes(o.status)) || balanceDueCents(o) > 0 ? 0 : 1);
+  const rows: OrderRow[] = data.teamOrders
+    .filter((o) => o.status !== "cancelled")
+    .sort((a, b) => rank(a) - rank(b) || +new Date(b.createdAt) - +new Date(a.createdAt))
+    .map((o) => {
+      const s = statusFor(o);
+      return {
+        reference: o.reference,
+        teamName: o.teamName.trim(),
+        summary: o.pieceLabel,
+        statusLabel: s.label,
+        statusTone: s.tone,
+        totalCents: o.totalCents + o.shippingCents,
+        dateLabel: o.createdAt ? shortDate(o.createdAt) : "",
+        href: `/portal/${token}/o/${o.reference}`,
+      };
+    });
 
   return (
-    <div className="mx-auto max-w-2xl px-4 sm:px-6 py-14 space-y-8">
-      <header>
-        <span className="display text-brand text-sm">Order Portal</span>
-        <h1 className="display text-3xl sm:text-4xl text-foreground mt-1">{data.name ? `Welcome back, ${data.name.split(" ")[0]}` : "Your Orders"}</h1>
-        <p className="mt-2 text-muted">{email}</p>
-      </header>
-
-      {data.empty && <p className="text-muted">We couldn&apos;t find any orders for this email. If you ordered under a different address, request a link with that one.</p>}
-
-      {data.teamOrders.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="display text-xl text-foreground">Team Orders</h2>
-          {data.teamOrders.map((o) => (
-            <Row key={o.reference} title={o.teamName} sub={o.reference} status={o.status} track={o.trackingNumber}
-              href={o.manageToken ? `/team-order/manage/${o.manageToken}` : undefined} cta={o.manageToken ? "Manage / add players" : undefined} />
-          ))}
-        </section>
-      )}
-
-      {data.designs.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="display text-xl text-foreground">Design Requests</h2>
-          {data.designs.map((d) => (
-            <Row key={d.reference} title={d.teamName} sub={d.reference} status={d.status}
-              href={d.statusToken ? `/design/status/${d.statusToken}` : undefined} cta={d.statusToken ? "View / approve" : undefined} />
-          ))}
-        </section>
-      )}
+    <div className="space-y-8">
+      <h2 className="display text-2xl text-foreground">Your orders</h2>
+      <PortalOrderList orders={rows} />
 
       {data.shop.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="display text-xl text-foreground">Store & Shop Orders</h2>
-          {data.shop.map((s) => (
-            <div key={s.reference} className="border border-line bg-steel p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="display text-foreground">{titleCase(s.type)} order {s.reference}</p>
-                  <p className="text-sm text-muted mt-0.5">{shortDate(s.createdAt)} &middot; {money(s.totalCents)}</p>
-                  {s.trackingNumber && (
-                    <a href={trackingUrlFor(s.trackingNumber)} target="_blank" rel="noopener noreferrer" className="text-sm text-brand underline underline-offset-2 mt-1 inline-block">
-                      Track shipment ({s.trackingNumber})
-                    </a>
-                  )}
+        <section className="space-y-2">
+          <h3 className="display text-sm uppercase tracking-wide text-muted">Store &amp; shop orders</h3>
+          {data.shop.map((s) => {
+            const track = s.trackingNumber && (carrierFor(s.trackingNumber) === "UPS" || carrierFor(s.trackingNumber) === "USPS") ? s.trackingNumber : null;
+            return (
+              <div key={s.reference} className="border border-line bg-steel px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <span className="display text-foreground">{s.reference}</span>
+                    <p className="text-sm text-foreground/90 mt-1">{titleCase(s.type)} order</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="display text-foreground tabular-nums">{money(s.totalCents)}</p>
+                    <p className="text-xs text-muted mt-0.5">{shortDate(s.createdAt)}</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs display text-brand border border-brand/40 px-2.5 py-1 rounded whitespace-nowrap">{titleCase(s.status)}</span>
-                  {s.addUrl && (
-                    <Link href={s.addUrl} className="text-sm display text-on-brand bg-brand hover:bg-brand-dark px-4 py-2 rounded whitespace-nowrap">Add items</Link>
-                  )}
-                </div>
+                {track && (
+                  <a href={trackingUrlFor(track)} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-sm text-brand underline underline-offset-2">Tracking: {track}</a>
+                )}
               </div>
-              <Receipt items={s.items} subtotalCents={s.subtotalCents} shippingCents={s.shippingCents} totalCents={s.totalCents} />
-            </div>
-          ))}
+            );
+          })}
         </section>
       )}
 
       {data.invoices.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="display text-xl text-foreground">Invoices</h2>
+        <section className="space-y-2">
+          <h3 className="display text-sm uppercase tracking-wide text-muted">Invoices</h3>
           {data.invoices.map((i) => (
-            <Row key={i.reference} title={`Invoice ${i.reference}`} sub={money(i.totalCents)} status={i.status}
-              href={i.status !== "paid" && i.payUrl ? i.payUrl : undefined} cta={i.status !== "paid" && i.payUrl ? "Pay now" : undefined} />
+            <div key={i.reference} className="border border-line bg-steel px-4 py-3 flex items-center justify-between gap-3">
+              <div>
+                <span className="display text-foreground">{i.reference}</span>
+                <p className="text-sm text-muted mt-0.5">{money(i.totalCents)} · {shortDate(i.createdAt)}</p>
+              </div>
+              {i.status !== "paid" && i.payUrl && (
+                <a href={i.payUrl} target="_blank" rel="noopener noreferrer" className="display text-sm bg-brand text-on-brand px-4 min-h-[44px] inline-flex items-center rounded hover:bg-brand-dark">Pay {money(i.totalCents)}</a>
+              )}
+            </div>
           ))}
         </section>
       )}
-
-      <div className="pt-4 border-t border-line">
-        <PortalAccount token={token} profile={data.profile} referralUrl={referralUrl} />
-      </div>
-
-      <p className="text-xs text-muted pt-4 border-t border-line">
-        Questions? Text (352) 414-7270 or email <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a>.
-      </p>
     </div>
   );
 }

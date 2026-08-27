@@ -86,7 +86,7 @@ function toQuoted(r: ShippoRate): QuotedRate {
 /** Live USPS/UPS rates for a destination, cheapest first. `to` can be just a
  *  ZIP (rating) or a full address (label purchase). */
 export async function getRates(
-  to: { zip: string; street1?: string; city?: string; state?: string; name?: string },
+  to: { zip: string; street1?: string; street2?: string; city?: string; state?: string; name?: string },
   weightOz: number,
 ): Promise<QuotedRate[]> {
   if (!shippoEnabled()) throw new Error("SHIPPO_API_KEY not configured");
@@ -98,6 +98,8 @@ export async function getRates(
       address_to: {
         name: to.name || "Customer",
         street1: to.street1 || "1 Main St", // placeholder is fine for rating; rates key off ZIP
+        // Apartment/unit/suite line - MUST reach the label or packages misdeliver.
+        ...(to.street2 ? { street2: to.street2 } : {}),
         city: to.city || "City",
         state: to.state || "",
         zip: to.zip,
@@ -201,7 +203,7 @@ async function uspsCarrierAccount(): Promise<string | null> {
 export async function scheduleUspsPickup(
   transactionIds: string[],
   dateIso: string, // YYYY-MM-DD (Eastern)
-): Promise<{ ok: true; confirmation: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; confirmation: string; alreadyScheduled?: boolean } | { ok: false; error: string }> {
   if (!shippoEnabled()) return { ok: false, error: "Shipping isn't configured." };
   if (transactionIds.length === 0) return { ok: false, error: "No USPS labels on this order to schedule a pickup for." };
   const carrierAccount = await uspsCarrierAccount();
@@ -218,19 +220,40 @@ export async function scheduleUspsPickup(
         carrier_account: carrierAccount,
         location: {
           building_location_type: "Front Door",
-          building_type: "office",
+          building_type: "building", // Shippo enum; "office" is rejected as invalid.
           instructions: "Packages by the front door.",
           address: { ...f, object_id: undefined },
         },
         transactions: transactionIds,
         requested_start_time: start,
         requested_end_time: end,
+        // Shippo requires a top-level contact email + phone for the pickup.
+        email: f.email,
+        phone: f.phone,
         is_test: false,
       }),
     });
     const data = await res.json();
+    // Shippo `messages` entries can be plain strings OR {text} objects.
+    const messages: string[] = (data.messages ?? [])
+      .map((m: string | { text?: string }) => (typeof m === "string" ? m : m?.text))
+      .filter(Boolean);
     if (!res.ok || data.status === "ERROR") {
-      const msg = (data.messages ?? []).map((m: { text?: string }) => m.text).filter(Boolean).join("; ");
+      // USPS allows only ONE active pickup per address at a time. When one is
+      // already booked, every outbound package there is collected anyway - so
+      // treat this as success, not an error the user has to fight.
+      if (messages.some((m) => /already\s+(requested|scheduled).*pickup/i.test(m))) {
+        return { ok: true, confirmation: "already-scheduled", alreadyScheduled: true };
+      }
+      // Other errors arrive as `messages`, a `detail` string, or field-level
+      // arrays ({email:["required"]}).
+      const fieldMsgs = Object.entries(data)
+        .filter(([k, v]) => Array.isArray(v) && k !== "messages" && k !== "transactions")
+        .map(([k, v]) => `${k}: ${(v as string[]).join(", ")}`);
+      const msg =
+        messages.join("; ") ||
+        (typeof data.detail === "string" ? data.detail : "") ||
+        fieldMsgs.join("; ");
       console.error("Shippo pickup failed:", res.status, JSON.stringify(data).slice(0, 500));
       return { ok: false, error: msg || "USPS couldn't schedule that pickup - try another date." };
     }

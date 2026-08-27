@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { requireApiRole } from "@/lib/admin-auth";
 import { markInvoicePaid, voidInvoice } from "@/lib/designer-invoices";
+import { postInvoicePaidToDiscord } from "@/lib/discord";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,7 @@ export async function POST(req: Request) {
   if (body.action === "paid") {
     const row = await markInvoicePaid(body.id, auth.session.name, body.note);
     if (!row) return NextResponse.json({ error: "Already paid or not found" }, { status: 409 });
+    await postInvoicePaidToDiscord({ reference: row.reference, totalCents: row.totalCents, method: `manually by ${auth.session.name}`, threadId: row.discordThreadId }).catch(() => {});
     return NextResponse.json({ ok: true });
   }
   if (body.action === "void") {

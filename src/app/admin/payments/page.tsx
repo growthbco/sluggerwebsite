@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { AdminPageHeader } from "@/components/admin-page-header";
 import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
@@ -35,6 +35,7 @@ export default async function AdminTransactionsPage() {
         depositPaidAt: teamOrders.depositPaidAt,
         invoicePaidAt: teamOrders.invoicePaidAt,
         paymentNote: teamOrders.paymentNote,
+        designerCostCents: teamOrders.designerCostCents,
       })
       .from(teamOrders),
     db
@@ -55,7 +56,10 @@ export default async function AdminTransactionsPage() {
   const txns: Txn[] = [];
 
   for (const t of torders) {
-    const offline = Boolean(t.paymentNote);
+    // "Offline" ONLY when the money was recorded via the manual Record-Payment
+    // flow (its note reads "<stage> via <method> - $X (date)"). A free-form note
+    // like a delivery hand-off note must NOT mislabel a real Stripe payment.
+    const offline = / via /.test(t.paymentNote ?? "");
     const total = t.quotedTotalCents ?? 0;
     const dep = t.depositCents ?? Math.round(total / 2);
     const paidInFull = Boolean(t.invoicePaidAt && t.depositPaidAt && Math.abs(+t.invoicePaidAt - +t.depositPaidAt) < 60000);
@@ -90,11 +94,51 @@ export default async function AdminTransactionsPage() {
   }
   txns.sort((a, b) => +new Date(b.at) - +new Date(a.at));
 
+  // Margin roll-up over PAID-IN-FULL team orders: goods revenue vs the actual
+  // designer cost recorded so far. Only orders with a recorded cost count toward
+  // the margin %, so it fills in as costs get logged.
+  let paidRev = 0, recordedRev = 0, recordedCost = 0, recordedN = 0, paidN = 0;
+  for (const t of torders) {
+    if (!t.invoicePaidAt) continue;
+    const rev = t.quotedTotalCents ?? 0;
+    if (rev <= 0) continue;
+    paidRev += rev; paidN++;
+    if (t.designerCostCents != null) { recordedRev += rev; recordedCost += t.designerCostCents; recordedN++; }
+  }
+  const marginCents = recordedRev - recordedCost;
+  const marginPct = recordedRev > 0 ? Math.round((marginCents / recordedRev) * 100) : 0;
+
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
-      <Link href="/admin" className="text-sm text-muted hover:text-foreground">← Dashboard</Link>
-      <h1 className="display text-4xl text-foreground mt-3">💳 Transactions</h1>
+      <AdminPageHeader eyebrow="Financials" title="Transactions" />
       <p className="mt-2 text-muted">Every dollar in - deposits, balances, add-ons, invoices, and store purchases · {txns.length} total</p>
+
+      {/* Real margin, as far as costs have been recorded. */}
+      <div className="mt-6 border border-line bg-steel p-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="display text-lg text-foreground">Margin (paid team orders)</h2>
+          <span className="text-xs text-muted">{recordedN} of {paidN} orders have a recorded designer cost</span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+          <div>
+            <div className="text-xs display text-muted uppercase tracking-wide">Goods revenue (paid)</div>
+            <div className="display text-lg text-foreground tabular-nums">{money(paidRev)}</div>
+          </div>
+          <div>
+            <div className="text-xs display text-muted uppercase tracking-wide">Designer cost recorded</div>
+            <div className="display text-lg text-foreground tabular-nums">{money(recordedCost)}</div>
+          </div>
+          <div>
+            <div className="text-xs display text-muted uppercase tracking-wide">Gross margin (recorded)</div>
+            <div className={`display text-lg tabular-nums ${recordedRev > 0 ? (marginPct >= 45 ? "text-green-400" : marginPct >= 30 ? "text-amber-300" : "text-red-400") : "text-muted"}`}>{recordedRev > 0 ? money(marginCents) : "-"}</div>
+          </div>
+          <div>
+            <div className="text-xs display text-muted uppercase tracking-wide">Margin %</div>
+            <div className={`display text-lg tabular-nums ${recordedRev > 0 ? (marginPct >= 45 ? "text-green-400" : marginPct >= 30 ? "text-amber-300" : "text-red-400") : "text-muted"}`}>{recordedRev > 0 ? `${marginPct}%` : "-"}</div>
+          </div>
+        </div>
+        <p className="mt-2 text-[11px] text-muted/70">Goods only (tax + shipping excluded). Margin % covers only orders where you&apos;ve recorded the actual designer cost - open an order&apos;s Payment section to record it. Duty + inbound shipping aren&apos;t in estimates.</p>
+      </div>
       <div className="mt-6">
         <AdminTransactions txns={txns} />
       </div>

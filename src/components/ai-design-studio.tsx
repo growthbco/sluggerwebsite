@@ -2,20 +2,9 @@
 
 import { useRef, useState } from "react";
 import { DropZone, firstImageFile } from "@/components/drop-zone";
+import { SPORT_MENU } from "@/lib/product-mockups";
 
 type Version = { url: string; cleanUrl?: string; product?: string; note: string; at: string };
-
-const PRODUCTS = [
-  { id: "jersey", label: "Jersey" },
-  { id: "hat", label: "Hat" },
-  { id: "hype-chain", label: "Hype chain" },
-  { id: "hoodie", label: "Hoodie" },
-  { id: "pants", label: "Pants" },
-  { id: "socks", label: "Socks" },
-];
-
-// Same jersey cuts the customer picks on the order form.
-const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button", "Quarter-Zip"];
 
 type Props = {
   token: string;
@@ -42,9 +31,24 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
 
   // Staff-supplied reference image + colors (optional overrides).
   const [refImage, setRefImage] = useState<string | null>(null);
-  const [product, setProduct] = useState<string>("jersey");
+  // Sport -> item -> style cascade state.
+  const [sportKey, setSportKey] = useState<string>(SPORT_MENU[0].key);
+  const [itemIdx, setItemIdx] = useState(0);
+  const [style, setStyle] = useState<string>(SPORT_MENU[0].items[0].styles[0]);
+  const currentSport = SPORT_MENU.find((s) => s.key === sportKey) ?? SPORT_MENU[0];
+  const currentItem = currentSport.items[itemIdx] ?? currentSport.items[0];
+  const product = currentItem.product;
+  const pickSport = (key: string) => {
+    const sp = SPORT_MENU.find((s) => s.key === key) ?? SPORT_MENU[0];
+    setSportKey(key);
+    setItemIdx(0);
+    setStyle(sp.items[0].styles[0]);
+  };
+  const pickItem = (idx: number) => {
+    setItemIdx(idx);
+    setStyle(currentSport.items[idx].styles[0]);
+  };
   // Jersey cut - "" = whatever the customer's brief says.
-  const [jerseyStyle, setJerseyStyle] = useState<string>("");
   const [useColors, setUseColors] = useState(false);
   const [primary, setPrimary] = useState("#1f4fd8");
   const [accent, setAccent] = useState("#d81f1f");
@@ -125,7 +129,12 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
           // the image being edited ("look at this and change X").
           refImage: refImage ?? undefined,
           colors: action === "generate" && useColors ? [primary, accent] : undefined,
-          style: action === "generate" && product === "jersey" && jerseyStyle ? jerseyStyle : undefined,
+          // On a fresh mockup, send the picked sport + style. Refine keeps the
+          // active version as-is.
+          sport: action === "generate" ? currentItem.sport : undefined,
+          // "Standard" is the default look - send no explicit style so the
+          // prompt stays clean (avoids "shorts, Standard").
+          style: action === "generate" && style && style !== "Standard" ? style : undefined,
         }),
       });
       const d = await res.json();
@@ -232,33 +241,43 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
           {/* Product type + staff reference + colors - applied to a fresh mockup
               (Generate / Start a fresh mockup). Refine ignores these. */}
           <div className="space-y-3 border border-line rounded p-3 bg-steel/40">
-              <div>
-                <label className="display text-xs text-muted tracking-wide">PRODUCT {active ? "(for a fresh mockup)" : ""}</label>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {PRODUCTS.map((p) => (
-                    <button key={p.id} type="button" onClick={() => setProduct(p.id)}
-                      className={`text-sm px-3 py-1.5 rounded border ${product === p.id ? "bg-brand text-on-brand border-brand" : "border-line text-foreground hover:bg-brand/10"}`}>
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-                {product === "jersey" && (
-                  <div className="mt-2">
-                    <label className="display text-xs text-muted tracking-wide">JERSEY CUT</label>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      <button type="button" onClick={() => setJerseyStyle("")}
-                        className={`text-sm px-3 py-1.5 rounded border ${jerseyStyle === "" ? "bg-brand text-on-brand border-brand" : "border-line text-foreground hover:bg-brand/10"}`}>
-                        From the brief
+              <div className="space-y-3">
+                {/* Step 1: Sport */}
+                <div>
+                  <label className="display text-xs text-muted tracking-wide">SPORT {active ? "(for a fresh mockup)" : ""}</label>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {SPORT_MENU.map((s) => (
+                      <button key={s.key} type="button" onClick={() => pickSport(s.key)}
+                        className={`text-sm px-3 py-1.5 rounded border ${sportKey === s.key ? "bg-brand text-on-brand border-brand" : "border-line text-foreground hover:bg-brand/10"}`}>
+                        {s.label}
                       </button>
-                      {JERSEY_STYLES.map((s) => (
-                        <button key={s} type="button" onClick={() => setJerseyStyle(s)}
-                          className={`text-sm px-3 py-1.5 rounded border ${jerseyStyle === s ? "bg-brand text-on-brand border-brand" : "border-line text-foreground hover:bg-brand/10"}`}>
-                          {s}
-                        </button>
-                      ))}
-                    </div>
+                    ))}
                   </div>
-                )}
+                </div>
+                {/* Step 2: Item within the sport */}
+                <div>
+                  <label className="display text-xs text-muted tracking-wide">ITEM</label>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {currentSport.items.map((it, idx) => (
+                      <button key={it.label} type="button" onClick={() => pickItem(idx)}
+                        className={`text-sm px-3 py-1.5 rounded border ${itemIdx === idx ? "bg-brand text-on-brand border-brand" : "border-line text-foreground hover:bg-brand/10"}`}>
+                        {it.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* Step 3: Style (always shown) */}
+                <div>
+                  <label className="display text-xs text-muted tracking-wide">STYLE</label>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {currentItem.styles.map((s) => (
+                      <button key={s} type="button" onClick={() => setStyle(s)}
+                        className={`text-sm px-3 py-1.5 rounded border ${style === s ? "bg-brand text-on-brand border-brand" : "border-line text-foreground hover:bg-brand/10"}`}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="display text-xs text-muted tracking-wide">REFERENCE IMAGE (optional)</label>
@@ -286,19 +305,29 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
                 {inspirationImages.length > 0 && (
                   <div className="mt-2">
                     <p className="text-xs text-muted">…or tap an image the client sent (inspiration + message attachments) to use it directly:</p>
-                    <div className="mt-1.5 flex flex-wrap gap-2">
+                    <div className="mt-1.5 flex flex-wrap gap-2.5">
                       {inspirationImages.filter((u) => !/\.(pdf|ai|eps|svg|zip|mp4|mov)($|\?)/i.test(u)).map((u, i) => (
-                        <button
-                          key={u}
-                          type="button"
-                          onClick={() => useInspiration(u, i)}
-                          title="Use as the reference image"
-                          className={`relative h-14 w-14 rounded overflow-hidden border-2 bg-white ${inspoIdx === i ? "border-brand ring-1 ring-brand" : "border-line hover:border-brand/60"}`}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={u} alt={`Client inspiration ${i + 1}`} className="h-full w-full object-cover" />
-                          {inspoIdx === i && <span className="absolute inset-0 grid place-items-center bg-brand/30 text-on-brand text-base">✓</span>}
-                        </button>
+                        <div key={u} className="relative h-24 w-24">
+                          <button
+                            type="button"
+                            onClick={() => useInspiration(u, i)}
+                            title="Use as the reference image"
+                            className={`h-full w-full rounded overflow-hidden border-2 bg-white ${inspoIdx === i ? "border-brand ring-1 ring-brand" : "border-line hover:border-brand/60"}`}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={u} alt={`Client inspiration ${i + 1}`} className="h-full w-full object-contain" />
+                            {inspoIdx === i && <span className="absolute inset-0 bg-brand/25" />}
+                          </button>
+                          {/* Enlarge without selecting - opens the full-screen viewer. */}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setZoom(u); }}
+                            title="Enlarge"
+                            className="absolute top-0.5 right-0.5 grid place-items-center h-5 w-5 rounded bg-black/60 text-white hover:bg-black/80"
+                          >
+                            <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3M11 8v6M8 11h6" /></svg>
+                          </button>
+                        </div>
                       ))}
                     </div>
                   </div>

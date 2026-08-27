@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
 import { getRoster, invoiceRosterEntries } from "@/lib/team-orders";
-import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
+import { computeTeamOrderQuote, estimateOrderParcelsOz } from "@/lib/team-order-pricing";
 import { taxCents } from "@/lib/pricing";
 import { renderTeamOrderInvoice } from "@/lib/email";
 import { requireApiRole } from "@/lib/admin-auth";
@@ -38,6 +38,10 @@ export async function GET(req: Request) {
 
   const roster = await getRoster(order.id);
   const quote = roster.length ? computeTeamOrderQuote(order, roster) : null;
+  // Hats ship in their own box, so a mixed order is 2 parcels - note it on the
+  // shipping line so a bigger shipping charge is self-explanatory.
+  const parcels = estimateOrderParcelsOz(roster);
+  const shipBoxes = [parcels.apparelOz, parcels.hatOz].filter((w) => w > 0).length;
 
   const totalCents = order.quotedTotalCents ?? quote?.totalCents ?? 0;
   if (totalCents <= 0) {
@@ -76,7 +80,7 @@ export async function GET(req: Request) {
           ${itemRows}
           ${line("Subtotal", money(totalCents))}
           ${order.taxExempt ? line("Sales tax", "Exempt") : line("FL Sales Tax (7%)", money(tax))}
-          ${line("Shipping", ship > 0 ? money(ship) : order.localPickup ? "Local pickup" : "$0.00")}
+          ${line(`Shipping${shipBoxes > 1 ? ` (${shipBoxes} boxes - hats ship separately)` : ""}`, ship > 0 ? money(ship) : order.localPickup ? "Local pickup" : "$0.00")}
           ${line("Total paid", money(grand), true)}
         </table>
         <p style="padding:14px 20px;color:#888;font-size:12px;margin:0;">Charged via Stripe to the card on file. This receipt reflects your system's record - no Stripe login needed.</p>
@@ -105,6 +109,7 @@ export async function GET(req: Request) {
     taxDueCents: order.taxExempt ? 0 : taxCents(dueCents),
     taxExempt: order.taxExempt,
     shipCents: stage === "balance" ? order.shippingChargedCents ?? 0 : 0,
+    shipBoxes,
     roster: invoiceRosterEntries(roster),
     payUrl: sentUrl ?? "#",
     payFullUrl: stage === "deposit" ? order.fullInvoiceUrl ?? undefined : undefined,

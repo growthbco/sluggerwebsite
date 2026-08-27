@@ -34,7 +34,7 @@ export function AdminRequote({ teamOrderId, lockedCents, rosterCents }: { teamOr
   return (
     <div className="border border-amber-400/50 bg-amber-400/5 px-4 py-3">
       <p className="text-sm text-amber-300">
-        ⚠️ The roster now prices at <strong>{money(rosterCents)}</strong> but the locked quote is{" "}
+        The roster now prices at <strong>{money(rosterCents)}</strong> but the locked quote is{" "}
         <strong>{money(lockedCents)}</strong> - pieces changed after invoicing. Update before sending
         the next invoice so it charges the right amount.
       </p>

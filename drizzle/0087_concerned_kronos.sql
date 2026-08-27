@@ -1,0 +1,1 @@
+ALTER TABLE "team_orders" ADD COLUMN "addon_nudge_sent_at" timestamp with time zone;

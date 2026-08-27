@@ -1,0 +1,1 @@
+ALTER TABLE "team_orders" ADD COLUMN "requires_names" boolean DEFAULT true NOT NULL;

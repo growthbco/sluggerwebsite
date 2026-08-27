@@ -55,6 +55,80 @@ export async function extractAsset(
   }
 }
 
+/** True if a design already has extracted asset sheets among its images (so we
+ *  don't regenerate them - approval can fire more than once). */
+export function hasAssetSheets(images: string[] | null | undefined): boolean {
+  const markers = ["pattern-swatch", "wordmark", "emblem"];
+  return (images ?? []).some((u) => markers.some((m) => u.includes(m)));
+}
+
+/** Generate the production asset sheets (pattern swatch, team wordmark, emblem)
+ *  from a design's finished artwork and post them into its Discord thread - the
+ *  SAME trace-ready individual files the AI lab produces on submit. Called on
+ *  APPROVAL so designs built/approved manually on the admin side get the
+ *  individual files too, not just the mockup. No-ops if the design already has
+ *  sheets or has no source image. Returns the URLs it added. */
+export async function generateAssetSheets(opts: {
+  designId: string;
+  reference: string;
+  teamName: string;
+  sport?: string | null;
+  style?: string | null;
+  threadId?: string | null;
+  currentImages?: string[];
+  sourceImageUrl: string;
+  includeEmblem?: boolean;
+}): Promise<string[]> {
+  if (!opts.sourceImageUrl) return [];
+  if (hasAssetSheets(opts.currentImages)) return [];
+  const db = getDb();
+  let concept: { mime: string; data: string };
+  try {
+    const buf = Buffer.from(await (await fetch(opts.sourceImageUrl)).arrayBuffer());
+    concept = { mime: "image/png", data: buf.toString("base64") };
+  } catch (e) {
+    console.error("generateAssetSheets: could not fetch source image", opts.reference, e);
+    return [];
+  }
+  const names: (keyof typeof SHEET_PROMPTS)[] = ["pattern-swatch.png", "wordmark.png"];
+  if (opts.includeEmblem !== false) names.push("emblem.png");
+  const added: { name: string; url: string }[] = [];
+  for (const name of names) {
+    const b64 = await extractAsset(concept, SHEET_PROMPTS[name]);
+    if (!b64) continue;
+    const blob = await put(`design-requests/sheets/${opts.reference}-${name}`, Buffer.from(b64, "base64"), {
+      access: "public", contentType: "image/png", addRandomSuffix: true,
+    });
+    added.push({ name, url: blob.url });
+  }
+  if (!added.length) return [];
+  // Re-read before appending so a concurrent write (e.g. a second approval)
+  // isn't clobbered.
+  const [row] = await db
+    .select({ imgs: designRequests.inspirationImages })
+    .from(designRequests)
+    .where(eq(designRequests.id, opts.designId))
+    .limit(1);
+  await db
+    .update(designRequests)
+    .set({ inspirationImages: [...(row?.imgs ?? opts.currentImages ?? []), ...added.map((a) => a.url)] })
+    .where(eq(designRequests.id, opts.designId));
+  const hook = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
+  if (hook && opts.threadId) {
+    await fetch(`${hook}?thread_id=${opts.threadId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: "Slugger Design Requests",
+        content: `📦 **Production asset sheets - ${opts.teamName}${opts.sport ? ` (${opts.sport}${opts.style ? `, ${opts.style}` : ""})` : ""} - ${opts.reference}**\n` +
+          added.map((a) => `${SHEET_LABELS[a.name]}: ${a.url}`).join("\n"),
+        embeds: added.slice(0, 4).map((a) => ({ image: { url: a.url } })),
+      }),
+    }).catch((e) => console.error("asset sheet post failed:", e));
+  }
+  return added.map((a) => a.url);
+}
+
 /** Cron self-heal: find recent AI-lab design requests missing their pattern or
  *  wordmark sheets, extract the missing ones, and post them into the thread. */
 export async function healMissingSheets(limit = 2): Promise<{ reference: string; added: string[] }[]> {

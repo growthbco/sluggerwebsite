@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { upload } from "@vercel/blob/client";
 
 // Admin-only SMS thread embedded in a design request's manage page. Loads and
 // sends through the same /api/admin/sms endpoint the Texts inbox uses, scoped
@@ -26,7 +27,35 @@ export function DesignRequestSms({ phone, name, token }: { phone: string; name?:
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingImages, setPendingImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+
+  // Upload images to Blob so they can be sent as MMS (same flow as the Texts
+  // inbox). Carriers reject large MMS, so cap at 5MB each, images only.
+  const uploadImages = useCallback(async (files: FileList | File[]) => {
+    const imgs = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (imgs.length === 0) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const urls: string[] = [];
+      for (const f of imgs.slice(0, 10)) {
+        if (f.size > 5 * 1024 * 1024) throw new Error(`${f.name || "Image"} is over 5MB - carriers reject large MMS.`);
+        const blob = await upload(`sms-media/${Date.now()}-${f.name || "image.jpg"}`, f, {
+          access: "public",
+          handleUploadUrl: "/api/design-request/upload",
+        });
+        urls.push(blob.url);
+      }
+      setPendingImages((p) => [...p, ...urls].slice(0, 10));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -71,19 +100,20 @@ export function DesignRequestSms({ phone, name, token }: { phone: string; name?:
 
   async function send() {
     const text = body.trim();
-    if (!text) return;
+    if (!text && pendingImages.length === 0) return;
     setSending(true);
     setError(null);
     try {
       const res = await fetch("/api/admin/sms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, body: text, name: name || undefined }),
+        body: JSON.stringify({ phone, body: text, name: name || undefined, mediaUrls: pendingImages }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Send failed");
       if (data.message) setMessages((m) => [...m, data.message]);
       setBody("");
+      setPendingImages([]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Send failed");
     } finally {
@@ -157,20 +187,69 @@ export function DesignRequestSms({ phone, name, token }: { phone: string; name?:
 
       {error && <p className="text-[#e5533c] text-sm mt-2">{error}</p>}
 
-      <div className="mt-3 flex gap-2 items-end">
+      {/* Staged images to send with the next text. */}
+      {pendingImages.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {pendingImages.map((u, i) => (
+            <div key={u} className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={u} alt="attachment" className="h-16 w-16 object-cover rounded border border-line" />
+              <button
+                type="button"
+                onClick={() => setPendingImages((p) => p.filter((_, idx) => idx !== i))}
+                className="absolute -top-1.5 -right-1.5 grid h-5 w-5 place-items-center rounded-full bg-ink border border-line text-muted hover:text-foreground text-xs"
+                aria-label="Remove image"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div
+        className={`mt-3 flex gap-2 items-end ${dragging ? "ring-2 ring-brand rounded" : ""}`}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files?.length) uploadImages(e.dataTransfer.files); }}
+      >
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send();
           }}
+          onPaste={(e) => {
+            const files = Array.from(e.clipboardData.files || []);
+            if (files.length) { e.preventDefault(); uploadImages(files); }
+          }}
           rows={2}
-          placeholder="Type a text to the customer"
+          placeholder={dragging ? "Drop image to attach…" : "Type a text to the customer (drag or paste an image to attach)"}
           className="flex-1 bg-ink border border-line clip-slant px-3 py-2 text-foreground placeholder:text-muted/50 focus:border-brand focus:outline-none resize-y text-sm"
         />
+        {/* Attach an image (photo icon). */}
+        <label
+          title="Attach a photo"
+          className={`inline-flex items-center gap-1.5 border border-line clip-slant px-3 py-2.5 text-sm text-foreground shrink-0 ${
+            uploading || sending ? "opacity-50" : "cursor-pointer hover:border-brand hover:text-brand"
+          }`}
+        >
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            disabled={uploading || sending}
+            onChange={(e) => { if (e.target.files) uploadImages(e.target.files); e.target.value = ""; }}
+          />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21.44 11.05l-9.19 9.19a5.5 5.5 0 01-7.78-7.78l9.19-9.19a3.5 3.5 0 014.95 4.95l-9.2 9.19a1.5 1.5 0 01-2.12-2.12l8.49-8.49" />
+          </svg>
+          <span className="display">{uploading ? "…" : "Photo"}</span>
+        </label>
         <button
           onClick={send}
-          disabled={sending || !body.trim()}
+          disabled={sending || uploading || (!body.trim() && pendingImages.length === 0)}
           className="bg-brand text-on-brand display px-5 py-2.5 clip-slant hover:bg-brand-dark transition-colors disabled:opacity-50"
         >
           {sending ? "..." : "Send"}

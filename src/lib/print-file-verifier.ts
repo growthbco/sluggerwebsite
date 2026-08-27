@@ -156,9 +156,10 @@ async function extractJerseysFromImage(imageUrl: string): Promise<Extracted[]> {
   const prompt = [
     "You are reading a jersey print-file layout (an image or a PDF page).",
     "The image shows jerseys grouped under size labels (e.g. 'SMALL-2', 'MEDIUM-4', 'LARGE-4', '6T-2', '3T-1', 'XLARGE-1', '2XLARGE-1').",
-    "Each player jersey (the BACK) shows the player NAME (large, arched across the upper back) and their NUMBER (very large, centered below the name).",
+    "Each player jersey (the BACK) shows the player NAME (large, arched across the upper back) and usually their NUMBER (very large, centered below the name).",
     "",
     "CRITICAL - read each jersey carefully:",
+    "- SOME jerseys have a NAME but NO number at all (common on bowling, rec, and adult-league teams). That is completely normal - do NOT invent a number, and do NOT read the team logo/monogram as a number. Return number as an empty string \"\" for those. A jersey with just a name is still a valid jersey to return.",
     "- A team LOGO, MONOGRAM, or WORDMARK (small initials/emblem such as 'GA', 'SA', a mascot, or a team name at the top collar or on the chest) is NOT part of the player's name. NEVER prepend or append it. If a jersey shows a monogram above the name, ignore the monogram and return only the actual player name.",
     "- The NUMBER belongs to the SAME jersey as the name directly above it. Do not borrow a number from an adjacent jersey. Two different jerseys may share the same number - that is fine, read each independently.",
     "- Each player usually has TWO panels shown together: the FRONT and the BACK of the same jersey. Read the BACK for the player name + large number, and pair it with its matching FRONT panel.",
@@ -231,7 +232,9 @@ async function extractJerseysFromImage(imageUrl: string): Promise<Extracted[]> {
   } catch {
     throw new Error("Gemini returned non-JSON output");
   }
-  return (parsed.jerseys ?? []).filter((j) => j.name && j.number);
+  // Keep a jersey if it has a name OR a number - name-only jerseys (bowling,
+  // rec, adult league) are valid and must still be diffed against the roster.
+  return (parsed.jerseys ?? []).filter((j) => j.name || j.number);
 }
 
 /** Diff the extracted jerseys against the roster ground truth. */
@@ -280,7 +283,7 @@ export function diffPrintFileVsRoster(
           kind: "wrong_size",
           roster: { name: r.name, number: r.number, size: r.size },
           printed: { name: p.name, number: p.number, size: p.size },
-          detail: `${r.name} #${r.number}: roster says ${rSize}, print file shows ${p.size}.`,
+          detail: `${r.name}${r.number ? ` #${r.number}` : ""}: roster says ${rSize}, print file shows ${p.size}.`,
         });
       }
       continue;
@@ -322,7 +325,7 @@ export function diffPrintFileVsRoster(
     mismatches.push({
       kind: "missing",
       roster: { name: r.name, number: r.number, size: r.size },
-      detail: `${r.name} #${r.number} (${rSize}) is on the roster but not on the print file.`,
+      detail: `${r.name}${r.number ? ` #${r.number}` : ""} (${rSize}) is on the roster but not on the print file.`,
     });
   }
 

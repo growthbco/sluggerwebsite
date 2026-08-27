@@ -12,6 +12,8 @@ import {
   recordDesignerReminder,
   findAiLeadFollowUpCandidates,
   recordAiLeadFollowUp,
+  findSeasonalReengagementCandidates,
+  recordSeasonalPrompt,
   findReviewRequestCandidates,
   recordReviewRequest,
   findOrderReviewCandidates,
@@ -24,11 +26,12 @@ import {
 } from "@/lib/follow-ups";
 import { getOrCreateCustomer } from "@/lib/customers";
 import { emailProofFollowUp, emailInvoiceReminder } from "@/lib/email";
-import { sendFollowUpSms } from "@/lib/sms";
+import { sendFollowUpSms, smsIfConsented } from "@/lib/sms";
+import { sendTeamOrderInvoice } from "@/lib/team-order-invoicing";
 import { postDesignThreadUpdate } from "@/lib/discord";
 import { getDb } from "@/db";
-import { teamOrders } from "@/db/schema";
-import { and, eq, isNull, isNotNull, or, lt } from "drizzle-orm";
+import { teamOrders, designRequests } from "@/db/schema";
+import { and, eq, ne, isNull, isNotNull, or, lt, sql } from "drizzle-orm";
 import { getLiveTracking } from "@/lib/shippo";
 import { getById as getDesignById } from "@/lib/design-requests";
 
@@ -49,6 +52,22 @@ export async function GET(req: Request) {
   const dryRun = new URL(req.url).searchParams.get("dryRun") === "1";
   const candidates = await findProofFollowUpCandidates();
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+  const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+
+  // A rotating set of daily proof-nudge texts so a customer who gets one every
+  // day doesn't see the exact same message (reads as robotic + trips spam
+  // filters). No emoji, no dashes - matches our texting tone.
+  const proofText = (first: string, team: string, url: string, round: number): string => {
+    const variants = [
+      `Hi ${first}, this is Slugger Athletics. Your ${team} design proof is ready to look over. Approve it or ask for any changes here: ${url}. Happy to answer questions.`,
+      `Hi ${first}, just checking in on your ${team} proof. Whenever you have a minute, take a look and tell us what you think: ${url}`,
+      `Hi ${first}, your ${team} design is saved and ready to go. Approve it or request tweaks here: ${url}. We can start production as soon as you give the word.`,
+      `Hi ${first}, following up on the ${team} proof. If anything needs adjusting we are glad to help. Review it here: ${url}`,
+      `Hi ${first}, we do not want your ${team} order to stall. Your proof is waiting for approval here: ${url}. Reply here anytime with questions.`,
+      `Hi ${first}, still holding your ${team} design ready to print. Take a look when you can: ${url}`,
+    ];
+    return `${variants[(round - 1) % variants.length]}\nReply STOP to opt out.`;
+  };
 
   const results: { reference: string; team: string; round: number; sent?: boolean }[] = [];
   for (const c of candidates) {
@@ -58,28 +77,33 @@ export async function GET(req: Request) {
       continue;
     }
     try {
-      const sent = await emailProofFollowUp({
-        to: c.contactEmail,
-        teamName: c.teamName,
-        reference: c.reference,
-        statusUrl: `${SITE}/design/status/${c.statusToken}`,
-        round,
-        neededBy: c.neededBy,
-      });
-      if (sent) {
-        await recordFollowUp(c.id);
-        await sendFollowUpSms({
-          phone: c.contactPhone,
-          body: `Slugger Athletics: your ${c.teamName} design proof is waiting for review. Approve or request changes here: ${SITE}/design/status/${c.statusToken}\nReply STOP to opt out.`,
+      const statusUrl = `${SITE}/design/status/${c.statusToken}`;
+      const first = (c.contactName || "").trim().split(/\s+/)[0] || "there";
+      // Text goes out EVERY day. Email only on the 1st and 4th nudge so we keep
+      // a paper trail without hammering their inbox daily (hurts deliverability).
+      const textSent = await sendFollowUpSms({ phone: c.contactPhone, body: proofText(first, c.teamName, statusUrl, round) });
+      let emailSent = false;
+      if (round === 1 || round === 4) {
+        emailSent = await emailProofFollowUp({
+          to: c.contactEmail,
+          teamName: c.teamName,
+          reference: c.reference,
+          statusUrl,
+          round,
+          neededBy: c.neededBy,
         });
+      }
+      // Advance the cadence if we reached them on either channel.
+      if (textSent || emailSent) {
+        await recordFollowUp(c.id);
         await postDesignThreadUpdate({
           threadId: c.discordThreadId ?? undefined,
-          title: `⏰ Auto follow-up ${round}/${MAX_FOLLOW_UPS} emailed - ${c.teamName} (${c.reference})`,
-          description: `Client hasn't reviewed the proof sent ${c.proofSentAt.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" })}. Reminder email sent automatically.`,
+          title: `Auto follow-up ${round}/${MAX_FOLLOW_UPS} - ${c.teamName} (${c.reference})`,
+          description: `Client hasn't acted on the proof sent ${c.proofSentAt.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" })}. Daily ${textSent ? "text" : ""}${textSent && emailSent ? " + email" : emailSent ? "email" : ""} reminder sent automatically.`,
           username: "Slugger Design Requests",
         });
       }
-      results.push({ reference: c.reference, team: c.teamName, round, sent });
+      results.push({ reference: c.reference, team: c.teamName, round, sent: textSent || emailSent });
     } catch (e) {
       console.error(`Follow-up failed for ${c.reference}:`, e);
       results.push({ reference: c.reference, team: c.teamName, round, sent: false });
@@ -116,6 +140,100 @@ export async function GET(req: Request) {
     } catch (e) {
       console.error(`Invoice reminder failed for ${c.reference}:`, e);
       invoiceResults.push({ reference: c.reference, team: c.teamName, stage: c.stage, round, sent: false });
+    }
+  }
+
+  // Add-on nudge: about a day after a customer pays, text them ONCE with their
+  // self-serve link so they can add more jerseys/sizes to the same order (the
+  // #1 thing customers ask for). Only paid, opted-in, design-linked orders that
+  // haven't shipped yet - and never twice (addonNudgeSentAt). Quiet hours +
+  // consent are enforced by smsIfConsented.
+  const addonResults: { reference: string; team: string; sent?: boolean }[] = [];
+  {
+    const adb = getDb();
+    const paidAt = sql`coalesce(${teamOrders.depositPaidAt}, ${teamOrders.invoicePaidAt})`;
+    const addonCandidates = await adb
+      .select({
+        id: teamOrders.id,
+        reference: teamOrders.reference,
+        teamName: teamOrders.teamName,
+        contactName: teamOrders.contactName,
+        contactPhone: teamOrders.contactPhone,
+        smsOptInAt: teamOrders.smsOptInAt,
+        statusToken: designRequests.statusToken,
+      })
+      .from(teamOrders)
+      .innerJoin(designRequests, eq(teamOrders.designRequestId, designRequests.id))
+      .where(
+        and(
+          isNull(teamOrders.addonNudgeSentAt),
+          isNull(teamOrders.archivedAt),
+          isNull(teamOrders.shippedAt),
+          ne(teamOrders.status, "cancelled"),
+          isNotNull(teamOrders.smsOptInAt),
+          isNotNull(teamOrders.contactPhone),
+          isNotNull(designRequests.statusToken),
+          sql`${paidAt} is not null`,
+          sql`${paidAt} < now() - interval '20 hours'`,
+          sql`${paidAt} > now() - interval '7 days'`,
+        ),
+      );
+    for (const c of addonCandidates) {
+      if (dryRun) { addonResults.push({ reference: c.reference, team: c.teamName }); continue; }
+      try {
+        const statusUrl = `${SITE}/design/status/${c.statusToken}`;
+        const first = (c.contactName || "").trim().split(/\s+/)[0] || "there";
+        const body = `Hi ${first}, this is Slugger Athletics. Thanks again for your ${c.teamName} order. If you need to add any more jerseys or sizes, you can add them to the same order here: ${statusUrl}. We can include them in the batch. Reply STOP to opt out.`;
+        const sent = await smsIfConsented({ phone: c.contactPhone, optInAt: c.smsOptInAt, body });
+        if (sent) await adb.update(teamOrders).set({ addonNudgeSentAt: new Date() }).where(eq(teamOrders.id, c.id));
+        addonResults.push({ reference: c.reference, team: c.teamName, sent });
+      } catch (e) {
+        console.error(`Add-on nudge failed for ${c.reference}:`, e);
+        addonResults.push({ reference: c.reference, team: c.teamName, sent: false });
+      }
+    }
+  }
+
+  // Stuck-invoice safety net: an order should auto-invoice the moment its
+  // roster is submitted. If that ever fails (e.g. a Stripe hiccup), the order
+  // sits in "submitted" with no invoice and nobody notices. Catch any that are
+  // more than 2 hours old (so we never race the instant on-submit invoice) and
+  // retry - self-healing, with a note to the design thread so staff sees it.
+  const stuckInvoiceResults: { reference: string; team: string; sent?: boolean; error?: string }[] = [];
+  {
+    const sdb = getDb();
+    const stuck = await sdb
+      .select({ id: teamOrders.id, reference: teamOrders.reference, teamName: teamOrders.teamName, designRequestId: teamOrders.designRequestId })
+      .from(teamOrders)
+      .where(
+        and(
+          eq(teamOrders.status, "submitted"),
+          isNull(teamOrders.invoiceUrl),
+          isNull(teamOrders.depositPaidAt),
+          isNull(teamOrders.archivedAt),
+          isNotNull(teamOrders.designRequestId),
+          sql`${teamOrders.createdAt} < now() - interval '2 hours'`,
+        ),
+      );
+    for (const o of stuck) {
+      if (dryRun) { stuckInvoiceResults.push({ reference: o.reference, team: o.teamName }); continue; }
+      try {
+        const res = await sendTeamOrderInvoice({ teamOrderId: o.id, stage: "deposit" });
+        stuckInvoiceResults.push({ reference: o.reference, team: o.teamName, sent: res.ok, error: res.ok ? undefined : res.error });
+        if (res.ok) {
+          let threadId: string | null = null;
+          if (o.designRequestId) { try { threadId = (await getDesignById(o.designRequestId))?.discordThreadId ?? null; } catch {} }
+          await postDesignThreadUpdate({
+            threadId: threadId ?? undefined,
+            title: `🧾 Safety net: sent the missing deposit invoice - ${o.teamName} (${o.reference})`,
+            description: `This order was submitted but never got its auto-invoice. It has now been sent (${money(res.dueCents)} deposit of ${money(res.totalCents)}).`,
+            username: "Slugger Design Requests",
+          });
+        }
+      } catch (e) {
+        console.error(`Stuck-invoice retry failed for ${o.reference}:`, e);
+        stuckInvoiceResults.push({ reference: o.reference, team: o.teamName, sent: false, error: "exception" });
+      }
     }
   }
 
@@ -213,7 +331,9 @@ export async function GET(req: Request) {
     const body =
       lead.round === 1
         ? `Hi ${name}, it's Slugger Athletics 🐆 We saw you were creating a jersey design with our Jersey Maker - want a hand finishing it or a quick quote for your team? Just reply here and we'll take care of you. No minimums.\nReply STOP to opt out.`
-        : `Hi ${name}, following up from Slugger Athletics - still happy to turn that jersey design into real uniforms whenever you're ready. Reply here anytime and we'll help.\nReply STOP to opt out.`;
+        : lead.round === 2
+          ? `Hi ${name}, following up from Slugger Athletics - still happy to turn that jersey design into real uniforms whenever you're ready. Reply here anytime and we'll help.\nReply STOP to opt out.`
+          : `Hi ${name}, last check-in from Slugger Athletics. Your jersey design is still saved with us. Whenever your team is ready, reply here and we'll get you a quote and real uniforms.\nReply STOP to opt out.`;
     let sent = false;
     try {
       sent = await sendFollowUpSms({ phone: lead.phone, body });
@@ -222,6 +342,28 @@ export async function GET(req: Request) {
       console.error("AI lead follow-up failed:", e);
     }
     aiLeadResults.push({ name, round: lead.round, sent });
+  }
+
+  // ── Season-aware re-engagement: nudge cold lab leads ahead of a busy ──────
+  // ordering season (spring baseball/softball, fall ball). Only fires when
+  // we're inside a sell window; once per window per lead.
+  const seasonal = await findSeasonalReengagementCandidates();
+  const seasonalResults: { name: string; campaign: string; sent?: boolean }[] = [];
+  for (const lead of seasonal) {
+    const name = lead.firstName?.trim() || "there";
+    if (dryRun) {
+      seasonalResults.push({ name, campaign: lead.campaignLabel });
+      continue;
+    }
+    const body = `Hi ${name}, it's Slugger Athletics. ${lead.campaignLabel} season is coming up and teams are ordering now. Your custom jersey design is still saved with us, so it's an easy head start. Want a quick quote or a hand getting your team's gear ready? Reply here anytime.\nReply STOP to opt out.`;
+    let sent = false;
+    try {
+      sent = await sendFollowUpSms({ phone: lead.phone, body });
+      if (sent) await recordSeasonalPrompt(lead.id);
+    } catch (e) {
+      console.error("seasonal re-engagement failed:", e);
+    }
+    seasonalResults.push({ name, campaign: lead.campaignLabel, sent });
   }
 
   // ── Referral prompt (~a week after delivery): "refer a team, free jersey" ─
@@ -330,12 +472,15 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     dryRun,
-    count: results.length + invoiceResults.length + staleResults.length + inboundResults.length + aiLeadResults.length + referralResults.length + reorderResults.length + reviewResults.length + healedSheets.length,
+    count: results.length + invoiceResults.length + addonResults.length + stuckInvoiceResults.length + staleResults.length + inboundResults.length + aiLeadResults.length + referralResults.length + reorderResults.length + reviewResults.length + healedSheets.length,
     results,
+    addonNudges: addonResults,
+    stuckInvoices: stuckInvoiceResults,
     invoiceReminders: invoiceResults,
     designerReminders: staleResults,
     inboundStalls: inboundResults,
     aiLeadFollowUps: aiLeadResults,
+    seasonalReengagement: seasonalResults,
     reviewRequests: reviewResults,
     referralPrompts: referralResults,
     reorderPrompts: reorderResults,

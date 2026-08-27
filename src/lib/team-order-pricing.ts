@@ -6,6 +6,8 @@ import { itemLabel } from "@/lib/order-items";
 // Per-item retail prices in cents (mirrors src/lib/pricing.ts).
 const ITEM_PRICES: Record<string, number> = {
   jersey: 2800, // crew / v-neck default; overridden by style below
+  hockey_jersey: 5500, // ice-hockey sweater; ~2.3x the $24 designer cost
+  flag_football_jersey: 2800, // sleeveless compression game shirt
   practice_jersey: 2000,
   knickers: 4000,
   long_pants: 4000,
@@ -14,8 +16,12 @@ const ITEM_PRICES: Record<string, number> = {
   lightweight_hoodie: 3500,
   pullover: 4000, // 1/4-zip
   socks: 1500,
+  cheer_uniform: 12000, // simple sublimated cheer set
+  cheer_uniform_rhinestone: 17500, // rhinestone / all-star cheer set
   fitted_hat: 3000,
-  snapback_hat: 2500,
+  snapback_hat: 3000, // leveled with fitted - one hat price
+  performance_hat: 3800, // premium water-resistant performance cap
+  beanie: 4000, // custom knit beanie, special-ordered from Cap America (estimate; adjust to real cost)
 };
 
 // Flat rush order fee: priority production + direct shipping. Charged once
@@ -23,11 +29,22 @@ const ITEM_PRICES: Record<string, number> = {
 // timeline before it's promised.
 export const RUSH_FEE_CENTS = 10000;
 
+// White-label upgrade (remove the SA back-logo + neck label): priced PER PIECE
+// because the value is lost advertising, which scales with quantity - with a
+// per-order floor so small runs still pay meaningfully.
+export const WHITE_LABEL_PER_PIECE_CENTS = 250;
+export const WHITE_LABEL_MIN_CENTS = 5000;
+
+/** The white-label fee for an order of N billable pieces. */
+export function whiteLabelFeeCents(pieces: number): number {
+  return Math.max(WHITE_LABEL_MIN_CENTS, pieces * WHITE_LABEL_PER_PIECE_CENTS);
+}
+
 // One-time hat digitizing charge: converting the design into an embroidery
 // file. Charged once on the FIRST order that includes hats; reorders of the
 // same design never pay it again (embroideryFeeWaived).
 export const EMBROIDERY_FEE_CENTS = 2000;
-const HAT_KEYS = ["fitted_hat", "snapback_hat"];
+const HAT_KEYS = ["fitted_hat", "snapback_hat", "performance_hat"];
 
 // Ocala league-family price for standard (crew/v-neck) jerseys.
 export const LOCAL_JERSEY_CENTS = 2500;
@@ -36,6 +53,8 @@ export const LOCAL_JERSEY_CENTS = 2500;
 // package weight - and thus shipping - is deterministic from the roster.
 export const ITEM_WEIGHT_OZ: Record<string, number> = {
   jersey: 11,
+  hockey_jersey: 14,
+  flag_football_jersey: 8,
   practice_jersey: 10,
   knickers: 14,
   long_pants: 16,
@@ -44,8 +63,12 @@ export const ITEM_WEIGHT_OZ: Record<string, number> = {
   lightweight_hoodie: 16,
   pullover: 20,
   socks: 3,
+  cheer_uniform: 14, // shell + skirt
+  cheer_uniform_rhinestone: 14,
   fitted_hat: 5,
   snapback_hat: 5,
+  performance_hat: 5,
+  beanie: 4,
 };
 
 /** Per-parcel weights (oz) for an order's roster. Hats ship in their OWN box
@@ -86,8 +109,13 @@ export function estimateOrderWeightOz(
 // crew/v-neck $28 / $25 local).
 export const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button", "Quarter-Zip"] as const;
 
-export function jerseyPriceCents(jerseyStyle?: string | null, localPricing?: boolean | null): number {
+export function jerseyPriceCents(jerseyStyle?: string | null, localPricing?: boolean | null, material?: string | null): number {
   const s = (jerseyStyle ?? "").toLowerCase();
+  // Bowling shirts are cut in a pricier microfiber, so a full-button bowling
+  // shirt is $42 (not the $35 standard full-button). Only full-button carries
+  // this premium; other bowling styles price by their normal style.
+  const microfiber = (material ?? "").toLowerCase() === "microfiber";
+  if (s.includes("full") && microfiber) return 4200;
   if (s.includes("zip")) return 3800;
   if (s.includes("full")) return 3500;
   if (s.includes("two")) return 3200;
@@ -95,9 +123,9 @@ export function jerseyPriceCents(jerseyStyle?: string | null, localPricing?: boo
 }
 
 /** Retail price for one piece of an order item ("jersey" follows the order's
- *  jersey style). Returns 0 for unknown keys. */
-export function itemPriceCents(key: string, jerseyStyle?: string | null, localPricing?: boolean | null): number {
-  if (key === "jersey") return jerseyPriceCents(jerseyStyle, localPricing);
+ *  jersey style + material). Returns 0 for unknown keys. */
+export function itemPriceCents(key: string, jerseyStyle?: string | null, localPricing?: boolean | null, material?: string | null): number {
+  if (key === "jersey") return jerseyPriceCents(jerseyStyle, localPricing, material);
   return ITEM_PRICES[key] ?? 0;
 }
 
@@ -124,6 +152,7 @@ type RosterRow = {
 export function computeTeamOrderQuote(
   order: {
     jerseyStyle?: string | null;
+    jerseyMaterial?: string | null;
     items?: string[] | null;
     rushShipping?: boolean | null;
     localPricing?: boolean | null;
@@ -132,6 +161,8 @@ export function computeTeamOrderQuote(
     /** Set when this design's one-time embroidery fee was already paid on a
      *  previous order (auto-detected at invoicing, or staff toggle). */
     embroideryFeeWaived?: boolean | null;
+    /** Paid white-label upgrade: adds a flat fee and drops SA branding. */
+    whiteLabel?: boolean | null;
   },
   roster: RosterRow[],
 ): TeamOrderQuote {
@@ -158,7 +189,7 @@ export function computeTeamOrderQuote(
     const quantity = counts.get(key)!;
     const unit =
       key === "jersey"
-        ? order.customJerseyCents || jerseyPriceCents(order.jerseyStyle, order.localPricing)
+        ? order.customJerseyCents || jerseyPriceCents(order.jerseyStyle, order.localPricing, order.jerseyMaterial)
         : ITEM_PRICES[key];
     if (!unit) continue; // unknown item type: leave for a manual quote
     const label =
@@ -177,6 +208,17 @@ export function computeTeamOrderQuote(
       unitPriceCents: EMBROIDERY_FEE_CENTS,
       totalCents: EMBROIDERY_FEE_CENTS,
     });
+  }
+
+  // Paid white-label upgrade: per piece with a per-order floor, its own line.
+  if (order.whiteLabel && pieces > 0) {
+    const fee = whiteLabelFeeCents(pieces);
+    const atFloor = fee === WHITE_LABEL_MIN_CENTS && pieces * WHITE_LABEL_PER_PIECE_CENTS < WHITE_LABEL_MIN_CENTS;
+    lines.push(
+      atFloor
+        ? { label: `White-label - remove Slugger branding (${pieces} pc, minimum)`, quantity: 1, unitPriceCents: fee, totalCents: fee }
+        : { label: "White-label - remove Slugger branding", quantity: pieces, unitPriceCents: WHITE_LABEL_PER_PIECE_CENTS, totalCents: fee },
+    );
   }
 
   const rushFeeCents = order.rushShipping ? RUSH_FEE_CENTS : 0;

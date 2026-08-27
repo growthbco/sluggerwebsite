@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { Device, Call } from "@twilio/voice-sdk";
 
 const prettyPhone = (p: string) => {
@@ -29,6 +30,15 @@ const KEYS: [string, string][] = [
  *  open it via window.dispatchEvent(new CustomEvent("slugger-dial",
  *  { detail: { phone } })). */
 export function AdminDialer() {
+  const pathname = usePathname();
+  // The Conversations page IS the phone hub - on mobile the floating dialer
+  // would sit right on top of the SEND button, so hide it there (desktop keeps
+  // it; the softphone still registers for incoming calls either way).
+  const onConversations = pathname === "/admin/texts";
+  // The Calls page shows a recording player on each card; a floating pill would
+  // sit on top of one. Hide the idle pill there (Call-back / incoming calls
+  // still open the dialer). Conversations hides it on mobile only.
+  const onCalls = pathname === "/admin/calls";
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"keypad" | "recents">("keypad");
   const [number, setNumber] = useState("");
@@ -187,7 +197,7 @@ export function AdminDialer() {
   const fmtDur = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`);
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div className={`fixed bottom-4 right-4 z-50 ${!open ? (onCalls ? "hidden" : onConversations ? "hidden lg:block" : "") : ""}`}>
       {open ? (
         <div className="w-[min(20rem,calc(100vw-1.5rem))] border border-line bg-steel shadow-2xl rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2.5 bg-background/60 border-b border-line">

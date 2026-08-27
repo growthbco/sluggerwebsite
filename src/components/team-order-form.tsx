@@ -8,9 +8,9 @@ import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-c
 
 const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button", "Quarter-Zip"];
 
-type Row = { name: string; number: string; sizes: Record<string, string>; notes: string };
+type Row = { name: string; number: string; sizes: Record<string, string>; notes: string; design: string };
 
-const emptyRow = (): Row => ({ name: "", number: "", sizes: {}, notes: "" });
+const emptyRow = (design = ""): Row => ({ name: "", number: "", sizes: {}, notes: "", design });
 
 type Prefill = {
   designToken: string;
@@ -21,6 +21,9 @@ type Prefill = {
   approvedDesignUrl: string | null;
   items?: string[];
   designJerseyStyle?: string | null;
+  /** Approved colorways to choose from. >1 means the roster shows a per-row
+   *  design picker (which artwork each player gets). */
+  designs?: { label: string; image: string; sku?: string | null }[];
 };
 
 /** Best-effort match of the design's jersey cut onto this form's style list. */
@@ -35,6 +38,13 @@ function styleFromDesign(designStyle?: string | null): string | undefined {
 }
 
 export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
+  // Approved designs this team can pick from. More than one (e.g. Pin Daddy /
+  // Pin Mommy) turns on the per-row design picker so each size ties to the
+  // right artwork - the exact gap that used to force people into the notes box.
+  const designs = prefill?.designs ?? [];
+  const hasApprovedDesign = Boolean(prefill && designs.length > 0);
+  const needsDesign = designs.length > 1;
+  const soleDesign = designs.length === 1 ? designs[0].label : "";
   const [mode, setMode] = useState<"manual" | "link">("manual");
   const [teamName, setTeamName] = useState(prefill?.teamName ?? "");
   const [contactName, setContactName] = useState(prefill?.contactName ?? "");
@@ -43,11 +53,13 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   // No design style specified -> leave blank rather than silently stamping
   // "Standard Crew Neck" on the order. Blank prices the same as crew/v-neck.
   const [jerseyStyle, setJerseyStyle] = useState(styleFromDesign(prefill?.designJerseyStyle) ?? "");
-  const [material, setMaterial] = useState(JERSEY_MATERIALS[0].key);
+  const [material, setMaterial] = useState(
+    (JERSEY_MATERIALS.find((m) => m.recommended) ?? JERSEY_MATERIALS[0]).key,
+  );
   // Orders from an approved design start with the items the design actually
   // covers (a hoodie design pre-selects hoodie, not the jersey default).
   const [items, setItems] = useState<string[]>(prefill?.items?.length ? prefill.items : ["jersey"]);
-  const [rows, setRows] = useState<Row[]>([emptyRow(), emptyRow(), emptyRow()]);
+  const [rows, setRows] = useState<Row[]>(() => [emptyRow(soleDesign), emptyRow(soleDesign), emptyRow(soleDesign)]);
   // Hats are ordered in bulk by size (not per player): { fitted_hat: { "S/M": 5 } }.
   const [hatQty, setHatQty] = useState<Record<string, Record<string, number>>>({});
   const setQty = (key: string, size: string, n: number) =>
@@ -84,27 +96,34 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   function updateSize(i: number, itemKey: string, value: string) {
     setRows((r) => r.map((row, idx) => (idx === i ? { ...row, sizes: { ...row.sizes, [itemKey]: value } } : row)));
   }
-  const addRow = () => setRows((r) => [...r, emptyRow()]);
+  const addRow = () => setRows((r) => [...r, emptyRow(soleDesign)]);
   const removeRow = (i: number) => setRows((r) => r.filter((_, idx) => idx !== i));
 
   const filledRows = rows.filter((r) => r.name || r.number || Object.keys(r.sizes).length);
   // Selected item types in canonical order, jersey first. Per-player items get
   // a size column on each roster row; in-house hats are ordered in bulk by size.
   const selected = ITEM_TYPES.filter((t) => items.includes(t.key));
-  const perPlayerSelected = selected.filter((t) => !t.inHouse);
-  const bulkSelected = selected.filter((t) => t.inHouse);
+  // One-size items ordered in bulk by size: in-house hats AND outsourced beanies.
+  const perPlayerSelected = selected.filter((t) => !t.inHouse && !t.outsourced);
+  const bulkSelected = selected.filter((t) => t.inHouse || t.outsourced);
   const perPlayerKeys = perPlayerSelected.map((t) => t.key);
   const bulkRows = () =>
     bulkSelected.flatMap((t) =>
       t.sizes
         .filter((s) => (hatQty[t.key]?.[s] ?? 0) > 0)
-        .map((s) => ({ name: "", number: "", sizes: { [t.key]: s }, notes: "", quantity: hatQty[t.key][s] })),
+        .map((s) => ({ name: "", number: "", sizes: { [t.key]: s }, notes: "", design: "", quantity: hatQty[t.key][s] })),
     );
   // Jersey style/material only apply when a jersey is actually being ordered
   // - a hoodie-only order must not carry a phantom jersey style.
   const hasJersey = items.includes("jersey");
 
   async function submit() {
+    // Multi-design team: every player row with anything on it must say which
+    // design it gets, so nothing falls back to a guess in production.
+    if (needsDesign && hasJersey) {
+      const missing = rows.some((r) => (r.name || r.number || Object.keys(r.sizes).length) && !r.design);
+      if (missing) { setStatus("error"); setMessage("This team has more than one design - pick which one each player gets."); return; }
+    }
     setStatus("sending"); setMessage("");
     try {
       const res = await fetch("/api/team-order", {
@@ -173,6 +192,18 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
 
   return (
     <div className="space-y-8">
+      {!hasApprovedDesign && (
+        <div className="border border-brand/60 bg-brand/[0.08] p-4" role="alert">
+          <p className="display text-foreground">Approved design required before submission</p>
+          <p className="mt-1 text-sm text-muted">
+            You can create a roster link and let players add their sizes now, but the final order cannot be submitted until your artwork is approved.
+          </p>
+          <a href="/design" className="mt-3 inline-flex clip-slant bg-brand px-4 py-2 text-sm display text-on-brand hover:bg-brand-dark">
+            Start free design
+          </a>
+        </div>
+      )}
+
       {/* Mode selector */}
       <div className="grid sm:grid-cols-2 gap-3">
         <button onClick={() => { setMode("manual"); setLinks(null); }} className={`text-left p-4 border transition-colors ${mode === "manual" ? "border-brand bg-steel" : "border-line hover:border-brand/50"}`}>
@@ -247,8 +278,13 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
               <button
                 key={m.key}
                 onClick={() => setMaterial(m.key)}
-                className={`text-left p-4 border transition-colors ${on ? "border-brand bg-steel" : "border-line hover:border-brand/50"}`}
+                className={`relative text-left p-4 border transition-colors ${on ? "border-brand bg-steel" : "border-line hover:border-brand/50"}`}
               >
+                {m.recommended && (
+                  <span className="absolute top-3 right-3 display text-[10px] uppercase tracking-wider text-on-brand bg-brand px-1.5 py-0.5">
+                    Recommended
+                  </span>
+                )}
                 <span className="display text-foreground">{on ? "✓ " : ""}{m.label}</span>
                 <p className="text-sm text-muted mt-1">{m.description}</p>
               </button>
@@ -288,6 +324,21 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
             </div>
             <p className="text-sm text-muted mt-1">A size for each item is all we need - name and number are optional (leave them blank for plain gear with no personalization). Names print in CAPS.</p>
 
+            {needsDesign && hasJersey && (
+              <div className="mt-3 bg-steel border border-brand/40 p-3">
+                <p className="display text-sm text-foreground">This team has {designs.length} designs - pick which one each player gets below.</p>
+                <div className="mt-2 flex flex-wrap gap-4">
+                  {designs.map((d) => (
+                    <div key={d.label} className="flex items-center gap-2 text-xs text-muted">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={d.image} alt={d.label} className="h-12 w-12 object-contain bg-white border border-line rounded" />
+                      {d.label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mt-4">
               <RosterImport
                 itemKeys={perPlayerKeys}
@@ -298,6 +349,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
                     number: r.number,
                     sizes: r.sizes,
                     notes: r.notes ?? "",
+                    design: soleDesign,
                   }));
                   // Replace untouched empty rows; keep anything already typed.
                   setRows((prev) => [
@@ -316,6 +368,17 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
                     <input className={`${inputCls} max-w-24`} value={row.number} onChange={(e) => update(i, "number", e.target.value)} placeholder="#" maxLength={4} />
                     <button onClick={() => removeRow(i)} className="text-muted hover:text-brand px-2 py-2.5" aria-label="Remove player">✕</button>
                   </div>
+                  {needsDesign && hasJersey && (
+                    <select
+                      className={`${inputCls} ${row.design ? "" : "border-brand/60 text-brand"}`}
+                      value={row.design}
+                      onChange={(e) => update(i, "design", e.target.value)}
+                      aria-label="Which design"
+                    >
+                      <option value="">Which design?</option>
+                      {designs.map((d) => <option key={d.label} value={d.label} className="text-foreground">{d.label}</option>)}
+                    </select>
+                  )}
                   {perPlayerSelected.length > 0 && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {perPlayerSelected.map((t) => (
@@ -375,10 +438,14 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
 
           {status === "error" && <p className="text-sm text-brand">{message}</p>}
 
-          <button onClick={submit} disabled={status === "sending"} className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors disabled:opacity-60">
-            {status === "sending" ? "Submitting…" : "Submit Team Order"}
+          <button onClick={submit} disabled={status === "sending" || !hasApprovedDesign} className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors disabled:opacity-60">
+            {status === "sending" ? "Submitting…" : hasApprovedDesign ? "Submit Team Order" : "Approved design required"}
           </button>
-          <p className="text-xs text-muted">No payment now - we&apos;ll email your total and a design proof to approve before production.</p>
+          <p className="text-xs text-muted">
+            {hasApprovedDesign
+              ? "No payment now - we'll email your total and 50% deposit invoice."
+              : "Need to collect sizes first? Choose “Let players enter their own” above to create a draft roster link."}
+          </p>
           <p className="text-xs text-muted">⏱ Working toward a deadline? Order as early as you can and build in a buffer. We push hard to hit every date, but carrier and shipping delays can happen and are outside our control - if your date is firm, tell us before you order and we&apos;ll be straight with you about it.</p>
         </>
       )}

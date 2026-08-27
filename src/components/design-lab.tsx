@@ -3,15 +3,29 @@
 import { useRef, useState, useEffect } from "react";
 import { DropZone, firstImageFile } from "@/components/drop-zone";
 import { SmsConsentNote } from "@/components/sms-consent";
-
-const SPORTS = ["Baseball", "Softball", "Basketball", "Soccer", "Flag Football", "Football", "Volleyball", "Hockey", "Pickleball", "Bowling"];
-const STYLES = ["Crew Neck", "Two-Button", "Full-Button", "Quarter-Zip", "Sleeveless / Tank", "Reversible"];
+import { SPORT_MENU } from "@/lib/product-mockups";
 
 /** Private AI jersey designer preview. Each generation ~13 cents; the API
  *  enforces a daily cap and requires the test key or an admin session. */
 export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; ladder?: boolean; paidJustNow?: boolean }) {
-  const [sport, setSport] = useState("Baseball");
-  const [style, setStyle] = useState("Crew Neck");
+  // Sport -> Item -> Style cascade (shared with the staff studio via SPORT_MENU).
+  const [sportKey, setSportKey] = useState<string>(SPORT_MENU[0].key);
+  const [itemIdx, setItemIdx] = useState(0);
+  const [style, setStyle] = useState<string>(SPORT_MENU[0].items[0].styles[0]);
+  const currentSport = SPORT_MENU.find((s) => s.key === sportKey) ?? SPORT_MENU[0];
+  const currentItem = currentSport.items[itemIdx] ?? currentSport.items[0];
+  const product = currentItem.product;
+  const sport = currentItem.sport ?? "baseball"; // sport string sent to the AI
+  const pickSport = (key: string) => {
+    const sp = SPORT_MENU.find((s) => s.key === key) ?? SPORT_MENU[0];
+    setSportKey(key);
+    setItemIdx(0);
+    setStyle(sp.items[0].styles[0]);
+  };
+  const pickItem = (idx: number) => {
+    setItemIdx(idx);
+    setStyle(currentSport.items[idx].styles[0]);
+  };
   const [primaryColor, setPrimaryColor] = useState("#0A0A0A");
   const [secondaryColor, setSecondaryColor] = useState("#B8A36C");
   const [extraColors, setExtraColors] = useState<string[]>([]);
@@ -55,7 +69,8 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
       const raw = localStorage.getItem(LS_KEY);
       if (!raw) return;
       const d = JSON.parse(raw);
-      if (d.sport) setSport(d.sport);
+      if (d.sportKey && SPORT_MENU.some((s) => s.key === d.sportKey)) setSportKey(d.sportKey);
+      if (typeof d.itemIdx === "number") setItemIdx(d.itemIdx);
       if (d.style) setStyle(d.style);
       if (d.primaryColor) setPrimaryColor(d.primaryColor);
       if (d.secondaryColor) setSecondaryColor(d.secondaryColor);
@@ -78,7 +93,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         localStorage.setItem(LS_KEY, JSON.stringify({
-          sport, style, primaryColor, secondaryColor, extraColors, teamName, backNumber, idea,
+          sportKey, itemIdx, style, primaryColor, secondaryColor, extraColors, teamName, backNumber, idea,
           logo, reference, image, cleanToken, history: hist,
         }));
         return;
@@ -87,7 +102,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
         else break; // even one image too big; give up quietly
       }
     }
-  }, [sport, style, primaryColor, secondaryColor, extraColors, teamName, backNumber, idea, logo, reference, image, cleanToken, history]);
+  }, [sportKey, itemIdx, style, primaryColor, secondaryColor, extraColors, teamName, backNumber, idea, logo, reference, image, cleanToken, history]);
 
   const refFileRef = useRef<HTMLInputElement>(null);
 
@@ -119,7 +134,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
         body: JSON.stringify({
           key: testKey,
           ladder: ladder || undefined,
-          sport, style, primaryColor, secondaryColor, extraColors, teamName, backNumber, idea,
+          product, sport, style, primaryColor, secondaryColor, extraColors, teamName, backNumber, idea,
           logo: logo ?? undefined,
           reference: reference ?? undefined,
           ...(refine && image ? { previousImage: image, refinement } : {}),
@@ -155,17 +170,23 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
     <div className="grid gap-8 lg:grid-cols-2">
       {/* Controls */}
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className={label}>SPORT</label>
-            <select value={sport} onChange={(e) => setSport(e.target.value)} className={input}>
-              {SPORTS.map((s) => <option key={s}>{s}</option>)}
+            <select value={sportKey} onChange={(e) => pickSport(e.target.value)} className={input}>
+              {SPORT_MENU.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
           </div>
           <div>
-            <label className={label}>JERSEY STYLE</label>
+            <label className={label}>ITEM</label>
+            <select value={itemIdx} onChange={(e) => pickItem(Number(e.target.value))} className={input}>
+              {currentSport.items.map((it, idx) => <option key={it.label} value={idx}>{it.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={label}>STYLE</label>
             <select value={style} onChange={(e) => setStyle(e.target.value)} className={input}>
-              {STYLES.map((s) => <option key={s}>{s}</option>)}
+              {currentItem.styles.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
         </div>
@@ -307,9 +328,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
               <div className="border border-green-600/60 bg-green-600/10 p-4 rounded space-y-1">
                 <p className="display text-foreground">🎉 Sent to our designer - {submitted.reference}</p>
                 <p className="text-sm text-muted">Your concept, logo, and colors are in the designer&apos;s hands. You&apos;ll get a real proof to approve.</p>
-                {submitted.checkoutUrl ? (
-                  <a href={submitted.checkoutUrl} className="inline-block mt-1 clip-slant bg-brand text-on-brand display text-sm px-4 py-2">Finish: pay the design fee</a>
-                ) : submitted.statusUrl ? (
+                {submitted.statusUrl ? (
                   <a href={submitted.statusUrl} className="text-sm text-brand underline">Track your design here</a>
                 ) : null}
               </div>

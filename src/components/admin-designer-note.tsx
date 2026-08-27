@@ -39,7 +39,7 @@ export function AdminDesignerNote({ teamOrderId, current }: { teamOrderId: strin
         title="Add a note for the designer/production (pushed to Discord)"
         className="text-xs display text-muted border border-line px-2 py-0.5 hover:border-brand/50 hover:text-foreground whitespace-nowrap"
       >
-        📝 Note{current ? " ✓" : ""}
+        Note{current ? " " : ""}
       </button>
 
       {open && (

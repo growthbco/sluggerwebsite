@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
-import { isValidDesignerToken, getBillableOrders } from "@/lib/designer-invoices";
-import { DesignerInvoiceForm } from "@/components/designer-invoice-form";
+import { isValidDesignerToken, getBillableOrders, getEditableDesignerInvoices, getPaidDesignerInvoices } from "@/lib/designer-invoices";
+import { DesignerInvoiceForm, type EditableInvoice, type PaidInvoice } from "@/components/designer-invoice-form";
 
 export const metadata: Metadata = {
   title: "Submit an Invoice - Slugger Athletics",
@@ -38,7 +38,38 @@ export default async function DesignerInvoicePage({
     );
   }
 
-  const billable = await getBillableOrders();
+  const [billable, editableRows, paidRows] = await Promise.all([
+    getBillableOrders(),
+    getEditableDesignerInvoices(),
+    getPaidDesignerInvoices(),
+  ]);
+  const editable: EditableInvoice[] = editableRows.map((inv) => ({
+    id: inv.id,
+    reference: inv.reference,
+    designerName: inv.designerName,
+    notes: inv.notes,
+    dutyCents: inv.dutyCents,
+    previousBalanceCents: inv.previousBalanceCents,
+    totalCents: inv.totalCents,
+    submittedAt: inv.submittedAt?.toISOString() ?? null,
+    vendorRef: inv.vendorRef,
+    attachmentUrls: inv.attachmentUrls,
+    lines: (inv.lines ?? []).map((l) => ({
+      team: l.team,
+      garment: l.garment,
+      qty: l.qty,
+      unitCents: l.unitCents,
+      teamOrderId: l.teamOrderId,
+      ourQty: l.ourQty,
+    })),
+  }));
+  const paid: PaidInvoice[] = paidRows.map((inv) => ({
+    id: inv.id,
+    reference: inv.reference,
+    totalCents: inv.totalCents,
+    paidAt: inv.paidAt?.toISOString() ?? null,
+    lineCount: (inv.lines ?? []).length,
+  }));
 
-  return <DesignerInvoiceForm token={token} billable={billable} />;
+  return <DesignerInvoiceForm token={token} billable={billable} editable={editable} paid={paid} />;
 }

@@ -7,7 +7,7 @@ import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
 import { assistDesignThread } from "@/lib/design-assistant";
 import { emailDesignerMessage } from "@/lib/email";
 import { postDesignThreadUpdate } from "@/lib/discord";
-import { smsIfConsented } from "@/lib/sms";
+import { smsIfConsented, textedRecently } from "@/lib/sms";
 
 export const runtime = "nodejs";
 // Headroom for the human-like reply pause below (client's own message still
@@ -69,12 +69,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const firstImage = attachments.find((u) => /\.(png|jpe?g|webp|gif)$/i.test(u));
     if (from === "designer") {
+      // Debounce the text nudge: if the client already got a "new reply" text
+      // in the last 20 min, don't send another (a burst of staff/AI replies
+      // should be one text, not one each). Email + Discord still fire.
+      const nudgeText = await textedRecently(request.contactPhone, "new reply on your", 20)
+        ? null
+        : smsIfConsented({
+            phone: request.contactPhone,
+            optInAt: request.smsOptInAt,
+            body: `Slugger Athletics: new reply on your ${request.teamName} design (${request.reference}). Read + reply: ${SITE}/design/status/${request.statusToken}`,
+          });
       await Promise.allSettled([
-        smsIfConsented({
-          phone: request.contactPhone,
-          optInAt: request.smsOptInAt,
-          body: `Slugger Athletics: new reply on your ${request.teamName} design (${request.reference}). Read + reply: ${SITE}/design/status/${request.statusToken}`,
-        }),
+        ...(nudgeText ? [nudgeText] : []),
         emailDesignerMessage({
           to: request.contactEmail,
           teamName: request.teamName,
@@ -123,6 +129,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
               design: {
                 reference: request.reference,
                 teamName: request.teamName,
+                sport: request.sport,
                 status: request.status,
                 revisionsUsed: request.revisionsUsed,
                 proofCount: request.proofImages?.length ?? 0,
@@ -158,11 +165,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
                 fromName: "Support",
                 statusUrl: `${SITE}/design/status/${request.statusToken}`,
               }).catch((e) => console.error("AI reply email failed:", e));
-              await smsIfConsented({
-                phone: request.contactPhone,
-                optInAt: request.smsOptInAt,
-                body: `Slugger Athletics: new reply on your ${request.teamName} design (${request.reference}). Read + reply: ${SITE}/design/status/${request.statusToken}`,
-              });
+              if (!(await textedRecently(request.contactPhone, "new reply on your", 20))) {
+                await smsIfConsented({
+                  phone: request.contactPhone,
+                  optInAt: request.smsOptInAt,
+                  body: `Slugger Athletics: new reply on your ${request.teamName} design (${request.reference}). Read + reply: ${SITE}/design/status/${request.statusToken}`,
+                });
+              }
               // Log the exchange to Discord so staff can correct a bad answer.
               // flagStaff (discount asks): the AI sent the holding reply per
               // policy, but the real number needs a human - ping for follow-up.

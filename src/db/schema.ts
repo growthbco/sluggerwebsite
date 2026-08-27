@@ -335,6 +335,13 @@ export const orders = pgTable(
     // Carrier of the primary outbound label (FedEx/UPS/USPS/DHL) - needed to
     // poll live delivery status (the review text waits until it's Delivered).
     shipCarrier: text("ship_carrier"),
+    // Set when this order's designer cost has been settled OUTSIDE the invoice
+    // tool (paid the designer directly) - drops it from the "not yet billed"
+    // list and the designer's quick-add.
+    designerSettledAt: timestamp("designer_settled_at", { withTimezone: true }),
+    // ACTUAL amount paid to the designer/factory for THIS order (COGS), recorded
+    // by staff - drives true per-order margin instead of an estimate.
+    designerCostCents: integer("designer_cost_cents"),
     // Shippo transaction object id of the primary label (lets us schedule a
     // carrier pickup for it).
     shipTransactionId: text("ship_transaction_id"),
@@ -429,10 +436,19 @@ export const teamOrders = pgTable(
     embroideryFeeWaived: boolean("embroidery_fee_waived").notNull().default(false),
     // Tax-exempt org/company: no sales tax on this order's invoices.
     taxExempt: boolean("tax_exempt").notNull().default(false),
+    // Paid white-label upgrade: remove Slugger's SA back-logo + neck label from
+    // the finished garments. Adds a flat fee to the invoice; production must
+    // omit the branding.
+    whiteLabel: boolean("white_label").notNull().default(false),
     jerseyMaterial: text("jersey_material"), // birdseye mesh / pro smooth
     // Which item types this order covers, e.g. ["jersey","pants","socks"].
     items: jsonb("items").$type<string[]>().default(["jersey"]),
     rushShipping: boolean("rush_shipping").notNull().default(false),
+    // "Do players need a name on the back?" survey answer for the roster form.
+    // Default true (most jerseys); auto-set false at provisioning for name-less
+    // items like cheer sets. When false, the roster hides the name field so
+    // players just enter a size.
+    requiresNames: boolean("requires_names").notNull().default(true),
 
     // Uploaded approved design + optional roster file.
     approvedDesignUrl: text("approved_design_url"),
@@ -511,6 +527,9 @@ export const teamOrders = pgTable(
     // admin page, e.g. "deposit via Zelle - $330 (Jul 22, 2026)".
     paymentNote: text("payment_note"),
     invoicePaidAt: timestamp("invoice_paid_at", { withTimezone: true }), // fully paid
+    // One-time "want to add more?" nudge, sent ~a day after the first payment
+    // with the self-serve add-on link. Set once so it never repeats.
+    addonNudgeSentAt: timestamp("addon_nudge_sent_at", { withTimezone: true }),
     // Unpaid-invoice reminders (deposit or balance); reset on each new invoice.
     invoiceRemindersSent: integer("invoice_reminders_sent").notNull().default(0),
     lastInvoiceReminderAt: timestamp("last_invoice_reminder_at", { withTimezone: true }),
@@ -520,6 +539,13 @@ export const teamOrders = pgTable(
     // Carrier of the primary outbound label (FedEx/UPS/USPS/DHL) - needed to
     // poll live delivery status (the review text waits until it's Delivered).
     shipCarrier: text("ship_carrier"),
+    // Set when this order's designer cost has been settled OUTSIDE the invoice
+    // tool (paid the designer directly) - drops it from the "not yet billed"
+    // list and the designer's quick-add.
+    designerSettledAt: timestamp("designer_settled_at", { withTimezone: true }),
+    // ACTUAL amount paid to the designer/factory for THIS order (COGS), recorded
+    // by staff - drives true per-order margin instead of an estimate.
+    designerCostCents: integer("designer_cost_cents"),
     // Shippo transaction object id of the primary label (lets us schedule a
     // carrier pickup for it).
     shipTransactionId: text("ship_transaction_id"),
@@ -770,10 +796,19 @@ export const designRequests = pgTable(
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     archivedNote: text("archived_note"),
 
+    // Auto-gallery: once approved, a design shows in the public "Recent
+    // Designs" showcase by default. Set true to hide one specific design from
+    // the gallery (does not affect the order or anything else).
+    galleryHidden: boolean("gallery_hidden").notNull().default(false),
+
     // Timestamps
     proofSentAt: timestamp("proof_sent_at", { withTimezone: true }),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     orderedAt: timestamp("ordered_at", { withTimezone: true }),
+    // Staff marked "I followed up" (e.g. texted/called the customer outside the
+    // thread). Clears the "waiting on us" flag until the customer messages again
+    // after this time. Reset whenever a newer client message arrives.
+    followedUpAt: timestamp("followed_up_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -935,6 +970,11 @@ export const designLabVisitors = pgTable("design_lab_visitors", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   phone: text("phone"),
+  // First-touch traffic source, captured the first time this visitor hit the
+  // lab (e.g. "Google -> /custom-jersey-maker", "Instagram (ad)", "Direct").
+  // Answers "how did they get to the AI Design Lab" - the lab origin alone
+  // doesn't say whether they came from search, social, an ad, or direct.
+  source: text("source"),
   generations: integer("generations").notNull().default(0),
   paidAt: timestamp("paid_at", { withTimezone: true }),
   stripeRef: text("stripe_ref"),
@@ -943,6 +983,10 @@ export const designLabVisitors = pgTable("design_lab_visitors", {
   // numbers automatically, so we only track how many we've sent + when.
   smsFollowUpsSent: integer("sms_follow_ups_sent").notNull().default(0),
   lastFollowUpAt: timestamp("last_follow_up_at", { withTimezone: true }),
+  // Season-aware re-engagement: last time we pinged this lead ahead of a busy
+  // season (spring baseball/softball, fall ball). Capped once per season window
+  // so a cold lead gets a nudge each new season without being spammed.
+  lastSeasonalPromptAt: timestamp("last_seasonal_prompt_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -983,6 +1027,31 @@ export const adminUsers = pgTable("admin_users", {
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Customer-facing failures that need a human follow-up. Callers upsert by
+// fingerprint so a noisy integration creates one actionable alert instead of
+// flooding the admin dashboard with duplicates.
+export const operationalEvents = pgTable(
+  "operational_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fingerprint: text("fingerprint").notNull(),
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    detail: text("detail"),
+    href: text("href"),
+    context: jsonb("context").$type<Record<string, string | number | boolean | null>>(),
+    occurrences: integer("occurrences").notNull().default(1),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedBy: text("resolved_by"),
+  },
+  (t) => [
+    uniqueIndex("operational_events_fingerprint_idx").on(t.fingerprint),
+    index("operational_events_unresolved_idx").on(t.resolvedAt, t.lastSeenAt),
+  ],
+);
 
 // Names staff attach to phone numbers in the texts inbox (takes priority
 // over names derived from order records).
@@ -1054,6 +1123,11 @@ export const designerInvoices = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     reference: text("reference").notNull(), // INV-XXXXXX
+    // Per-invoice token for a shareable read-only link (/invoice/<token>).
+    viewToken: text("view_token"),
+    // Discord forum thread this invoice opened on submission, so the "PAID"
+    // confirmation nests in the SAME thread instead of spawning a new one.
+    discordThreadId: text("discord_thread_id"),
 
     status: designerInvoiceStatus("status").notNull().default("submitted"),
 
@@ -1088,6 +1162,11 @@ export const designerInvoices = pgTable(
     totalCents: integer("total_cents").notNull().default(0), // what he's asking for
 
     notes: text("notes"),
+
+    // The vendor's OWN invoice number (their external doc), if they have one.
+    vendorRef: text("vendor_ref"),
+    // The vendor's own uploaded invoice file(s) (PDF/image) on Vercel Blob.
+    attachmentUrls: jsonb("attachment_urls").$type<string[]>().notNull().default([]),
 
     submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
     paidAt: timestamp("paid_at", { withTimezone: true }),

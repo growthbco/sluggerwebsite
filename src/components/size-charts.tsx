@@ -29,6 +29,31 @@ export const FITTED_HATS = [
 ];
 export const FITTED_HAT_HEADERS = ["Size", "Cap America", "Pacific Headwear"];
 
+// Flag football = SLEEVELESS COMPRESSION uniform. Width = across the chest 1"
+// below the armhole; length = highest point of shoulder to hem (inches).
+export const FLAG_FOOTBALL = [
+  ["Youth XS", "12", "20"], ["Youth S", "13", "21"], ["Youth M", "14", "22"],
+  ["Youth L", "15", "23"], ["Youth XL", "16", "24"],
+  ["XS", "17", "25"], ["S", "18", "26"], ["M", "19", "27"], ["L", "20", "28"],
+  ["XL", "21", "29"], ["2XL", "22", "30"], ["3XL", "23", "31"],
+];
+
+// Cheer sets: chest / waist / hips (inches). Slugger Athletics' official cheer
+// uniform size chart. Fit runs snug - size up if between sizes. Row labels
+// mirror CHEER_SIZES in order-items.ts so a picked size lines up with the chart.
+export const CHEER_SET = [
+  ["Youth XS", "20-22", "18-20", "21-22"],
+  ["Youth Small", "22-24", "20-22", "22-25"],
+  ["Youth Medium", "24-26", "22-24", "26-28"],
+  ["Youth Large", "26-28", "24-26", "28-30"],
+  ["Adult XS", "30-32", "26-28", "31-33"],
+  ["Adult Small", "32-34", "28-30", "34-36"],
+  ["Adult Medium", "34-36", "30-32", "36-38"],
+  ["Adult Large", "36-38", "32-34", "39-41"],
+  ["Adult X-Large", "38-40", "34-36", "41-44"],
+  ["Adult 2X-Large", "40-42", "36-38", "45-48"],
+];
+
 export function ChartTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
   return (
     <div className="overflow-x-auto border border-line">
@@ -56,53 +81,145 @@ export function ChartTable({ headers, rows }: { headers: string[]; rows: string[
   );
 }
 
-/** The full chart set (jerseys / hoodies / pants) as one block. */
+// Each chart section, standalone so pages can show only what's being ordered.
+function JerseySection() {
+  return (
+    <section>
+      <h3 className="display text-lg text-foreground">Jerseys & Shirts</h3>
+      <div className="mt-3 grid md:grid-cols-2 gap-6">
+        <div>
+          <h4 className="display text-sm text-brand mb-2">Adult</h4>
+          <ChartTable headers={["Size", "Width", "Length"]} rows={JERSEYS_ADULT} />
+        </div>
+        <div>
+          <h4 className="display text-sm text-brand mb-2">Youth</h4>
+          <ChartTable headers={["Size", "Width", "Length"]} rows={JERSEYS_YOUTH} />
+        </div>
+      </div>
+    </section>
+  );
+}
+function HoodieSection() {
+  return (
+    <section>
+      <h3 className="display text-lg text-foreground">Hoodies & Pullovers</h3>
+      <div className="mt-3 max-w-md">
+        <ChartTable headers={["Size", "Width", "Length"]} rows={HOODIES} />
+      </div>
+    </section>
+  );
+}
+function HatSection() {
+  return (
+    <section>
+      <h3 className="display text-lg text-foreground">Hats</h3>
+      <p className="mt-2 text-foreground">
+        🧢 <strong>Snapback Hats: one size fits most</strong>{" "}
+        <span className="text-muted">- adjustable, no size to pick.</span>
+      </p>
+      <p className="mt-3 text-sm text-muted">Fitted hats by hat size:</p>
+      <div className="mt-2 max-w-md">
+        <ChartTable headers={FITTED_HAT_HEADERS} rows={FITTED_HATS} />
+      </div>
+    </section>
+  );
+}
+function CheerSection() {
+  return (
+    <section>
+      <h3 className="display text-lg text-foreground">Cheer Sets</h3>
+      <p className="mt-2 text-sm text-muted">Fit runs snug - if you&apos;re between sizes, size up. Take chest, waist, and hips at the fullest point.</p>
+      <div className="mt-3 max-w-xl">
+        <ChartTable headers={["Size", "Chest", "Waist", "Hips"]} rows={CHEER_SET} />
+      </div>
+    </section>
+  );
+}
+function PantsSection() {
+  return (
+    <section>
+      <h3 className="display text-lg text-foreground">Pants (Knickers & Long Pants)</h3>
+      <div className="mt-3 grid md:grid-cols-2 gap-6">
+        <div>
+          <h4 className="display text-sm text-brand mb-2">Adult</h4>
+          <ChartTable headers={["Size", "Waist", "Inseam"]} rows={PANTS_ADULT} />
+        </div>
+        <div>
+          <h4 className="display text-sm text-brand mb-2">Youth</h4>
+          <ChartTable headers={["Size", "Waist", "Inseam"]} rows={PANTS_YOUTH} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FlagFootballSection() {
+  return (
+    <section>
+      <h3 className="display text-lg text-foreground">Flag Football (sleeveless compression)</h3>
+      <p className="mt-2 text-sm text-muted">A snug compression fit. Width = across the chest 1&quot; below the armhole; length = shoulder to hem. Want a looser fit? Choose a standard crew-neck jersey instead.</p>
+      <div className="mt-3 max-w-md">
+        <ChartTable headers={["Size", "Width", "Length"]} rows={FLAG_FOOTBALL} />
+      </div>
+    </section>
+  );
+}
+
+// Map an order-item key to the chart section it needs. Socks (self-explanatory
+// S/M, L/XL) have no chart. Keep in sync with ITEM_TYPES in order-items.ts.
+type ChartGroup = "jersey" | "flag_football" | "hoodie" | "hats" | "cheer" | "pants";
+function chartGroup(itemKey: string): ChartGroup | null {
+  const k = itemKey.toLowerCase();
+  if (/cheer/.test(k)) return "cheer";
+  if (/flag[_\s-]?football/.test(k)) return "flag_football"; // before /jersey/
+  if (/hoodie|pullover/.test(k)) return "hoodie";
+  if (/hat|beanie|cap/.test(k)) return "hats";
+  if (/knicker|pant|short/.test(k)) return "pants";
+  if (/jersey|shirt/.test(k)) return "jersey";
+  return null; // socks, unknown
+}
+
+const GROUP_SECTION: Record<ChartGroup, () => React.ReactElement> = {
+  jersey: JerseySection,
+  flag_football: FlagFootballSection,
+  hoodie: HoodieSection,
+  hats: HatSection,
+  cheer: CheerSection,
+  pants: PantsSection,
+};
+// Show groups in a stable, sensible order regardless of item order.
+const GROUP_ORDER: ChartGroup[] = ["jersey", "flag_football", "cheer", "hoodie", "hats", "pants"];
+
+/** Only the charts an order actually needs, based on its item keys. Falls back
+ *  to the jersey chart if nothing maps (e.g. a socks-only or unknown order). */
+export function SizeChartsFor({ items }: { items: string[] }) {
+  const groups = new Set<ChartGroup>();
+  for (const k of items) {
+    const g = chartGroup(k);
+    if (g) groups.add(g);
+  }
+  const ordered = GROUP_ORDER.filter((g) => groups.has(g));
+  if (ordered.length === 0) ordered.push("jersey");
+  return (
+    <div className="space-y-8">
+      {ordered.map((g) => {
+        const Section = GROUP_SECTION[g];
+        return <Section key={g} />;
+      })}
+    </div>
+  );
+}
+
+/** The full chart set (every product) as one block - used by /size-guide. */
 export function AllSizeCharts() {
   return (
     <div className="space-y-8">
-      <section>
-        <h3 className="display text-lg text-foreground">Jerseys & Shirts</h3>
-        <div className="mt-3 grid md:grid-cols-2 gap-6">
-          <div>
-            <h4 className="display text-sm text-brand mb-2">Adult</h4>
-            <ChartTable headers={["Size", "Width", "Length"]} rows={JERSEYS_ADULT} />
-          </div>
-          <div>
-            <h4 className="display text-sm text-brand mb-2">Youth</h4>
-            <ChartTable headers={["Size", "Width", "Length"]} rows={JERSEYS_YOUTH} />
-          </div>
-        </div>
-      </section>
-      <section>
-        <h3 className="display text-lg text-foreground">Hoodies</h3>
-        <div className="mt-3 max-w-md">
-          <ChartTable headers={["Size", "Width", "Length"]} rows={HOODIES} />
-        </div>
-      </section>
-      <section>
-        <h3 className="display text-lg text-foreground">Hats</h3>
-        <p className="mt-2 text-foreground">
-          🧢 <strong>Snapback Hats: one size fits most</strong>{" "}
-          <span className="text-muted">- adjustable, no size to pick.</span>
-        </p>
-        <p className="mt-3 text-sm text-muted">Fitted hats by hat size:</p>
-        <div className="mt-2 max-w-md">
-          <ChartTable headers={FITTED_HAT_HEADERS} rows={FITTED_HATS} />
-        </div>
-      </section>
-      <section>
-        <h3 className="display text-lg text-foreground">Pants (Knickers & Long Pants)</h3>
-        <div className="mt-3 grid md:grid-cols-2 gap-6">
-          <div>
-            <h4 className="display text-sm text-brand mb-2">Adult</h4>
-            <ChartTable headers={["Size", "Waist", "Inseam"]} rows={PANTS_ADULT} />
-          </div>
-          <div>
-            <h4 className="display text-sm text-brand mb-2">Youth</h4>
-            <ChartTable headers={["Size", "Waist", "Inseam"]} rows={PANTS_YOUTH} />
-          </div>
-        </div>
-      </section>
+      <JerseySection />
+      <FlagFootballSection />
+      <HoodieSection />
+      <HatSection />
+      <CheerSection />
+      <PantsSection />
     </div>
   );
 }

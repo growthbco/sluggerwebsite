@@ -17,7 +17,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="admin-shell flex flex-col lg:flex-row min-h-screen">
       <AdminSidebar role={session?.role ?? "staff"} userName={session?.name} />
-      <div className="flex-1 min-w-0">{children}</div>
+      {/* Bottom clearance so the floating dialer (fixed bottom-right) never sits
+          on top of a table's last row / row actions. */}
+      <div className="flex-1 min-w-0 pb-24">{children}</div>
       {session && session.role !== "designer" && <AdminDialer />}
       {session && <AdminNotifier />}
     </div>

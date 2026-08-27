@@ -26,6 +26,26 @@ export const STAGE_CHIPS: { label: string; value: string }[] = [
   { label: "🚚 Shipped", value: "shipped" },
 ];
 
+/** The six team-order pipeline stages, in funnel order. SINGLE source of truth
+ *  for stage names so the pipeline cards and the filter dropdown always read the
+ *  same. Values match the team_orders status enum. */
+export const ORDER_STAGES: { value: string; title: string }[] = [
+  { value: "collecting", title: "Collecting roster" },
+  { value: "submitted", title: "Needs invoice" },
+  { value: "quoted", title: "Awaiting payment" },
+  { value: "in_production", title: "In production" },
+  { value: "paid", title: "Ready to ship" },
+  { value: "shipped", title: "Shipped" },
+];
+
+/** Friendly stage name for a team-order status, falling back to a humanized
+ *  version of the raw value (e.g. draft/cancelled). */
+export function stageTitle(value: string): string {
+  const s = ORDER_STAGES.find((x) => x.value === value);
+  if (s) return s.title;
+  return value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, " ");
+}
+
 export function useStatusFilter(): [string, (s: string) => void] {
   const value = useSyncExternalStore(
     subscribe,

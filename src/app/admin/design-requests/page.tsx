@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AdminPageHeader } from "@/components/admin-page-header";
 import { desc, sql, eq, isNotNull, isNull } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { designRequests, teamOrders, teams, orders, teamOrderAddons, assistantFacts, customInvoices, designLabVisitors } from "@/db/schema";
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
+import { designNeedsAction } from "@/lib/design-requests";
+import { FollowedUpButton } from "@/components/admin-followed-up-button";
 import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote, estimateOrderWeightOz } from "@/lib/team-order-pricing";
 import { sizeBreakdown, ITEM_TYPES } from "@/lib/order-items";
@@ -22,9 +25,10 @@ import { TrackingInfo } from "@/components/tracking-info";
 import { inboundTrackingUrlFor } from "@/lib/tracking";
 import { AdminAddonDetails } from "@/components/admin-addon-details";
 import { AdminArchiveButton } from "@/components/admin-archive-button";
+import { AdminGalleryToggle } from "@/components/admin-gallery-toggle";
 import { AdminLocalToggle } from "@/components/admin-local-toggle";
 import { AdminTaxToggle } from "@/components/admin-tax-toggle";
-import { AdminSearch } from "@/components/admin-search";
+import { DesignRequestFilter } from "@/components/design-request-filter";
 import { AdminNewStore } from "@/components/admin-new-store";
 import { AdminRecordPayment } from "@/components/admin-record-payment";
 import { AdminPickupToggle } from "@/components/admin-pickup-toggle";
@@ -57,7 +61,7 @@ const STATUS_TONE: Record<string, string> = {
 
 function Badge({ label }: { label: string }) {
   return (
-    <span className={`inline-block border px-2 py-0.5 text-xs display ${STATUS_TONE[label] ?? "border-line text-muted"}`}>
+    <span className={`inline-block border rounded-full px-2.5 py-0.5 text-xs display whitespace-nowrap ${STATUS_TONE[label] ?? "border-line text-muted"}`}>
       {label.replace(/_/g, " ")}
     </span>
   );
@@ -95,11 +99,16 @@ export default async function AdminDesignRequestsPage() {
         contactEmail: designRequests.contactEmail,
         revisionsUsed: designRequests.revisionsUsed,
         neededBy: designRequests.neededBy,
-        messages: designRequests.messages,
+        // Just the last thread message (jsonb `-> -1`), not the whole array -
+        // all this list needs is who spoke last.
+        lastMessage: sql<{ from?: string; name?: string; at?: string } | null>`${designRequests.messages} -> -1`,
         source: designRequests.source,
         manageToken: designRequests.manageToken,
         archivedAt: designRequests.archivedAt,
         archivedNote: designRequests.archivedNote,
+        approvedDesignUrl: designRequests.approvedDesignUrl,
+        galleryHidden: designRequests.galleryHidden,
+        followedUpAt: designRequests.followedUpAt,
         updatedAt: designRequests.updatedAt,
       })
       .from(designRequests)
@@ -192,51 +201,56 @@ export default async function AdminDesignRequestsPage() {
   const activeOrders = torders.filter((o) => !o.archivedAt);
   const archivedOrders = torders.filter((o) => o.archivedAt);
 
-  // "Waiting on us" = the design work still needs Slugger. Once a design is
-  // approved / ordered / cancelled the work is done, so a trailing client
-  // message ("thanks!", "approved") must NOT keep flagging it.
-  const DESIGN_DONE = new Set(["approved", "ordered", "cancelled"]);
-  const needsAction = activeDesigns.filter((d) => {
-    if (DESIGN_DONE.has(d.status)) return false;
-    const lastMsg = d.messages?.[d.messages.length - 1];
-    return d.status === "changes_requested" || d.status === "submitted" || lastMsg?.from === "client";
-  });
+  // "Waiting on us" = the design work still needs Slugger (shared rule; a staff
+  // "followed up" mark clears it until the customer replies again).
+  const needsAction = activeDesigns.filter((d) => designNeedsAction(d));
+
+  // Status chips for the filter, in pipeline order, only those present.
+  const STATUS_ORDER = ["submitted", "proof_sent", "changes_requested", "approved", "ordered", "draft", "cancelled"];
+  const statusTally = activeDesigns.reduce((acc, d) => {
+    acc[d.status] = (acc[d.status] ?? 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  const statusCounts = Object.keys(statusTally)
+    .sort((a, b) => {
+      const ia = STATUS_ORDER.indexOf(a), ib = STATUS_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    })
+    .map((value) => ({ value, label: value.replace(/_/g, " "), count: statusTally[value] }));
 
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
-      <Link href="/admin" className="text-sm text-muted hover:text-foreground">← Dashboard</Link>
-      <h1 className="display text-4xl text-foreground mt-3">🎨 Design Requests ({activeDesigns.length})</h1>
+      <AdminPageHeader eyebrow="Operations" title={`Design Requests (${activeDesigns.length})`} />
       {needsAction.length > 0 && (
         <p className="mt-3 text-sm text-amber-400">
-          ⚠ {needsAction.length} design{needsAction.length === 1 ? "" : "s"} waiting on us:{" "}
+          {needsAction.length} design{needsAction.length === 1 ? "" : "s"} waiting on us:{" "}
           {needsAction.map((d) => d.teamName.trim()).join(", ")}
         </p>
       )}
 
-      <AdminSearch statuses={[]} />
+      <DesignRequestFilter total={activeDesigns.length} statuses={statusCounts} />
 
       <section className="mt-6 scroll-mt-16" id="design-requests">
-        <h2 className="display text-xl text-foreground">Design requests ({activeDesigns.length})</h2>
-        <div className="mt-3 overflow-x-auto border border-line">
+        <div className="overflow-x-auto border border-line">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-steel text-left text-xs text-muted uppercase">
+              <tr className="bg-steel text-left text-xs text-muted uppercase tracking-wide">
                 <th className="px-3 py-2">Ref</th>
                 <th className="px-3 py-2">Team</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Contact</th>
                 <th className="px-3 py-2">Source</th>
-                <th className="px-3 py-2">Rev</th>
-                <th className="px-3 py-2">Needed by</th>
-                <th className="px-3 py-2">Last msg</th>
+                <th className="px-3 py-2 text-muted/60">Rev</th>
+                <th className="px-3 py-2 whitespace-nowrap">Needed by</th>
+                <th className="px-3 py-2 whitespace-nowrap">Last msg</th>
                 <th className="px-3 py-2">Updated</th>
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[color:var(--line)]">
               {activeDesigns.map((d) => {
-                const lastMsg = d.messages?.[d.messages.length - 1];
+                const lastMsg = d.lastMessage;
                 return (
                   <tr
                     key={d.reference}
@@ -246,7 +260,7 @@ export default async function AdminDesignRequestsPage() {
                     data-search={`${d.teamName} ${d.reference} ${d.contactName} ${d.contactEmail}`.toLowerCase()}
                   >
                     <td className="px-3 py-2 font-mono text-xs">
-                      <Link href={`/design/manage/${d.manageToken}`} className="text-brand hover:underline">
+                      <Link href={`/admin/design-requests/${d.id}`} className="text-brand hover:underline">
                         {d.reference}
                       </Link>
                     </td>
@@ -254,14 +268,22 @@ export default async function AdminDesignRequestsPage() {
                     <td className="px-3 py-2"><Badge label={d.status} /></td>
                     <td className="px-3 py-2 text-muted">{d.contactName}</td>
                     <td className="px-3 py-2 text-muted whitespace-nowrap" title={d.source ?? "unknown (pre-tracking)"}>{srcShort(d.source)}</td>
-                    <td className="px-3 py-2 text-muted">{d.revisionsUsed ?? 0}/5</td>
+                    <td className="px-3 py-2 text-xs text-muted/50 tabular-nums">{d.revisionsUsed ?? 0}/5</td>
                     <td className="px-3 py-2 text-muted">{fmtDate(d.neededBy)}</td>
                     <td className="px-3 py-2 text-muted">
-                      {lastMsg ? (lastMsg.from === "client" ? "⚠ client waiting" : lastMsg.name ?? "staff") : "-"}
+                      {lastMsg ? (lastMsg.from === "client" ? "client waiting" : lastMsg.name ?? "staff") : "-"}
                     </td>
                     <td className="px-3 py-2 text-muted">{fmtDate(d.updatedAt)}</td>
                     <td className="px-3 py-2">
-                      <AdminArchiveButton kind="design_request" id={d.id} archived={false} />
+                      <div className="flex items-center gap-1.5 justify-end">
+                        {(designNeedsAction(d) || d.followedUpAt) && (
+                          <FollowedUpButton id={d.id} followedUp={Boolean(d.followedUpAt)} />
+                        )}
+                        {d.status === "approved" && d.approvedDesignUrl && (
+                          <AdminGalleryToggle designId={d.id} hidden={d.galleryHidden} />
+                        )}
+                        <AdminArchiveButton kind="design_request" id={d.id} archived={false} />
+                      </div>
                     </td>
                   </tr>
                 );
@@ -282,7 +304,7 @@ export default async function AdminDesignRequestsPage() {
             {archivedDesigns.map((d) => (
               <div key={d.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm">
                 <div>
-                  <Link href={`/design/manage/${d.manageToken}`} className="font-mono text-xs text-brand hover:underline">
+                  <Link href={`/admin/design-requests/${d.id}`} className="font-mono text-xs text-brand hover:underline">
                     {d.reference}
                   </Link>
                   <span className="ml-2 text-foreground">{d.teamName}</span>

@@ -1,5 +1,8 @@
 import { validTwilioSignature, formParams } from "@/lib/twilio-webhook";
 import { rehostTwilioMedia } from "@/lib/sms";
+import { relayEnabled, isOwner, relayOwnerReply, forwardToOwner } from "@/lib/whatsapp-relay";
+
+const EMPTY_TWIML = new Response(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, { headers: { "Content-Type": "text/xml" } });
 
 export const runtime = "nodejs";
 
@@ -28,6 +31,13 @@ export async function POST(req: Request) {
   // Twilio media URLs need auth - re-host to public Blob so the inbox can show
   // the images. Falls back to none if the fetch fails.
   const publicMedia = mediaUrls.length ? await rehostTwilioMedia(mediaUrls) : [];
+
+  // WhatsApp relay: if THIS is the owner replying from his WhatsApp, send it on
+  // to the customer he's talking to and stop (don't log it as a customer text).
+  if (relayEnabled() && channel === "whatsapp" && isOwner(from)) {
+    try { await relayOwnerReply(body, publicMedia); } catch (e) { console.error("relay reply failed:", e); }
+    return EMPTY_TWIML;
+  }
 
   // Log to the admin texts inbox (non-fatal).
   try {
@@ -61,6 +71,12 @@ export async function POST(req: Request) {
     }).catch(() => {});
   }
 
+  // Forward the customer's text to the owner's WhatsApp so he can reply from
+  // his phone; his reply comes back through this same webhook and is relayed.
+  if (relayEnabled()) {
+    try { await forwardToOwner(from, body, publicMedia); } catch (e) { console.error("relay forward failed:", e); }
+  }
+
   // Empty TwiML = no auto-reply; humans answer.
-  return new Response(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, { headers: { "Content-Type": "text/xml" } });
+  return EMPTY_TWIML;
 }

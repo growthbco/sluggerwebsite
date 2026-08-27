@@ -1,5 +1,3 @@
-import sharp from "sharp";
-
 // Shared jersey-image generation with a Pro -> Flash -> OpenAI fallback chain,
 // so both the public Jersey Maker and the staff design studio survive Gemini
 // outages. The first two tiers are Google (single-vendor), so a Google-side
@@ -186,19 +184,28 @@ export function parseDataUrl(u?: string | null): { mime_type: string; data: stri
   return m ? { mime_type: m[1], data: m[2] } : null;
 }
 
-// The Slugger logo, fetched once per instance from the site's public asset.
-// We watermark with the logo IMAGE (not SVG text) because the serverless
-// runtime's librsvg has no fonts - SVG <text> renders blank there, which is
-// why the old text watermark silently disappeared.
-let logoB64: string | null = null;
-async function getLogo(): Promise<string | null> {
-  if (logoB64) return logoB64;
+// The pre-tiled "SA" watermark sheet, fetched once per instance from the site's
+// public asset. It's a ready-made repeating pattern (light gray SA marks on
+// white), so we composite it directly rather than building a tile pattern in
+// code - gives art full control over the watermark's look.
+let sheetB64: string | null = null;
+async function getWatermarkSheet(): Promise<string | null> {
+  if (sheetB64) return sheetB64;
   try {
     const site = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
-    const res = await fetch(`${site}/slugger-logo.png`);
-    if (!res.ok) return null;
-    logoB64 = Buffer.from(await res.arrayBuffer()).toString("base64");
-    return logoB64;
+    const res = await fetch(`${site}/sa-watermark.png`);
+    if (res.ok) {
+      sheetB64 = Buffer.from(await res.arrayBuffer()).toString("base64");
+      return sheetB64;
+    }
+  } catch {
+    // fall through to the local file (dev / before first deploy)
+  }
+  try {
+    const { readFile } = await import("fs/promises");
+    const { join } = await import("path");
+    sheetB64 = (await readFile(join(process.cwd(), "public", "sa-watermark.png"))).toString("base64");
+    return sheetB64;
   } catch {
     return null;
   }
@@ -207,15 +214,44 @@ async function getLogo(): Promise<string | null> {
 // Flood-fill the near-white background inward from the image borders, so we
 // know which pixels are the empty backdrop vs. the product. mask[i] === 1 means
 // background. A small margin keeps the watermark off the product's edge/shadow.
+//
+// The catch: a WHITE garment on a WHITE backdrop has no color boundary on its
+// white edges, so a naive flood leaks up through the shirt and the watermark
+// lands on the fabric ("residue"). To prevent that WITHOUT nuking the whole
+// area around the product (which would leave a single centered jersey with no
+// visible watermark at all), we SEAL the garment: dilate the clearly-colored
+// product pixels into a barrier the flood can't cross. That keeps the fill in
+// the real backdrop - including right beside the garment - but stops it from
+// creeping into white fabric through a gap in the outline.
 function backgroundMask(rgba: Buffer, width: number, height: number): Uint8Array {
-  const mask = new Uint8Array(width * height);
+  const n = width * height;
   const nearWhite = (i: number) => rgba[i * 4] >= 236 && rgba[i * 4 + 1] >= 236 && rgba[i * 4 + 2] >= 236;
+
+  // Colored (non-near-white) pixels = the product's outline, piping, numbers,
+  // sleeves, shadows. Dilate them by a small seal margin to close thin white
+  // gaps in the garment's edge, forming a barrier the background flood respects.
+  let barrier = new Uint8Array(n);
+  for (let i = 0; i < n; i++) if (!nearWhite(i)) barrier[i] = 1;
+  const seal = Math.max(4, Math.round(width * 0.006));
+  for (let s = 0; s < seal; s++) {
+    const next = barrier.slice();
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = y * width + x;
+        if (barrier[i]) continue;
+        if ((x > 0 && barrier[i - 1]) || (x < width - 1 && barrier[i + 1]) || (y > 0 && barrier[i - width]) || (y < height - 1 && barrier[i + width])) next[i] = 1;
+      }
+    }
+    barrier = next;
+  }
+
+  const mask = new Uint8Array(n);
   const stack: number[] = [];
   for (let x = 0; x < width; x++) { stack.push(x, (height - 1) * width + x); }
   for (let y = 0; y < height; y++) { stack.push(y * width, y * width + width - 1); }
   while (stack.length) {
     const i = stack.pop()!;
-    if (mask[i] || !nearWhite(i)) continue;
+    if (mask[i] || barrier[i] || !nearWhite(i)) continue; // barrier seals the garment edge
     mask[i] = 1;
     const x = i % width;
     if (x > 0) stack.push(i - 1);
@@ -242,41 +278,37 @@ function backgroundMask(rgba: Buffer, width: number, height: number): Uint8Array
   return eroded;
 }
 
-/** Bake a repeating diagonal Slugger-logo watermark BEHIND the mockup: the logo
- *  tiles across the frame but only shows in the empty background around the
- *  product (masked off the garment/chain itself), so the design stays clean and
- *  the branding still protects the artwork. Uses the logo image (renders
- *  reliably in serverless, unlike SVG text). Returns base64 PNG (falls back to
- *  the input on error). */
+/** Composite the pre-tiled "SA" watermark sheet BEHIND the mockup: the sheet's
+ *  faint marks show only in the empty background around the product (masked off
+ *  the garment itself), so the design stays clean and the branding still
+ *  protects the artwork. The sheet is light gray on white, so we composite it
+ *  with a MULTIPLY blend - white areas of the sheet are a no-op, the gray SA
+ *  marks darken the backdrop just enough to read. Returns base64 PNG (falls
+ *  back to the input on error). */
 export async function watermarkImage(b64: string): Promise<string> {
   try {
+    // Lazy-load sharp (native module) so a load failure only skips the
+    // watermark - it can never take down image GENERATION, which is in the
+    // same module.
+    const sharp = (await import("sharp")).default;
     const srcBuf = Buffer.from(b64, "base64");
     const { width = 1200, height = 900 } = await sharp(srcBuf).metadata();
-    const logo = await getLogo();
-    if (!logo) return b64; // no logo asset -> leave unstamped rather than blank
-    const tileW = Math.round(width * 0.34);
-    const tileH = Math.round(width * 0.28);
-    const logoW = Math.round(width * 0.22);
-    const overlaySvg = Buffer.from(
-      `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="p" width="${tileW}" height="${tileH}" patternUnits="userSpaceOnUse" patternTransform="rotate(-20)">
-            <image href="data:image/png;base64,${logo}" x="0" y="${Math.round(tileH * 0.2)}" width="${logoW}" opacity="0.18"/>
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#p)"/>
-      </svg>`,
+    const sheet = await getWatermarkSheet();
+    if (!sheet) return b64; // no watermark asset -> leave unstamped rather than blank
+    // Resize the sheet to cover the render (keeps the SA marks undistorted),
+    // as plain RGB - it becomes a multiply overlay.
+    const overlayRaw = Buffer.from(
+      await sharp(Buffer.from(sheet, "base64")).resize(width, height, { fit: "cover" }).removeAlpha().raw().toBuffer(),
     );
-    // Render the tiled overlay to raw RGBA, then knock out its alpha wherever
-    // the source is the product (mask === 0), leaving the logo in the backdrop.
-    const overlayRaw = Buffer.from(await sharp(overlaySvg).resize(width, height).ensureAlpha().raw().toBuffer());
     const srcRaw = await sharp(srcBuf).ensureAlpha().raw().toBuffer();
+    // backgroundMask seals the garment edge, so the watermark fills the real
+    // backdrop (including right beside the product) but never the fabric.
     const mask = backgroundMask(srcRaw, width, height);
     for (let i = 0; i < mask.length; i++) {
-      if (!mask[i]) overlayRaw[i * 4 + 3] = 0; // product pixel -> hide watermark
+      if (!mask[i]) { overlayRaw[i * 3] = 255; overlayRaw[i * 3 + 1] = 255; overlayRaw[i * 3 + 2] = 255; } // product -> white = multiply no-op
     }
-    const overlay = await sharp(overlayRaw, { raw: { width, height, channels: 4 } }).png().toBuffer();
-    const stamped = await sharp(srcBuf).composite([{ input: overlay }]).png().toBuffer();
+    const overlay = await sharp(overlayRaw, { raw: { width, height, channels: 3 } }).png().toBuffer();
+    const stamped = await sharp(srcBuf).composite([{ input: overlay, blend: "multiply" }]).png().toBuffer();
     return stamped.toString("base64");
   } catch (e) {
     console.error("watermarkImage failed (returning unstamped):", e);

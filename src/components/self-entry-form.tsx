@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { ITEM_TYPES } from "@/lib/order-items";
+import { ITEM_TYPES, formatSize } from "@/lib/order-items";
 
-export function SelfEntryForm({ token, items, designs = [] }: { token: string; items: string[]; designs?: { label: string; image: string; sku?: string | null }[] }) {
+export function SelfEntryForm({ token, items, designs = [], requiresNames = true }: { token: string; items: string[]; designs?: { label: string; image: string; sku?: string | null }[]; requiresNames?: boolean }) {
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
   const [sizes, setSizes] = useState<Record<string, string>>({});
@@ -85,10 +85,12 @@ export function SelfEntryForm({ token, items, designs = [] }: { token: string; i
           </div>
         </div>
       )}
-      <div>
-        <label className="display text-sm text-foreground">Your Name <span className="text-muted normal-case">(optional - prints in CAPS if given)</span></label>
-        <input className={`mt-2 ${inputCls}`} value={name} onChange={(e) => setName(e.target.value)} placeholder="Last name, or leave blank for no name" />
-      </div>
+      {requiresNames && (
+        <div>
+          <label className="display text-sm text-foreground">Your Name <span className="text-muted normal-case">(optional - prints in CAPS if given)</span></label>
+          <input className={`mt-2 ${inputCls}`} value={name} onChange={(e) => setName(e.target.value)} placeholder="Last name, or leave blank for no name" />
+        </div>
+      )}
       <div>
         <label className="display text-sm text-foreground">Number</label>
         <input className={`mt-2 ${inputCls} max-w-32`} value={number} onChange={(e) => setNumber(e.target.value)} placeholder="#" maxLength={4} />
@@ -100,7 +102,7 @@ export function SelfEntryForm({ token, items, designs = [] }: { token: string; i
             <label className="display text-sm text-foreground">{t.label} Size *</label>
             <select className={`mt-2 ${inputCls}`} value={sizes[t.key] ?? ""} onChange={(e) => setSize(t.key, e.target.value)}>
               <option value="">Select</option>
-              {t.sizes.map((s) => <option key={s}>{s}</option>)}
+              {t.sizes.map((s) => <option key={s} value={s}>{formatSize(s)}</option>)}
             </select>
           </div>
         ))}

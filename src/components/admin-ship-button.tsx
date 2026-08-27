@@ -63,14 +63,14 @@ export function AdminShipButton({
         onClick={() => setOpen(true)}
         className="text-xs display text-foreground border border-brand/50 px-2.5 py-1 hover:bg-brand/10 disabled:opacity-50 whitespace-nowrap"
       >
-        {label ?? "🚚 Mark shipped"}
+        {label ?? "Mark shipped"}
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={() => !busy && reset()}>
           <div className="w-full max-w-md bg-ink border border-line" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-line">
-              <p className="display text-foreground">🚚 Mark shipped - {who}</p>
+              <p className="display text-foreground">Mark shipped - {who}</p>
               <button type="button" onClick={reset} disabled={busy} className="text-muted hover:text-foreground text-xl leading-none">✕</button>
             </div>
             <div className="p-4 space-y-4">

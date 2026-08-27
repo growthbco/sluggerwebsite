@@ -2,13 +2,14 @@
 
 import { useRef, useState } from "react";
 import { DropZone, firstImageFile } from "@/components/drop-zone";
-import { sizesFor, itemLabel } from "@/lib/order-items";
+import { sizesFor, itemLabel, formatSize } from "@/lib/order-items";
 
 export type ImportedRow = {
   name: string;
   number: string;
   sizes: Record<string, string>;
   notes?: string;
+  design?: string;
 };
 
 /** AI roster import: paste text or add a photo, review the parsed rows, then
@@ -176,10 +177,10 @@ export function RosterImport({
                       }`}
                     >
                       <option value="">{def.label}: -</option>
-                      {val && !allowed.includes(val) && <option value={val}>⚠ {val}</option>}
+                      {val && !allowed.includes(val) && <option value={val}>⚠ {formatSize(val)}</option>}
                       {allowed.map((s) => (
                         <option key={s} value={s}>
-                          {s}
+                          {formatSize(s)}
                         </option>
                       ))}
                     </select>

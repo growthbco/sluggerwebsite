@@ -89,7 +89,7 @@ export function AdminTransactions({ txns }: { txns: Txn[] }) {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="🔍 Search by customer or reference…"
+            placeholder="Search by customer or reference…"
             className="flex-1 min-w-52 bg-background border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
           />
           <label className="flex items-center gap-1.5 text-xs text-muted">
@@ -101,7 +101,7 @@ export function AdminTransactions({ txns }: { txns: Txn[] }) {
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="bg-background border border-line px-2 py-1.5 text-xs text-foreground" />
           </label>
           <button type="button" onClick={exportCsv} className="text-xs display text-foreground border border-line px-3 py-2 hover:border-brand/50">
-            ⬇ Export CSV
+            Export CSV
           </button>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -148,7 +148,7 @@ export function AdminTransactions({ txns }: { txns: Txn[] }) {
                   <td className="px-3 py-2.5 font-mono text-xs text-muted">{t.ref}</td>
                   <td className="px-3 py-2.5"><span className={`inline-block border px-2 py-0.5 text-xs display ${KIND_TONE[t.kind]}`}>{t.kind}</span></td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-foreground">{money(t.amountCents)}</td>
-                  <td className="px-3 py-2.5 text-xs text-muted">{t.method === "Offline" ? "💵 Offline" : "Stripe"}</td>
+                  <td className="px-3 py-2.5 text-xs text-muted">{t.method === "Offline" ? "Offline" : "Stripe"}</td>
                 </tr>
                 {isOpen && (
                   <tr className="border-t border-line/40 bg-background/40">

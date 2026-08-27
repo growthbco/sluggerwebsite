@@ -1,11 +1,13 @@
 // Customer portal: a stateless, email magic-link view of everything a
 // customer has with Slugger (team orders, store purchases, design requests,
 // custom invoices). No passwords - the link IS the auth, and it's short-lived.
+import { cache } from "react";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 import { sql, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
-import { teamOrders, designRequests, customInvoices, orders, orderItems, teams } from "@/db/schema";
+import { teamOrders, teamOrderRoster, designRequests, customInvoices, orders, orderItems, teams } from "@/db/schema";
 import { getOrCreateCustomer } from "@/lib/customers";
+import { itemLabel } from "@/lib/order-items";
 
 const TTL_MS = 45 * 60 * 1000; // 45 minutes
 
@@ -44,14 +46,23 @@ export function readPortalToken(token: string): string | null {
 }
 
 export type PortalData = {
-  teamOrders: { reference: string; teamName: string; status: string; manageToken: string | null; trackingNumber: string | null; createdAt: Date }[];
-  designs: { reference: string; teamName: string; status: string; statusToken: string | null; createdAt: Date }[];
+  teamOrders: {
+    reference: string; teamName: string; status: string; manageToken: string | null; trackingNumber: string | null; createdAt: Date;
+    totalCents: number; shippingCents: number; depositCents: number | null; invoiceUrl: string | null; fullInvoiceUrl: string | null; balanceInvoiceUrl: string | null; depositPaidAt: Date | null; invoicePaidAt: Date | null; pieceLabel: string;
+    inboundCarrier: string | null; inboundTrackingNumber: string | null;
+  }[];
+  designs: { reference: string; teamName: string; status: string; statusToken: string | null; createdAt: Date; mockups: string[] }[];
   invoices: { reference: string; status: string; totalCents: number; payUrl: string | null; createdAt: Date }[];
   shop: { reference: string; type: string; status: string; totalCents: number; subtotalCents: number; shippingCents: number; items: { name: string; quantity: number; unitPriceCents: number }[]; trackingNumber: string | null; shippedAt: Date | null; addUrl: string | null; createdAt: Date }[];
   name: string | null;
   profile: { name: string | null; phone: string | null; referralCode: string; referralCreditCents: number; hasPassword: boolean };
+  shippingAddress: { line1: string; line2: string; city: string; state: string; postalCode: string } | null;
   empty: boolean;
 };
+
+/** Request-scoped cache so the portal shell layout and its section pages share
+ *  ONE query per render instead of each re-fetching everything. */
+export const getCustomerOrdersCached = cache((email: string) => getCustomerOrders(email));
 
 /** Everything on file for a given email address. */
 export async function getCustomerOrders(email: string): Promise<PortalData> {
@@ -63,8 +74,77 @@ export async function getCustomerOrders(email: string): Promise<PortalData> {
     db.select().from(customInvoices).where(sql`lower(${customInvoices.customerEmail}) = ${e}`),
     db.select().from(orders).where(sql`lower(${orders.customerEmail}) = ${e}`),
   ]);
-  const teamOrdersV = team.map((o) => ({ reference: o.reference, teamName: o.teamName, status: o.status, manageToken: o.manageToken, trackingNumber: o.trackingNumber, createdAt: o.createdAt }));
-  const designsV = designs.map((d) => ({ reference: d.reference, teamName: d.teamName, status: d.status, statusToken: d.statusToken, createdAt: d.createdAt }));
+  // What each order actually is, from the roster: count every item type (jerseys
+  // with their style, hats, pants, etc.) into a plain-English summary like
+  // "12 Full Button jerseys + 12 Fitted Hats".
+  const teamIds = team.map((o) => o.id);
+  const comp = new Map<string, Map<string, number>>();
+  if (teamIds.length) {
+    const rr = await db
+      .select({ to: teamOrderRoster.teamOrderId, sizes: teamOrderRoster.sizes, size: teamOrderRoster.size })
+      .from(teamOrderRoster)
+      .where(inArray(teamOrderRoster.teamOrderId, teamIds));
+    for (const r of rr) {
+      const m = comp.get(r.to) ?? new Map<string, number>();
+      const sized = Object.entries(r.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
+      if (sized.length) for (const [k] of sized) m.set(k, (m.get(k) ?? 0) + 1);
+      else if ((r.size ?? "").trim()) m.set("jersey", (m.get("jersey") ?? 0) + 1);
+      comp.set(r.to, m);
+    }
+  }
+  const summarize = (o: (typeof team)[number]): string => {
+    const m = comp.get(o.id);
+    if (!m || m.size === 0) return "";
+    const st = (o.jerseyStyle ?? "").trim();
+    // Jerseys first, then the rest.
+    const keys = [...m.keys()].sort((a, b) => (a === "jersey" ? -1 : b === "jersey" ? 1 : 0));
+    return keys
+      .map((k) => {
+        const n = m.get(k)!;
+        if (k === "jersey") return `${n} ${st ? st + " " : ""}${n === 1 ? "jersey" : "jerseys"}`;
+        const lbl = itemLabel(k);
+        return `${n} ${lbl}${n === 1 ? "" : "s"}`;
+      })
+      .join(" + ");
+  };
+  const teamOrdersV = team.map((o) => {
+    return {
+      reference: o.reference,
+      teamName: o.teamName,
+      status: o.status,
+      manageToken: o.manageToken,
+      trackingNumber: o.trackingNumber,
+      createdAt: o.createdAt,
+      totalCents: o.quotedTotalCents ?? 0,
+      shippingCents: o.shippingChargedCents ?? 0,
+      depositCents: o.depositCents,
+      invoiceUrl: o.invoiceUrl,
+      fullInvoiceUrl: o.fullInvoiceUrl,
+      balanceInvoiceUrl: o.balanceInvoiceUrl,
+      depositPaidAt: o.depositPaidAt,
+      invoicePaidAt: o.invoicePaidAt,
+      pieceLabel: summarize(o),
+      inboundCarrier: o.inboundCarrier,
+      inboundTrackingNumber: o.inboundTrackingNumber,
+    };
+  });
+  const designsV = designs.map((d) => {
+    // Show ALL approved designs (e.g. the player jersey AND the coach quarter-zip),
+    // so a single unrepresentative image never confuses the customer.
+    const approved = d.approvedDesignUrls?.length
+      ? d.approvedDesignUrls
+      : d.approvedDesignUrl
+      ? [d.approvedDesignUrl]
+      : d.proofImages ?? [];
+    return {
+      reference: d.reference,
+      teamName: d.teamName,
+      status: d.status,
+      statusToken: d.statusToken,
+      createdAt: d.createdAt,
+      mockups: [...new Set(approved.filter(Boolean))].slice(0, 6),
+    };
+  });
   const invoicesV = invoices.map((i) => ({ reference: i.reference, status: i.status, totalCents: i.totalCents, payUrl: i.payUrl, createdAt: i.createdAt }));
   // For unshipped team-store orders, offer a self-serve "add items" link that
   // reopens the team's store in add-to-order mode (only when the store is live).
@@ -114,6 +194,10 @@ export async function getCustomerOrders(email: string): Promise<PortalData> {
     invoices: invoicesV,
     shop: shopV,
     name: customer.name || named,
+    shippingAddress: (() => {
+      const a = [...team].sort((x, y) => +y.createdAt - +x.createdAt).find((t) => t.shippingAddress?.line1)?.shippingAddress;
+      return a ? { line1: a.line1 ?? "", line2: a.line2 ?? "", city: a.city ?? "", state: a.state ?? "", postalCode: a.postalCode ?? "" } : null;
+    })(),
     empty: teamOrdersV.length + designsV.length + invoicesV.length + shopV.length === 0,
   };
 }

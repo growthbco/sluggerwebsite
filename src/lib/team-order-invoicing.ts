@@ -139,6 +139,27 @@ export async function sendTeamOrderInvoice(opts: {
   const creditForFull = stage === "deposit" ? creditFor(totalCents) : 0;
   const creditForBalance = stage === "balance" ? creditFor(dueCents) : 0;
 
+  // Plain-English summary shown under the amount on the Stripe checkout page,
+  // so the coach sees what the payment buys and how the two stages work - not
+  // a bare dollar figure. Goods breakdown comes from the priced quote (deposit
+  // stage); the balance link just needs the closing terms.
+  const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+  const goodsSummary = quoteLines
+    .filter((l) => !/rush order fee|embroider|digitiz/i.test(l.label))
+    .map((l) => `${l.quantity}x ${l.label}`)
+    .join(", ");
+  const balanceRemaining = totalCents - depositCents;
+  const withSummary = (terms: string) => (goodsSummary ? `${goodsSummary}. ${terms}` : terms);
+  const depositDesc = withSummary(
+    `This is your 50% production deposit. The remaining ${money(balanceRemaining)} plus shipping is billed once your order is ready. Production starts as soon as this deposit is paid.`,
+  );
+  const fullDesc = withSummary(
+    "Pays your order in full including shipping, so there is nothing left to collect later. Production starts right away.",
+  );
+  const balanceDesc = withSummary(
+    "Final balance for your order, including shipping. This clears your account in full.",
+  );
+
   try {
     const stripe = getStripe();
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
@@ -149,13 +170,23 @@ export async function sendTeamOrderInvoice(opts: {
     // Each link charges the goods + 7% FL sales tax (skipped when tax-exempt).
     // creditCents is subtracted from the goods (and the tax base) before the
     // Stripe prices are built, so the customer pays the discounted amount.
-    const makeLink = async (name: string, goodsCents: number, linkStage: string, extraMeta: Record<string, string> = {}, shippingCents = 0, creditCents = 0) => {
+    const makeLink = async (name: string, goodsCents: number, linkStage: string, extraMeta: Record<string, string> = {}, shippingCents = 0, creditCents = 0, description?: string) => {
       const netGoods = Math.max(0, goodsCents - creditCents);
-      const goodsPrice = await stripe.prices.create({
-        currency: "usd",
-        unit_amount: netGoods,
-        product_data: { name: creditCents > 0 ? `${name} (incl. $${(creditCents / 100).toFixed(2)} referral credit)` : name },
-      });
+      const goodsName = creditCents > 0 ? `${name} (incl. $${(creditCents / 100).toFixed(2)} credit)` : name;
+      // Stripe's inline `product_data` on a price does NOT accept a description.
+      // To show the order-summary line on checkout we create a real Product with
+      // the description, then price it; otherwise a name-only inline product.
+      const goodsPrice = description
+        ? await stripe.prices.create({
+            currency: "usd",
+            unit_amount: netGoods,
+            product: (await stripe.products.create({ name: goodsName, description })).id,
+          })
+        : await stripe.prices.create({
+            currency: "usd",
+            unit_amount: netGoods,
+            product_data: { name: goodsName },
+          });
       const items = [{ price: goodsPrice.id, quantity: 1 }];
       if (!exempt && taxCents(netGoods) > 0) {
         const taxPrice = await stripe.prices.create({
@@ -188,11 +219,11 @@ export async function sendTeamOrderInvoice(opts: {
       // Deposit + a pay-in-full sibling. Whichever is paid first deactivates
       // the other (via siblingLinkId in the webhook) so nobody double-pays.
       // Credit rides on the pay-in-full link only (the deposit is partial).
-      link = await makeLink(`50% Production Deposit - ${order.teamName} (${order.reference})`, dueCents, "deposit");
-      fullLink = await makeLink(`Pay in Full - ${order.teamName} (${order.reference})`, totalCents, "full", { siblingLinkId: link.id, shipCents: String(fullShipCents) }, fullShipCents, creditForFull);
+      link = await makeLink(`50% Production Deposit - ${order.teamName} (${order.reference})`, dueCents, "deposit", {}, 0, 0, depositDesc);
+      fullLink = await makeLink(`Pay in Full - ${order.teamName} (${order.reference})`, totalCents, "full", { siblingLinkId: link.id, shipCents: String(fullShipCents) }, fullShipCents, creditForFull, fullDesc);
       await stripe.paymentLinks.update(link.id, { metadata: { ...link.metadata, siblingLinkId: fullLink.id } });
     } else {
-      link = await makeLink(`Final Balance - ${order.teamName} (${order.reference})`, dueCents, "balance", {}, shipCents, creditForBalance);
+      link = await makeLink(`Final Balance - ${order.teamName} (${order.reference})`, dueCents, "balance", {}, shipCents, creditForBalance, balanceDesc);
     }
 
     await db
@@ -229,6 +260,7 @@ export async function sendTeamOrderInvoice(opts: {
       taxDueCents: order.taxExempt ? 0 : taxCents(dueCents - creditForBalance),
       taxExempt: order.taxExempt,
       shipCents,
+      shipBoxes: parcelsFor().length,
       creditAppliedCents: creditForBalance,
       payFullCreditCents: creditForFull,
       localPickup: order.localPickup,
