@@ -33,6 +33,7 @@ const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 // Visual identity per item so cards read as products, not form rows.
 const ITEM_ICONS: Record<string, string> = {
   round_neck_jersey: "👕",
+  v_neck_jersey: "👕",
   long_sleeve_shirt: "👕",
   two_button_jersey: "👕",
   full_button_jersey: "👕",

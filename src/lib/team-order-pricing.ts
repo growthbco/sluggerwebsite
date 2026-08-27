@@ -5,7 +5,7 @@ import { itemLabel } from "@/lib/order-items";
 
 // Per-item retail prices in cents (mirrors src/lib/pricing.ts).
 const ITEM_PRICES: Record<string, number> = {
-  jersey: 2800, // crew / v-neck default; overridden by style below
+  jersey: 2800, // crew default; V-neck and premium cuts are overridden below
   hockey_jersey: 5500, // ice-hockey sweater; ~2.3x the $24 designer cost
   flag_football_jersey: 2800, // sleeveless compression game shirt
   practice_jersey: 2000,
@@ -46,7 +46,7 @@ export function whiteLabelFeeCents(pieces: number): number {
 export const EMBROIDERY_FEE_CENTS = 2000;
 const HAT_KEYS = ["fitted_hat", "snapback_hat", "performance_hat"];
 
-// Ocala league-family price for standard (crew/v-neck) jerseys.
+// Ocala league-family price for standard crew/V-neck jerseys.
 export const LOCAL_JERSEY_CENTS = 2500;
 
 // Approx shipping weight per item, ounces. The order's items are known, so the
@@ -106,7 +106,7 @@ export function estimateOrderWeightOz(
 
 // The jersey styles a team order can use, in the order shown in the form. The
 // price follows the style via jerseyPriceCents (zip $38, full $35, two $32,
-// crew/v-neck $28 / $25 local).
+// V-neck $29, crew $28; crew/V-neck are $25 with local pricing).
 export const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button", "Quarter-Zip"] as const;
 
 export function jerseyPriceCents(jerseyStyle?: string | null, localPricing?: boolean | null, material?: string | null): number {
@@ -119,7 +119,8 @@ export function jerseyPriceCents(jerseyStyle?: string | null, localPricing?: boo
   if (s.includes("zip")) return 3800;
   if (s.includes("full")) return 3500;
   if (s.includes("two")) return 3200;
-  return localPricing ? LOCAL_JERSEY_CENTS : 2800; // crew / v-neck / unspecified
+  if (/v[\s-]?neck/.test(s)) return localPricing ? LOCAL_JERSEY_CENTS : 2900;
+  return localPricing ? LOCAL_JERSEY_CENTS : 2800; // crew / unspecified
 }
 
 /** Retail price for one piece of an order item ("jersey" follows the order's

@@ -51,7 +51,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [contactEmail, setContactEmail] = useState(prefill?.contactEmail ?? "");
   const [contactPhone, setContactPhone] = useState(prefill?.contactPhone ?? "");
   // No design style specified -> leave blank rather than silently stamping
-  // "Standard Crew Neck" on the order. Blank prices the same as crew/v-neck.
+  // "Standard Crew Neck" on the order. Blank prices the same as crew neck.
   const [jerseyStyle, setJerseyStyle] = useState(styleFromDesign(prefill?.designJerseyStyle) ?? "");
   const [material, setMaterial] = useState(
     (JERSEY_MATERIALS.find((m) => m.recommended) ?? JERSEY_MATERIALS[0]).key,
@@ -261,8 +261,12 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       <div>
         <label className="display text-sm text-foreground">Jersey Style *</label>
         <select className={`mt-2 ${inputCls}`} value={jerseyStyle} onChange={(e) => setJerseyStyle(e.target.value)}>
-          <option value="">Standard (crew / v-neck)</option>
-          {JERSEY_STYLES.map((s) => <option key={s}>{s}</option>)}
+          <option value="">Select a style</option>
+          {JERSEY_STYLES.map((s) => (
+            <option key={s} value={s}>
+              {s} — ${s === "V-Neck" ? 29 : s === "Two Button" ? 32 : s === "Full Button" ? 35 : s === "Quarter-Zip" ? 38 : 28}
+            </option>
+          ))}
         </select>
       </div>
       )}

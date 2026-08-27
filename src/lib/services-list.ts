@@ -117,6 +117,13 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
         href: "/pricing",
       },
       {
+        name: "V-Neck Jerseys",
+        price: "$29",
+        description:
+          "Fully sublimated V-neck jerseys with custom design, names, and numbers included.",
+        href: "/pricing",
+      },
+      {
         name: "Two-Button Jerseys",
         price: "$32",
         description:

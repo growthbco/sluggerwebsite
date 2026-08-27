@@ -29,6 +29,7 @@ export type StoreItem = {
 // store is created. Prices mirror src/lib/pricing.ts at snapshot time.
 export const STORE_ITEM_PRESETS: StoreItem[] = [
   { key: "round_neck_jersey", label: "Round-Neck Jersey", priceCents: 2800, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 10 },
+  { key: "v_neck_jersey", label: "V-Neck Jersey", priceCents: 2900, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 10 },
   { key: "long_sleeve_shirt", label: "Long-Sleeve Shirt", priceCents: 3200, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 12 },
   { key: "two_button_jersey", label: "Two-Button Jersey", priceCents: 3200, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 11 },
   { key: "full_button_jersey", label: "Full-Button Jersey", priceCents: 3500, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 12 },
@@ -100,7 +101,7 @@ export async function createTeamStore(input: {
   }
 
   const items = STORE_ITEM_PRESETS.filter((p) => input.itemKeys.includes(p.key)).map((p) =>
-    input.localPricing && p.key === "round_neck_jersey" ? { ...p, priceCents: 2500 } : p,
+    input.localPricing && ["round_neck_jersey", "v_neck_jersey"].includes(p.key) ? { ...p, priceCents: 2500 } : p,
   );
   const base = slugify(input.name) || "team";
   const [row] = await db

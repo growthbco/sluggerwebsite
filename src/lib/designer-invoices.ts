@@ -183,7 +183,8 @@ export function designerCostCents(label: string, material?: string | null): numb
   if (/legging/.test(s)) return 1700;
   if (/compression/.test(s)) return 1300;
   if (/hockey/.test(s)) return 2400; // hockey jersey (sweater) - Gary's cost Aug 2026
-  if (/jersey|shirt|crew|v-?neck|round[\s-]?neck/.test(s)) return 1100; // standard round-neck jersey
+  if (/v[\s-]?neck/.test(s)) return 1200;
+  if (/jersey|shirt|crew|round[\s-]?neck/.test(s)) return 1100; // standard round-neck jersey
   return null;
 }
 
