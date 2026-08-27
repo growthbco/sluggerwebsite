@@ -2,6 +2,7 @@ import { put } from "@vercel/blob";
 import { and, eq, gt, ne, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { designRequests } from "@/db/schema";
+import { generateJerseyImage } from "@/lib/jersey-image";
 
 // Shared asset-sheet extraction for the AI design lab: used inline on submit
 // and by the daily cron to heal submissions whose sheets failed (the image
@@ -27,32 +28,13 @@ export const SHEET_LABELS: Record<string, string> = {
 export async function extractAsset(
   concept: { mime: string; data: string },
   prompt: string,
-  timeoutMs = 120000,
 ): Promise<string | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-  const call = () =>
-    fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }, { inline_data: { mime_type: concept.mime, data: concept.data } }] }],
-        generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "1:1" } },
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-  try {
-    let res = await call();
-    if (!res.ok) res = await call();
-    if (!res.ok) return null;
-    const data = await res.json();
-    const img = data?.candidates?.[0]?.content?.parts?.find(
-      (x: { inlineData?: { data: string }; inline_data?: { data: string } }) => x.inlineData || x.inline_data,
-    );
-    return (img?.inlineData ?? img?.inline_data)?.data ?? null;
-  } catch {
-    return null;
-  }
+  const result = await generateJerseyImage(
+    [{ text: prompt }, { inline_data: { mime_type: concept.mime, data: concept.data } }],
+    "1:1",
+    { forceOpenai: true, quality: "medium", operation: "asset_sheet_extraction" },
+  );
+  return "error" in result ? null : result.data;
 }
 
 /** True if a design already has extracted asset sheets among its images (so we

@@ -6,18 +6,16 @@
 //    from /design/manage. Drafts may touch any topic (a human reviews), but
 //    never invent discounts, prices, or promises not in the facts.
 //
-// Text generation runs on Claude (the owner prefers its wording) with the
-// original Gemini setup kept as an automatic fallback; image work stays on
-// Gemini elsewhere in the codebase.
+// Text generation runs on Claude (the owner prefers its wording).
 
 import Anthropic from "@anthropic-ai/sdk";
 import { PRICE_LIST, BUNDLES, BUNDLE_UPGRADE_NOTE } from "@/lib/pricing";
 import { FAQS } from "@/lib/faqs";
 import { MAX_REVISIONS, type DesignMessage } from "@/lib/design-requests";
 import { itemLabel } from "@/lib/order-items";
+import { recordAiUsage } from "@/lib/ai-usage";
 
-const MODEL = process.env.GEMINI_ASSISTANT_MODEL || "gemini-flash-latest";
-const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+const CLAUDE_MODEL = "claude-opus-4-8";
 
 export type AssistantResult = {
   action: "answer" | "escalate" | "none";
@@ -191,49 +189,38 @@ async function callClaude(prompt: string, schema: object): Promise<Record<string
   try {
     anthropic ??= new Anthropic({ timeout: 25000, maxRetries: 1 });
     const response = await anthropic.messages.create({
-      model: "claude-opus-4-8",
+      model: CLAUDE_MODEL,
       max_tokens: 2048,
       output_config: { format: { type: "json_schema", schema: toJsonSchema(schema as Record<string, unknown>) } },
       messages: [{ role: "user", content: prompt }],
     });
-    if (response.stop_reason === "refusal") return null;
-    const text = response.content.find((b) => b.type === "text")?.text ?? "";
-    return text ? JSON.parse(text) : null;
-  } catch (e) {
-    console.error("claude assistant error (falling back to gemini):", e);
-    return null;
-  }
-}
-
-/** Grounded JSON generation: Claude first, Gemini as fallback. Shared by the
- *  design-thread assistant, staff reply drafts, public chat, and invoice AI. */
-export async function generateJson(prompt: string, schema: object): Promise<Record<string, string> | null> {
-  return (await callClaude(prompt, schema)) ?? (await callGemini(prompt, schema));
-}
-
-async function callGemini(prompt: string, schema: object): Promise<Record<string, string> | null> {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return null;
-  try {
-    const res = await fetch(`${API_BASE}/${MODEL}:generateContent?key=${key}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2, responseMimeType: "application/json", responseSchema: schema },
-      }),
-      signal: AbortSignal.timeout(20000),
-    });
-    if (!res.ok) {
-      console.error("design assistant failed:", res.status, await res.text().catch(() => ""));
+    const tokenUsage = {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+    };
+    if (response.stop_reason === "refusal") {
+      await recordAiUsage({ provider: "anthropic", model: CLAUDE_MODEL, operation: "assistant_json", status: "refused", ...tokenUsage });
       return null;
     }
-    const data = await res.json();
-    return JSON.parse(data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}");
+    const text = response.content.find((b) => b.type === "text")?.text ?? "";
+    const parsed = text ? JSON.parse(text) : null;
+    await recordAiUsage({ provider: "anthropic", model: CLAUDE_MODEL, operation: "assistant_json", status: parsed ? "success" : "error", ...tokenUsage });
+    return parsed;
   } catch (e) {
-    console.error("design assistant error:", e);
+    console.error("Claude assistant error:", e);
+    await recordAiUsage({
+      provider: "anthropic", model: CLAUDE_MODEL, operation: "assistant_json", status: "error",
+      metadata: { error: e instanceof Error ? e.name : "unknown" },
+    });
     return null;
   }
+}
+
+/** Grounded JSON generation shared by the design-thread assistant, staff
+ * reply drafts, public chat, and invoice AI. */
+export async function generateJson(prompt: string, schema: object): Promise<Record<string, string> | null> {
+  return callClaude(prompt, schema);
 }
 
 /** Shared human-tone rules for every client-facing reply (public chat, the

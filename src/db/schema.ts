@@ -1078,6 +1078,47 @@ export const designLabRenders = pgTable("design_lab_renders", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// One durable row per AI provider request. Cost is stored in millionths of a
+// dollar so inexpensive image/text calls can be totaled without rounding.
+// Some providers do not return enough billing detail for an honest estimate;
+// those rows keep estimatedCostMicros null and still record model + token use.
+export const aiUsageEvents = pgTable(
+  "ai_usage_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    operation: text("operation").notNull(),
+    quality: text("quality"),
+    status: text("status").notNull().default("success"),
+    estimatedCostMicros: integer("estimated_cost_micros"),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    totalTokens: integer("total_tokens"),
+    metadata: jsonb("metadata").$type<Record<string, string | number | boolean | null>>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("ai_usage_events_created_idx").on(t.createdAt),
+    index("ai_usage_events_provider_idx").on(t.provider, t.model, t.createdAt),
+  ],
+);
+
+// Atomic counters make the design-lab daily cap work across every serverless
+// instance. The old module variable reset whenever Vercel started a new
+// instance, so it was not a real spending limit.
+export const aiDailyCounters = pgTable(
+  "ai_daily_counters",
+  {
+    id: text("id").primaryKey(), // e.g. design-lab:2026-08-27
+    scope: text("scope").notNull(),
+    day: text("day").notNull(), // UTC YYYY-MM-DD (matches the previous cap)
+    used: integer("used").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("ai_daily_counters_scope_day_idx").on(t.scope, t.day)],
+);
+
 export const teamsRelations = relations(teams, ({ many }) => ({
   teamStoreProducts: many(teamStoreProducts),
 }));

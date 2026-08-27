@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { redirect } from "next/navigation";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
 import { dbEnabled, getDb } from "@/db";
-import { designLabVisitors, designLabRenders, designRequests } from "@/db/schema";
+import { aiDailyCounters, aiUsageEvents, designLabVisitors, designLabRenders, designRequests } from "@/db/schema";
 import { AdminBulkLeadDelete } from "@/components/admin-bulk-lead-delete";
 import { LabLeadConvertButton } from "@/components/lab-lead-convert-button";
 import { AdminLabFilter } from "@/components/admin-lab-filter";
 import { LabConcepts } from "@/components/lab-concepts";
 import { LabRowMenu } from "@/components/lab-row-menu";
+import { DESIGN_LAB_DAILY_CAP } from "@/lib/ai-usage";
 
 export const metadata: Metadata = { title: "Design Lab Leads", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -26,6 +27,23 @@ export default async function DesignLabLeadsPage() {
   if (!dbEnabled()) redirect("/admin");
 
   const db = getDb();
+  const recentAiUsage = await db
+    .select()
+    .from(aiUsageEvents)
+    .where(sql`${aiUsageEvents.createdAt} >= now() - interval '7 days'`)
+    .orderBy(desc(aiUsageEvents.createdAt))
+    .limit(2000);
+  const [dailyCounter] = await db
+    .select()
+    .from(aiDailyCounters)
+    .where(and(
+      eq(aiDailyCounters.scope, "design-lab"),
+      sql`${aiDailyCounters.day} = to_char(now() at time zone 'UTC', 'YYYY-MM-DD')`,
+    ))
+    .limit(1);
+  const estimatedSevenDayMicros = recentAiUsage.reduce((sum, row) => sum + (row.estimatedCostMicros ?? 0), 0);
+  const openAiCalls = recentAiUsage.filter((row) => row.provider === "openai").length;
+  const googleCalls = recentAiUsage.filter((row) => row.provider === "google").length;
   const visitors = await db.select().from(designLabVisitors).orderBy(desc(designLabVisitors.createdAt));
   const renders = visitors.length
     ? await db
@@ -73,6 +91,42 @@ export default async function DesignLabLeadsPage() {
         </p>
         <AdminBulkLeadDelete count={junkCount} />
       </div>
+
+      <section className="mt-6 border border-line bg-steel/40 p-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="display text-xl text-foreground">AI usage</h2>
+            <p className="mt-1 text-xs text-muted">Provider/model audit for the last 7 days. Spend is an estimate from published OpenAI image-output prices; edit input can add a little more.</p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+            <div className="border border-line px-3 py-2"><div className="text-xs text-muted">Today&apos;s lab cap</div><div className="display text-lg">{dailyCounter?.used ?? 0} / {DESIGN_LAB_DAILY_CAP}</div></div>
+            <div className="border border-line px-3 py-2"><div className="text-xs text-muted">OpenAI calls</div><div className="display text-lg">{openAiCalls}</div></div>
+            <div className="border border-line px-3 py-2"><div className="text-xs text-muted">Google calls</div><div className="display text-lg">{googleCalls}</div></div>
+            <div className="border border-line px-3 py-2"><div className="text-xs text-muted">Tracked estimate</div><div className="display text-lg">${(estimatedSevenDayMicros / 1_000_000).toFixed(2)}</div></div>
+          </div>
+        </div>
+        <details className="mt-4">
+          <summary className="cursor-pointer text-sm text-brand">View recent AI requests</summary>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead><tr className="text-left text-muted uppercase tracking-wide"><th className="py-1 pr-3">When</th><th className="py-1 pr-3">Provider / model</th><th className="py-1 pr-3">Operation</th><th className="py-1 pr-3">Quality</th><th className="py-1 pr-3">Status</th><th className="py-1 text-right">Est.</th></tr></thead>
+              <tbody className="divide-y divide-[color:var(--line)]">
+                {recentAiUsage.slice(0, 30).map((row) => (
+                  <tr key={row.id}>
+                    <td className="py-1.5 pr-3 whitespace-nowrap text-muted">{fmt(row.createdAt)}</td>
+                    <td className="py-1.5 pr-3"><span className="text-foreground">{row.provider}</span><div className="text-muted">{row.model}</div></td>
+                    <td className="py-1.5 pr-3">{row.operation}</td>
+                    <td className="py-1.5 pr-3 text-muted">{row.quality ?? "-"}</td>
+                    <td className={`py-1.5 pr-3 ${row.status === "success" ? "text-green-400" : "text-red-400"}`}>{row.status}</td>
+                    <td className="py-1.5 text-right">{row.estimatedCostMicros == null ? "-" : `$${(row.estimatedCostMicros / 1_000_000).toFixed(3)}`}</td>
+                  </tr>
+                ))}
+                {!recentAiUsage.length && <tr><td colSpan={6} className="py-3 text-muted">No AI requests logged yet.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </section>
 
       <AdminLabFilter counts={filterCounts} />
 

@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   const gate = await requireApiRole("money");
   if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "AI not configured" }, { status: 503 });
   }
 

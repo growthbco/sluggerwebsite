@@ -8,25 +8,15 @@ import { designLabVisitors } from "@/db/schema";
 import { getOrCreateVisitor, tierFor, LAB_COOKIE, encryptCleanUrl, FREE_GENS } from "@/lib/design-lab";
 import { watermarkImage, generateJerseyImage, type ImagePart } from "@/lib/jersey-image";
 import { buildProductPrompt, productNoun, productAspect, PRODUCTS, JERSEY_BRANDING, type ProductType } from "@/lib/product-mockups";
+import { reserveDesignLabGeneration } from "@/lib/ai-usage";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 // PRIVATE preview of the AI jersey designer (not linked from the site).
-// Gated: admin session OR the shared test key. Each generation on
-// gemini-3-pro-image costs ~$0.134, so a daily cap keeps testing bounded.
+// Gated: admin session OR the shared test key. The daily counter is stored in
+// Postgres so it applies across every Vercel instance and restart.
 const TEST_KEY = process.env.DESIGN_LAB_KEY || "slugger26";
-const DAILY_CAP = 150;
-let dayStamp = "";
-let used = 0;
-
-function checkCap(): boolean {
-  const today = new Date().toISOString().slice(0, 10);
-  if (today !== dayStamp) { dayStamp = today; used = 0; }
-  if (used >= DAILY_CAP) return false;
-  used += 1;
-  return true;
-}
 
 export async function POST(req: Request) {
   let body: {
@@ -65,7 +55,14 @@ export async function POST(req: Request) {
       return res;
     }
   }
-  if (!checkCap()) return NextResponse.json({ error: "Daily generation cap reached - try tomorrow." }, { status: 429 });
+  let capUsage: { used: number; cap: number } | null;
+  try {
+    capUsage = await reserveDesignLabGeneration();
+  } catch (error) {
+    console.error("design-lab cap reservation failed:", error);
+    return NextResponse.json({ error: "The design lab is briefly unavailable - try again." }, { status: 503 });
+  }
+  if (!capUsage) return NextResponse.json({ error: "Daily generation cap reached - try tomorrow." }, { status: 429 });
 
   const clean = (s: string | undefined, n: number) => (s ?? "").replace(/[\r\n]+/g, " ").trim().slice(0, n);
   const sport = clean(body.sport, 40) || "baseball";
@@ -178,12 +175,13 @@ export async function POST(req: Request) {
   }
 
   try {
-    // Shared two-vendor engine: OpenAI image-2 primary, Gemini fallback.
-    // Medium quality here - the public maker is high-volume and visitors are
-    // just exploring; the staff studio uses high quality for client proofs.
-    const result = await generateJerseyImage(parts, productAspect(product), { quality: "medium" });
+    // GPT Image 2 at medium quality: the public maker is high-volume and
+    // visitors are exploring; the staff studio keeps high quality for proofs.
+    const result = await generateJerseyImage(parts, productAspect(product), {
+      quality: "medium",
+      operation: refinement ? "design_lab_refinement" : "design_lab_generation",
+    });
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
-    if (result.usedFallback) console.log("design-lab used fallback vendor");
     const payload: { data: string; mimeType: string } = { data: result.data, mimeType: result.mime };
     // Save the CLEAN master first - the designer handoff uses this; the
     // customer only ever receives the watermarked copy below.
@@ -204,7 +202,7 @@ export async function POST(req: Request) {
     // clean version only ever exists as the designer's real proof.
     payload.data = await watermarkImage(payload.data as string);
     const mime = "image/png"; // watermarkImage always returns PNG
-    console.log(`design-lab generation #${used} today (~$${(used * 0.134).toFixed(2)} spent)`);
+    console.log(`design-lab generation #${capUsage.used} of ${capUsage.cap} today`);
     // Persist every render (fire-and-forget) so there's a reviewable history.
     try {
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -230,7 +228,7 @@ export async function POST(req: Request) {
         .returning();
       ladderState = { used: updated.generations, free: FREE_GENS };
     }
-    const out = NextResponse.json({ image: `data:${mime};base64,${payload.data}`, cleanToken, usedToday: used, capToday: DAILY_CAP, ladder: ladderState });
+    const out = NextResponse.json({ image: `data:${mime};base64,${payload.data}`, cleanToken, usedToday: capUsage.used, capToday: capUsage.cap, ladder: ladderState });
     if (visitorCtx?.setCookie) out.cookies.set(LAB_COOKIE, visitorCtx.setCookie, { httpOnly: true, maxAge: 31536000, path: "/" });
     return out;
   } catch (e) {

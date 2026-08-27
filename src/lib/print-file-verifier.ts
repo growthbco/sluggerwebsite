@@ -1,5 +1,5 @@
 /**
- * Print-file QA: read a jersey print-file image with Gemini, extract every
+ * Print-file QA: read a jersey print-file image with OpenAI, extract every
  * jersey's {name, number, size}, and diff against the submitted roster so the
  * designer can catch typos / missing players / wrong sizes BEFORE printing.
  *
@@ -7,14 +7,11 @@
  * proof" step that historically caused costly reprints.
  */
 
-// Google retired gemini-2.5-pro for new API keys ("no longer available to new
-// users"), which broke QA. gemini-flash-latest is a moving alias that always
-// points at the current Flash model, so it won't get deprecated out from under
-// us, and it's newer/sharper than the 2.5-flash that used to misread fonts.
-// The manual "This is correct" override still backstops any misread.
-// Override with GEMINI_QA_MODEL (e.g. a pro model once billing is enabled).
-const MODEL = process.env.GEMINI_QA_MODEL || "gemini-flash-latest";
-const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+import {
+  generateOpenAiStructured,
+  OPENAI_VISION_MODEL,
+  type OpenAiInputPart,
+} from "@/lib/openai-structured";
 
 export type RosterEntry = {
   name: string;
@@ -92,66 +89,13 @@ function lev(a: string, b: string): number {
   return dp[n];
 }
 
-/** Ask Gemini to extract jerseys from the print-file image as structured JSON. */
-// Inline base64 is capped by Gemini's ~20MB request limit; above this we hand
-// the file to the Files API and reference it by URI instead.
-const INLINE_LIMIT_BYTES = 12 * 1024 * 1024;
-
-/** Upload bytes to the Gemini Files API and return an ACTIVE file URI. Used for
- *  large print PDFs that can't be inlined. */
-async function uploadToGeminiFiles(key: string, buf: Buffer, mime: string): Promise<string> {
-  const base = "https://generativelanguage.googleapis.com/upload/v1beta/files";
-  // Resumable upload: start, then upload+finalize.
-  const start = await fetch(`${base}?key=${encodeURIComponent(key)}`, {
-    method: "POST",
-    headers: {
-      "X-Goog-Upload-Protocol": "resumable",
-      "X-Goog-Upload-Command": "start",
-      "X-Goog-Upload-Header-Content-Length": String(buf.length),
-      "X-Goog-Upload-Header-Content-Type": mime,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ file: { display_name: "print-file" } }),
-  });
-  const uploadUrl = start.headers.get("x-goog-upload-url");
-  if (!start.ok || !uploadUrl) {
-    throw new Error(`Gemini file upload start failed (${start.status})`);
-  }
-  const fin = await fetch(uploadUrl, {
-    method: "POST",
-    headers: {
-      "X-Goog-Upload-Command": "upload, finalize",
-      "X-Goog-Upload-Offset": "0",
-      "Content-Length": String(buf.length),
-    },
-    body: new Uint8Array(buf),
-  });
-  if (!fin.ok) throw new Error(`Gemini file upload failed (${fin.status})`);
-  const meta = await fin.json();
-  let file = meta?.file;
-  if (!file?.uri) throw new Error("Gemini file upload returned no URI");
-  // PDFs may need a moment to become ACTIVE before generateContent can use them.
-  for (let i = 0; file.state === "PROCESSING" && i < 20; i++) {
-    await new Promise((r) => setTimeout(r, 1000));
-    const poll = await fetch(`https://generativelanguage.googleapis.com/v1beta/${file.name}?key=${encodeURIComponent(key)}`);
-    file = await poll.json();
-  }
-  if (file.state === "FAILED") throw new Error("Gemini could not process the file");
-  return file.uri;
-}
-
 async function extractJerseysFromImage(imageUrl: string): Promise<Extracted[]> {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new Error("GEMINI_API_KEY is not configured");
-
-  // Fetch the file. Small files inline as base64; large ones go via Files API.
+  // OpenAI accepts PDFs as input files and images as data URLs.
   const imgRes = await fetch(imageUrl);
   if (!imgRes.ok) throw new Error(`Could not fetch print file (${imgRes.status})`);
   const mime = imgRes.headers.get("content-type") || "image/png";
   const buf = Buffer.from(await imgRes.arrayBuffer());
-  const useFilesApi = buf.length > INLINE_LIMIT_BYTES;
-  const fileUri = useFilesApi ? await uploadToGeminiFiles(key, buf, mime) : null;
-  const b64 = useFilesApi ? "" : buf.toString("base64");
+  const b64 = buf.toString("base64");
 
   const prompt = [
     "You are reading a jersey print-file layout (an image or a PDF page).",
@@ -177,61 +121,37 @@ async function extractJerseysFromImage(imageUrl: string): Promise<Extracted[]> {
     "No commentary, no markdown fences.",
   ].join("\n");
 
-  const filePart = fileUri
-    ? { file_data: { mime_type: mime, file_uri: fileUri } }
-    : { inline_data: { mime_type: mime, data: b64 } };
-  const body = {
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: prompt }, filePart],
-      },
-    ],
-    generationConfig: {
-      temperature: 0,
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: "OBJECT",
-        properties: {
-          jerseys: {
-            type: "ARRAY",
-            items: {
-              type: "OBJECT",
-              properties: {
-                name: { type: "STRING" },
-                number: { type: "STRING" },
-                frontNumber: { type: "STRING" },
-                size: { type: "STRING" },
-              },
-              required: ["name", "number", "size"],
+  const mediaPart: OpenAiInputPart = mime.includes("pdf")
+    ? { type: "input_file", filename: "print-file.pdf", file_data: `data:${mime};base64,${b64}` }
+    : { type: "input_image", image_url: `data:${mime};base64,${b64}`, detail: "high" };
+  const parsed = await generateOpenAiStructured<{ jerseys?: Extracted[] }>({
+    operation: "print_file_qa",
+    schemaName: "print_file_jerseys",
+    timeoutMs: 180000,
+    metadata: { mime, bytes: buf.length },
+    parts: [{ type: "input_text", text: prompt }, mediaPart],
+    schema: {
+      type: "object",
+      properties: {
+        jerseys: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              number: { type: "string" },
+              frontNumber: { type: "string" },
+              size: { type: "string" },
             },
+            required: ["name", "number", "frontNumber", "size"],
+            additionalProperties: false,
           },
         },
-        required: ["jerseys"],
       },
+      required: ["jerseys"],
+      additionalProperties: false,
     },
-  };
-
-  const url = `${API_BASE}/${MODEL}:generateContent?key=${encodeURIComponent(key)}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`Gemini API ${res.status}: ${txt.slice(0, 400)}`);
-  }
-  const json = await res.json();
-  const text: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-  if (!text) throw new Error("Gemini returned no text content");
-
-  let parsed: { jerseys?: Extracted[] };
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new Error("Gemini returned non-JSON output");
-  }
   // Keep a jersey if it has a name OR a number - name-only jerseys (bowling,
   // rec, adult league) are valid and must still be diffed against the roster.
   return (parsed.jerseys ?? []).filter((j) => j.name || j.number);
@@ -348,7 +268,7 @@ export function diffPrintFileVsRoster(
   return { ok, summary, mismatches };
 }
 
-/** End-to-end: fetch image → Gemini → diff. */
+/** End-to-end: fetch image -> OpenAI -> diff. */
 export async function verifyPrintFile(
   imageUrl: string,
   roster: RosterEntry[],
@@ -374,6 +294,6 @@ export async function verifyPrintFiles(
     extracted,
     mismatches,
     verifiedAt: new Date().toISOString(),
-    model: MODEL,
+    model: OPENAI_VISION_MODEL,
   };
 }

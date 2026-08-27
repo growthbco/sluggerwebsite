@@ -6,44 +6,13 @@ import { eq } from "drizzle-orm";
 import { getDb, dbEnabled } from "@/db";
 import { designRequests } from "@/db/schema";
 import { decryptCleanUrl } from "@/lib/design-lab";
+import { extractAsset, SHEET_LABELS, SHEET_PROMPTS } from "@/lib/design-lab-assets";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const TEST_KEY = process.env.DESIGN_LAB_KEY || "slugger26";
 
-// Decompose the chosen concept into designer-usable pieces: the background
-// pattern as a flat print swatch and the wordmark isolated on white (plus the
-// emblem when the customer didn't supply a real logo file). Raster, not
-// vector - but sublimation patterns print as raster anyway, and an isolated
-// wordmark traces in minutes.
-async function extractAsset(conceptB64: { mime: string; data: string }, prompt: string): Promise<string | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-  const call = () =>
-    fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }, { inline_data: { mime_type: conceptB64.mime, data: conceptB64.data } }] }],
-        generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "1:1" } },
-      }),
-      signal: AbortSignal.timeout(120000),
-    });
-  try {
-    let res = await call();
-    if (!res.ok) res = await call();
-    if (!res.ok) return null;
-    const data = await res.json();
-    const img = data?.candidates?.[0]?.content?.parts?.find(
-      (x: { inlineData?: { data: string }; inline_data?: { data: string } }) => x.inlineData || x.inline_data,
-    );
-    const payload = img?.inlineData ?? img?.inline_data;
-    return payload?.data ?? null;
-  } catch {
-    return null;
-  }
-}
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
 
 // "Proceed with this design": wraps the chosen AI concept + the customer's
@@ -164,19 +133,18 @@ export async function POST(req: Request) {
   const reference: string = data.reference;
   waitUntil((async () => {
     try {
-      const jobs: [string, string][] = [
-        ["pattern-swatch.png", "From this jersey design, extract ONLY the background pattern/texture as a flat, full-bleed, seamless square print swatch: the complete pattern at full intensity edge to edge, straight-on view, no garment, no fabric folds, no lettering, no numbers, no logos, no shadows. Production artwork style. The source image contains a repeated semi-transparent logo watermark overlay - completely remove it; output clean artwork with no watermark."],
-        ["wordmark.png", "From this jersey design, extract ONLY the team name wordmark/lettering exactly as styled (same font, colors, outlines, and any swoosh/underline), laid out flat and large, perfectly centered on a plain solid white background. No garment, no pattern, no other elements. Clean logo-sheet presentation. The source image contains a repeated semi-transparent logo watermark overlay - completely remove it; output clean artwork with no watermark."],
+      const jobs: [keyof typeof SHEET_PROMPTS, string][] = [
+        ["pattern-swatch.png", SHEET_PROMPTS["pattern-swatch.png"]],
+        ["wordmark.png", SHEET_PROMPTS["wordmark.png"]],
       ];
       if (!hasRealLogo) {
-        jobs.push(["emblem.png", "From this jersey design, extract ONLY the logo/emblem/mascot graphic (if one exists besides the team name lettering), isolated large and centered on a plain solid white background. If there is no distinct emblem, reproduce the most distinctive graphic element instead. No garment, no pattern. The source image contains a repeated semi-transparent logo watermark overlay - completely remove it; output clean artwork with no watermark."]);
+        jobs.push(["emblem.png", SHEET_PROMPTS["emblem.png"]]);
       }
       const results = await Promise.all(jobs.map(async ([name, prompt]) => {
         const b64 = await extractAsset(conceptB64, prompt);
         return b64 ? await upload(name, `data:image/png;base64,${b64}`) : null;
       }));
-      const labels = ["🎨 Pattern swatch (print-style)", "🔤 Wordmark on white (trace-ready)", "🛡️ Emblem on white (AI-invented - trace/redraw)"];
-      const found = results.map((url, i) => ({ url, label: labels[i] })).filter((r): r is { url: string; label: string } => Boolean(r.url));
+      const found = results.map((url, i) => ({ url, label: SHEET_LABELS[jobs[i][0]] })).filter((r): r is { url: string; label: string } => Boolean(r.url));
       if (!found.length) { console.error("design-lab: all extractions failed for", reference); return; }
       if (dbEnabled()) {
         const db = getDb();

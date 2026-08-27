@@ -631,6 +631,20 @@
       "when": 1787843916851,
       "tag": "0089_flashy_micromax",
       "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1787851039439,
+      "tag": "0090_wandering_whirlwind",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1787854023512,
+      "tag": "0091_useful_weapon_omega",
+      "breakpoints": true
     }
   ]
 }

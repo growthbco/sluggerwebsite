@@ -4,11 +4,7 @@
 // grid, it never submits.
 
 import { sizesFor, itemLabel } from "@/lib/order-items";
-
-// Moving alias to the current Flash model so a pinned version can't be
-// deprecated out from under us (as gemini-2.5-pro was).
-const MODEL = process.env.GEMINI_ROSTER_MODEL || "gemini-flash-latest";
-const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+import { generateOpenAiStructured, type OpenAiInputPart } from "@/lib/openai-structured";
 
 export type ParsedRosterRow = {
   name: string;
@@ -27,8 +23,6 @@ export async function parseRoster(input: {
    *  the team-order item types when absent. */
   itemDefs?: ParseItemDef[];
 }): Promise<ParsedRosterRow[]> {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new Error("GEMINI_API_KEY is not configured");
   if (!input.text && !input.image) throw new Error("Nothing to parse");
 
   const defs: ParseItemDef[] =
@@ -61,56 +55,53 @@ export async function parseRoster(input: {
     'Return ONLY valid JSON: { "players": [ ... ] }. No commentary, no markdown fences.',
   ].join("\n");
 
-  const parts: unknown[] = [{ text: prompt }];
-  if (input.text) parts.push({ text: `ROSTER SOURCE TEXT:\n${input.text}` });
-  if (input.image) parts.push({ inline_data: { mime_type: input.image.mime, data: input.image.base64 } });
+  const parts: OpenAiInputPart[] = [{ type: "input_text", text: prompt }];
+  if (input.text) parts.push({ type: "input_text", text: `ROSTER SOURCE TEXT:\n${input.text}` });
+  if (input.image) {
+    parts.push({
+      type: "input_image",
+      image_url: `data:${input.image.mime};base64,${input.image.base64}`,
+      detail: "high",
+    });
+  }
 
-  const body = {
-    contents: [{ role: "user", parts }],
-    generationConfig: {
-      temperature: 0,
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: "OBJECT",
+  let parsed: { players?: ParsedRosterRow[] };
+  try {
+    parsed = await generateOpenAiStructured<{ players?: ParsedRosterRow[] }>({
+      operation: "roster_parse",
+      schemaName: "team_roster",
+      parts,
+      metadata: { hasImage: Boolean(input.image) },
+      schema: {
+        type: "object",
         properties: {
           players: {
-            type: "ARRAY",
+            type: "array",
             items: {
-              type: "OBJECT",
+              type: "object",
               properties: {
-                name: { type: "STRING" },
-                number: { type: "STRING" },
+                name: { type: "string" },
+                number: { type: "string" },
                 sizes: {
-                  type: "OBJECT",
-                  properties: Object.fromEntries(items.map((k) => [k, { type: "STRING" }])),
+                  type: "object",
+                  properties: Object.fromEntries(items.map((k) => [k, { type: "string" }])),
+                  required: items,
+                  additionalProperties: false,
                 },
-                notes: { type: "STRING" },
+                notes: { type: "string" },
               },
-              required: ["name"],
+              required: ["name", "number", "sizes", "notes"],
+              additionalProperties: false,
             },
           },
         },
         required: ["players"],
+        additionalProperties: false,
       },
-    },
-  };
-
-  const res = await fetch(`${API_BASE}/${MODEL}:generateContent?key=${key}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    console.error("Gemini roster parse failed:", res.status, await res.text());
+    });
+  } catch (error) {
+    console.error("OpenAI roster parse failed:", error);
     throw new Error("The AI reader had trouble - try again or enter players manually.");
-  }
-  const data = await res.json();
-  const textOut = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
-  let parsed: { players?: ParsedRosterRow[] } = {};
-  try {
-    parsed = JSON.parse(textOut);
-  } catch {
-    throw new Error("Could not read a roster from that - try a clearer photo or paste the text.");
   }
 
   return (parsed.players ?? [])

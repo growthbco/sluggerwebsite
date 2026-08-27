@@ -156,7 +156,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   }
 
   // High quality here - staff studio output goes to clients as proofs.
-  const result = await generateJerseyImage(parts, productAspect(product), { quality: "high" });
+  const result = await generateJerseyImage(parts, productAspect(product), {
+    quality: "high",
+    operation: action === "generate" ? "staff_design_generation" : "staff_design_refinement",
+  });
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
 
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
