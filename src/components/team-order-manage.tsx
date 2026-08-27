@@ -66,7 +66,7 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerse
   const nextStepCopy = nextIsDeposit
     ? "We'll email your total and the 50% deposit invoice to start production."
     : "We'll email your total and a design proof to approve.";
-  const materialLabel = jerseyMaterial
+  const materialLabel = items.some((k) => k.includes("jersey")) && jerseyMaterial
     ? JERSEY_MATERIALS.find((m) => m.key === jerseyMaterial)?.label ?? jerseyMaterial
     : null;
   const router = useRouter();

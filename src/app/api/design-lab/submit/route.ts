@@ -7,6 +7,7 @@ import { getDb, dbEnabled } from "@/db";
 import { designRequests } from "@/db/schema";
 import { decryptCleanUrl } from "@/lib/design-lab";
 import { extractAsset, SHEET_LABELS, SHEET_PROMPTS } from "@/lib/design-lab-assets";
+import { PRODUCTS, type ProductType } from "@/lib/product-mockups";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -14,6 +15,21 @@ export const maxDuration = 300;
 const TEST_KEY = process.env.DESIGN_LAB_KEY || "slugger26";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+
+function designProductLabel(product: ProductType, style?: string): string {
+  const s = (style ?? "").toLowerCase();
+  switch (product) {
+    case "cheer": return s.includes("rhinestone") ? "Cheer Uniform (Rhinestone)" : "Cheer Uniform (Set)";
+    case "jersey": return "Jersey / Shirt";
+    case "hat": return s.includes("fitted") ? "Fitted Hat" : "Snapback Hat";
+    case "hoodie": return "Hoodie";
+    case "pants": return s.includes("knicker") ? "Knickers" : "Pants";
+    case "shorts": return "Shorts";
+    case "socks": return "Socks";
+    case "jacket": return "Warm-Up Jacket";
+    case "hype-chain": return "Hype Chain";
+  }
+}
 
 // "Proceed with this design": wraps the chosen AI concept + the customer's
 // real assets into a normal design request, so the designer gets everything
@@ -26,6 +42,7 @@ export async function POST(req: Request) {
     contactPhone?: string;
     smsConsent?: boolean;
     teamName?: string;
+    product?: string;
     sport?: string;
     style?: string;
     colorHexes?: string[];
@@ -47,6 +64,9 @@ export async function POST(req: Request) {
   if (!body.contactName?.trim() || !body.contactEmail?.trim() || !body.teamName?.trim()) {
     return NextResponse.json({ error: "Name, email, and team name are required." }, { status: 400 });
   }
+  const product: ProductType = PRODUCTS.some((p) => p.id === body.product)
+    ? body.product as ProductType
+    : "jersey";
   // Prefer the clean (unwatermarked) master saved at generation time; fall
   // back to the customer's watermarked copy if the token is missing/stale.
   let cleanConcept: { mime: string; data: string } | null = null;
@@ -120,7 +140,7 @@ export async function POST(req: Request) {
       vision,
       notes: (body.notes ?? "").trim().slice(0, 500) || undefined,
       colorHexes: (body.colorHexes ?? []).slice(0, 6),
-      productTypes: ["Jerseys"],
+      productTypes: [designProductLabel(product, body.style)],
       jerseyStyle: (body.style ?? "").trim().slice(0, 30) || undefined,
       inspirationImages: [conceptUrl, logoUrl, referenceUrl].filter(Boolean),
       estimatedPieces: (body.estimatedPieces ?? "").trim().slice(0, 20) || undefined,

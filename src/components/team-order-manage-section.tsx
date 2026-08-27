@@ -38,6 +38,7 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
   // tax are added at invoice). Uses the same pricing engine as the real quote.
   const quote = computeTeamOrderQuote(order, roster);
   const orderItems = order.items ?? ["jersey"];
+  const hasJersey = orderItems.some((item) => item.includes("jersey"));
   const canAddon = !["draft", "collecting", "cancelled"].includes(order.status);
   const addonPrices = Object.fromEntries(addonItems.map((k) => [k, itemPriceCents(k, order.jerseyStyle, order.localPricing, order.jerseyMaterial)]));
   // The "Add to this order" block: primary gold, placed right under the
@@ -111,7 +112,11 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
       label: "Size Charts",
       content: (
         <div>
-          <p className="text-sm text-muted mb-4">All measurements in inches. Jerseys run slightly large - when in doubt, size down.</p>
+          <p className="text-sm text-muted mb-4">
+            {hasJersey
+              ? "All measurements in inches. Jerseys run slightly large - when in doubt, size down."
+              : "All measurements are in inches. Use the chart for the items in this order."}
+          </p>
           <SizeChartsFor items={orderItems} />
         </div>
       ),

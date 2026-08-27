@@ -148,7 +148,7 @@ export function itemKeysFromDesignProducts(productTypes?: string[] | null): stri
     const p = raw.toLowerCase();
     // Cheer FIRST - "cheerleading uniform shell and shirt" contains "shirt",
     // which would otherwise map to a jersey.
-    if (/cheer/.test(p)) push("cheer_uniform");
+    if (/cheer/.test(p)) push(/rhinestone/.test(p) ? "cheer_uniform_rhinestone" : "cheer_uniform");
     else if (/jersey|shirt/.test(p)) push("jersey");
     else if (/hoodie|sweat/.test(p)) push("hoodie");
     else if (/knicker/.test(p)) push("knickers");

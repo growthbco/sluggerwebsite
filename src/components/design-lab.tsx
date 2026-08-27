@@ -358,7 +358,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                           key: testKey, contactName, contactEmail, contactPhone, smsConsent: smsOptIn,
-                          teamName, sport, style, backNumber, idea, estimatedPieces,
+                          teamName, product, sport, style, backNumber, idea, estimatedPieces,
                           colorHexes: [primaryColor, secondaryColor, ...extraColors],
                           concept: image, cleanToken, logo: logo ?? undefined, reference: reference ?? undefined,
                         }),
