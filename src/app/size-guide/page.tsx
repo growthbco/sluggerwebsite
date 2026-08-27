@@ -6,6 +6,8 @@ import {
   ChartTable,
   JERSEYS_ADULT,
   JERSEYS_YOUTH,
+  VOLLEYBALL_GIRLS_ADULT,
+  VOLLEYBALL_GIRLS_YOUTH,
   HOODIES,
   PANTS_ADULT,
   PANTS_YOUTH,
@@ -15,9 +17,9 @@ import {
 
 export const metadata: Metadata = {
   alternates: { canonical: "/size-guide" },
-  title: "Size Guide - Jerseys, Hoodies & Pants",
+  title: "Size Guide - Jerseys, Girls Volleyball, Hoodies & Pants",
   description:
-    "Sizing charts for Slugger Athletics custom jerseys, hoodies, and pants. Measurements in inches for youth and adult sizes.",
+    "Sizing charts for Slugger Athletics custom jerseys, girls volleyball jerseys, hoodies, and pants. Measurements in inches for youth and adult sizes.",
 };
 
 function getUploadedCharts(): { file: string; title: string }[] {
@@ -57,6 +59,23 @@ export default function SizeGuidePage() {
             <div>
               <h3 className="display text-sm text-brand mb-2">Youth</h3>
               <ChartTable headers={["Size", "Width", "Length"]} rows={JERSEYS_YOUTH} />
+            </div>
+          </div>
+        </section>
+
+        <section id="girls-volleyball">
+          <h2 className="display text-2xl text-foreground">Girls&apos; Volleyball Jerseys</h2>
+          <p className="mt-2 max-w-2xl text-sm text-muted">
+            Use these measurements for our girls&apos; volleyball V-neck jerseys. Width and length are measured in inches.
+          </p>
+          <div className="mt-4 grid md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="display text-sm text-brand mb-2">Adult</h3>
+              <ChartTable headers={["Size", "Width", "Length"]} rows={VOLLEYBALL_GIRLS_ADULT} />
+            </div>
+            <div>
+              <h3 className="display text-sm text-brand mb-2">Youth</h3>
+              <ChartTable headers={["Size", "Width", "Length"]} rows={VOLLEYBALL_GIRLS_YOUTH} />
             </div>
           </div>
         </section>

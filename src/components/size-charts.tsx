@@ -8,6 +8,16 @@ export const JERSEYS_ADULT = [
 export const JERSEYS_YOUTH = [
   ["YS", "18.5", "24"], ["YM", "19", "24.5"], ["YL", "19.5", "25"], ["YXL", "20", "25.5"],
 ];
+// Girls' volleyball V-neck jerseys use their own fitted block. Keep this
+// separate from the relaxed-fit all-sport jersey chart above.
+export const VOLLEYBALL_GIRLS_ADULT = [
+  ["AXS", "18.5", "26"], ["S", "19.5", "27"], ["M", "20.5", "28"],
+  ["L", "21.5", "29"], ["XL", "22.5", "30"], ["2XL", "23.5", "31"],
+];
+export const VOLLEYBALL_GIRLS_YOUTH = [
+  ["YXS", "13.5", "21"], ["YS", "14.5", "22"], ["YM", "15.5", "23"],
+  ["YL", "16.5", "24"], ["YXL", "17.5", "25"],
+];
 export const HOODIES = [
   ["S", "23", "29"], ["M", "24.5", "30"], ["L", "26", "32"], ["XL", "27.5", "33"],
   ["2XL", "29", "35"], ["3XL", "31.5", "36"], ["4XL", "33", "37"], ["5XL", "34", "38"],
