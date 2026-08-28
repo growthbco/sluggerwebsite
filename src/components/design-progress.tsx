@@ -28,6 +28,7 @@ export function DesignProgress({
   orderReference,
   orderSpec,
   printFileVerified,
+  showNextAction = true,
 }: {
   status: string;
   orderStatus?: string | null;
@@ -35,6 +36,7 @@ export function DesignProgress({
   /** What's being made: jersey style, material, items. */
   orderSpec?: string | null;
   printFileVerified?: boolean;
+  showNextAction?: boolean;
 }) {
   if (status === "cancelled") {
     return (
@@ -115,22 +117,22 @@ export function DesignProgress({
       )}
 
       {/* The one thing to do next. */}
-      {status === "changes_requested" && (
+      {showNextAction && status === "changes_requested" && (
         <p className="mt-3 text-sm text-amber-400">
           ⏭ <strong>Next:</strong> send the client an updated proof (they requested changes).
         </p>
       )}
-      {status === "pending_payment" && (
+      {showNextAction && status === "pending_payment" && (
         <p className="mt-3 text-sm text-amber-400">
           ⏭ <strong>Next:</strong> waiting on the design fee before work starts.
         </p>
       )}
-      {rosterIn && !printFileVerified && (
+      {showNextAction && rosterIn && !printFileVerified && (
         <p className="mt-3 text-sm text-amber-400">
           ⏭ <strong>Next:</strong> upload the print file below and run the AI check.
         </p>
       )}
-      {printFileVerified && orderStatus === "submitted" && (
+      {showNextAction && printFileVerified && orderStatus === "submitted" && (
         <p className="mt-3 text-sm text-green-400">
           ⏭ <strong>Next:</strong> print file passed - send the deposit invoice from the dashboard.
         </p>

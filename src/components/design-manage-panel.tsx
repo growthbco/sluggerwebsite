@@ -37,6 +37,8 @@ type Props = {
   neededBy: string | null;
   rushApprovedAt: string | null;
   rushApprovedBy: string | null;
+  /** The admin detail page already owns the project title and status summary. */
+  showRequestHeader?: boolean;
   // Which slice of this panel to render, so the admin page can put the brief in
   // an "Overview" tab and the proof workflow in a "Proofs" tab from the SAME
   // markup. Omit to render everything (legacy single-scroll).
@@ -68,6 +70,7 @@ export function DesignManagePanel({
   neededBy,
   rushApprovedAt,
   rushApprovedBy,
+  showRequestHeader = true,
   view,
 }: Props) {
   const showOverview = view !== "proofs";
@@ -230,7 +233,6 @@ export function DesignManagePanel({
   const neededStr = neededBy
     ? new Date(neededBy).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" })
     : null;
-
   return (
     <div className="space-y-8">
       {showOverview && rush && (
@@ -267,7 +269,7 @@ export function DesignManagePanel({
       )}
       {showOverview && (
       <>
-      <header>
+      {showRequestHeader && <header>
         <span className="display text-brand text-sm">{reference} · {status.replace(/_/g, " ")}</span>
         <h1 className="display text-3xl sm:text-4xl text-foreground mt-1">{teamName}</h1>
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
@@ -285,7 +287,7 @@ export function DesignManagePanel({
             Revisions: {revisionsUsed} / {maxRevisions}
           </span>
         </div>
-      </header>
+      </header>}
 
       <section className="bg-steel border border-line p-5 grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
         <div>
@@ -524,7 +526,7 @@ export function DesignManagePanel({
       {showProofs && (
       <section>
         <h2 className="display text-xl text-foreground">Upload a proof</h2>
-        <p className="text-sm text-muted mt-1">Add one or more proof images. When you click "Send to Client", they're emailed a link to approve.</p>
+        <p className="text-sm text-muted mt-1">Add one or more proof images. When you click &quot;Send to Client,&quot; they&apos;re emailed a link to approve.</p>
 
         <label
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}

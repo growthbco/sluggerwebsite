@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { dbEnabled } from "@/db";
-import { getById, MAX_REVISIONS, formatProducts } from "@/lib/design-requests";
+import { designNeedsAction, getById, MAX_REVISIONS, formatProducts } from "@/lib/design-requests";
 import { getByDesignRequestId, getRoster, getPrintableJerseys, getSiblingChecklists } from "@/lib/team-orders";
 import { getPaidAddonBatches } from "@/lib/team-order-addons";
 import { JERSEY_MATERIALS, itemLabel, notDesignerMade } from "@/lib/order-items";
@@ -18,9 +19,42 @@ import { PrintFileThumbs } from "@/components/print-file-thumbs";
 import { TeamStoreTeaser } from "@/components/team-store-teaser";
 import { PrintChecklist } from "@/components/print-checklist";
 import { InboundTracking } from "@/components/inbound-tracking";
+import { FollowedUpButton } from "@/components/admin-followed-up-button";
 
 export const metadata: Metadata = { title: "Design Request", robots: { index: false } };
 export const dynamic = "force-dynamic";
+
+const STATUS_LABELS: Record<string, string> = {
+  pending_payment: "Pending",
+  submitted: "Submitted",
+  in_design: "In design",
+  proof_sent: "Proof sent",
+  changes_requested: "Changes requested",
+  approved: "Approved",
+  ordered: "Order created",
+  cancelled: "Cancelled",
+};
+
+const STATUS_TONES: Record<string, string> = {
+  pending_payment: "border-amber-500/40 bg-amber-500/10 text-amber-300",
+  submitted: "border-brand/40 bg-brand/10 text-brand",
+  in_design: "border-violet-400/40 bg-violet-400/10 text-violet-300",
+  proof_sent: "border-sky-400/40 bg-sky-400/10 text-sky-300",
+  changes_requested: "border-amber-500/40 bg-amber-500/10 text-amber-300",
+  approved: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
+  ordered: "border-green-500/40 bg-green-500/10 text-green-300",
+  cancelled: "border-line bg-steel text-muted",
+};
+
+function fmtDate(value: Date | null | undefined) {
+  if (!value) return "Not provided";
+  return value.toLocaleDateString("en-US", {
+    timeZone: "America/New_York",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 // Staff/designer workspace for a single design request, inside the admin
 // sidebar chrome (not the public marketing header). Same building blocks as the
@@ -66,6 +100,42 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
 
   const storeEligible = request.status === "approved" || request.status === "ordered";
   const store = storeEligible ? await getStoreByDesignRequestId(request.id) : null;
+  const statusUrl = `${SITE}/design/status/${request.statusToken}`;
+  const lastMessage = request.messages?.[request.messages.length - 1] ?? null;
+  const needsAction = designNeedsAction(request);
+  const printFileVerified = Boolean(linkedOrder?.printFileVerifiedAt) || (Boolean(linkedOrder) && printRoster.length > 0 && !personalized);
+  const canOpenLinkedOrder = Boolean(linkedOrder && canAccess(session.role, `/admin/team-order/${linkedOrder.id}`));
+
+  let waitingOn = "Slugger";
+  if (!needsAction && request.status === "in_design") waitingOn = "Design team";
+  else if (!needsAction && request.status === "proof_sent") waitingOn = "Customer";
+  else if (!needsAction && request.status === "approved") waitingOn = linkedOrder ? "Roster / payment" : "Roster / order";
+  else if (!needsAction && request.status === "ordered") waitingOn = "Production";
+  else if (!needsAction && request.status === "cancelled") waitingOn = "—";
+
+  let nextAction = "Review the project and choose the next workflow step.";
+  let nextTab = "overview";
+  if (needsAction && request.status === "changes_requested") {
+    nextAction = "Review the requested changes and send an updated proof.";
+    nextTab = "proofs";
+  } else if (needsAction && lastMessage?.from === "client") {
+    nextAction = "Reply to the customer’s latest message.";
+    nextTab = "messages";
+  } else if (needsAction && request.status === "submitted") {
+    nextAction = "Review the brief and begin the first design.";
+  } else if (linkedOrder && printRoster.length > 0 && !printFileVerified) {
+    nextAction = "Run print-file QA before production continues.";
+    nextTab = "production";
+  } else if (request.status === "proof_sent") {
+    nextAction = "Waiting for customer feedback on the current proof.";
+  } else if (request.status === "approved" && !linkedOrder) {
+    nextAction = "The artwork is approved; the customer can begin the roster or order.";
+  } else if (linkedOrder?.status === "in_production" && !linkedOrder.inboundTrackingNumber && !linkedOrder.trackingNumber) {
+    nextAction = "Add production tracking when the factory ships.";
+    nextTab = "production";
+  }
+
+  const deadlineTone = request.rush ? "text-amber-300" : "text-foreground";
 
   const managePanel = (view: "overview" | "proofs") => (
     <DesignManagePanel
@@ -85,7 +155,7 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
       proofLabels={request.proofLabels ?? {}}
       designSkus={request.designSkus ?? {}}
       approvedUrls={request.approvedDesignUrls ?? (request.approvedDesignUrl ? [request.approvedDesignUrl] : [])}
-      statusUrl={`${SITE}/design/status/${request.statusToken}`}
+      statusUrl={statusUrl}
       revisionsUsed={request.revisionsUsed ?? 0}
       maxRevisions={MAX_REVISIONS}
       changeRequests={request.changeRequests ?? []}
@@ -93,6 +163,7 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
       neededBy={request.neededBy ? request.neededBy.toISOString() : null}
       rushApprovedAt={request.rushApprovedAt ? request.rushApprovedAt.toISOString() : null}
       rushApprovedBy={request.rushApprovedBy ?? null}
+      showRequestHeader={false}
       view={view}
     />
   );
@@ -116,13 +187,51 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
                 .join(" · ")
             : null
         }
-        printFileVerified={Boolean(linkedOrder?.printFileVerifiedAt) || (Boolean(linkedOrder) && printRoster.length > 0 && !personalized)}
+        printFileVerified={printFileVerified}
+        showNextAction={false}
       />
 
       {managePanel("overview")}
+    </div>
+  );
+
+  const production = (
+    <div className="space-y-8">
+      <section className="border border-line bg-steel p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="display text-xl text-foreground">Order &amp; production</h2>
+            <p className="mt-1 text-sm text-muted">Roster, print-file QA, shipment tracking, and team-store handoff.</p>
+          </div>
+          {linkedOrder && canOpenLinkedOrder && (
+            <Link href={`/admin/team-order/${linkedOrder.id}`} className="border border-brand/40 px-3 py-2 text-sm text-brand hover:bg-brand/10">
+              Open full order
+            </Link>
+          )}
+        </div>
+        {linkedOrder ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="border border-line bg-ink/40 p-3">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-muted">Order</p>
+              <p className="mt-1 font-mono text-sm text-brand">{linkedOrder.reference}</p>
+              <p className="mt-0.5 text-xs text-muted">{linkedOrder.status.replace(/_/g, " ")}</p>
+            </div>
+            <div className="border border-line bg-ink/40 p-3">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-muted">Roster</p>
+              <p className="mt-1 text-lg text-foreground">{printRoster.length} player{printRoster.length === 1 ? "" : "s"}</p>
+            </div>
+            <div className="border border-line bg-ink/40 p-3">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-muted">Print-file QA</p>
+              <p className={`mt-1 text-sm ${printFileVerified ? "text-green-300" : "text-amber-300"}`}>{printFileVerified ? "Verified" : "Needs verification"}</p>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-muted">No team order is linked to this design yet.</p>
+        )}
+      </section>
 
       {/* Production QA: print-file checklists + inbound tracking, shown once a
-          linked roster exists. Same blocks as before, gathered under Overview. */}
+          linked roster exists. */}
       {linkedOrder && printJerseys.length > 0 && (
         <PrintChecklist
           token={linkedOrder.manageToken!}
@@ -234,7 +343,19 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
 
   const tabs: ManageTab[] = [
     { key: "overview", label: "Overview", content: overview },
-    { key: "proofs", label: "Proofs", content: managePanel("proofs") },
+    { key: "proofs", label: `Proofs (${request.proofImages?.length ?? 0})`, content: managePanel("proofs") },
+    {
+      key: "messages",
+      label: `Messages (${request.messages?.length ?? 0})`,
+      content: (
+        <DesignConversation
+          token={token}
+          phone={smsPhone}
+          name={request.contactName}
+          initialDesignMessages={request.messages ?? []}
+        />
+      ),
+    },
     {
       key: "studio",
       label: "Studio",
@@ -248,28 +369,62 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
         />
       ),
     },
-    {
-      key: "messages",
-      label: "Messages",
-      content: (
-        <DesignConversation
-          token={token}
-          phone={smsPhone}
-          name={request.contactName}
-          initialDesignMessages={request.messages ?? []}
-        />
-      ),
-    },
+    ...(linkedOrder || storeEligible ? [{ key: "production", label: "Order & Production", content: production }] : []),
   ];
 
   return (
-    <div className="mx-auto max-w-5xl px-4 sm:px-6 py-10">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <Link href="/admin/design-requests" className="mb-4 inline-flex text-sm text-muted hover:text-brand">
+        ← All design requests
+      </Link>
       <AdminPageHeader
         eyebrow={`Design Request · ${request.reference}`}
         title={request.teamName}
-      />
+      >
+        <span className={`border px-3 py-1.5 text-xs ${STATUS_TONES[request.status] ?? "border-line bg-steel text-muted"}`}>
+          {STATUS_LABELS[request.status] ?? request.status.replace(/_/g, " ")}
+        </span>
+        {(needsAction || request.followedUpAt) && (
+          <FollowedUpButton id={request.id} followedUp={Boolean(request.followedUpAt)} />
+        )}
+      </AdminPageHeader>
+
+      <section className={`border p-4 ${needsAction ? "border-amber-500/40 bg-amber-500/10" : "border-line bg-steel/60"}`}>
+        <p className="text-[10px] uppercase tracking-[0.16em] text-muted">Next action</p>
+        <p className={`mt-1 text-base ${needsAction ? "font-medium text-amber-200" : "text-foreground"}`}>{nextAction}</p>
+      </section>
+
+      <section aria-label="Request summary" className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="border border-line bg-steel/50 p-4">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-muted">Waiting on</p>
+          <p className={`mt-1 text-base ${needsAction ? "font-medium text-amber-300" : "text-foreground"}`}>{waitingOn}</p>
+        </div>
+        <div className="border border-line bg-steel/50 p-4">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-muted">Customer in-hand date</p>
+          <p className={`mt-1 text-base tabular-nums ${deadlineTone}`}>{fmtDate(request.neededBy)}</p>
+          {request.rush && <p className="mt-0.5 text-xs text-amber-300">Rush timeline</p>}
+        </div>
+        <div className="border border-line bg-steel/50 p-4">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-muted">Revisions</p>
+          <p className="mt-1 text-base text-foreground">{request.revisionsUsed ?? 0} of {MAX_REVISIONS}</p>
+        </div>
+        <div className="border border-line bg-steel/50 p-4">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-muted">Linked order</p>
+          {linkedOrder ? (
+            canOpenLinkedOrder ? (
+              <Link href={`/admin/team-order/${linkedOrder.id}`} className="mt-1 block font-mono text-sm text-brand hover:underline">{linkedOrder.reference}</Link>
+            ) : (
+              <p className="mt-1 font-mono text-sm text-foreground">{linkedOrder.reference}</p>
+            )
+          ) : (
+            <p className="mt-1 text-base text-muted">Not started</p>
+          )}
+          {linkedOrder && <p className="mt-0.5 text-xs text-muted">{linkedOrder.status.replace(/_/g, " ")}</p>}
+        </div>
+      </section>
+
       <div className="mt-6">
-        <ManageTabs tabs={tabs} />
+        <ManageTabs tabs={tabs} defaultTab={nextTab} />
       </div>
     </div>
   );
