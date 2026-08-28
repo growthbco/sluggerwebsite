@@ -1,7 +1,7 @@
 // Posts new orders to Discord via an incoming webhook (no bot to host).
 // Used for paid Shop/Buy-In orders (#orders) and custom projects in the
 // Design Requests forum.
-import { itemLabel, notDesignerMade } from "@/lib/order-items";
+import { itemLabel, notDesignerMade, sizeFieldsForItems, sizeValueForField } from "@/lib/order-items";
 
 const GOLD = 0xb8a36c;
 
@@ -333,10 +333,10 @@ export async function postTeamOrderToDiscord(
   const rows = order.roster
     .filter((r) => r.name || r.number || r.size || (r.sizes && Object.keys(r.sizes).length))
     .map((r, i) => {
-      const sizeStr = itemKeys
-        .map((k) => {
-          const v = r.sizes?.[k] ?? (k === "jersey" ? r.size : undefined);
-          return v ? `${itemLabel(k)}: ${v}` : null;
+      const sizeStr = sizeFieldsForItems(itemKeys)
+        .map((field) => {
+          const v = sizeValueForField(field, r.sizes, r.size);
+          return v ? `${field.label}: ${v}` : null;
         })
         .filter(Boolean)
         .join(" · ");

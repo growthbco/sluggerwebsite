@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { getBySelfEntryToken, addRosterRow } from "@/lib/team-orders";
+import { missingCheerSizeLabels } from "@/lib/order-items";
 
 export const runtime = "nodejs";
 
@@ -28,6 +29,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const hasSize = body.sizes && Object.values(body.sizes).some(Boolean);
   if (!hasSize) {
     return NextResponse.json({ error: "Pick at least one size." }, { status: 400 });
+  }
+  if (missingCheerSizeLabels(order.items ?? ["jersey"], body.sizes).length) {
+    return NextResponse.json({ error: "Choose both a cheer top size and skirt size." }, { status: 400 });
   }
 
   // One jersey per selected design (same name/number/size). No design picked

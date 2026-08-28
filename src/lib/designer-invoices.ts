@@ -28,7 +28,7 @@ function isNonGarment(name: string): boolean {
 function garmentType(name: string): string {
   return (name.split(" - ")[0] || name || "").trim() || name;
 }
-import { notDesignerMade, itemLabel } from "@/lib/order-items";
+import { itemKeyForSizeField, notDesignerMade, itemLabel } from "@/lib/order-items";
 
 // The garments the DESIGNER actually produces for an order, counted straight
 // from the roster: every piece INCLUDING paid add-ons (he makes those too),
@@ -42,7 +42,8 @@ function billableGarmentsFromRoster(
     const qty = Math.max(1, row.quantity ?? 1);
     const sized = Object.entries(row.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
     if (sized.length) {
-      for (const [key] of sized) counts.set(key, (counts.get(key) ?? 0) + qty);
+      const itemKeys = new Set(sized.map(([key]) => itemKeyForSizeField(key)));
+      for (const key of itemKeys) counts.set(key, (counts.get(key) ?? 0) + qty);
     } else if ((row.size ?? "").trim()) {
       counts.set("jersey", (counts.get("jersey") ?? 0) + qty);
     }

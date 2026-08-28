@@ -7,7 +7,7 @@ import { sql, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrders, teamOrderRoster, designRequests, customInvoices, orders, orderItems, teams } from "@/db/schema";
 import { getOrCreateCustomer } from "@/lib/customers";
-import { itemLabel } from "@/lib/order-items";
+import { itemKeyForSizeField, itemLabel } from "@/lib/order-items";
 
 const TTL_MS = 45 * 60 * 1000; // 45 minutes
 
@@ -86,7 +86,10 @@ export async function getCustomerOrders(email: string): Promise<PortalData> {
     for (const r of rr) {
       const m = comp.get(r.to) ?? new Map<string, number>();
       const sized = Object.entries(r.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
-      if (sized.length) for (const [k] of sized) m.set(k, (m.get(k) ?? 0) + 1);
+      if (sized.length) {
+        const itemKeys = new Set(sized.map(([key]) => itemKeyForSizeField(key)));
+        for (const k of itemKeys) m.set(k, (m.get(k) ?? 0) + 1);
+      }
       else if ((r.size ?? "").trim()) m.set("jersey", (m.get("jersey") ?? 0) + 1);
       comp.set(r.to, m);
     }

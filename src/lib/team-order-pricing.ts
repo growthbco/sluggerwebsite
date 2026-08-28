@@ -1,7 +1,7 @@
 // Auto-pricing for quote-first team orders: roster rows x the public price
 // list. Jersey price follows the order's jersey style; rush is a flat $100.
 
-import { itemLabel } from "@/lib/order-items";
+import { itemKeyForSizeField, itemLabel } from "@/lib/order-items";
 import { rushFeeCentsForPieces } from "@/lib/rush-pricing";
 
 // Per-item retail prices in cents (mirrors src/lib/pricing.ts).
@@ -80,7 +80,8 @@ export function estimateOrderParcelsOz(
     const qty = Math.max(1, r.quantity ?? 1);
     const sized = Object.entries(r.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
     if (sized.length) {
-      for (const [key] of sized) {
+      const itemKeys = new Set(sized.map(([key]) => itemKeyForSizeField(key)));
+      for (const key of itemKeys) {
         const oz = (ITEM_WEIGHT_OZ[key] ?? 12) * qty;
         if (HAT_KEYS.includes(key)) hat += oz;
         else apparel += oz;
@@ -173,9 +174,11 @@ export function computeTeamOrderQuote(
   for (const row of billable) {
     const qty = Math.max(1, row.quantity ?? 1);
     const sized = Object.entries(row.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
-    const matching = sized.filter(([key]) => allowedItems.has(key));
-    if (matching.length) {
-      for (const [key] of matching) counts.set(key, (counts.get(key) ?? 0) + qty);
+    const matching = new Set(
+      sized.map(([key]) => itemKeyForSizeField(key)).filter((key) => allowedItems.has(key)),
+    );
+    if (matching.size) {
+      for (const key of matching) counts.set(key, (counts.get(key) ?? 0) + qty);
     } else if (sized.length && orderItems.length === 1) {
       // Legacy safety net: if an order's product was corrected after its
       // roster was entered (for example jersey -> rhinestone cheer set), its

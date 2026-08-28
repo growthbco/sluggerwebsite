@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-acknowledgment";
-import { itemLabel, sizesFor, sizeBreakdown, formatSize, JERSEY_MATERIALS } from "@/lib/order-items";
+import { itemLabel, sizeBreakdown, formatSize, JERSEY_MATERIALS, missingCheerSizeLabels, sizeFieldsForItems, sizeValueForField } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 
 type RosterRow = {
@@ -46,10 +46,10 @@ type Props = {
 };
 
 function rowSizes(r: RosterRow, items: string[]): string {
-  return items
-    .map((k) => {
-      const v = r.sizes?.[k] ?? (k === "jersey" ? r.size : undefined);
-      return v ? `${itemLabel(k)}: ${formatSize(v)}` : null;
+  return sizeFieldsForItems(items)
+    .map((field) => {
+      const v = sizeValueForField(field, r.sizes, r.size);
+      return v ? `${field.label}: ${formatSize(v)}` : null;
     })
     .filter(Boolean)
     .join(" · ");
@@ -126,6 +126,7 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
   async function addManual() {
     if (!canAddManual) return;
     if (needsDesign && !manual.design) { setManualError("Pick a design for this player."); return; }
+    if (missingCheerSizeLabels(items, manual.sizes).length) { setManualError("Choose both a cheer top size and skirt size."); return; }
     setManualBusy(true);
     setManualError("");
     try {
@@ -289,16 +290,16 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
                       {designs.map((d) => <option key={d.label} value={d.label} className="text-foreground">{d.label}</option>)}
                     </select>
                   )}
-                  {items.map((k) => (
+                  {sizeFieldsForItems(items).map((field) => (
                     <select
-                      key={k}
-                      value={manual.sizes[k] ?? ""}
-                      onChange={(e) => setManual((m) => ({ ...m, sizes: { ...m.sizes, [k]: e.target.value } }))}
+                      key={field.key}
+                      value={manual.sizes[field.key] ?? ""}
+                      onChange={(e) => setManual((m) => ({ ...m, sizes: { ...m.sizes, [field.key]: e.target.value } }))}
                       className="bg-ink border border-line px-2 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
-                      aria-label={`${itemLabel(k)} size`}
+                      aria-label={`${field.label} size`}
                     >
-                      <option value="">{itemLabel(k)}: -</option>
-                      {sizesFor(k).map((s) => (
+                      <option value="">{field.label}: -</option>
+                      {field.sizes.map((s) => (
                         <option key={s} value={s}>{formatSize(s)}</option>
                       ))}
                     </select>
@@ -612,7 +613,7 @@ function RosterRowItem({ token, row, index, items, designs = [], needsDesign = f
   const [design, setDesign] = useState(row.design ?? "");
   const [sizes, setSizes] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
-    for (const k of items) init[k] = row.sizes?.[k] ?? (k === "jersey" ? row.size ?? "" : "");
+    for (const field of sizeFieldsForItems(items)) init[field.key] = sizeValueForField(field, row.sizes, row.size);
     return init;
   });
 
@@ -621,6 +622,7 @@ function RosterRowItem({ token, row, index, items, designs = [], needsDesign = f
     setError("");
     try {
       if (needsDesign && !design) { setError("Pick a design for this player."); setBusy(false); return; }
+      if (missingCheerSizeLabels(items, sizes).length) { setError("Choose both a cheer top size and skirt size."); setBusy(false); return; }
       const res = await fetch(`/api/team-order/${token}/roster`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -671,10 +673,10 @@ function RosterRowItem({ token, row, index, items, designs = [], needsDesign = f
               {designs.map((d) => <option key={d.label} value={d.label} className="text-foreground">{d.label}</option>)}
             </select>
           )}
-          {items.map((k) => (
-            <select key={k} value={sizes[k] ?? ""} onChange={(e) => setSizes((s) => ({ ...s, [k]: e.target.value }))} className="bg-ink border border-line px-2 py-2 text-sm text-foreground focus:border-brand focus:outline-none" aria-label={`${itemLabel(k)} size`}>
-              <option value="">{itemLabel(k)}: -</option>
-              {sizesFor(k).map((s) => (<option key={s} value={s}>{formatSize(s)}</option>))}
+          {sizeFieldsForItems(items).map((field) => (
+            <select key={field.key} value={sizes[field.key] ?? ""} onChange={(e) => setSizes((s) => ({ ...s, [field.key]: e.target.value }))} className="bg-ink border border-line px-2 py-2 text-sm text-foreground focus:border-brand focus:outline-none" aria-label={`${field.label} size`}>
+              <option value="">{field.label}: -</option>
+              {field.sizes.map((s) => (<option key={s} value={s}>{formatSize(s)}</option>))}
             </select>
           ))}
         </div>

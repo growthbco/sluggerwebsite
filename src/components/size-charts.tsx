@@ -48,26 +48,31 @@ export const FLAG_FOOTBALL = [
   ["XL", "21", "29"], ["2XL", "22", "30"], ["3XL", "23", "31"],
 ];
 
-// Cheer sets: chest / waist / hips (inches). Slugger Athletics' official cheer
-// uniform size chart. Fit runs snug - size up if between sizes. Row labels
-// mirror CHEER_SIZES in order-items.ts so a picked size lines up with the chart.
+// Supplier finished-item measurements in inches / centimeters. The waist range
+// belongs to the skirt/bottom, while chest and sleeve measurements belong to
+// the top. Row labels mirror CHEER_SIZES in order-items.ts.
+export const CHEER_SET_HEADERS = [
+  "Size",
+  "Garment length",
+  "Chest",
+  "Skirt waist",
+  "Sleeve length",
+  "Sock thigh circumference",
+  "Sock length",
+];
 export const CHEER_SET = [
-  ["Youth XS", "20-22", "18-20", "21-22"],
-  ["Youth Small", "22-24", "20-22", "22-25"],
-  ["Youth Medium", "24-26", "22-24", "26-28"],
-  ["Youth Large", "26-28", "24-26", "28-30"],
-  ["Adult XS", "30-32", "26-28", "31-33"],
-  ["Adult Small", "32-34", "28-30", "34-36"],
-  ["Adult Medium", "34-36", "30-32", "36-38"],
-  ["Adult Large", "36-38", "32-34", "39-41"],
-  ["Adult X-Large", "38-40", "34-36", "41-44"],
-  ["Adult 2X-Large", "40-42", "36-38", "45-48"],
+  ["6", '18" / 46 cm', '22.5" / 57.5 cm', '20.5-27.5" / 52.5-70 cm', '14.5" / 37 cm', '7.1-18.9" / 18-48 cm', '15.7" / 40 cm'],
+  ["8", '20" / 51 cm', '24.5" / 62.5 cm', '22-29" / 56.5-74 cm', '15.5" / 40 cm', '7.1-18.9" / 18-48 cm', '15.7" / 40 cm'],
+  ["10", '22" / 55.5 cm', '26.5" / 67.5 cm', '23.5-30.5" / 60.5-78 cm', '17" / 43.5 cm', '7.1-18.9" / 18-48 cm', '18.9" / 48 cm'],
+  ["12", '23.5" / 60.5 cm', '28.5" / 72.5 cm', '25-32" / 64.5-82 cm', '18.5" / 47 cm', '7.1-18.9" / 18-48 cm', '18.9" / 48 cm'],
+  ["14", '25.5" / 65 cm', '30.5" / 77.5 cm', '27-33.5" / 68.5-86 cm', '19.5" / 50 cm', '7.1-18.9" / 18-48 cm', '18.9" / 48 cm'],
+  ["16", '27.5" / 70 cm', '32.5" / 82.5 cm', '28.5-35" / 72.5-90 cm', '21" / 53.5 cm', '7.1-18.9" / 18-48 cm', '18.9" / 48 cm'],
 ];
 
-export function ChartTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
+export function ChartTable({ headers, rows, wide = false }: { headers: string[]; rows: string[][]; wide?: boolean }) {
   return (
     <div className="overflow-x-auto border border-line">
-      <table className="w-full text-left text-sm">
+      <table className={`w-full text-left text-sm ${wide ? "min-w-[1050px]" : ""}`}>
         <thead>
           <tr className="bg-brand text-on-brand display">
             {headers.map((h) => (
@@ -79,7 +84,7 @@ export function ChartTable({ headers, rows }: { headers: string[]; rows: string[
           {rows.map((r, i) => (
             <tr key={r[0]} className={i % 2 ? "bg-steel" : "bg-ink"}>
               {r.map((cell, j) => (
-                <td key={j} className={`px-4 py-2.5 ${j === 0 ? "display text-foreground" : "text-muted"}`}>
+                <td key={j} className={`px-4 py-2.5 ${j === 0 ? "display text-foreground" : "text-muted"} ${wide ? "whitespace-nowrap" : ""}`}>
                   {cell}
                 </td>
               ))}
@@ -87,6 +92,21 @@ export function ChartTable({ headers, rows }: { headers: string[]; rows: string[
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+export function CheerSizingNotes() {
+  return (
+    <div className="mt-3 max-w-2xl border border-line bg-steel p-4 text-sm text-muted">
+      <p className="font-medium text-foreground">Before choosing cheer sizes</p>
+      <ul className="mt-2 list-disc space-y-1.5 pl-5">
+        <li>The chart lists finished-item measurements, not body measurements. Measure the athlete instead of relying on age or a usual clothing size.</li>
+        <li>Choose the top by chest and the skirt/bottom by the skirt waist measurement. Top and skirt sizes may be different.</li>
+        <li>If a measurement falls between two sizes, choose the larger size.</li>
+        <li>Sock thigh circumference is the stretch range. Garments are measured by hand, so minor measurement variation is normal.</li>
+        <li>Review both sizes before the roster closes. Custom uniforms cannot be returned or exchanged for a sizing change; manufacturing defects are covered under our <a href="/returns" className="text-brand hover:underline">Returns &amp; Exchanges policy</a>.</li>
+      </ul>
     </div>
   );
 }
@@ -138,9 +158,10 @@ function CheerSection() {
   return (
     <section>
       <h3 className="display text-lg text-foreground">Cheer Sets</h3>
-      <p className="mt-2 text-sm text-muted">Fit runs snug - if you&apos;re between sizes, size up. Take chest, waist, and hips at the fullest point.</p>
-      <div className="mt-3 max-w-xl">
-        <ChartTable headers={["Size", "Chest", "Waist", "Hips"]} rows={CHEER_SET} />
+      <CheerSizingNotes />
+      <div className="mt-3">
+        <p className="mb-2 text-xs text-muted sm:hidden">Swipe sideways to see all measurements.</p>
+        <ChartTable headers={CHEER_SET_HEADERS} rows={CHEER_SET} wide />
       </div>
     </section>
   );
