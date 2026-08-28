@@ -10,6 +10,7 @@ import { AdminLogout } from "@/components/admin-logout";
 import { AdminIcon } from "@/components/admin-icons";
 import { MarkStaffDevice } from "@/components/mark-staff-device";
 import { resolveOperationalEvent } from "./actions";
+import { DesignerDashboard } from "@/components/designer-dashboard";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -54,6 +55,10 @@ export default async function AdminPage() {
   if (!session) redirect("/admin/login");
   if (!dbEnabled()) {
     return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Database not configured.</div>;
+  }
+
+  if ((session.role as string) === "designer") {
+    return <DesignerDashboard userName={session.name} />;
   }
 
   const db = getDb();

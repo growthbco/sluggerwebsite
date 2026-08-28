@@ -107,6 +107,8 @@ export async function isAdmin(): Promise<boolean> {
 const DESIGNER_ALLOWED_PREFIXES = [
   "/admin/design-requests",
   "/admin/team-orders", // the list (read-only production view)
+  "/admin/designer-tracking",
+  "/admin/designer-invoices",
   "/admin/texts",
   "/admin/design-lab",
 ];

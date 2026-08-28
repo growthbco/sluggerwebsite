@@ -69,11 +69,13 @@ export function DesignerInvoiceForm({
   billable,
   editable = [],
   paid = [],
+  embedded = false,
 }: {
   token: string;
   billable: BillableOrder[];
   editable?: EditableInvoice[];
   paid?: PaidInvoice[];
+  embedded?: boolean;
 }) {
   const [designerName, setDesignerName] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
@@ -333,8 +335,8 @@ export function DesignerInvoiceForm({
   ];
 
   return (
-    <main className="min-h-dvh bg-ink text-foreground pb-28 lg:pb-10">
-      {BrandBar}
+    <main className={`${embedded ? "min-h-0" : "min-h-dvh"} bg-ink text-foreground pb-28 lg:pb-10`}>
+      {!embedded && BrandBar}
       <div className="mx-auto max-w-6xl px-4 py-6 lg:grid lg:grid-cols-[1fr_380px] lg:gap-6 lg:items-start">
         {/* ── LEFT: find the job ─────────────────────────────────────── */}
         <div className="min-w-0">
