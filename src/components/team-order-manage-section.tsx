@@ -4,7 +4,7 @@ import { getRoster, getLinkedDesignPreview } from "@/lib/team-orders";
 import { getStoreByDesignRequestId, teamRaisedCents } from "@/lib/team-stores";
 import { TeamFundraiseCard } from "@/components/team-fundraise-card";
 import { itemPriceCents, computeTeamOrderQuote } from "@/lib/team-order-pricing";
-import { EXTRA_ADDON_KEYS, minPiecesForItems } from "@/lib/order-items";
+import { EXTRA_ADDON_KEYS, itemLabel, minPiecesForItems } from "@/lib/order-items";
 import { TeamOrderManage } from "@/components/team-order-manage";
 import { TeamOrderAddon } from "@/components/team-order-addon";
 import { TeamOrderShipping } from "@/components/team-order-shipping";
@@ -38,7 +38,18 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
   // tax are added at invoice). Uses the same pricing engine as the real quote.
   const quote = computeTeamOrderQuote(order, roster);
   const orderItems = order.items ?? ["jersey"];
+  const orderMinimum = minPiecesForItems(order.items);
   const hasJersey = orderItems.some((item) => item.includes("jersey"));
+  const collecting = ["draft", "collecting"].includes(order.status);
+  const productPrices = orderItems
+    .map((key) => ({
+      key,
+      label: itemLabel(key),
+      unitCents: key === "jersey" && order.customJerseyCents
+        ? order.customJerseyCents
+        : itemPriceCents(key, order.jerseyStyle, order.localPricing, order.jerseyMaterial),
+    }))
+    .filter((p) => p.unitCents > 0);
   const canAddon = !["draft", "collecting", "cancelled"].includes(order.status);
   const addonPrices = Object.fromEntries(addonItems.map((k) => [k, itemPriceCents(k, order.jerseyStyle, order.localPricing, order.jerseyMaterial)]));
   // The "Add to this order" block: primary gold, placed right under the
@@ -74,7 +85,6 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
       content: (
         <TeamOrderManage
           token={order.manageToken!}
-          reference={order.reference}
           teamName={order.teamName}
           jerseyStyle={order.jerseyStyle}
           jerseyMaterial={order.jerseyMaterial}
@@ -92,15 +102,11 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
             quantity: r.quantity,
           }))}
           submitted={!["draft", "collecting"].includes(order.status)}
-          contactName={order.contactName}
-          contactEmail={order.contactEmail}
-          contactPhone={order.contactPhone}
           colors={design?.colors ?? null}
-          placedAt={order.createdAt ? new Date(order.createdAt).toISOString() : null}
           locked={["shipped", "cancelled"].includes(order.status)}
           requiresNames={order.requiresNames}
-          minPieces={minPiecesForItems(order.items)}
-          quote={{ lines: quote.lines, totalCents: quote.totalCents }}
+          minPieces={orderMinimum}
+          quote={{ lines: quote.lines, rushFeeCents: quote.rushFeeCents, totalCents: quote.totalCents }}
           nextIsDeposit={designState === "approved"}
           designState={designState}
           addonSlot={addonSlot}
@@ -137,7 +143,7 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
 
   // Order-level status + pay/track for the customer's order page. Customers
   // only ever see outbound UPS/USPS tracking, never internal DHL/FedEx.
-  const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+  const money = (c: number) => `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const titleCaseStatus = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
   const paid = Boolean(order.invoicePaidAt);
   const started = Boolean(order.depositPaidAt);
@@ -150,28 +156,79 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
   const showPayDeposit = !paid && !started && Boolean(payUrl);
   const showPayBalance = started && !paid && Boolean(order.balanceInvoiceUrl) && balanceDue > 0;
   const outboundTrack = order.trackingNumber && ["UPS", "USPS"].includes(carrierFor(order.trackingNumber)) ? order.trackingNumber : null;
-  const statusLabel = paid ? "Paid" : started ? "In production" : order.status === "quoted" ? "Awaiting payment" : titleCaseStatus(order.status);
+  const statusLabel = paid
+    ? "Paid"
+    : started
+      ? "In production"
+      : ["draft", "collecting"].includes(order.status)
+        ? "Building roster"
+        : order.status === "submitted"
+          ? "Roster confirmed"
+          : order.status === "quoted"
+            ? "Awaiting payment"
+            : titleCaseStatus(order.status);
   const shipAddr = order.shippingAddress?.line1
     ? { line1: order.shippingAddress.line1 ?? "", line2: order.shippingAddress.line2 ?? "", city: order.shippingAddress.city ?? "", state: order.shippingAddress.state ?? "", postalCode: order.shippingAddress.postalCode ?? "" }
     : null;
 
   return (
     <div className="space-y-8">
+      {/* Persistent product + price identity. The customer should never have
+          to infer what they are buying from a roster field or an invoice. */}
+      <section className="rounded-xl border-2 border-brand/60 bg-brand/[0.07] p-5">
+        <p className="display text-xs uppercase tracking-[0.16em] text-brand">Your order</p>
+        <h2 className="display text-2xl text-foreground mt-1">
+          {orderItems.map((key) => itemLabel(key)).join(" + ")}
+        </h2>
+        {order.jerseyStyle && <p className="text-sm text-muted mt-1">{order.jerseyStyle}</p>}
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="border border-line bg-ink/40 px-4 py-3">
+            <p className="text-xs uppercase tracking-wider text-muted">Price</p>
+            {productPrices.map((p) => (
+              <p key={p.key} className="display text-lg text-foreground mt-0.5">{money(p.unitCents)} each</p>
+            ))}
+          </div>
+          <div className="border border-line bg-ink/40 px-4 py-3">
+            <p className="text-xs uppercase tracking-wider text-muted">Roster</p>
+            <p className="display text-lg text-foreground mt-0.5">{roster.length} {roster.length === 1 ? "athlete" : "athletes"}</p>
+            <p className="text-xs text-muted mt-0.5">{orderMinimum}-piece minimum</p>
+          </div>
+          <div className="border border-line bg-ink/40 px-4 py-3">
+            <p className="text-xs uppercase tracking-wider text-muted">Current subtotal</p>
+            <p className="display text-lg text-foreground mt-0.5">{totalCents > 0 ? money(totalCents) : "Add sizes"}</p>
+            <p className="text-xs text-muted mt-0.5">Tax and shipping added later</p>
+          </div>
+        </div>
+
+        {collecting && (
+          <a href="#roster-builder" className="inline-flex mt-4 clip-slant bg-brand text-on-brand display text-sm px-5 py-2.5 hover:bg-brand-dark">
+            {roster.length < orderMinimum
+              ? roster.length === 0
+                ? "Add your first athlete ↓"
+                : `Add ${orderMinimum - roster.length} more ${orderMinimum - roster.length === 1 ? "athlete" : "athletes"} ↓`
+              : "Review roster and total ↓"}
+          </a>
+        )}
+      </section>
+
       {/* This order at a glance: status, total (with shipping once known), and
           Pay / Pay balance / Track by state. */}
       <section className="border border-line bg-steel p-4 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="display text-foreground">{order.reference} · {statusLabel}</p>
-          {totalCents > 0 && (
+          <p className="display text-foreground">Order status · {statusLabel}</p>
+          {shippingCents > 0 && (
             <p className="text-sm text-muted mt-0.5">
-              {shippingCents > 0 ? `${money(totalCents)} goods + ${money(shippingCents)} shipping = ${money(grandTotal)}` : money(totalCents)}
+              {money(totalCents)} goods + {money(shippingCents)} shipping = {money(grandTotal)}
             </p>
           )}
           {showPayBalance && <p className="text-sm text-amber-300 mt-0.5">Balance due: {money(balanceDue)}</p>}
         </div>
         <div className="flex items-center gap-2">
           {showPayDeposit && (
-            <a href={payUrl!} target="_blank" rel="noopener noreferrer" className="display text-sm bg-brand text-on-brand px-5 min-h-[44px] inline-flex items-center rounded hover:bg-brand-dark">Pay {money(totalCents)}</a>
+            <a href={payUrl!} target="_blank" rel="noopener noreferrer" className="display text-sm bg-brand text-on-brand px-5 min-h-[44px] inline-flex items-center rounded hover:bg-brand-dark">
+              {order.fullInvoiceUrl ? `Pay in full ${money(totalCents)}` : `Pay deposit ${money(depositCents)}`}
+            </a>
           )}
           {showPayBalance && (
             <a href={order.balanceInvoiceUrl!} target="_blank" rel="noopener noreferrer" className="display text-sm bg-brand text-on-brand px-5 min-h-[44px] inline-flex items-center rounded hover:bg-brand-dark">Pay balance {money(balanceDue)}</a>
@@ -236,7 +293,9 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
         <TeamOrderShipping token={order.manageToken!} initial={shipAddr} locked={order.status === "shipped" || Boolean(order.shippedAt)} />
       )}
 
-      <ManageTabs tabs={tabs} />
+      <div id="roster-builder" className="scroll-mt-6">
+        <ManageTabs tabs={tabs} />
+      </div>
     </div>
   );
 }

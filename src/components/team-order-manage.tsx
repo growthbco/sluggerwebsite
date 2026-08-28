@@ -18,7 +18,6 @@ type RosterRow = {
 
 type Props = {
   token: string;
-  reference: string;
   teamName: string;
   jerseyStyle: string | null;
   jerseyMaterial: string | null;
@@ -29,11 +28,7 @@ type Props = {
   shareUrl: string;
   roster: RosterRow[];
   submitted: boolean;
-  contactName?: string | null;
-  contactEmail?: string | null;
-  contactPhone?: string | null;
   colors?: string | null;
-  placedAt?: string | null; // ISO string of when the order came in
   locked?: boolean; // order shipped/cancelled: roster is read-only
   requiresNames?: boolean; // "names on the back?" survey answer
   minPieces?: number; // order minimum (6 default, cheer 12)
@@ -43,7 +38,7 @@ type Props = {
   // Final submission is only available once approved artwork is attached. A
   // draft roster remains editable while artwork is missing or pending.
   designState?: "approved" | "pending" | "missing";
-  quote?: { lines: { label: string; quantity: number; unitPriceCents: number; totalCents: number }[]; totalCents: number } | null; // live running total
+  quote?: { lines: { label: string; quantity: number; unitPriceCents: number; totalCents: number }[]; rushFeeCents?: number; totalCents: number } | null; // live running total
   // "Add to this order" block (the add-on form), shown right under the submitted
   // banner so coaches actually find it - the #1 thing they ask for.
   addonSlot?: React.ReactNode;
@@ -59,7 +54,9 @@ function rowSizes(r: RosterRow, items: string[]): string {
     .join(" · ");
 }
 
-export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerseyMaterial, items, designs = [], shareUrl, roster, submitted, contactName, contactEmail, contactPhone, colors, placedAt, locked, requiresNames = true, minPieces = 6, quote, nextIsDeposit = false, designState = "approved", addonSlot }: Props) {
+const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, items, designs = [], shareUrl, roster, submitted, colors, locked, requiresNames = true, minPieces = 6, quote, nextIsDeposit = false, designState = "approved", addonSlot }: Props) {
   // >1 approved design -> show the "which design?" picker on every add/edit row.
   const needsDesign = designs.length > 1;
   const soleDesign = designs.length === 1 ? designs[0].label : "";
@@ -73,6 +70,8 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerse
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">(submitted ? "done" : "idle");
   const [message, setMessage] = useState("");
+  const [confirmingSubmit, setConfirmingSubmit] = useState(false);
+  const [submitAck, setSubmitAck] = useState(false);
 
   // "Names on the back?" survey. Controls whether the name field shows for
   // players and in the coach's add/edit rows. Saved to the order on change.
@@ -153,13 +152,14 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerse
       );
       return;
     }
-    if (!confirm("Submit this order? Players won't be able to add themselves after this.")) return;
+    setConfirmingSubmit(false);
     setStatus("sending");
     try {
       const res = await fetch(`/api/team-order/${token}/submit`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not submit");
       setStatus("done");
+      router.refresh();
     } catch (e) {
       setStatus("error");
       setMessage((e as Error).message);
@@ -176,7 +176,7 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerse
   return (
     <div className="space-y-8">
       <header>
-        <span className="display text-brand text-sm">{teamName} · {reference}</span>
+        <span className="display text-brand text-sm">{teamName}</span>
         <h1 className="display text-2xl sm:text-3xl text-foreground mt-1">
           {collecting ? "Fill Your Team Roster" : "Team Order"}
         </h1>
@@ -350,7 +350,7 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerse
             {status === "error" && <p className="text-sm text-brand mt-4">{message}</p>}
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <button
-                onClick={submit}
+                onClick={() => { setSubmitAck(false); setConfirmingSubmit(true); }}
                 disabled={status === "sending" || roster.length === 0 || belowHardMin || designState !== "approved"}
                 className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors disabled:opacity-60"
               >
@@ -364,13 +364,86 @@ export function TeamOrderManage({ token, reference, teamName, jerseyStyle, jerse
                     ? "Add players to submit"
                     : belowHardMin
                       ? `Add ${needMore} more to submit`
-                      : `Submit Team Order (${roster.length})`}
+                      : `Review total & submit (${roster.length})`}
               </button>
               {belowHardMin && (
                 <span className="text-sm text-brand">{minPieces}-piece minimum for this uniform.</span>
               )}
             </div>
             <p className="text-xs text-muted mt-3">Submitting closes the roster and sends it to us. You can still fix a size or name afterward.</p>
+
+            {confirmingSubmit && (
+              <div
+                className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="submit-order-title"
+                onClick={(e) => { if (e.target === e.currentTarget && status !== "sending") setConfirmingSubmit(false); }}
+              >
+                <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-steel border border-brand/60 p-6 text-left">
+                  <p className="display text-xs uppercase tracking-[0.16em] text-brand">Final review</p>
+                  <h2 id="submit-order-title" className="display text-2xl text-foreground mt-1">Confirm your order</h2>
+                  <p className="mt-2 text-sm text-muted">Check the product, quantity, sizes, and price before we create the deposit invoice.</p>
+
+                  <div className="mt-4 border border-line divide-y divide-[color:var(--line)]">
+                    {(quote?.lines ?? []).map((line, i) => (
+                      <div key={i} className="flex items-start justify-between gap-4 px-4 py-3 text-sm">
+                        <div>
+                          <p className="text-foreground">{line.label}</p>
+                          <p className="text-xs text-muted mt-0.5">{line.quantity} × {money(line.unitPriceCents)}</p>
+                        </div>
+                        <span className="display text-foreground">{money(line.totalCents)}</span>
+                      </div>
+                    ))}
+                    {Boolean(quote?.rushFeeCents) && (
+                      <div className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
+                        <span className="text-foreground">Rush order fee</span>
+                        <span className="display text-foreground">{money(quote!.rushFeeCents!)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between gap-4 bg-brand/[0.08] px-4 py-4">
+                      <span className="display text-foreground">Current subtotal</span>
+                      <span className="display text-2xl text-foreground">{quote ? money(quote.totalCents) : "—"}</span>
+                    </div>
+                  </div>
+
+                  <p className="mt-3 text-xs text-muted">Tax and shipping are calculated separately on the invoice.</p>
+                  <label className="mt-4 flex items-start gap-2.5 text-sm text-foreground cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={submitAck}
+                      onChange={(e) => setSubmitAck(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+                    />
+                    <span>I confirm the products, roster, and sizes above are correct.</span>
+                  </label>
+
+                  {status === "error" && <p className="mt-3 text-sm text-brand">{message}</p>}
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={submit}
+                      disabled={!submitAck || status === "sending"}
+                      className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-6 py-3 disabled:opacity-50"
+                    >
+                      {status === "sending"
+                        ? "Submitting…"
+                        : nextIsDeposit
+                          ? "Confirm roster & receive deposit invoice"
+                          : "Confirm & submit order"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingSubmit(false)}
+                      disabled={status === "sending"}
+                      className="clip-slant border border-line text-foreground display px-5 py-3 hover:bg-foreground/5 disabled:opacity-50"
+                    >
+                      Go back
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </Step>
         </>
       ) : (
@@ -424,9 +497,9 @@ function RunningTotal({ quote }: { quote: NonNullable<Props["quote"]> }) {
   return (
     <div className="mt-4">
       <div className="flex flex-wrap items-baseline gap-2 border border-brand/40 bg-brand/5 px-4 py-3">
-        <span className="display text-sm text-muted">Running total</span>
-        <span className="display text-2xl text-foreground">${(quote.totalCents / 100).toFixed(2)}</span>
-        <span className="text-xs text-muted">estimate - shipping and any tax added at invoice</span>
+        <span className="display text-sm text-muted">Current subtotal</span>
+        <span className="display text-2xl text-foreground">{money(quote.totalCents)}</span>
+        <span className="text-xs text-muted">tax and shipping added at invoice</span>
       </div>
       <details className="mt-2 border border-line bg-steel">
         <summary className="cursor-pointer px-4 py-2 text-sm text-muted list-none flex items-center justify-between">
@@ -436,10 +509,16 @@ function RunningTotal({ quote }: { quote: NonNullable<Props["quote"]> }) {
         <div className="px-4 pb-3 space-y-1">
           {quote.lines.map((l, i) => (
             <div key={i} className="flex justify-between text-sm">
-              <span className="text-muted">{l.label} × {l.quantity}</span>
-              <span className="text-foreground">${(l.totalCents / 100).toFixed(2)}</span>
+              <span className="text-muted">{l.label}: {l.quantity} × {money(l.unitPriceCents)}</span>
+              <span className="text-foreground">{money(l.totalCents)}</span>
             </div>
           ))}
+          {Boolean(quote.rushFeeCents) && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted">Rush order fee</span>
+              <span className="text-foreground">{money(quote.rushFeeCents!)}</span>
+            </div>
+          )}
         </div>
       </details>
     </div>

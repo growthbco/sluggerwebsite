@@ -8,8 +8,8 @@ import { ProofLightbox } from "@/components/proof-lightbox";
 
 type Props = {
   token: string;
-  reference: string;
   teamName: string;
+  productTypes?: string[];
   status: string;
   proofImages: string[];
   proofLabels?: Record<string, string>;
@@ -25,15 +25,15 @@ const STATUS_COPY: Record<string, { label: string; blurb: string }> = {
   in_design: { label: "In Design", blurb: "Our designer is working on your mockup." },
   proof_sent: { label: "Proof Ready", blurb: "Your proof is below. Approve it, or request changes." },
   changes_requested: { label: "Changes Requested", blurb: "We're updating the proof based on your notes." },
-  approved: { label: "Approved", blurb: "Design approved! Time to submit your team order." },
-  ordered: { label: "Ordered", blurb: "Your team order has been submitted. We're on it." },
+  approved: { label: "Approved", blurb: "Your artwork is approved. Next, add your roster and review the full price." },
+  ordered: { label: "Roster Confirmed", blurb: "Your roster is submitted. The deposit is the next step." },
   cancelled: { label: "Cancelled", blurb: "" },
 };
 
 export function DesignStatusPanel({
   token,
-  reference,
   teamName,
+  productTypes = [],
   status,
   proofImages,
   proofLabels = {},
@@ -75,6 +75,7 @@ export function DesignStatusPanel({
   // Which design(s) the client approved, to show on the approved screen.
   const approvedShown = approvedUrls.length ? approvedUrls : initialApprovedUrl ? [initialApprovedUrl] : [];
   const hasProof = proofImages.length > 0;
+  const isJerseyProject = productTypes.some((p) => /jersey|shirt/i.test(p));
   const revisionsLeft = Math.max(0, maxRevisions - used);
   const maxedOut = revisionsLeft === 0;
 
@@ -147,7 +148,7 @@ export function DesignStatusPanel({
   return (
     <div className="space-y-8">
       <header>
-        <span className="display text-brand text-sm">{reference}</span>
+        <span className="display text-brand text-sm">Your project</span>
         <h1 className="display text-3xl sm:text-4xl text-foreground mt-1">{teamName}</h1>
         <div className="mt-4 inline-block clip-slant bg-brand text-on-brand display text-sm px-4 py-2">{copy.label}</div>
         {copy.blurb && <p className="mt-3 text-muted">{copy.blurb}</p>}
@@ -168,11 +169,13 @@ export function DesignStatusPanel({
                 : "Tap the proof to select it, then approve or request changes."}
             </p>
           )}
-          <p className="text-xs text-muted mt-1">
-            Note: every finished jersey includes standard Slugger Athletics branding - a size barcode
-            tag on the lower-right front, the SA logo at the top of the back, and a neck label reading
-            &quot;Slugger Athletics&quot; - even if it isn&apos;t shown on the proof.
-          </p>
+          {isJerseyProject && (
+            <p className="text-xs text-muted mt-1">
+              Note: every finished jersey includes standard Slugger Athletics branding - a size barcode
+              tag on the lower-right front, the SA logo at the top of the back, and a neck label reading
+              &quot;Slugger Athletics&quot; - even if it isn&apos;t shown on the proof.
+            </p>
+          )}
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {proofImages.map((u) => {
               const isSel = selected.includes(u);
@@ -214,7 +217,7 @@ export function DesignStatusPanel({
         <p className="text-sm text-foreground bg-brand/10 border border-brand/40 px-4 py-3">
           ⚠ <strong>Your approved design is what we produce.</strong> Every name, number, size, logo,
           and detail on the proof you approve prints exactly as shown. Not right yet? Request changes -
-          revisions are included. Once you approve, it goes straight to production as-is.
+          revisions are included. Approval locks the artwork; production starts only after your roster is confirmed and your deposit is paid.
         </p>
       )}
 
@@ -279,10 +282,10 @@ export function DesignStatusPanel({
               <div className="w-full max-w-md bg-steel border border-amber-500/50 p-6 text-left">
                 <h2 id="approve-confirm-title" className="display text-2xl text-foreground">⚠ Are you sure?</h2>
                 <p className="mt-3 text-sm text-foreground/90">
-                  Approving sends {selected.length > 1 ? "these designs" : "this design"} <strong>straight into production</strong>. This is <strong>final</strong> - every name, number, size, logo, and color prints <strong>exactly as shown on the proof</strong>.
+                  Approving locks {selected.length > 1 ? "these designs" : "this design"} as your final artwork. Every logo, color, and design detail will be produced as shown.
                 </p>
                 <p className="mt-2 text-sm text-foreground/90">
-                  Once you approve, it <strong>cannot be changed, cancelled, or refunded</strong>. Please double-check every detail first.
+                  <strong>This does not start production or charge you.</strong> Next you&apos;ll confirm your roster, review the full price, and receive the deposit invoice.
                 </p>
                 <label className="mt-4 flex items-start gap-2.5 text-sm text-foreground cursor-pointer select-none">
                   <input
@@ -291,7 +294,7 @@ export function DesignStatusPanel({
                     onChange={(e) => setAck(e.target.checked)}
                     className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
                   />
-                  <span>I&apos;ve checked every detail. I understand this is final and goes into production as-is, with no changes or refunds.</span>
+                  <span>I&apos;ve checked the artwork and approve it as the final design for this order.</span>
                 </label>
                 <p className="mt-2 text-xs text-muted">
                   By approving you agree to our{" "}
@@ -304,7 +307,7 @@ export function DesignStatusPanel({
                     disabled={!ack || busy !== ""}
                     className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-6 py-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {busy === "approving" ? "Approving…" : "Yes, approve & produce"}
+                    {busy === "approving" ? "Approving…" : "Approve design & continue"}
                   </button>
                   <button
                     onClick={() => setConfirming(false)}

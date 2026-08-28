@@ -57,6 +57,22 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
       ? "Free design - welcome back, the mockup is on us"
       : "Free design - the mockup is on us";
 
+  const nextStep = !isApproved
+    ? request.proofImages?.length
+      ? { title: "Review your proof", body: "Approve the design or request changes.", href: "#design", action: "Review design ↓" }
+      : { title: "Your proof is being created", body: "We’ll email you when it’s ready to review.", href: null, action: null }
+    : !order
+      ? { title: "Your order page is being prepared", body: "Refresh in a moment to continue to roster and pricing.", href: null, action: null }
+      : !submitted
+      ? { title: "Finish your roster and review the price", body: "Add every athlete’s size, confirm the total, then submit.", href: "#roster", action: "Continue to roster ↓" }
+      : !depositDone
+        ? order.invoiceUrl
+          ? { title: "Pay the deposit", body: "Your roster is confirmed. The deposit starts production.", href: order.invoiceUrl, action: "Pay deposit →" }
+          : { title: "Deposit invoice is next", body: "Your roster is confirmed. We’ll email the invoice and place it here.", href: "#deposit", action: "View payment status ↓" }
+        : shipped
+          ? { title: "Your order shipped", body: "Use your carrier link to follow the delivery.", href: order?.trackingNumber ? trackingUrlFor(order.trackingNumber) : "#shipment", action: "Track shipment →" }
+          : { title: "Your order is in production", body: "We’ll post tracking here and email you as soon as it ships.", href: null, action: null };
+
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14 space-y-6">
       {/* One link, whole order: the progress tracker orients the customer no
@@ -64,6 +80,17 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
       <div className="border border-line bg-foreground/[0.02] px-4 py-4">
         <OrderStageTracker stages={stages} />
       </div>
+
+      <section className="border-2 border-brand/60 bg-brand/[0.08] px-5 py-4">
+        <p className="display text-xs uppercase tracking-[0.16em] text-brand">Next step</p>
+        <h2 className="display text-xl text-foreground mt-1">{nextStep.title}</h2>
+        <p className="text-sm text-muted mt-1">{nextStep.body}</p>
+        {nextStep.href && nextStep.action && (
+          <Link href={nextStep.href} className="inline-flex mt-3 clip-slant bg-brand text-on-brand display text-sm px-5 py-2.5 hover:bg-brand-dark">
+            {nextStep.action}
+          </Link>
+        )}
+      </section>
 
       <div className="text-sm px-4 py-2 border border-brand/40 bg-brand/5 text-foreground">{feeLabel}</div>
 
@@ -90,19 +117,21 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
         </div>
       )}
 
-      <DesignStatusPanel
-        token={token}
-        reference={request.reference}
-        teamName={request.teamName}
-        status={request.status}
-        proofImages={request.proofImages ?? []}
-        proofLabels={request.proofLabels ?? {}}
-        initialApprovedUrl={request.approvedDesignUrl}
-        approvedUrls={request.approvedDesignUrls ?? []}
-        teamOrderUrl={order ? "#roster" : `/team-order?design=${token}`}
-        revisionsUsed={request.revisionsUsed ?? 0}
-        maxRevisions={MAX_REVISIONS}
-      />
+      <section id="design" className="scroll-mt-6">
+        <DesignStatusPanel
+          token={token}
+          teamName={request.teamName}
+          productTypes={request.productTypes ?? []}
+          status={request.status}
+          proofImages={request.proofImages ?? []}
+          proofLabels={request.proofLabels ?? {}}
+          initialApprovedUrl={request.approvedDesignUrl}
+          approvedUrls={request.approvedDesignUrls ?? []}
+          teamOrderUrl={order ? "#roster" : `/team-order?design=${token}`}
+          revisionsUsed={request.revisionsUsed ?? 0}
+          maxRevisions={MAX_REVISIONS}
+        />
+      </section>
 
       {/* STAGE 2 - Roster & sizes, on the same link once the design is approved. */}
       {isApproved && order && (
@@ -116,7 +145,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
           before the coach formally submits the roster), so the pay link never
           dies into email. */}
       {isApproved && order && depositReady && (
-        <section className="pt-6 border-t border-line">
+        <section id="deposit" className="pt-6 border-t border-line scroll-mt-6">
           <h2 className="display text-2xl text-foreground">Deposit</h2>
           {depositDone ? (
             <p className="mt-2 text-sm text-foreground bg-brand/10 border border-brand/40 px-4 py-3">
@@ -140,7 +169,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
 
       {/* STAGE 4 - Track. */}
       {isApproved && order && (shipped || inProduction) && (
-        <section className="pt-6 border-t border-line">
+        <section id="shipment" className="pt-6 border-t border-line scroll-mt-6">
           <h2 className="display text-2xl text-foreground">{shipped ? "Shipment" : "Production"}</h2>
           {shipped ? (
             <div className="mt-2 space-y-2 text-sm">
