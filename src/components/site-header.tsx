@@ -56,7 +56,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50">
       {/* Announcement bar */}
       <div className="bg-brand text-on-brand text-center text-xs sm:text-sm font-semibold tracking-wide py-2 px-4">
-        FALL DATES FILL FAST · ORDER EARLY · RUSH OPTIONS FROM $100
+        FALL DATES FILL FAST · ORDER EARLY · FLAT $100 RUSH SERVICE
       </div>
 
       <div className="bg-ink/95 backdrop-blur border-b border-line">

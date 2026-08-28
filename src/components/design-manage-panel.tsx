@@ -237,7 +237,7 @@ export function DesignManagePanel({
         <div className="border-2 border-red-500 bg-red-500/10 p-5">
           <p className="display text-2xl sm:text-3xl text-red-400">RUSH ORDER{neededStr ? ` - NEEDED BY ${neededStr.toUpperCase()}` : ""}</p>
           <p className="mt-2 text-sm text-foreground">
-            Rush starts at $100, scales with piece count, and the order ships direct.{" "}
+            Rush is a flat $100 fee, and the order ships direct.{" "}
             {rushOk ? "Timeline is confirmed - this design is priority." : <strong>Do NOT promise this date to the client until it&apos;s approved below.</strong>}
           </p>
           {rushOk ? (

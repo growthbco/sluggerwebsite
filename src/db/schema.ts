@@ -706,8 +706,8 @@ export const designRequests = pgTable(
     colorHexes: jsonb("color_hexes").$type<string[]>().default([]),
 
     // When the customer needs the uniforms in hand. Anything < 14 days triggers
-    // the rush flag: rush starts at $100 (order ships direct), and staff must
-    // confirm the final fee and timeline before design work starts.
+    // the rush flag: rush is a flat $100 fee (order ships direct), and staff
+    // must confirm the timeline before design work starts.
     neededBy: timestamp("needed_by", { withTimezone: true }),
     rush: boolean("rush").notNull().default(false),
     // When the customer ticked the required "delivery dates are estimates and

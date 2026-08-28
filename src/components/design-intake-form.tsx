@@ -383,8 +383,8 @@ export function DesignIntakeForm() {
           if (days < 0) return <p className="mt-2 text-sm text-brand">That date is in the past - please pick a future date.</p>;
           return (
             <p className="mt-2 text-sm bg-brand/10 border border-brand/40 text-foreground p-3">
-              🚨 Heads up - that&apos;s within 2 weeks, so you may need a <strong>rush order</strong>. Rush starts at <strong>$100</strong> and can increase based on the items and quantity.
-              We&apos;ll confirm the final fee and whether we can meet your date before design work starts.
+              🚨 Heads up - that&apos;s within 2 weeks, so you may need a <strong>rush order</strong>. Rush is a flat <strong>$100</strong> fee.
+              We&apos;ll confirm whether we can meet your date before design work starts.
             </p>
           );
         })()}

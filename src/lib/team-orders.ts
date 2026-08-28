@@ -25,8 +25,7 @@ export type NewTeamOrder = {
   designRequestId?: string;
   /** Discord home for this order. Usually the linked design's forum thread. */
   discordThreadId?: string;
-  // Inherited from a rush design request: flags the rush fee ($100 minimum,
-  // scaling with billable piece count).
+  // Inherited from a rush design request: flags the flat $100 rush fee.
   rushShipping?: boolean;
   // Active SMS opt-in checked on the order form.
   smsOptIn?: boolean;

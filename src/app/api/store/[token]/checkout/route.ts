@@ -169,7 +169,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     return NextResponse.json({ error: "No valid items selected" }, { status: 400 });
   }
 
-  // Rush production: $5/piece with a $100 minimum. One explicit line keeps the
+  // Rush production: one flat $100 fee. One explicit line keeps the
   // Stripe total identical to the site and makes the policy easy to audit.
   if (rush) {
     const pieces = lineItems.reduce((s, l) => s + l.quantity, 0);
@@ -179,7 +179,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       price_data: {
         currency: "usd",
         unit_amount: rushFeeCents,
-        product_data: { name: `🚨 RUSH production (${pieces} pieces, timeline confirmed separately)` },
+        product_data: { name: "🚨 RUSH production (flat fee; timeline confirmed separately)" },
       },
     });
   }

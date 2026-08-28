@@ -228,9 +228,9 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
       },
       {
         name: "Rush Production (About 1 Week)",
-        price: null,
+        price: "$100 flat",
         description:
-          "Need it fast? Rush production gets most orders to you in about a week.",
+          "Need it fast? Rush production gets priority handling for one flat $100 fee. The timeline must be confirmed before we promise a date.",
         href: "/faq",
       },
       {

@@ -49,7 +49,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     postDesignThreadUpdate({
       threadId: request.discordThreadId ?? undefined,
       title: `✅ RUSH approved by ${name} - ${request.teamName} (${request.reference})`,
-      description: `Timeline confirmed for **${neededStr}**. Rush starts at $100, scales with piece count, and ships direct. Client has been emailed.`,
+      description: `Timeline confirmed for **${neededStr}**. Rush is a flat $100 fee and ships direct. Client has been emailed.`,
     }),
   ]);
 

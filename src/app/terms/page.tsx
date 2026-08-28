@@ -72,8 +72,8 @@ export default function TermsPage() {
             volume may take longer.
           </p>
           <p className="mt-2">
-            Rush service starts at $100. The final rush charge and available timeline
-            depend on the items and quantity, and rush is not confirmed until Slugger
+            Rush service is a flat $100 fee. The available timeline
+            is not confirmed until Slugger
             Athletics approves it for the specific order. Rush prioritizes production;
             it does not guarantee carrier transit after the package ships.
             See our Shipping page for details.

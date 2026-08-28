@@ -119,7 +119,7 @@ export default function PricingPage() {
           <li>Prices are per piece, plus tax. Fully custom design in your colors is included.</li>
           <li>Shipping is not included - it&apos;s calculated by weight at checkout. Local pickup in Ocala is always free.</li>
           <li>Standard turnaround is 2-3 weeks after you approve your design proof.</li>
-          <li>Need it within 2 weeks? Rush service starts at $100; the final fee depends on the items and quantity. We confirm the fee and timeline before promising a date.</li>
+          <li>Need it within 2 weeks? Rush service is a flat $100 fee. We confirm the timeline before promising a date.</li>
           <li>Hype chains and anything you don&apos;t see here are quoted custom - just ask.</li>
         </ul>
       </section>

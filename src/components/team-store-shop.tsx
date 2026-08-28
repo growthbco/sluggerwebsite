@@ -312,13 +312,13 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
               className="mt-0.5 accent-[color:var(--brand-gold)]"
             />
             <span className="text-foreground">
-              🚨 Request rush production <span className="text-muted">($100 minimum · scales with quantity · timeline confirmed by Slugger)</span>
+              🚨 Request rush production <span className="text-muted">(flat $100 fee · timeline confirmed by Slugger)</span>
             </span>
           </label>
         )}
         {rush && pieces > 0 && (
           <div className="mt-2 flex justify-between text-sm">
-            <span className="text-muted">Rush fee ({pieces} × $5)</span>
+            <span className="text-muted">Rush fee (flat)</span>
             <span className="text-foreground">{money(rushFeeCents)}</span>
           </div>
         )}

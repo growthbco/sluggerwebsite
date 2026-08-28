@@ -16,7 +16,7 @@ export function DeliveryTimingAcknowledgment({ checked, onChange, id = "delivery
       <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-foreground/90">
         <li>Standard turnaround and requested delivery dates are estimates, not guarantees.</li>
         <li>
-          Have a firm deadline? Ask us before ordering. Rush service starts at <strong>$100</strong>; the final fee and available timeline depend on your items and quantity, and rush is confirmed only after Slugger approves it.
+          Have a firm deadline? Ask us before ordering. Rush service is a flat <strong>$100</strong> fee, and the timeline is confirmed only after Slugger approves it.
         </li>
         <li>
           Carrier, weather, customs, and routing delays are outside Slugger&apos;s control. We&apos;ll help track the package, but extra or upgraded shipping caused by a late order or carrier delay is the customer&apos;s responsibility unless we agree otherwise in writing.

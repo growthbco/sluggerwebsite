@@ -39,7 +39,7 @@ export type NewDesignRequest = {
 };
 
 const RUSH_DAYS = 14;
-export const RUSH_FEE_NOTE = "Rush service starts at $100 and scales with piece count; staff must confirm the fee and timeline.";
+export const RUSH_FEE_NOTE = "Rush service is a flat $100 fee; staff must confirm the timeline.";
 
 /** The approved mockup graphic(s) for a design, in priority order: the approved
  *  set, then the single approved URL, then the latest proof as a fallback. Used

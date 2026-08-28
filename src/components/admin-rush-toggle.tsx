@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-/** Toggle the rush order fee ($100 minimum, scales with piece count).
+/** Toggle the flat $100 rush order fee.
  *  Auto-set when the order comes from a rush design request. */
 export function AdminRushToggle({ teamOrderId, rush }: { teamOrderId: string; rush: boolean }) {
   const router = useRouter();
@@ -31,12 +31,12 @@ export function AdminRushToggle({ teamOrderId, rush }: { teamOrderId: string; ru
       type="button"
       onClick={toggle}
       disabled={busy}
-      title="Rush fee: $100 minimum, scales with piece count; priority production + direct shipping"
+      title="Rush fee: flat $100; priority production + direct shipping"
       className={`text-xs display px-2 py-0.5 border disabled:opacity-50 whitespace-nowrap ${
         rush ? "border-red-500/70 text-red-400 bg-red-500/10" : "border-line text-muted hover:border-brand/40"
       }`}
     >
-      {busy ? "..." : rush ? "Rush fee ON (from $100)" : "Add rush fee (from $100)"}
+      {busy ? "..." : rush ? "Rush fee ON ($100)" : "Add rush fee ($100)"}
     </button>
   );
 }

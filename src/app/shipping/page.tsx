@@ -15,7 +15,7 @@ const SECTIONS = [
       "Custom orders are made to order, so the production clock starts after your proof is approved, your final roster is confirmed, and your deposit is paid.",
       "Most orders ship in about 2-3 weeks after those steps are complete, but this is an estimate rather than a guaranteed delivery date. Specialty items and larger orders may take longer.",
       "Fall is our busiest season. Production queues and carrier networks can slow down, so order as early as possible and leave a buffer before your first game, event, or competition.",
-      "Need it faster? Rush service starts at $100. The final fee and available timeline depend on the items and quantity, and rush is not confirmed until Slugger approves it for your specific order.",
+      "Need it faster? Rush service is a flat $100 fee. The timeline is not confirmed until Slugger approves it for your specific order.",
     ],
   },
   {
