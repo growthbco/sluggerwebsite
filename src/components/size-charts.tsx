@@ -48,7 +48,7 @@ export const FLAG_FOOTBALL = [
   ["XL", "21", "29"], ["2XL", "22", "30"], ["3XL", "23", "31"],
 ];
 
-// Supplier finished-item measurements in inches / centimeters. The waist range
+// Supplier finished-item measurements in inches. The waist range
 // belongs to the skirt/bottom, while chest and sleeve measurements belong to
 // the top. Row labels mirror CHEER_SIZES in order-items.ts.
 export const CHEER_SET_HEADERS = [
@@ -61,12 +61,12 @@ export const CHEER_SET_HEADERS = [
   "Sock length",
 ];
 export const CHEER_SET = [
-  ["6", '18" / 46 cm', '22.5" / 57.5 cm', '20.5-27.5" / 52.5-70 cm', '14.5" / 37 cm', '7.1-18.9" / 18-48 cm', '15.7" / 40 cm'],
-  ["8", '20" / 51 cm', '24.5" / 62.5 cm', '22-29" / 56.5-74 cm', '15.5" / 40 cm', '7.1-18.9" / 18-48 cm', '15.7" / 40 cm'],
-  ["10", '22" / 55.5 cm', '26.5" / 67.5 cm', '23.5-30.5" / 60.5-78 cm', '17" / 43.5 cm', '7.1-18.9" / 18-48 cm', '18.9" / 48 cm'],
-  ["12", '23.5" / 60.5 cm', '28.5" / 72.5 cm', '25-32" / 64.5-82 cm', '18.5" / 47 cm', '7.1-18.9" / 18-48 cm', '18.9" / 48 cm'],
-  ["14", '25.5" / 65 cm', '30.5" / 77.5 cm', '27-33.5" / 68.5-86 cm', '19.5" / 50 cm', '7.1-18.9" / 18-48 cm', '18.9" / 48 cm'],
-  ["16", '27.5" / 70 cm', '32.5" / 82.5 cm', '28.5-35" / 72.5-90 cm', '21" / 53.5 cm', '7.1-18.9" / 18-48 cm', '18.9" / 48 cm'],
+  ["6", '18"', '22.5"', '20.5-27.5"', '14.5"', '7.1-18.9"', '15.7"'],
+  ["8", '20"', '24.5"', '22-29"', '15.5"', '7.1-18.9"', '15.7"'],
+  ["10", '22"', '26.5"', '23.5-30.5"', '17"', '7.1-18.9"', '18.9"'],
+  ["12", '23.5"', '28.5"', '25-32"', '18.5"', '7.1-18.9"', '18.9"'],
+  ["14", '25.5"', '30.5"', '27-33.5"', '19.5"', '7.1-18.9"', '18.9"'],
+  ["16", '27.5"', '32.5"', '28.5-35"', '21"', '7.1-18.9"', '18.9"'],
 ];
 
 export function ChartTable({ headers, rows, wide = false }: { headers: string[]; rows: string[][]; wide?: boolean }) {

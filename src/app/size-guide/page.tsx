@@ -46,7 +46,7 @@ export default function SizeGuidePage() {
         <span className="display text-brand text-sm">Sizing</span>
         <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">Size Guide</h1>
         <p className="mt-3 text-muted">
-          Measurements are in inches; the cheer chart also includes centimeters. Our jerseys have a relaxed fit and run slightly large - when in doubt, size down or reach out and we&apos;ll help.
+          All measurements are in inches. Our jerseys have a relaxed fit and run slightly large - when in doubt, size down or reach out and we&apos;ll help.
         </p>
       </header>
 
