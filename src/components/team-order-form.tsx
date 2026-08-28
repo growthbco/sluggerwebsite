@@ -5,6 +5,7 @@ import { SmsConsentNote } from "@/components/sms-consent";
 import { ITEM_TYPES, JERSEY_MATERIALS } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
+import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-acknowledgment";
 
 const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button", "Quarter-Zip"];
 
@@ -70,6 +71,9 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [copied, setCopied] = useState("");
   const [manageUrl, setManageUrl] = useState<string | null>(null);
   const [smsOptIn, setSmsOptIn] = useState(false);
+  const [confirmingSubmit, setConfirmingSubmit] = useState(false);
+  const [rosterAck, setRosterAck] = useState(false);
+  const [deliveryAck, setDeliveryAck] = useState(false);
 
   // Returning visitor prefill (browser-local). Skipped when the identity is
   // already locked from an approved design.
@@ -118,6 +122,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const hasJersey = items.includes("jersey");
 
   async function submit() {
+    if (!rosterAck || !deliveryAck) return;
     // Multi-design team: every player row with anything on it must say which
     // design it gets, so nothing falls back to a guess in production.
     if (needsDesign && hasJersey) {
@@ -129,7 +134,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn, deliveryTermsAccepted: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
@@ -442,8 +447,12 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
 
           {status === "error" && <p className="text-sm text-brand">{message}</p>}
 
-          <button onClick={submit} disabled={status === "sending" || !hasApprovedDesign} className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors disabled:opacity-60">
-            {status === "sending" ? "Submitting…" : hasApprovedDesign ? "Submit Team Order" : "Approved design required"}
+          <button
+            onClick={() => { setRosterAck(false); setDeliveryAck(false); setConfirmingSubmit(true); }}
+            disabled={status === "sending" || !hasApprovedDesign}
+            className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors disabled:opacity-60"
+          >
+            {status === "sending" ? "Submitting…" : hasApprovedDesign ? "Review & Submit Team Order" : "Approved design required"}
           </button>
           <p className="text-xs text-muted">
             {hasApprovedDesign
@@ -451,6 +460,60 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
               : "Need to collect sizes first? Choose “Let players enter their own” above to create a draft roster link."}
           </p>
           <p className="text-xs text-muted">⏱ Working toward a deadline? Order as early as you can and build in a buffer. We push hard to hit every date, but carrier and shipping delays can happen and are outside our control - if your date is firm, tell us before you order and we&apos;ll be straight with you about it.</p>
+
+          {confirmingSubmit && (
+            <div
+              className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="direct-order-confirm-title"
+              onClick={(event) => { if (event.target === event.currentTarget && status !== "sending") setConfirmingSubmit(false); }}
+            >
+              <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-steel border border-brand/60 p-6 text-left">
+                <p className="display text-xs uppercase tracking-[0.16em] text-brand">Final review</p>
+                <h2 id="direct-order-confirm-title" className="display text-2xl text-foreground mt-1">Confirm your team order</h2>
+                <p className="mt-2 text-sm text-muted">Please review the roster and delivery expectations before submitting.</p>
+
+                <label className="mt-4 flex cursor-pointer select-none items-start gap-2.5 border border-line p-3 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={rosterAck}
+                    onChange={(event) => setRosterAck(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+                  />
+                  <span>I confirm the approved design, products, roster, and sizes are correct.</span>
+                </label>
+
+                <div className="mt-4">
+                  <DeliveryTimingAcknowledgment
+                    id="direct-order-delivery-timing-ack"
+                    checked={deliveryAck}
+                    onChange={setDeliveryAck}
+                  />
+                </div>
+
+                {status === "error" && <p className="mt-3 text-sm text-brand">{message}</p>}
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={submit}
+                    disabled={!rosterAck || !deliveryAck || status === "sending"}
+                    className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-6 py-3 disabled:opacity-50"
+                  >
+                    {status === "sending" ? "Submitting…" : "Accept & submit order"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingSubmit(false)}
+                    disabled={status === "sending"}
+                    className="clip-slant border border-line text-foreground display px-5 py-3 hover:bg-foreground/5 disabled:opacity-50"
+                  >
+                    Go back
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 

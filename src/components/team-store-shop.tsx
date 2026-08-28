@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
+import { rushFeeCentsForPieces } from "@/lib/rush-pricing";
 
 type StoreItem = {
   key: string;
@@ -154,7 +155,7 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
   const [rush, setRush] = useState(false);
   const [note, setNote] = useState("");
   const pieces = selections.reduce((sum, s) => sum + s.quantity, 0);
-  const rushFeeCents = rush ? pieces * 500 : 0;
+  const rushFeeCents = rush ? rushFeeCentsForPieces(pieces) : 0;
   const subtotal = selections.reduce((sum, s) => sum + s.priceCents * s.quantity, 0) + rushFeeCents;
 
   async function checkout() {
@@ -311,7 +312,7 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
               className="mt-0.5 accent-[color:var(--brand-gold)]"
             />
             <span className="text-foreground">
-              🚨 Rush my order <span className="text-muted">(+$5/item · ~1 week instead of 2-3)</span>
+              🚨 Request rush production <span className="text-muted">($100 minimum · scales with quantity · timeline confirmed by Slugger)</span>
             </span>
           </label>
         )}

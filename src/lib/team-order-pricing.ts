@@ -1,7 +1,8 @@
 // Auto-pricing for quote-first team orders: roster rows x the public price
-// list. Jersey price follows the order's jersey style; rush adds a flat $100.
+// list. Jersey price follows the order's jersey style; rush starts at $100.
 
 import { itemLabel } from "@/lib/order-items";
+import { rushFeeCentsForPieces } from "@/lib/rush-pricing";
 
 // Per-item retail prices in cents (mirrors src/lib/pricing.ts).
 const ITEM_PRICES: Record<string, number> = {
@@ -23,11 +24,6 @@ const ITEM_PRICES: Record<string, number> = {
   performance_hat: 3800, // premium water-resistant performance cap
   beanie: 4000, // custom knit beanie, special-ordered from Cap America (estimate; adjust to real cost)
 };
-
-// Flat rush order fee: priority production + direct shipping. Charged once
-// per order (not per piece) when rushShipping is set; staff approve the
-// timeline before it's promised.
-export const RUSH_FEE_CENTS = 10000;
 
 // White-label upgrade (remove the SA back-logo + neck label): priced PER PIECE
 // because the value is lost advertising, which scales with quantity - with a
@@ -232,7 +228,7 @@ export function computeTeamOrderQuote(
     );
   }
 
-  const rushFeeCents = order.rushShipping ? RUSH_FEE_CENTS : 0;
+  const rushFeeCents = order.rushShipping ? rushFeeCentsForPieces(pieces) : 0;
   const totalCents = lines.reduce((s, l) => s + l.totalCents, 0) + rushFeeCents;
   return { lines, pieces, rushFeeCents, totalCents };
 }

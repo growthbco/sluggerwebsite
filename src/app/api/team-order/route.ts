@@ -25,6 +25,7 @@ export async function POST(req: Request) {
     items?: string[];
     roster?: RosterRow[];
     designToken?: string;
+    deliveryTermsAccepted?: boolean;
   };
   try {
     body = await req.json();
@@ -67,6 +68,9 @@ export async function POST(req: Request) {
 
   if (!teamName || !contactName || !contactEmail) {
     return NextResponse.json({ error: "Team name, contact name, and email are required." }, { status: 400 });
+  }
+  if (body.deliveryTermsAccepted !== true) {
+    return NextResponse.json({ error: "Please accept the delivery and carrier-delay policy before submitting." }, { status: 400 });
   }
   if (roster.length === 0) {
     return NextResponse.json({ error: "Add at least one player to the roster." }, { status: 400 });
@@ -140,7 +144,7 @@ export async function POST(req: Request) {
         "coach",
       );
     }
-    await submitTeamOrder(created.id);
+    await submitTeamOrder(created.id, new Date());
     // Auto-invoice ONLY when the submitter proved they own this funnel by
     // presenting a valid design token. This endpoint is public and takes an
     // attacker-controlled teamName / email / phone; without the proof, auto-

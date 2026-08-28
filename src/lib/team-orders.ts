@@ -25,7 +25,8 @@ export type NewTeamOrder = {
   designRequestId?: string;
   /** Discord home for this order. Usually the linked design's forum thread. */
   discordThreadId?: string;
-  // Inherited from a rush design request: flags the flat $100 rush order fee.
+  // Inherited from a rush design request: flags the rush fee ($100 minimum,
+  // scaling with billable piece count).
   rushShipping?: boolean;
   // Active SMS opt-in checked on the order form.
   smsOptIn?: boolean;
@@ -484,12 +485,14 @@ export async function saveInboundTracking(
     .where(eq(teamOrders.id, teamOrderId));
 }
 
-/** Coach submits the order; locks self-entry and marks it submitted. */
-export async function submitTeamOrder(teamOrderId: string) {
+/** Coach submits the order; records delivery-policy acceptance, locks
+ * self-entry, and marks it submitted. Requiring the timestamp here prevents a
+ * future submission path from silently skipping the acknowledgment. */
+export async function submitTeamOrder(teamOrderId: string, deliveryTermsAcceptedAt: Date) {
   const db = getDb();
   await db
     .update(teamOrders)
-    .set({ status: "submitted", selfEntryOpen: false, submittedAt: new Date(), updatedAt: new Date() })
+    .set({ status: "submitted", selfEntryOpen: false, deliveryTermsAcceptedAt, submittedAt: new Date(), updatedAt: new Date() })
     .where(eq(teamOrders.id, teamOrderId));
 }
 

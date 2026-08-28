@@ -6,6 +6,7 @@ import { SmsConsentNote } from "@/components/sms-consent";
 import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
 import Image from "next/image";
 import { upload } from "@vercel/blob/client";
+import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-acknowledgment";
 
 type Uploaded = { url: string; pathname: string };
 
@@ -382,8 +383,8 @@ export function DesignIntakeForm() {
           if (days < 0) return <p className="mt-2 text-sm text-brand">That date is in the past - please pick a future date.</p>;
           return (
             <p className="mt-2 text-sm bg-brand/10 border border-brand/40 text-foreground p-3">
-              🚨 Heads up - that&apos;s within 2 weeks, so this is a <strong>rush order</strong>: a flat <strong>$100 rush order fee</strong> applies,
-              your order gets priority production and ships direct. We&apos;ll confirm we can meet your date before design work starts.
+              🚨 Heads up - that&apos;s within 2 weeks, so you may need a <strong>rush order</strong>. Rush starts at <strong>$100</strong> and can increase based on the items and quantity.
+              We&apos;ll confirm the final fee and whether we can meet your date before design work starts.
             </p>
           );
         })()}
@@ -439,19 +440,11 @@ export function DesignIntakeForm() {
       {status === "error" && <p className="text-sm text-brand">{message}</p>}
       {message && status !== "error" && <p className="text-sm text-brand">{message}</p>}
 
-      <label className="flex items-start gap-2.5 text-sm text-foreground cursor-pointer select-none border border-line bg-steel p-3">
-        <input
-          type="checkbox"
-          checked={ackDelays}
-          onChange={(e) => setAckDelays(e.target.checked)}
-          className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
-        />
-        <span>
-          I understand delivery dates are estimates. Slugger Athletics works hard to hit every deadline, but is
-          <strong> not responsible for shipping carrier, customs, weather, or other delays outside its control</strong>.
-          I&apos;ll order early and build in a buffer, and flag any firm deadline before production.
-        </span>
-      </label>
+      <DeliveryTimingAcknowledgment
+        id="design-delivery-timing-ack"
+        checked={ackDelays}
+        onChange={setAckDelays}
+      />
 
       <button
         onClick={submit}

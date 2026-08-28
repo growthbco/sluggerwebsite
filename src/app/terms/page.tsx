@@ -66,8 +66,16 @@ export default function TermsPage() {
         <div>
           <h2 className="display text-xl text-foreground">Turnaround &amp; Shipping</h2>
           <p className="mt-2">
-            Standard production is typically 2-3 weeks after proof approval; rush is
-            roughly one week and is not guaranteed. Specialty items may take longer.
+            Standard production is typically 2-3 weeks after proof approval, final
+            roster confirmation, and deposit payment. This is an estimate, not a
+            guaranteed delivery date. Specialty items, larger orders, and peak fall-season
+            volume may take longer.
+          </p>
+          <p className="mt-2">
+            Rush service starts at $100. The final rush charge and available timeline
+            depend on the items and quantity, and rush is not confirmed until Slugger
+            Athletics approves it for the specific order. Rush prioritizes production;
+            it does not guarantee carrier transit after the package ships.
             See our Shipping page for details.
           </p>
           <p className="mt-2">
@@ -78,6 +86,13 @@ export default function TermsPage() {
             guarantees. Please build in a buffer when you order for an event or season,
             and place your order as early as you can. If you have a hard deadline, tell us
             before you order so we can be honest about whether we can meet it.
+          </p>
+          <p className="mt-2">
+            Once a package is accepted by the carrier, Slugger Athletics is not
+            responsible for carrier, weather, routing, customs, or other transit delays
+            outside our control. We will assist with tracking and carrier claims when
+            appropriate, but extra or upgraded shipping caused by a late order or a
+            carrier delay is the customer&apos;s responsibility unless we agree otherwise in writing.
           </p>
         </div>
         <div>

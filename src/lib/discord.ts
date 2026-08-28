@@ -453,7 +453,7 @@ export async function postDesignRequestToDiscord(req: DesignRequestPayload): Pro
   if (needed) {
     fields.push({
       name: req.rush ? "Needed by 🚨 RUSH" : "Needed by",
-      value: req.rush ? `${needed} - within 2 weeks ($100 rush order fee)` : needed,
+      value: req.rush ? `${needed} - within 2 weeks (rush starts at $100; confirm fee + timeline)` : needed,
       inline: true,
     });
   }
@@ -473,10 +473,10 @@ export async function postDesignRequestToDiscord(req: DesignRequestPayload): Pro
   const body: Record<string, unknown> = {
     username: "Slugger Design Requests",
     // Rush requests get an unmissable @here banner above the embed: staff must
-    // confirm the timeline is doable (and the $100 fee) before design starts.
+    // confirm the timeline and final rush fee before design starts.
     ...(req.rush
       ? {
-          content: `@here # 🚨🚨 RUSH ORDER 🚨🚨\n**Needed by ${fmtNeededBy(req.neededBy ?? null) ?? "ASAP"}. $100 rush order fee + ships direct. DO NOT promise the date until staff approves it on the manage page.**`,
+          content: `@here # 🚨🚨 RUSH ORDER 🚨🚨\n**Needed by ${fmtNeededBy(req.neededBy ?? null) ?? "ASAP"}. Rush starts at $100, scales with piece count, and ships direct. DO NOT promise the date or final fee until staff approves it on the manage page.**`,
           allowed_mentions: { parse: ["everyone"] },
         }
       : {}),

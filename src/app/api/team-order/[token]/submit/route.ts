@@ -12,11 +12,22 @@ export const runtime = "nodejs";
 
 // Coach submits the order via their private manage link: locks self-entry and
 // posts the final roster into the order's Design Requests forum thread.
-export async function POST(_req: Request, { params }: { params: Promise<{ token: string }> }) {
+export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
   if (!dbEnabled()) {
     return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   }
   const { token } = await params;
+
+  let deliveryTermsAccepted = false;
+  try {
+    const body = await req.json();
+    deliveryTermsAccepted = body.deliveryTermsAccepted === true;
+  } catch {
+    // A missing/invalid body cannot count as an affirmative acceptance.
+  }
+  if (!deliveryTermsAccepted) {
+    return NextResponse.json({ error: "Please accept the delivery and carrier-delay policy before submitting." }, { status: 400 });
+  }
 
   const order = await getByManageToken(token);
   if (!order) return NextResponse.json({ error: "Link not found" }, { status: 404 });
@@ -56,7 +67,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ token:
   }
 
   try {
-    await submitTeamOrder(order.id);
+    await submitTeamOrder(order.id, new Date());
     // Linked orders post into the design's existing thread (one project, one
     // thread); standalone orders get their own thread in the same forum.
     const discordThreadId = await ensureTeamOrderDiscordThread(order.id);

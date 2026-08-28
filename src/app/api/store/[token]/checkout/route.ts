@@ -5,6 +5,7 @@ import { getStoreByHandle, shippingCentsFor, applyFundraise, fundraisePortionCen
 import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 import { refCodeFromCookie } from "@/lib/referral-cookie";
 import { recordOperationalFailure } from "@/lib/operational-events";
+import { rushFeeCentsForPieces } from "@/lib/rush-pricing";
 
 export const runtime = "nodejs";
 
@@ -73,8 +74,6 @@ async function shipOptions(parcelsOz: number[], zip: string | undefined, pickup:
   }
   return options;
 }
-
-const RUSH_FEE_CENTS = 500; // per piece, matches the site-wide rush policy
 
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
   if (!stripeEnabled() || !dbEnabled()) {
@@ -170,15 +169,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     return NextResponse.json({ error: "No valid items selected" }, { status: 400 });
   }
 
-  // Rush production: $5/piece, shows as its own line so Discord/email flag it.
+  // Rush production: $5/piece with a $100 minimum. One explicit line keeps the
+  // Stripe total identical to the site and makes the policy easy to audit.
   if (rush) {
     const pieces = lineItems.reduce((s, l) => s + l.quantity, 0);
+    const rushFeeCents = rushFeeCentsForPieces(pieces);
     lineItems.push({
-      quantity: pieces,
+      quantity: 1,
       price_data: {
         currency: "usd",
-        unit_amount: RUSH_FEE_CENTS,
-        product_data: { name: "🚨 RUSH production (~1 week)" },
+        unit_amount: rushFeeCents,
+        product_data: { name: `🚨 RUSH production (${pieces} pieces, timeline confirmed separately)` },
       },
     });
   }

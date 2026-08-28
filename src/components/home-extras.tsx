@@ -185,7 +185,7 @@ export function AboutBand() {
             From free team stores to full uniform programs, we make standing out easy.
           </p>
           <ul className="mt-6 space-y-2 text-foreground/90">
-            {["Field-tested, durable fabrics", "Free in-house design proofs", "Flexible delivery - 2-3 weeks or 1-week rush", "Real people, real customer support"].map((b) => (
+            {["Field-tested, durable fabrics", "Free in-house design proofs", "Order early; approved rush options from $100", "Real people, real customer support"].map((b) => (
               <li key={b} className="flex gap-2"><span className="text-brand">✓</span> {b}</li>
             ))}
           </ul>

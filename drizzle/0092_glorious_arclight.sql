@@ -1,0 +1,1 @@
+ALTER TABLE "team_orders" ADD COLUMN "delivery_terms_accepted_at" timestamp with time zone;

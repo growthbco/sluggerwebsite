@@ -47,7 +47,7 @@ async function main() {
 
     await addRosterRow(orderId, { playerName: "SMITH", playerNumber: "1", sizes: { jersey: "M" } }, "test");
     await addRosterRow(orderId, { playerName: "JONES", playerNumber: "2", sizes: { jersey: "L" } }, "test");
-    await submitTeamOrder(orderId);
+    await submitTeamOrder(orderId, new Date());
 
     console.log("2) Marking print file as verified (pre-add-on state)...");
     await savePrintFileVerification(orderId, ["https://example.com/fake-print-file.png"], {

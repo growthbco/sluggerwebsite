@@ -6,7 +6,7 @@ import { requireApiRole } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 
-// Admin-only: toggle the flat $100 rush order fee (rushShipping). Applied
+// Admin-only: toggle the rush order fee ($100 minimum, scales by piece count).
 // automatically when the order comes from a rush design request; staff can
 // remove it if the rush is declined, or add it to any order.
 export async function POST(req: Request) {

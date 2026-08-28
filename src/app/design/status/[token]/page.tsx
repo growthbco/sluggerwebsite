@@ -102,7 +102,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
               {request.neededBy
                 ? ` - we'll have your order in hand by ${request.neededBy.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" })}.`
                 : "."}{" "}
-              A flat $100 rush order fee will be on your invoice and your order ships direct.
+              Your confirmed rush fee will be on the invoice and your order ships direct.
             </>
           ) : (
             <>
@@ -110,8 +110,8 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
               {request.neededBy
                 ? ` - needed by ${request.neededBy.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" })}.`
                 : "."}{" "}
-              We&apos;re confirming we can meet your date and will let you know shortly. Rush orders carry a flat
-              $100 rush order fee and ship direct.
+              We&apos;re confirming we can meet your date and will let you know shortly. Rush service starts at $100;
+              the final fee depends on the items and quantity, and the order ships direct.
             </>
           )}
         </div>

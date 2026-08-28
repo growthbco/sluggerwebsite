@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-acknowledgment";
 import { itemLabel, sizesFor, sizeBreakdown, formatSize, JERSEY_MATERIALS } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 
@@ -72,6 +73,7 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
   const [message, setMessage] = useState("");
   const [confirmingSubmit, setConfirmingSubmit] = useState(false);
   const [submitAck, setSubmitAck] = useState(false);
+  const [deliveryAck, setDeliveryAck] = useState(false);
 
   // "Names on the back?" survey. Controls whether the name field shows for
   // players and in the coach's add/edit rows. Saved to the order on change.
@@ -143,6 +145,7 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
   }
 
   async function submit() {
+    if (!submitAck || !deliveryAck) return;
     if (designState !== "approved") {
       setStatus("error");
       setMessage(
@@ -155,7 +158,11 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
     setConfirmingSubmit(false);
     setStatus("sending");
     try {
-      const res = await fetch(`/api/team-order/${token}/submit`, { method: "POST" });
+      const res = await fetch(`/api/team-order/${token}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryTermsAccepted: true }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not submit");
       setStatus("done");
@@ -350,7 +357,7 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
             {status === "error" && <p className="text-sm text-brand mt-4">{message}</p>}
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <button
-                onClick={() => { setSubmitAck(false); setConfirmingSubmit(true); }}
+                onClick={() => { setSubmitAck(false); setDeliveryAck(false); setConfirmingSubmit(true); }}
                 disabled={status === "sending" || roster.length === 0 || belowHardMin || designState !== "approved"}
                 className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors disabled:opacity-60"
               >
@@ -418,12 +425,20 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
                     <span>I confirm the products, roster, and sizes above are correct.</span>
                   </label>
 
+                  <div className="mt-4">
+                    <DeliveryTimingAcknowledgment
+                      id="manage-delivery-timing-ack"
+                      checked={deliveryAck}
+                      onChange={setDeliveryAck}
+                    />
+                  </div>
+
                   {status === "error" && <p className="mt-3 text-sm text-brand">{message}</p>}
                   <div className="mt-5 flex flex-wrap gap-3">
                     <button
                       type="button"
                       onClick={submit}
-                      disabled={!submitAck || status === "sending"}
+                      disabled={!submitAck || !deliveryAck || status === "sending"}
                       className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-6 py-3 disabled:opacity-50"
                     >
                       {status === "sending"

@@ -12,9 +12,10 @@ const SECTIONS = [
   {
     h: "Production turnaround",
     body: [
-      "Custom orders are made to order, so the clock starts when you approve your free design proof - not when you place the order.",
-      "Most orders ship within 2-3 weeks of proof approval. Specialty items like hoodies, pants, and long-sleeve jerseys can add a few days.",
-      "Need it faster? Rush production gets your order out the door in about a week. Ask us before you order so we can confirm timing for your specific items.",
+      "Custom orders are made to order, so the production clock starts after your proof is approved, your final roster is confirmed, and your deposit is paid.",
+      "Most orders ship in about 2-3 weeks after those steps are complete, but this is an estimate rather than a guaranteed delivery date. Specialty items and larger orders may take longer.",
+      "Fall is our busiest season. Production queues and carrier networks can slow down, so order as early as possible and leave a buffer before your first game, event, or competition.",
+      "Need it faster? Rush service starts at $100. The final fee and available timeline depend on the items and quantity, and rush is not confirmed until Slugger approves it for your specific order.",
     ],
   },
   {
@@ -22,6 +23,7 @@ const SECTIONS = [
     body: [
       "Orders ship via USPS or UPS, with the carrier chosen based on weight and destination for the best balance of speed and cost.",
       "Shipping is calculated at checkout based on your order size and address. Larger team orders typically ship as a single bulk shipment to your coach or team contact.",
+      "Once a package is accepted by the carrier, weather, routing, customs, and carrier-network delays are outside Slugger Athletics' control. We will help locate and track a delayed package, but extra or upgraded shipping caused by a late order or carrier delay is the customer's responsibility unless Slugger agrees otherwise in writing.",
     ],
   },
   {
@@ -64,7 +66,7 @@ export default function ShippingPage() {
       <div className="mt-12 bg-steel border border-line p-6 text-center">
         <h2 className="display text-xl text-foreground">Need it by a certain date?</h2>
         <p className="mt-2 text-muted text-sm">
-          Tell us your deadline and we&apos;ll let you know if rush is needed. Email{" "}
+          Tell us before you order. We&apos;ll review the products, quantity, and destination, then confirm whether rush is available and what it will cost. Email{" "}
           <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a> or call{" "}
           <a href="tel:+13524147270" className="text-brand hover:underline">352-414-7270</a>.
         </p>

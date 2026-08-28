@@ -583,6 +583,10 @@ export const teamOrders = pgTable(
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     archivedNote: text("archived_note"),
 
+    // Timestamped proof that the coach accepted the delivery-delay policy at
+    // final roster submission (standard dates are estimates, rush must be
+    // confirmed, and carrier delays are outside Slugger's control).
+    deliveryTermsAcceptedAt: timestamp("delivery_terms_accepted_at", { withTimezone: true }),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -702,8 +706,8 @@ export const designRequests = pgTable(
     colorHexes: jsonb("color_hexes").$type<string[]>().default([]),
 
     // When the customer needs the uniforms in hand. Anything < 14 days triggers
-    // the rush flag: a flat $100 rush order fee (order ships direct), and staff
-    // must confirm the timeline is doable before design work starts.
+    // the rush flag: rush starts at $100 (order ships direct), and staff must
+    // confirm the final fee and timeline before design work starts.
     neededBy: timestamp("needed_by", { withTimezone: true }),
     rush: boolean("rush").notNull().default(false),
     // When the customer ticked the required "delivery dates are estimates and
