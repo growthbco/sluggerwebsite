@@ -226,6 +226,8 @@ export type TeamOrderInvoiceContent = {
   payFullCreditCents?: number;
   /** Order is local pickup in Ocala - no shipping is ever charged. */
   localPickup?: boolean;
+  /** Rush orders ship direct from production with no additional shipping fee. */
+  shippingIncludedWithRush?: boolean;
 };
 
 /** The invoice email as { subject, html } - shared by the actual send and the
@@ -269,7 +271,9 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
           ${
             args.shipCents && args.shipCents > 0
               ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping${args.shipBoxes && args.shipBoxes > 1 ? ` <span style="color:#8a8570;">(${args.shipBoxes} boxes - hats ship separately)</span>` : ""}</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;">${money(args.shipCents)}</td></tr>`
-              : args.localPickup
+              : args.shippingIncludedWithRush
+                ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Direct shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;color:#2e7d32;">included with Rush</td></tr>`
+                : args.localPickup
                 ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;color:#8a8570;">free local pickup in Ocala</td></tr>`
                 : isDeposit
                   ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;color:#8a8570;">added to your final invoice</td></tr>`
@@ -287,7 +291,9 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
         </table>
         ${
           isDeposit
-            ? args.localPickup
+            ? args.shippingIncludedWithRush
+              ? `<p style="margin:0 0 14px;font-size:13px;color:#666;">This order includes direct shipping from production as part of the Rush fee. No additional shipping charge will be added.</p>`
+              : args.localPickup
               ? `<p style="margin:0 0 14px;font-size:13px;color:#666;">This order is set for free local pickup at our Ocala shop - no shipping charges, ever. We'll let you know the moment it's ready to grab.</p>`
               : `<p style="margin:0 0 14px;font-size:13px;color:#666;">Why is shipping on the final invoice? Teams often add pieces while we're in production - extra jerseys, hats, a team hype chain. Charging shipping at the end means everything ships together and you pay the exact real rate, never an estimate. And if you pick up at our Ocala shop, shipping is simply $0.</p>`
             : ""
@@ -315,7 +321,7 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
         }
         ${
           isDeposit
-            ? `<p style="margin:0;">Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} plus tax and shipping is due before your order ships. You'll enter your <strong>shipping address</strong> on the payment page so we know exactly where your gear is headed. Questions or roster changes first? Just reply to this email.</p>
+            ? `<p style="margin:0;">${args.shippingIncludedWithRush ? `Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} plus tax is due before your order ships. Direct shipping is included with Rush, with no added shipping charge.` : `Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} plus tax and shipping is due before your order ships.`} You'll enter your <strong>shipping address</strong> on the payment page so we know exactly where your gear is headed. Questions or roster changes first? Just reply to this email.</p>
         <table style="width:100%;border-collapse:collapse;margin:18px 0 0;"><tr><td style="padding:14px 16px;background:#f6f4ee;border:1px solid #e6e0cf;border-left:3px solid #b8a36c;">
           <p style="margin:0 0 6px;font-weight:bold;color:#13160b;">🏆 Make it official: add a Custom Team Hype Chain</p>
           <p style="margin:0 0 8px;font-size:14px;color:#444;">The chain your players fight for after every big play - custom built in 3D to match your team's logo and colors. Chains start at $40 each (one-time $50 design file charge per design), and the mockup is free. Add one now and it ships right alongside your uniforms.</p>
@@ -604,7 +610,7 @@ export async function emailRushConfirmed(args: {
       intro: `Reference: <strong>${esc(args.reference)}</strong>`,
       bodyHtml: `
         <p style="margin:0 0 12px;">${args.approvedBy ? `${esc(args.approvedBy)} at Slugger` : "Our team"} reviewed your deadline and we can have your order in hand by <strong>${esc(date)}</strong>.</p>
-        <p style="margin:0 0 12px;">Rush orders get priority production and ship direct to you. Rush is a flat <strong>$100</strong> fee and will appear on your invoice.</p>
+        <p style="margin:0 0 12px;">Rush orders get priority production and ship direct to you. Rush is a flat <strong>$100</strong> fee, includes direct shipping, and will appear on your invoice. No additional shipping charge will be added.</p>
         <p style="margin:0;">To keep the timeline, please approve your design and pay the deposit as soon as they're ready - the clock starts there.</p>
       `,
       ctaText: "View your design",

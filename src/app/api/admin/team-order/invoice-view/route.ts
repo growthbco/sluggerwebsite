@@ -80,7 +80,7 @@ export async function GET(req: Request) {
           ${itemRows}
           ${line("Subtotal", money(totalCents))}
           ${order.taxExempt ? line("Sales tax", "Exempt") : line("FL Sales Tax (7%)", money(tax))}
-          ${line(`Shipping${shipBoxes > 1 ? ` (${shipBoxes} boxes - hats ship separately)` : ""}`, ship > 0 ? money(ship) : order.localPickup ? "Local pickup" : "$0.00")}
+          ${line(`Shipping${shipBoxes > 1 ? ` (${shipBoxes} boxes - hats ship separately)` : ""}`, ship > 0 ? money(ship) : order.rushShipping ? "Included with Rush" : order.localPickup ? "Local pickup" : "$0.00")}
           ${line("Total paid", money(grand), true)}
         </table>
         <p style="padding:14px 20px;color:#888;font-size:12px;margin:0;">Charged via Stripe to the card on file. This receipt reflects your system's record - no Stripe login needed.</p>
@@ -93,7 +93,7 @@ export async function GET(req: Request) {
   }
 
   // Mirror the send route: line items appear on the deposit invoice only.
-  let lines = stage === "deposit" && quote ? [...quote.lines] : [];
+  const lines = stage === "deposit" && quote ? [...quote.lines] : [];
   if (stage === "deposit" && quote && quote.rushFeeCents > 0) {
     lines.push({ label: "Rush Order Fee (priority production + direct shipping)", quantity: 1, unitPriceCents: quote.rushFeeCents, totalCents: quote.rushFeeCents });
   }
@@ -114,6 +114,7 @@ export async function GET(req: Request) {
     payUrl: sentUrl ?? "#",
     payFullUrl: stage === "deposit" ? order.fullInvoiceUrl ?? undefined : undefined,
     localPickup: order.localPickup,
+    shippingIncludedWithRush: order.rushShipping,
   });
 
   const banner = sentUrl

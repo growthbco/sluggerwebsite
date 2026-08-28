@@ -15,6 +15,7 @@ import { emailTeamOrderInvoice } from "@/lib/email";
 import { getStripe } from "@/lib/stripe";
 import { getCustomer } from "@/lib/customers";
 import { smsIfConsented } from "@/lib/sms";
+import { shouldChargeAdditionalTeamOrderShipping } from "@/lib/team-order-shipping";
 
 export type InvoiceResult =
   | { ok: true; stage: string; totalCents: number; dueCents: number; shipCents: number; creditAppliedCents: number; taxDueCents: number; invoiceUrl: string | null; fullInvoiceUrl?: string; emailed: boolean; teamName: string; reference: string }
@@ -100,7 +101,12 @@ export async function sendTeamOrderInvoice(opts: {
     const p = estimateOrderParcelsOz(roster);
     return [p.apparelOz, p.hatOz].filter((w) => w > 0);
   };
-  const wantShip = stage === "balance" && (opts.ship ? opts.ship !== "pickup" : !order.localPickup);
+  const chargeAdditionalShipping = shouldChargeAdditionalTeamOrderShipping({
+    rushShipping: order.rushShipping,
+    localPickup: order.localPickup,
+    ship: opts.ship,
+  });
+  const wantShip = stage === "balance" && chargeAdditionalShipping;
   if (wantShip) {
     // A pre-set amount is an intentional staff override (for example, a
     // customer-approved rush shipment). Preserve it when the final invoice is
@@ -127,7 +133,7 @@ export async function sendTeamOrderInvoice(opts: {
   // yet at this point, so we charge the weight-based formula amount (a shippo
   // quote if an address happens to be on file); local-pickup orders stay $0.
   let fullShipCents = 0;
-  if (stage === "deposit" && !(opts.ship ? opts.ship === "pickup" : order.localPickup)) {
+  if (stage === "deposit" && chargeAdditionalShipping) {
     // quoteShippingCents falls back to the weight formula when there's no zip
     // on file yet - same per-parcel math either way.
     const zip = order.shippingAddress?.postalCode ?? "";
@@ -158,13 +164,19 @@ export async function sendTeamOrderInvoice(opts: {
   const balanceRemaining = totalCents - depositCents;
   const withSummary = (terms: string) => (goodsSummary ? `${goodsSummary}. ${terms}` : terms);
   const depositDesc = withSummary(
-    `This is your 50% production deposit. The remaining ${money(balanceRemaining)} plus shipping is billed once your order is ready. Production starts as soon as this deposit is paid.`,
+    order.rushShipping
+      ? `This is your 50% production deposit. The remaining ${money(balanceRemaining)} is billed once your order is ready. Direct shipping is included with Rush, so no additional shipping charge will be added. Production starts as soon as this deposit is paid.`
+      : `This is your 50% production deposit. The remaining ${money(balanceRemaining)} plus shipping is billed once your order is ready. Production starts as soon as this deposit is paid.`,
   );
   const fullDesc = withSummary(
-    "Pays your order in full including shipping, so there is nothing left to collect later. Production starts right away.",
+    order.rushShipping
+      ? "Pays your order in full. Direct shipping is included with Rush, so there is nothing left to collect later. Production starts right away."
+      : "Pays your order in full including shipping, so there is nothing left to collect later. Production starts right away.",
   );
   const balanceDesc = withSummary(
-    "Final balance for your order, including shipping. This clears your account in full.",
+    order.rushShipping
+      ? "Final balance for your order. Direct shipping is included with Rush, with no additional shipping charge. This clears your account in full."
+      : "Final balance for your order, including shipping. This clears your account in full.",
   );
 
   try {
@@ -271,6 +283,7 @@ export async function sendTeamOrderInvoice(opts: {
       creditAppliedCents: creditForBalance,
       payFullCreditCents: creditForFull,
       localPickup: order.localPickup,
+      shippingIncludedWithRush: order.rushShipping,
       roster: invoiceRosterEntries(roster),
       payUrl: link.url,
       payFullUrl: fullLink?.url ?? undefined,
