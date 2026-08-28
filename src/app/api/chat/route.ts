@@ -34,7 +34,7 @@ async function lookupOrder(reference: string, email: string): Promise<string> {
         o.shippedAt
           ? `- SHIPPED on ${o.shippedAt.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric" })}${o.trackingNumber ? ` - tracking number ${o.trackingNumber}, track it at ${trackingUrlFor(o.trackingNumber)}` : ""}`
           : o.invoicePaidAt
-            ? "- Paid in full - in production / preparing to ship. Tracking is emailed the moment it ships."
+            ? "- Paid in full - in production / preparing to ship. Customer tracking is emailed only when the final package ships to them; internal designer/factory tracking is not shared."
             : o.depositPaidAt
               ? "- Deposit received - order is IN PRODUCTION. The balance invoice comes before shipping."
               : "- Roster received - the invoice email is the next step. Check the inbox (and spam) for it.",

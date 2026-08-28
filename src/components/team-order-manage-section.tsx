@@ -223,6 +223,13 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
             </p>
           )}
           {showPayBalance && <p className="text-sm text-amber-300 mt-0.5">Balance due: {money(balanceDue)}</p>}
+          {started && !outboundTrack && (
+            <p className="max-w-xl text-xs text-muted mt-1.5">
+              {order.rushShipping
+                ? "Customer tracking appears only when the final package is on its way to you. Internal production tracking is not shown here."
+                : "Customer tracking appears after the finished order reaches Slugger and we prepare the final shipment to you. Internal designer and supplier tracking is not shown here."}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {showPayDeposit && (

@@ -49,7 +49,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
     { label: "Approve design", state: st(isApproved, !isApproved) },
     { label: "Roster & sizes", state: st(submitted, Boolean(isApproved && !submitted)) },
     { label: "Deposit", state: st(depositDone, Boolean(depositReady && !depositDone)) },
-    { label: shipped ? "Shipped" : "Track", state: st(shipped, Boolean(depositDone && !shipped)) },
+    { label: shipped ? "Shipped" : "Final shipment", state: st(shipped, Boolean(depositDone && !shipped)) },
   ];
 
   const feeLabel =
@@ -71,7 +71,14 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
           : { title: "Deposit invoice is next", body: "Your roster is confirmed. We’ll email the invoice and place it here.", href: "#deposit", action: "View payment status ↓" }
         : shipped
           ? { title: "Your order shipped", body: "Use your carrier link to follow the delivery.", href: order?.trackingNumber ? trackingUrlFor(order.trackingNumber) : "#shipment", action: "Track shipment →" }
-          : { title: "Your order is in production", body: "We’ll post tracking here and email you as soon as it ships.", href: null, action: null };
+          : {
+              title: "Your order is in production",
+              body: request.rushApprovedAt
+                ? "Customer tracking appears here only when your final package is on its way to you. Internal production tracking isn’t displayed."
+                : "We’ll post tracking only after we receive the finished order and send the final package to you. Internal designer and supplier tracking isn’t displayed.",
+              href: null,
+              action: null,
+            };
 
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14 space-y-6">
@@ -194,7 +201,11 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
               ))}
             </div>
           ) : (
-            <p className="mt-2 text-sm text-muted">Your order is in production. We&apos;ll post tracking here (and email it) the moment it ships.</p>
+            <p className="mt-2 text-sm text-muted">
+              Your order is in production. {request.rushApprovedAt
+                ? "Customer tracking will appear here only when the final package is on its way to you. Internal production tracking is not displayed."
+                : "We’ll post and email tracking after the finished order reaches Slugger and we send the final package to you. Internal designer and supplier tracking is not displayed."}
+            </p>
           )}
         </section>
       )}

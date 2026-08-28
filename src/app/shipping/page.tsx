@@ -29,7 +29,8 @@ const SECTIONS = [
   {
     h: "Tracking your order",
     body: [
-      "Once your order ships, we email a tracking number to the address on the order. For team orders, tracking goes to the team contact who placed it.",
+      "For standard orders, customer tracking is created only after Slugger Athletics has the finished order in hand and prepares the final shipment to you. We email that tracking number to the address on the order; for team orders, it goes to the team contact who placed it.",
+      "Tracking from a designer, factory, or supplier to Slugger Athletics is internal production tracking. It is not customer delivery tracking, so it is not shared or displayed on the customer order page.",
       "If you haven't seen a tracking email and it's been more than three weeks since you approved your proof, reach out and we'll track it down for you.",
     ],
   },

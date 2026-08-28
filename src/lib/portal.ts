@@ -49,7 +49,6 @@ export type PortalData = {
   teamOrders: {
     reference: string; teamName: string; status: string; manageToken: string | null; trackingNumber: string | null; createdAt: Date;
     totalCents: number; shippingCents: number; depositCents: number | null; invoiceUrl: string | null; fullInvoiceUrl: string | null; balanceInvoiceUrl: string | null; depositPaidAt: Date | null; invoicePaidAt: Date | null; pieceLabel: string;
-    inboundCarrier: string | null; inboundTrackingNumber: string | null;
   }[];
   designs: { reference: string; teamName: string; status: string; statusToken: string | null; createdAt: Date; mockups: string[] }[];
   invoices: { reference: string; status: string; totalCents: number; payUrl: string | null; createdAt: Date }[];
@@ -124,8 +123,6 @@ export async function getCustomerOrders(email: string): Promise<PortalData> {
       depositPaidAt: o.depositPaidAt,
       invoicePaidAt: o.invoicePaidAt,
       pieceLabel: summarize(o),
-      inboundCarrier: o.inboundCarrier,
-      inboundTrackingNumber: o.inboundTrackingNumber,
     };
   });
   const designsV = designs.map((d) => {

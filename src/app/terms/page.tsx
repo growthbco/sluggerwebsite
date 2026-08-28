@@ -94,6 +94,13 @@ export default function TermsPage() {
             appropriate, but extra or upgraded shipping caused by a late order or a
             carrier delay is the customer&apos;s responsibility unless we agree otherwise in writing.
           </p>
+          <p className="mt-2">
+            Customer tracking is provided for the final shipment to the customer.
+            Tracking for production shipments from a designer, factory, or supplier
+            to Slugger Athletics is internal and is not shared as customer delivery tracking.
+            For standard orders, customer tracking is issued after we receive the
+            finished order and prepare it for final shipment.
+          </p>
         </div>
         <div>
           <h2 className="display text-xl text-foreground">Returns</h2>

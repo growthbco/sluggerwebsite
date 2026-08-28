@@ -82,6 +82,11 @@ export function TrackOrder() {
               🚚 Track package ({result.tracking.number})
             </a>
           )}
+          {!result.tracking && !result.shipped && (
+            <p className="mt-4 border border-line bg-ink/40 px-4 py-3 text-sm text-muted">
+              Customer tracking appears only when the final package is headed to you. Tracking from a designer, factory, or supplier to Slugger is internal production tracking and is not shown here.
+            </p>
+          )}
         </div>
       )}
     </div>

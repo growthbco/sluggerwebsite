@@ -21,6 +21,9 @@ export function DeliveryTimingAcknowledgment({ checked, onChange, id = "delivery
         <li>
           Carrier, weather, customs, and routing delays are outside Slugger&apos;s control. We&apos;ll help track the package, but extra or upgraded shipping caused by a late order or carrier delay is the customer&apos;s responsibility unless we agree otherwise in writing.
         </li>
+        <li>
+          Customer tracking is for the final shipment to you. Tracking from a designer, factory, or supplier to Slugger is internal production tracking and is not shared on the customer order page.
+        </li>
       </ul>
       <label htmlFor={id} className="mt-4 flex cursor-pointer select-none items-start gap-2.5 text-sm text-foreground">
         <input
