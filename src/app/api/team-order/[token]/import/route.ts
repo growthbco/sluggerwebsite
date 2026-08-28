@@ -26,7 +26,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   try {
     ({ rows } = await req.json());
   } catch {}
-  rows = (Array.isArray(rows) ? rows : []).filter((r) => (r.name ?? "").trim()).slice(0, 200);
+  rows = (Array.isArray(rows) ? rows : [])
+    .filter((r) =>
+      Boolean(
+        (r.name ?? "").trim() ||
+        (r.number ?? "").trim() ||
+        Object.values(r.sizes ?? {}).some((v) => String(v ?? "").trim()),
+      ),
+    )
+    .slice(0, 200);
   if (rows.length === 0) return NextResponse.json({ error: "No players to add." }, { status: 400 });
 
   let added = 0;
@@ -41,7 +49,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
             Object.entries(r.sizes ?? {})
               .filter(([, v]) => String(v ?? "").trim())
               .slice(0, 10)
-              .map(([k, v]) => [String(k).slice(0, 20), String(v).trim().slice(0, 30)]),
+              .map(([k, v]) => [String(k).slice(0, 64), String(v).trim().slice(0, 30)]),
           ),
           notes: String(r.notes ?? "").trim().slice(0, 200) || undefined,
           design: String(r.design ?? "").trim().slice(0, 60) || undefined,

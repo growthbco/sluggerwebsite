@@ -52,7 +52,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ token:
             Object.entries(body.sizes)
               .filter(([, v]) => String(v ?? "").trim())
               .slice(0, 10)
-              .map(([k, v]) => [String(k).slice(0, 20), String(v).trim().slice(0, 30)]),
+              .map(([k, v]) => [String(k).slice(0, 64), String(v).trim().slice(0, 30)]),
           ),
         }
       : {}),

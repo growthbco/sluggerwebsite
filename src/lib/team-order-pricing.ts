@@ -171,14 +171,24 @@ export function computeTeamOrderQuote(
   // paid checkout. Without this, the quote-drift warning tells staff to
   // "update" the locked quote to a total that double-bills the add-ons.
   const billable = roster.filter((r) => r.filledBy !== "addon");
+  const orderItems = order.items?.length ? order.items : ["jersey"];
+  const allowedItems = new Set(orderItems);
   const counts = new Map<string, number>();
   for (const row of billable) {
     const qty = Math.max(1, row.quantity ?? 1);
     const sized = Object.entries(row.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
-    if (sized.length) {
-      for (const [key] of sized) counts.set(key, (counts.get(key) ?? 0) + qty);
+    const matching = sized.filter(([key]) => allowedItems.has(key));
+    if (matching.length) {
+      for (const [key] of matching) counts.set(key, (counts.get(key) ?? 0) + qty);
+    } else if (sized.length && orderItems.length === 1) {
+      // Legacy safety net: if an order's product was corrected after its
+      // roster was entered (for example jersey -> rhinestone cheer set), its
+      // single active item is the pricing source of truth—not the stale key.
+      const key = orderItems[0];
+      counts.set(key, (counts.get(key) ?? 0) + qty);
     } else if ((row.size ?? "").trim()) {
-      counts.set("jersey", (counts.get("jersey") ?? 0) + qty);
+      const key = allowedItems.has("jersey") ? "jersey" : orderItems.length === 1 ? orderItems[0] : null;
+      if (key) counts.set(key, (counts.get(key) ?? 0) + qty);
     }
   }
 
