@@ -116,12 +116,12 @@ function urgencyRank(item: AdminDesignRequestListItem, now: string) {
   return 3;
 }
 
-function DesignRow({ item, now }: { item: AdminDesignRequestListItem; now: string }) {
+function DesignRow({ item, now, restricted }: { item: AdminDesignRequestListItem; now: string; restricted: boolean }) {
   const deadline = deadlineState(item, now);
   const lastActor = item.lastMessage?.from === "client" ? "Customer message" : item.lastMessage ? `${item.lastMessage.name || "Slugger"} replied` : "Updated";
   const requestHref = `/admin/design-requests/${item.id}`;
-  const primaryHref = item.linkedOrder && item.status === "ordered" ? `/admin/team-order/${item.linkedOrder.id}` : requestHref;
-  const primaryLabel = item.linkedOrder && item.status === "ordered" ? "Open order" : "Open request";
+  const primaryHref = !restricted && item.linkedOrder && item.status === "ordered" ? `/admin/team-order/${item.linkedOrder.id}` : requestHref;
+  const primaryLabel = !restricted && item.linkedOrder && item.status === "ordered" ? "Open order" : "Open request";
 
   return (
     <article className="border-t border-line px-4 py-4 first:border-t-0 hover:bg-steel/45">
@@ -132,8 +132,7 @@ function DesignRow({ item, now }: { item: AdminDesignRequestListItem; now: strin
           </Link>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
             <span className="font-mono text-brand">{item.reference}</span>
-            <span aria-hidden="true">·</span>
-            <span className="truncate">{item.contactName}</span>
+            {!restricted && <><span aria-hidden="true">·</span><span className="truncate">{item.contactName}</span></>}
           </div>
         </div>
 
@@ -166,7 +165,7 @@ function DesignRow({ item, now }: { item: AdminDesignRequestListItem; now: strin
           <Link href={primaryHref} className="whitespace-nowrap bg-brand px-3 py-2 text-xs text-on-brand hover:bg-brand-dark">
             {primaryLabel}
           </Link>
-          <details className="group relative">
+          {!restricted && <details className="group relative">
             <summary className="flex h-8 w-9 cursor-pointer list-none items-center justify-center border border-line text-muted hover:border-brand/50 hover:text-foreground" aria-label={`More actions for ${item.teamName}`}>
               <span aria-hidden="true">•••</span>
             </summary>
@@ -187,14 +186,14 @@ function DesignRow({ item, now }: { item: AdminDesignRequestListItem; now: strin
                 <AdminArchiveButton kind="design_request" id={item.id} archived={false} />
               </div>
             </div>
-          </details>
+          </details>}
         </div>
       </div>
     </article>
   );
 }
 
-export function AdminDesignRequestWorkspace({ items, now }: { items: AdminDesignRequestListItem[]; now: string }) {
+export function AdminDesignRequestWorkspace({ items, now, restricted = false }: { items: AdminDesignRequestListItem[]; now: string; restricted?: boolean }) {
   const active = useMemo(() => items.filter((item) => !item.archivedAt), [items]);
   const archived = useMemo(() => items.filter((item) => item.archivedAt), [items]);
   const [queue, setQueue] = useState<QueueKey>("action");
@@ -210,9 +209,9 @@ export function AdminDesignRequestWorkspace({ items, now }: { items: AdminDesign
     const query = search.trim().toLowerCase();
     return active
       .filter((item) => queue === "all" || queueFor(item) === queue)
-      .filter((item) => !query || `${item.teamName} ${item.reference} ${item.contactName} ${item.contactEmail}`.toLowerCase().includes(query))
+      .filter((item) => !query || `${item.teamName} ${item.reference}${restricted ? "" : ` ${item.contactName} ${item.contactEmail}`}`.toLowerCase().includes(query))
       .sort((a, b) => urgencyRank(a, now) - urgencyRank(b, now) || new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }, [active, now, queue, search]);
+  }, [active, now, queue, restricted, search]);
 
   const overdue = active.filter((item) => deadlineState(item, now) === "overdue").length;
   const dueSoon = active.filter((item) => deadlineState(item, now) === "soon").length;
@@ -266,7 +265,7 @@ export function AdminDesignRequestWorkspace({ items, now }: { items: AdminDesign
                 setSearch(value);
                 if (value.trim()) setQueue("all");
               }}
-              placeholder="Search team, reference, or contact"
+              placeholder={restricted ? "Search team or reference" : "Search team, reference, or contact"}
               className="w-full border border-line bg-ink px-3 py-2.5 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
             />
           </label>
@@ -274,7 +273,7 @@ export function AdminDesignRequestWorkspace({ items, now }: { items: AdminDesign
 
         <div className="mt-4 border border-line bg-ink">
           <div className="hidden grid-cols-[minmax(210px,1.45fr)_145px_130px_125px_140px_minmax(112px,auto)] gap-4 bg-steel px-4 py-2 text-[10px] uppercase tracking-[0.14em] text-muted xl:grid">
-            <span>Team / contact</span>
+            <span>{restricted ? "Team / order" : "Team / contact"}</span>
             <span>Stage</span>
             <span>Waiting on</span>
             <span>In-hand date</span>
@@ -282,7 +281,7 @@ export function AdminDesignRequestWorkspace({ items, now }: { items: AdminDesign
             <span className="text-right">Actions</span>
           </div>
           {filtered.length > 0 ? (
-            filtered.map((item) => <DesignRow key={item.id} item={item} now={now} />)
+            filtered.map((item) => <DesignRow key={item.id} item={item} now={now} restricted={restricted} />)
           ) : (
             <div className="px-5 py-12 text-center">
               <p className="text-foreground">{search ? "No requests match that search." : `Nothing is in ${selectedQueue.label.toLowerCase()} right now.`}</p>
@@ -304,11 +303,11 @@ export function AdminDesignRequestWorkspace({ items, now }: { items: AdminDesign
                 <div className="min-w-0">
                   <Link href={`/admin/design-requests/${item.id}`} className="font-mono text-xs text-brand hover:underline">{item.reference}</Link>
                   <span className="ml-2 text-foreground">{item.teamName}</span>
-                  <span className="ml-2 text-muted">{item.contactName}</span>
-                  {item.archivedNote && <span className="ml-2 text-xs text-amber-300">&quot;{item.archivedNote}&quot;</span>}
+                  {!restricted && <span className="ml-2 text-muted">{item.contactName}</span>}
+                  {!restricted && item.archivedNote && <span className="ml-2 text-xs text-amber-300">&quot;{item.archivedNote}&quot;</span>}
                   <span className="ml-2 text-xs text-muted">archived {fmtDate(item.archivedAt)}</span>
                 </div>
-                <AdminArchiveButton kind="design_request" id={item.id} archived />
+                {!restricted && <AdminArchiveButton kind="design_request" id={item.id} archived />}
               </div>
             ))}
           </div>

@@ -18,8 +18,8 @@ export default async function AdminSettingsPage() {
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
       <AdminPageHeader eyebrow="Settings" title="Users & Settings" />
       <p className="mt-2 text-muted">
-        Give each person their own login and role. Designers see design work only - no money, customer,
-        or store pages.
+        Give each person their own login and role. Designers get a restricted production portal with
+        no customer contact details, inboxes, addresses, payments, or store data.
       </p>
       <div className="mt-8">
         <AdminUsersPanel />

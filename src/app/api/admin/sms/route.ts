@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { desc, eq, sql } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { smsMessages, smsContacts } from "@/db/schema";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 import { sendSms, toE164 } from "@/lib/sms";
 import { customerContext, namesByPhone } from "@/lib/sms-crm";
 
@@ -12,7 +12,8 @@ const last10 = (p: string | null | undefined) => (p ?? "").replace(/\D/g, "").sl
 
 // GET -> conversation list; ?phone= -> full thread; ?phone=&context=1 -> CRM panel.
 export async function GET(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("customer");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   const db = getDb();
   const url = new URL(req.url);
@@ -79,7 +80,8 @@ export async function GET(req: Request) {
 
 // PUT {phone, name?, star?, archive?, markRead?} -> contact + conversation state.
 export async function PUT(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("customer");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   let body: { phone?: string; name?: string; star?: boolean; archive?: boolean; markRead?: boolean } = {};
   try { body = await req.json(); } catch {}
@@ -108,7 +110,8 @@ export async function PUT(req: Request) {
 // POST {phone, body, channel?, name?, note?} -> send + log; note=true stores an
 // internal staff note in the thread WITHOUT texting the customer.
 export async function POST(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("customer");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   let body: { phone?: string; body?: string; channel?: string; name?: string; note?: boolean; mediaUrls?: string[] } = {};
   try { body = await req.json(); } catch {}

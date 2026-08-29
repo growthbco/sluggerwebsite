@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 import { quoteShippingCents } from "@/lib/ship-quote";
 
 export const runtime = "nodejs";
 
 // Shipping preview for the custom-invoice form.
 export async function POST(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("money");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   let body: { zip?: string; weightOz?: number } = {};
   try { body = await req.json(); } catch {}
   const zip = (body.zip ?? "").trim();

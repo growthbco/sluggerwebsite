@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders, designRequests, orders } from "@/db/schema";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 import { archiveDiscordThread } from "@/lib/discord-bot";
 
 export const runtime = "nodejs";
@@ -11,7 +11,8 @@ export const runtime = "nodejs";
 // design request. Nothing is deleted - archived records live in their own
 // dashboard sections, and archived designs stop getting auto follow-ups.
 export async function POST(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("customer");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
 
   let body: { kind?: string; id?: string; archive?: boolean; note?: string } = {};

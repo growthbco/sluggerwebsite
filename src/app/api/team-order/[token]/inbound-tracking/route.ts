@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { and, isNull, ne, inArray } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
-import { getByManageToken, saveInboundTracking, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
+import { getById, getByManageToken, saveInboundTracking, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { INBOUND_CARRIERS, inboundTrackingUrlFor } from "@/lib/tracking";
 import { emailInboundShipment } from "@/lib/email";
 import { postDesignThreadUpdate } from "@/lib/discord";
@@ -35,7 +35,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   const { token } = await params;
-  const order = await getByManageToken(token);
+  const order = (await getById(token)) ?? (await getByManageToken(token));
   if (!order) return NextResponse.json({ error: "Link not found" }, { status: 404 });
   const candidates = await boxmateCandidates(order.id);
   return NextResponse.json({ candidates });
@@ -52,7 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   }
   const { token } = await params;
 
-  const order = await getByManageToken(token);
+  const order = (await getById(token)) ?? (await getByManageToken(token));
   if (!order) return NextResponse.json({ error: "Link not found" }, { status: 404 });
 
   let body: {

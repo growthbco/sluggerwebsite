@@ -66,7 +66,7 @@ export async function DesignerDashboard({ userName }: { userName: string }) {
   const queue = [
     ...actionDesigns.slice(0, 6).map((design) => ({
       key: `design-${design.id}`,
-      title: `${design.teamName} needs a response`,
+      title: `${design.teamName} needs design review`,
       detail: `${design.reference} · ${design.status.replaceAll("_", " ")} · ${ageLabel(design.updatedAt)}`,
       href: `/admin/design-requests/${design.id}`,
       label: "Open design",
@@ -85,7 +85,7 @@ export async function DesignerDashboard({ userName }: { userName: string }) {
     ...missingTracking.slice(0, 3).map((order) => ({
       key: `tracking-${order.id}`,
       title: `${order.teamName} needs inbound tracking`,
-      detail: `${order.reference} · ${order.status.replaceAll("_", " ")}`,
+      detail: `${order.reference} · ${order.status === "paid" ? "ready to ship" : order.status.replaceAll("_", " ")}`,
       href: "/admin/designer-tracking",
       label: "Add tracking",
       tone: "text-violet-300 bg-violet-500/10",
@@ -94,12 +94,10 @@ export async function DesignerDashboard({ userName }: { userName: string }) {
   ].slice(0, 10);
 
   const modules = [
-    { href: "/admin/design-requests", icon: "pen", title: "Design Requests", sub: `${activeDesigns.length} active · proofs, messages, approvals` },
+    { href: "/admin/design-requests", icon: "pen", title: "Design Requests", sub: `${activeDesigns.length} active · briefs, proofs, and approvals` },
     { href: "/admin/team-orders", icon: "box", title: "Production Orders", sub: `${productionOrders.length} being produced or ready` },
     { href: "/admin/designer-tracking", icon: "truck", title: "Production Tracking", sub: `${missingTracking.length} waiting for factory tracking` },
     { href: "/admin/designer-invoices", icon: "receipt", title: "My Invoices", sub: `${unbilled} unbilled · ${editableInvoices.length} submitted` },
-    { href: "/admin/texts", icon: "chat", title: "Conversations", sub: "Customer and team messages" },
-    { href: "/admin/design-lab", icon: "flask", title: "Design Lab", sub: "Saved concepts and incoming leads" },
   ];
 
   return (
@@ -109,14 +107,14 @@ export async function DesignerDashboard({ userName }: { userName: string }) {
         <div>
           <span className="text-[11px] uppercase tracking-[0.2em] text-muted">Designer portal</span>
           <h1 className="display text-4xl text-foreground mt-1">Welcome, {userName}</h1>
-          <p className="mt-2 text-sm text-muted">Design, production, tracking, and invoices in one place.</p>
+          <p className="mt-2 text-sm text-muted">Design, production, tracking, and your invoices—without customer contact or payment data.</p>
         </div>
         <AdminLogout />
       </header>
 
       <section className="mt-7 grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Needs response", value: actionDesigns.length, href: "/admin/design-requests", tone: "text-amber-300" },
+          { label: "Needs review", value: actionDesigns.length, href: "/admin/design-requests", tone: "text-amber-300" },
           { label: "Print QA", value: printQa.length, href: "/admin/team-orders?status=in_production", tone: "text-sky-300" },
           { label: "Needs tracking", value: missingTracking.length, href: "/admin/designer-tracking", tone: "text-violet-300" },
           { label: "Unbilled jobs", value: unbilled, href: "/admin/designer-invoices", tone: "text-brand" },

@@ -1,4 +1,4 @@
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 import { getRecordingMedia } from "@/lib/twilio-calls";
 
 export const runtime = "nodejs";
@@ -8,7 +8,8 @@ export const runtime = "nodejs";
 // this must never be a public link - admin session required, and the id is
 // validated to a Twilio recording SID shape.
 export async function GET(_req: Request, { params }: { params: Promise<{ sid: string }> }) {
-  if (!(await isAdmin())) return new Response("Unauthorized", { status: 401 });
+  const gate = await requireApiRole("customer");
+  if (!gate.ok) return new Response(gate.status === 403 ? "Forbidden" : "Unauthorized", { status: gate.status });
   const { sid } = await params;
   if (!/^RE[0-9a-fA-F]{32}$/.test(sid)) return new Response("Bad request", { status: 400 });
 

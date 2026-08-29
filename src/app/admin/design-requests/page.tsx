@@ -8,7 +8,7 @@ import {
 } from "@/components/admin-design-request-workspace";
 import { dbEnabled, getDb } from "@/db";
 import { designRequests, teamOrders } from "@/db/schema";
-import { adminEnabled, isAdmin } from "@/lib/admin-auth";
+import { adminEnabled, canAccess, getAdminSession } from "@/lib/admin-auth";
 import { designNeedsAction } from "@/lib/design-requests";
 
 export const metadata: Metadata = { title: "Design Requests", robots: { index: false } };
@@ -18,7 +18,9 @@ export default async function AdminDesignRequestsPage() {
   if (!adminEnabled()) {
     return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Set ADMIN_PASSWORD to enable the dashboard.</div>;
   }
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!canAccess(session.role, "/admin/design-requests")) redirect("/admin");
   if (!dbEnabled()) {
     return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Database not configured.</div>;
   }
@@ -65,6 +67,7 @@ export default async function AdminDesignRequestsPage() {
     }
   }
 
+  const restricted = session.role === "designer";
   const items: AdminDesignRequestListItem[] = designs.map((design) => {
     const linkedOrder = orderByDesign.get(design.id);
     return {
@@ -72,14 +75,16 @@ export default async function AdminDesignRequestsPage() {
       reference: design.reference,
       teamName: design.teamName,
       status: design.status,
-      contactName: design.contactName,
-      contactEmail: design.contactEmail,
+      contactName: restricted ? "" : design.contactName,
+      contactEmail: restricted ? "" : design.contactEmail,
       revisionsUsed: design.revisionsUsed ?? 0,
       neededBy: design.neededBy?.toISOString() ?? null,
-      lastMessage: design.lastMessage,
-      source: design.source,
+      lastMessage: design.lastMessage
+        ? { ...design.lastMessage, name: restricted && design.lastMessage.from === "client" ? "Customer" : design.lastMessage.name }
+        : null,
+      source: restricted ? null : design.source,
       archivedAt: design.archivedAt?.toISOString() ?? null,
-      archivedNote: design.archivedNote,
+      archivedNote: restricted ? null : design.archivedNote,
       hasApprovedDesign: Boolean(design.approvedDesignUrl),
       galleryHidden: design.galleryHidden,
       followedUpAt: design.followedUpAt?.toISOString() ?? null,
@@ -96,7 +101,7 @@ export default async function AdminDesignRequestsPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
       <AdminPageHeader eyebrow="Operations" title={`Design Requests (${activeCount})`} />
-      <AdminDesignRequestWorkspace items={items} now={new Date().toISOString()} />
+      <AdminDesignRequestWorkspace items={items} now={new Date().toISOString()} restricted={restricted} />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { assistDesignThread } from "@/lib/design-assistant";
 import { emailDesignerMessage } from "@/lib/email";
 import { postDesignThreadUpdate } from "@/lib/discord";
 import { smsIfConsented, textedRecently } from "@/lib/sms";
+import { requireApiRole } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 // Headroom for the human-like reply pause below (client's own message still
@@ -27,12 +28,27 @@ async function resolve(token: string) {
   return null;
 }
 
+function safeMessagesForRole(
+  messages: NonNullable<Awaited<ReturnType<typeof getById>>>["messages"],
+  from: "designer" | "client",
+) {
+  if (from !== "designer") return messages ?? [];
+  return (messages ?? []).map((message) =>
+    message.from === "client" ? { ...message, name: "Customer" } : message,
+  );
+}
+
 export async function GET(_req: Request, { params }: { params: Promise<{ token: string }> }) {
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   const { token } = await params;
   const resolved = await resolve(token);
   if (!resolved) return NextResponse.json({ error: "Link not found" }, { status: 404 });
-  return NextResponse.json({ messages: resolved.request.messages ?? [] });
+  if (resolved.from === "designer") {
+    const gate = await requireApiRole("production");
+    if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
+    if (gate.session.role === "designer") return NextResponse.json({ error: "Designer messages are handled by Slugger staff." }, { status: 403 });
+  }
+  return NextResponse.json({ messages: safeMessagesForRole(resolved.request.messages, resolved.from) });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
@@ -40,6 +56,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const { token } = await params;
   const resolved = await resolve(token);
   if (!resolved) return NextResponse.json({ error: "Link not found" }, { status: 404 });
+  if (resolved.from === "designer") {
+    const gate = await requireApiRole("production");
+    if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
+    if (gate.session.role === "designer") return NextResponse.json({ error: "Designer messages are handled by Slugger staff." }, { status: 403 });
+  }
   const { request, from } = resolved;
 
   let body: { text?: string; name?: string; attachments?: string[] } = {};
@@ -200,7 +221,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       }
     }
 
-    return NextResponse.json({ ok: true, messages });
+    return NextResponse.json({ ok: true, messages: safeMessagesForRole(messages, from) });
   } catch (e) {
     console.error("addDesignMessage failed:", e);
     return NextResponse.json({ error: "Could not save" }, { status: 500 });

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { smsMessages, smsContacts } from "@/db/schema";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 import { toE164 } from "@/lib/sms";
 import { customerContext } from "@/lib/sms-crm";
 import { draftSmsReply } from "@/lib/design-assistant";
@@ -14,7 +14,8 @@ export const maxDuration = 60;
 // customer's real orders/designs, then writes a reply into the staff
 // member's box. Human edits and sends - never auto-replies.
 export async function POST(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("customer");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
 
   let body: { phone?: string; direction?: string } = {};

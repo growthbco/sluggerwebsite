@@ -31,8 +31,8 @@ export default function AdminLoginPage() {
 
   return (
     <div className="mx-auto max-w-sm px-4 py-24">
-      <h1 className="display text-3xl text-foreground text-center">Staff Login</h1>
-      <p className="mt-2 text-sm text-muted text-center">Enter your password - it knows who you are.</p>
+      <h1 className="display text-3xl text-foreground text-center">Team Login</h1>
+      <p className="mt-2 text-sm text-muted text-center">Use the personal password Slugger assigned you.</p>
       <form onSubmit={submit} className="mt-6 space-y-4">
         <input
           type="password"

@@ -17,12 +17,12 @@ type SavedResult = {
  * destination is deliberately required because it controls whether tracking
  * stays internal or marks the order shipped and contacts the customer. */
 export function AdminInboundTracking({
-  manageToken,
+  orderKey,
   initialCarrier,
   initialNumber,
   canShipDirect,
 }: {
-  manageToken: string;
+  orderKey: string;
   initialCarrier: string | null;
   initialNumber: string | null;
   canShipDirect: boolean;
@@ -45,7 +45,7 @@ export function AdminInboundTracking({
     setBusy(true);
     setError("");
     try {
-      const res = await fetch(`/api/team-order/${manageToken}/inbound-tracking`, {
+      const res = await fetch(`/api/team-order/${orderKey}/inbound-tracking`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -107,7 +107,7 @@ export function AdminInboundTracking({
             <span className="flex items-start gap-2">
               <input
                 type="radio"
-                name={`tracking-destination-${manageToken}`}
+                name={`tracking-destination-${orderKey}`}
                 checked={destination === "slugger"}
                 onChange={() => {
                   setDestination("slugger");
@@ -126,7 +126,7 @@ export function AdminInboundTracking({
             <span className="flex items-start gap-2">
               <input
                 type="radio"
-                name={`tracking-destination-${manageToken}`}
+                name={`tracking-destination-${orderKey}`}
                 checked={destination === "customer"}
                 disabled={!canShipDirect}
                 onChange={() => {

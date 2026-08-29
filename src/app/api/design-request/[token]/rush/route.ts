@@ -5,6 +5,7 @@ import { designRequests } from "@/db/schema";
 import { getByManageToken } from "@/lib/design-requests";
 import { emailRushConfirmed } from "@/lib/email";
 import { postDesignThreadUpdate } from "@/lib/discord";
+import { requireApiRole } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,8 @@ export const runtime = "nodejs";
 // Records who signed off, tells the client by email, and logs it in the
 // design's Discord thread so nobody promises a date we can't hit.
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
+  const gate = await requireApiRole("money");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   const { token } = await params;
   const request = await getByManageToken(token);

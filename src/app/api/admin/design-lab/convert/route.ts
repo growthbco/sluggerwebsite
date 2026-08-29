@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 import { convertLeadToDesignRequest } from "@/lib/design-requests";
 
 export const runtime = "nodejs";
@@ -8,7 +8,8 @@ export const runtime = "nodejs";
 // Turn an AI Jersey Maker lead into a design request seeded with their saved
 // designs, so staff can keep editing in the AI studio. Admin-only.
 export async function POST(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("customer");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
 
   let body: { visitorId?: string } = {};

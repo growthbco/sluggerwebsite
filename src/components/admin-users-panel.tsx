@@ -7,7 +7,7 @@ type User = { id: string; name: string; role: string; active: boolean; createdAt
 const ROLE_DESC: Record<string, string> = {
   owner: "Everything, including this settings page",
   staff: "Everything except user management",
-  designer: "Design requests, team orders, conversations, and Design Lab only - no money or customer pages",
+  designer: "Restricted design and production portal - no customer contacts, inboxes, addresses, payments, or store data",
 };
 
 /** Owner-only user manager: each person gets their OWN password (that's how
@@ -29,7 +29,10 @@ export function AdminUsersPanel() {
       else setError(data.error ?? "Could not load users");
     } catch {}
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [load]);
 
   async function call(method: string, body: object, okMsg: string) {
     setBusy(true);
@@ -83,6 +86,8 @@ export function AdminUsersPanel() {
             <option value="owner">Owner</option>
           </select>
           <input
+            type="password"
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Their password (8+ chars)"

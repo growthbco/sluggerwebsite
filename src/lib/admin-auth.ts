@@ -109,8 +109,6 @@ const DESIGNER_ALLOWED_PREFIXES = [
   "/admin/team-orders", // the list (read-only production view)
   "/admin/designer-tracking",
   "/admin/designer-invoices",
-  "/admin/texts",
-  "/admin/design-lab",
 ];
 
 // Order-detail pages are money pages (pricing, invoices, payments), so the
@@ -132,14 +130,22 @@ export function canAccess(role: AdminRole, pathname: string): boolean {
 /* ── API-layer role gate ────────────────────────────────────────── */
 // Page redirects (canAccess) are NOT enough: an authenticated designer can
 // call admin APIs directly with their cookie. These helpers enforce role at
-// the API layer. "production" = shared designer/staff workflow; "money" =
-// pricing/invoicing/payment/shipping/store mutations and customer PII;
-// "settings" = user management. Designers are blocked from money/settings;
-// staff and owner pass money; only owner passes settings.
-export async function requireApiRole(area: "production" | "money" | "settings"): Promise<{ ok: true; session: AdminSession } | { ok: false; status: 401 | 403 }> {
+// the API layer. "production" = shared designer/staff workflow; "customer" =
+// customer contact details, inboxes, calls, addresses, and CRM records;
+// "money" = pricing/invoicing/payment/shipping/store mutations; "settings" =
+// user management. Designers are blocked from customer/money/settings; staff
+// and owner pass customer/money; only owner passes settings.
+export type AdminApiArea = "production" | "customer" | "money" | "settings";
+
+export function canAccessApi(role: AdminRole, area: AdminApiArea): boolean {
+  if (area === "settings") return role === "owner";
+  if (area === "customer" || area === "money") return role !== "designer";
+  return true;
+}
+
+export async function requireApiRole(area: AdminApiArea): Promise<{ ok: true; session: AdminSession } | { ok: false; status: 401 | 403 }> {
   const session = await getAdminSession();
   if (!session) return { ok: false, status: 401 };
-  if (area === "settings" && session.role !== "owner") return { ok: false, status: 403 };
-  if (area === "money" && session.role === "designer") return { ok: false, status: 403 };
+  if (!canAccessApi(session.role, area)) return { ok: false, status: 403 };
   return { ok: true, session };
 }

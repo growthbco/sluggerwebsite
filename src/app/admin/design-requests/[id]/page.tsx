@@ -64,6 +64,7 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
   const session = await getAdminSession();
   if (!session) redirect("/admin/login");
   if (!canAccess(session.role, "/admin/design-requests")) redirect("/admin");
+  const restricted = session.role === "designer";
   if (!dbEnabled()) redirect("/admin");
 
   const { id } = await params;
@@ -72,7 +73,7 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
 
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   const token = request.manageToken!;
-  const smsPhone = request.contactPhone ? toE164(request.contactPhone) : null;
+  const smsPhone = !restricted && request.contactPhone ? toE164(request.contactPhone) : null;
 
   // Linked-order production data (same derivation as the old manage page).
   const linkedOrder = await getByDesignRequestId(request.id);
@@ -99,8 +100,8 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
     });
 
   const storeEligible = request.status === "approved" || request.status === "ordered";
-  const store = storeEligible ? await getStoreByDesignRequestId(request.id) : null;
-  const statusUrl = `${SITE}/design/status/${request.statusToken}`;
+  const store = !restricted && storeEligible ? await getStoreByDesignRequestId(request.id) : null;
+  const statusUrl = restricted ? "" : `${SITE}/design/status/${request.statusToken}`;
   const lastMessage = request.messages?.[request.messages.length - 1] ?? null;
   const needsAction = designNeedsAction(request);
   const printFileVerified = Boolean(linkedOrder?.printFileVerifiedAt) || (Boolean(linkedOrder) && printRoster.length > 0 && !personalized);
@@ -119,8 +120,10 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
     nextAction = "Review the requested changes and send an updated proof.";
     nextTab = "proofs";
   } else if (needsAction && lastMessage?.from === "client") {
-    nextAction = "Reply to the customer’s latest message.";
-    nextTab = "messages";
+    nextAction = restricted
+      ? "Review the latest requested changes and update the artwork."
+      : "Reply to the customer’s latest message.";
+    nextTab = restricted ? "proofs" : "messages";
   } else if (needsAction && request.status === "submitted") {
     nextAction = "Review the brief and begin the first design.";
   } else if (linkedOrder && printRoster.length > 0 && !printFileVerified) {
@@ -148,8 +151,8 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
       vision={request.vision}
       colors={request.colors}
       colorHexes={request.colorHexes ?? []}
-      contact={{ name: request.contactName, email: request.contactEmail, phone: request.contactPhone }}
-      source={request.source ?? "Direct"}
+      contact={restricted ? { name: "Customer", email: "", phone: null } : { name: request.contactName, email: request.contactEmail, phone: request.contactPhone }}
+      source={restricted ? null : request.source ?? "Direct"}
       inspirationImages={request.inspirationImages ?? []}
       proofImages={request.proofImages ?? []}
       proofLabels={request.proofLabels ?? {}}
@@ -164,6 +167,7 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
       rushApprovedAt={request.rushApprovedAt ? request.rushApprovedAt.toISOString() : null}
       rushApprovedBy={request.rushApprovedBy ?? null}
       showRequestHeader={false}
+      restricted={restricted}
       view={view}
     />
   );
@@ -234,7 +238,7 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
           linked roster exists. */}
       {linkedOrder && printJerseys.length > 0 && (
         <PrintChecklist
-          token={linkedOrder.manageToken!}
+          token={linkedOrder.id}
           jerseys={printJerseys.map((j) => ({ ...j, verifiedAt: j.verifiedAt ? new Date(j.verifiedAt).toISOString() : null }))}
         />
       )}
@@ -243,7 +247,7 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
         <div key={sc.id} className="space-y-2">
           <p className="text-sm text-amber-300 display">🧢 Also on this print sheet - ordered separately: {sc.label} <span className="font-mono text-xs text-muted">({sc.reference})</span></p>
           <PrintChecklist
-            token={sc.token}
+            token={sc.id}
             jerseys={sc.jerseys.map((j) => ({ ...j, verifiedAt: j.verifiedAt ? new Date(j.verifiedAt).toISOString() : null }))}
           />
         </div>
@@ -295,9 +299,9 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
         </section>
       )}
 
-      {linkedOrder && linkedOrder.manageToken && (
+      {linkedOrder && (
         <InboundTracking
-          token={linkedOrder.manageToken}
+          token={linkedOrder.id}
           canShipDirect={Boolean(linkedOrder.invoicePaidAt)}
           initial={
             linkedOrder.inboundTrackingNumber
@@ -307,7 +311,7 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
         />
       )}
 
-      {storeEligible && (
+      {!restricted && storeEligible && (
         <div className="pt-2">
           <TeamStoreTeaser
             manageToken={token}
@@ -345,18 +349,18 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
   const tabs: ManageTab[] = [
     { key: "overview", label: "Overview", content: overview },
     { key: "proofs", label: `Proofs (${request.proofImages?.length ?? 0})`, content: managePanel("proofs") },
-    {
+    ...(!restricted ? [{
       key: "messages",
       label: `Messages (${request.messages?.length ?? 0})`,
       content: (
         <DesignConversation
           token={token}
           phone={smsPhone}
-          name={request.contactName}
-          initialDesignMessages={request.messages ?? []}
+          name={restricted ? null : request.contactName}
+          initialDesignMessages={(request.messages ?? []).map((message) => restricted && message.from === "client" ? { ...message, name: "Customer" } : message)}
         />
       ),
-    },
+    }] : []),
     {
       key: "studio",
       label: "Studio",
@@ -370,7 +374,7 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
         />
       ),
     },
-    ...(linkedOrder || storeEligible ? [{ key: "production", label: "Order & Production", content: production }] : []),
+    ...(linkedOrder || (!restricted && storeEligible) ? [{ key: "production", label: "Order & Production", content: production }] : []),
   ];
 
   return (
@@ -385,7 +389,7 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
         <span className={`border px-3 py-1.5 text-xs ${STATUS_TONES[request.status] ?? "border-line bg-steel text-muted"}`}>
           {STATUS_LABELS[request.status] ?? request.status.replace(/_/g, " ")}
         </span>
-        {(needsAction || request.followedUpAt) && (
+        {!restricted && (needsAction || request.followedUpAt) && (
           <FollowedUpButton id={request.id} followedUp={Boolean(request.followedUpAt)} />
         )}
       </AdminPageHeader>

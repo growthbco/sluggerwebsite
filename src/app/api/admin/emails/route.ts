@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 import { designRequests } from "@/db/schema";
 import { designNeedsAction, getById, type DesignMessage } from "@/lib/design-requests";
 
@@ -15,7 +15,8 @@ export const runtime = "nodejs";
 // Scopes columns and pulls only the LAST message per design for the list (jsonb
 // `-> -1`) so the listing never drags whole threads across the wire.
 export async function GET(req: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("customer");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ threads: [] });
 
   const db = getDb();

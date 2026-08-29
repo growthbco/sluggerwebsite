@@ -2,11 +2,15 @@ import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
 import { getByManageToken } from "@/lib/team-orders";
 import { TeamOrderManageSection } from "@/components/team-order-manage-section";
+import { getAdminSession } from "@/lib/admin-auth";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = { title: "Manage Team Order", robots: { index: false } };
 
 export default async function ManagePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
+  const session = await getAdminSession();
+  if (session?.role === "designer") redirect("/admin/team-orders");
 
   if (!dbEnabled()) {
     return <Centered title="Not available yet">Team orders aren&apos;t turned on yet.</Centered>;

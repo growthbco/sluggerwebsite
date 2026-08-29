@@ -32,7 +32,6 @@ export default async function DesignerTrackingPage() {
       teamName: teamOrders.teamName,
       status: teamOrders.status,
       designRequestId: teamOrders.designRequestId,
-      manageToken: teamOrders.manageToken,
       inboundCarrier: teamOrders.inboundCarrier,
       inboundTrackingNumber: teamOrders.inboundTrackingNumber,
       inboundTrackingAddedAt: teamOrders.inboundTrackingAddedAt,
@@ -44,7 +43,7 @@ export default async function DesignerTrackingPage() {
     .orderBy(desc(teamOrders.updatedAt));
 
   const orders = rows
-    .filter((row) => activeStatuses.has(row.status) && row.manageToken)
+    .filter((row) => activeStatuses.has(row.status))
     .sort((a, b) => Number(Boolean(a.inboundTrackingNumber)) - Number(Boolean(b.inboundTrackingNumber)) || b.updatedAt.getTime() - a.updatedAt.getTime());
   const missing = orders.filter((order) => !order.inboundTrackingNumber).length;
 
@@ -78,7 +77,7 @@ export default async function DesignerTrackingPage() {
                   </div>
                 </div>
                 <div>
-                  <span className="inline-flex border border-sky-400/40 px-2 py-0.5 text-xs display text-sky-300">{order.status.replaceAll("_", " ")}</span>
+                  <span className="inline-flex border border-sky-400/40 px-2 py-0.5 text-xs display text-sky-300">{order.status === "paid" ? "ready to ship" : order.status.replaceAll("_", " ")}</span>
                 </div>
                 <div className="min-w-0">
                   {order.inboundTrackingNumber && (
@@ -92,7 +91,7 @@ export default async function DesignerTrackingPage() {
                     </a>
                   )}
                   <AdminInboundTracking
-                    manageToken={order.manageToken!}
+                    orderKey={order.id}
                     initialCarrier={order.inboundCarrier}
                     initialNumber={order.inboundTrackingNumber}
                     canShipDirect={Boolean(order.invoicePaidAt)}

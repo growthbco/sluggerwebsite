@@ -224,7 +224,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                     )}
                   </div>
                 </div>
-                <div><Badge label={order.status} /></div>
+                <div><Badge label={order.status === "paid" ? "ready_to_ship" : order.status} /></div>
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   {order.printFileUrl ? (
                     order.printFileVerifiedAt ? <span className="text-green-300">Print file verified</span> : <span className="text-amber-300">Print QA needed</span>
@@ -561,7 +561,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                             )}
                             {!o.shippedAt && o.manageToken && (
                               <AdminInboundTracking
-                                manageToken={o.manageToken}
+                                orderKey={o.id}
                                 initialCarrier={o.inboundCarrier}
                                 initialNumber={o.inboundTrackingNumber}
                                 canShipDirect={Boolean(o.invoicePaidAt)}
