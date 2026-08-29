@@ -11,6 +11,7 @@ const ITEM_PRICES: Record<string, number> = {
   flag_football_jersey: 2800, // sleeveless compression game shirt
   practice_jersey: 2000,
   polo: 3500,
+  polo_pin_dot: 3500,
   knickers: 4000,
   long_pants: 4000,
   shorts: 2500,
@@ -55,6 +56,7 @@ export const ITEM_WEIGHT_OZ: Record<string, number> = {
   flag_football_jersey: 8,
   practice_jersey: 10,
   polo: 10,
+  polo_pin_dot: 10,
   knickers: 14,
   long_pants: 16,
   shorts: 10,

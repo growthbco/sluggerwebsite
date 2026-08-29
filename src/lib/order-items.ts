@@ -97,7 +97,8 @@ export const ITEM_TYPES: ItemType[] = [
   // Flag football game shirt: sleeveless compression, its own size scale.
   { key: "flag_football_jersey", label: "Flag Football Jersey", sizes: FLAG_FOOTBALL_SIZES },
   { key: "practice_jersey", label: "Practice Jersey", sizes: APPAREL_SIZES },
-  { key: "polo", label: "Custom Polo", sizes: APPAREL_SIZES },
+  { key: "polo", label: "Custom Polo - Dri-Fit", sizes: APPAREL_SIZES },
+  { key: "polo_pin_dot", label: "Custom Polo - Pin-Dot", sizes: APPAREL_SIZES },
   { key: "knickers", label: "Knickers", sizes: APPAREL_SIZES },
   { key: "long_pants", label: "Long Pants", sizes: APPAREL_SIZES },
   { key: "shorts", label: "Shorts", sizes: APPAREL_SIZES },
@@ -127,6 +128,7 @@ export const ITEM_TYPES: ItemType[] = [
 // special-order beanie. Each MUST exist in ITEM_TYPES + the price map.
 export const EXTRA_ADDON_KEYS = [
   "polo",
+  "polo_pin_dot",
   "hoodie",
   "lightweight_hoodie",
   "pullover",
@@ -199,6 +201,7 @@ export function itemKeysFromDesignProducts(productTypes?: string[] | null): stri
     // Cheer FIRST - "cheerleading uniform shell and shirt" contains "shirt",
     // which would otherwise map to a jersey.
     if (/cheer/.test(p)) push(/rhinestone/.test(p) ? "cheer_uniform_rhinestone" : "cheer_uniform");
+    else if (/polo/.test(p) && /pin[\s-]?dot/.test(p)) push("polo_pin_dot");
     else if (/polo/.test(p)) push("polo");
     else if (/jersey|shirt/.test(p)) push("jersey");
     else if (/jacket|warm[\s-]?up/.test(p)) push("jacket");

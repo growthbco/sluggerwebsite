@@ -15,6 +15,7 @@ export const ITEM_WEIGHT_OZ: Record<string, number> = {
   jersey: 11,
   practice_jersey: 10,
   polo: 10,
+  polo_pin_dot: 10,
   knickers: 14,
   long_pants: 16,
   shorts: 10,
