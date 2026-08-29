@@ -40,6 +40,7 @@ const ITEM_ICONS: Record<string, string> = {
   full_button_jersey: "👕",
   reversible_basketball: "🏀",
   hoodie: "🧥",
+  jacket: "🧥",
   baseball_pants: "👖",
   microfiber_pants: "👖",
   knickers: "👖",

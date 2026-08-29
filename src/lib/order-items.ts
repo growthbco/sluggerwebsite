@@ -103,6 +103,7 @@ export const ITEM_TYPES: ItemType[] = [
   { key: "hoodie", label: "Heavyweight Hoodie", sizes: APPAREL_SIZES },
   { key: "lightweight_hoodie", label: "Lightweight Hoodie", sizes: APPAREL_SIZES },
   { key: "pullover", label: "1/4-Zip Pullover", sizes: APPAREL_SIZES },
+  { key: "jacket", label: "Custom Jacket", sizes: APPAREL_SIZES },
   { key: "cheer_uniform", label: "Cheer Uniform (Set)", sizes: CHEER_SIZES, minPieces: 12, noNames: true },
   { key: "cheer_uniform_rhinestone", label: "Cheer Uniform (Rhinestone)", sizes: CHEER_SIZES, minPieces: 12, noNames: true },
   { key: "socks", label: "Socks", sizes: SOCK_SIZES },
@@ -127,6 +128,7 @@ export const EXTRA_ADDON_KEYS = [
   "hoodie",
   "lightweight_hoodie",
   "pullover",
+  "jacket",
   "fitted_hat",
   "snapback_hat",
   "performance_hat",
@@ -196,6 +198,7 @@ export function itemKeysFromDesignProducts(productTypes?: string[] | null): stri
     // which would otherwise map to a jersey.
     if (/cheer/.test(p)) push(/rhinestone/.test(p) ? "cheer_uniform_rhinestone" : "cheer_uniform");
     else if (/jersey|shirt/.test(p)) push("jersey");
+    else if (/jacket|warm[\s-]?up/.test(p)) push("jacket");
     else if (/hoodie|sweat/.test(p)) push("hoodie");
     else if (/knicker/.test(p)) push("knickers");
     else if (/pant/.test(p)) push("long_pants");

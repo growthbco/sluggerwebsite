@@ -16,6 +16,7 @@ const ITEM_PRICES: Record<string, number> = {
   hoodie: 4000, // heavyweight
   lightweight_hoodie: 3500,
   pullover: 4000, // 1/4-zip
+  jacket: 5000, // custom warm-up jacket
   socks: 1500,
   cheer_uniform: 12000, // simple sublimated cheer set
   cheer_uniform_rhinestone: 17500, // rhinestone / all-star cheer set
@@ -58,6 +59,7 @@ export const ITEM_WEIGHT_OZ: Record<string, number> = {
   hoodie: 24,
   lightweight_hoodie: 16,
   pullover: 20,
+  jacket: 20,
   socks: 3,
   cheer_uniform: 14, // shell + skirt
   cheer_uniform_rhinestone: 14,

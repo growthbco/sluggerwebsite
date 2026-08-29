@@ -203,7 +203,7 @@ function chartGroup(itemKey: string): ChartGroup | null {
   const k = itemKey.toLowerCase();
   if (/cheer/.test(k)) return "cheer";
   if (/flag[_\s-]?football/.test(k)) return "flag_football"; // before /jersey/
-  if (/hoodie|pullover/.test(k)) return "hoodie";
+  if (/hoodie|pullover|jacket/.test(k)) return "hoodie";
   if (/hat|beanie|cap/.test(k)) return "hats";
   if (/knicker|pant|short/.test(k)) return "pants";
   if (/jersey|shirt/.test(k)) return "jersey";

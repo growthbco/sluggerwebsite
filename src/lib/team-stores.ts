@@ -39,6 +39,7 @@ export const STORE_ITEM_PRESETS: StoreItem[] = [
   { key: "hoodie", label: "Heavyweight Hoodie", priceCents: 4000, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 24 },
   { key: "lightweight_hoodie", label: "Lightweight Hoodie", priceCents: 3500, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 16 },
   { key: "pullover", label: "1/4-Zip Pullover", priceCents: 4000, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 20 },
+  { key: "jacket", label: "Custom Jacket", priceCents: 5000, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 20 },
   { key: "baseball_pants", label: "Baseball / Softball Pants", priceCents: 4000, sizes: APPAREL_SIZES, weightOz: 16 },
   { key: "microfiber_pants", label: "Lightweight Microfiber Pants", priceCents: 4000, sizes: APPAREL_SIZES, weightOz: 12 },
   { key: "knickers", label: "Knickers", priceCents: 4000, sizes: APPAREL_SIZES, weightOz: 14 },

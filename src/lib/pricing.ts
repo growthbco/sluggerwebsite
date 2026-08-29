@@ -44,6 +44,7 @@ export const PRICE_LIST: PriceGroup[] = [
     group: "Hoodies & Extras",
     rows: [
       { item: "Hoodie", priceCents: 4000 },
+      { item: "Custom Jacket", priceCents: 5000, note: "Fully custom team warm-up jacket" },
       { item: "Custom Socks", priceCents: 1500 },
       { item: "Custom 3D Hype Chain", priceCents: 4000, note: "Starting price - final depends on design detail and colors. Free mockup; one-time $50 3D design file fee per design, then each chain from $40" },
     ],

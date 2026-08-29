@@ -20,6 +20,7 @@ export const ITEM_WEIGHT_OZ: Record<string, number> = {
   hoodie: 24,
   lightweight_hoodie: 16,
   pullover: 20,
+  jacket: 20,
   socks: 3,
   fitted_hat: 5,
   snapback_hat: 5,
