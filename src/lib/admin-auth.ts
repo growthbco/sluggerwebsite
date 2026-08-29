@@ -2,13 +2,16 @@
 // login; additional users (staff / designer) live in admin_users with their
 // own scrypt-hashed passwords. There are no usernames - each person's unique
 // password identifies them at login. A signed, expiring httpOnly cookie
-// carries {expiry, role, name}, HMAC'd with ADMIN_PASSWORD.
+// carries {version, expiry, role, name}, HMAC'd with ADMIN_PASSWORD.
 
 import { createHmac, timingSafeEqual, scryptSync, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 
 export const ADMIN_COOKIE = "sa_admin";
 const SESSION_DAYS = 30;
+// Bump this to revoke every existing admin session after a permission leak or
+// shared-device incident. Old formats are intentionally rejected below.
+const SESSION_VERSION = "v2";
 
 export type AdminRole = "owner" | "staff" | "designer";
 export type AdminSession = { role: AdminRole; name: string };
@@ -24,12 +27,13 @@ function hmac(payload: string): string {
 const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64url");
 const unb64 = (s: string) => Buffer.from(s, "base64url").toString("utf8");
 
-/** Cookie value: "<expiryMs>.<role>.<b64 name>.<hmac>" - stateless and
- *  tamper-proof. Legacy two-part cookies (pre-roles) still verify as owner. */
+/** Cookie value: "<version>.<expiryMs>.<role>.<b64 name>.<hmac>" - stateless
+ *  and tamper-proof. Older formats are rejected so sessions can be revoked. */
 export function makeSessionValue(role: AdminRole = "owner", name = "Owner"): string {
   const exp = Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000;
   const nameB = b64(name.slice(0, 40));
-  return `${exp}.${role}.${nameB}.${hmac(`${exp}.${role}.${nameB}`)}`;
+  const payload = `${SESSION_VERSION}.${exp}.${role}.${nameB}`;
+  return `${payload}.${hmac(payload)}`;
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -43,16 +47,11 @@ function safeEqual(a: string, b: string): boolean {
 export function parseSessionValue(value: string | undefined): AdminSession | null {
   if (!value || !adminEnabled()) return null;
   const parts = value.split(".");
-  if (parts.length === 2) {
-    // Legacy cookie from before roles existed: treat as owner.
-    const [exp, sig] = parts;
-    if (Number(exp) < Date.now() || !safeEqual(sig, hmac(exp))) return null;
-    return { role: "owner", name: "Owner" };
-  }
-  if (parts.length !== 4) return null;
-  const [exp, role, nameB, sig] = parts;
+  if (parts.length !== 5) return null;
+  const [version, exp, role, nameB, sig] = parts;
+  if (version !== SESSION_VERSION) return null;
   if (Number(exp) < Date.now()) return null;
-  if (!safeEqual(sig, hmac(`${exp}.${role}.${nameB}`))) return null;
+  if (!safeEqual(sig, hmac(`${version}.${exp}.${role}.${nameB}`))) return null;
   if (role !== "owner" && role !== "staff" && role !== "designer") return null;
   try {
     return { role, name: unb64(nameB) || "Staff" };
