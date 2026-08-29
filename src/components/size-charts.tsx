@@ -206,7 +206,7 @@ function chartGroup(itemKey: string): ChartGroup | null {
   if (/hoodie|pullover|jacket/.test(k)) return "hoodie";
   if (/hat|beanie|cap/.test(k)) return "hats";
   if (/knicker|pant|short/.test(k)) return "pants";
-  if (/jersey|shirt/.test(k)) return "jersey";
+  if (/jersey|shirt|polo/.test(k)) return "jersey";
   return null; // socks, unknown
 }
 

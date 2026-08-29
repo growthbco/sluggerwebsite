@@ -39,6 +39,7 @@ const ITEM_ICONS: Record<string, string> = {
   two_button_jersey: "👕",
   full_button_jersey: "👕",
   reversible_basketball: "🏀",
+  polo: "👕",
   hoodie: "🧥",
   jacket: "🧥",
   baseball_pants: "👖",
