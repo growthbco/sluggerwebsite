@@ -445,6 +445,7 @@ export async function emailOrderShipped(args: {
   reference: string;
   trackingNumber: string;
   trackingUrl: string;
+  directFromProduction?: boolean;
 }): Promise<boolean> {
   return sendEmail({
     to: args.to,
@@ -456,6 +457,11 @@ export async function emailOrderShipped(args: {
       bodyHtml: `
         <p style="margin:0 0 12px;">Your custom gear just shipped. Track it here:</p>
         <p style="margin:0 0 12px;background:#f6f4ee;padding:12px 14px;border-left:3px solid #b8a36c;font-family:monospace;">${esc(args.trackingNumber)}</p>
+        ${args.directFromProduction ? `
+          <p style="margin:0 0 12px;background:#fff8df;padding:12px 14px;border-left:3px solid #b8a36c;">
+            This order is shipping directly from one of our production partners. Carrier tracking may display the shipment&apos;s origin facility or country. Slugger Athletics remains your point of contact for the order and any delivery questions.
+          </p>
+        ` : ""}
         <p style="margin:0 0 16px;">Once it lands, we'd love to see it on the field - tag us @sluggerathletics!</p>
         <p style="margin:0 0 6px;"><strong>Happy with your gear?</strong> A quick Google review helps our small shop more than you'd think.</p>
         <p style="margin:0 0 12px;font-size:13px;color:#555;">One sentence about what we made for you (jerseys, embroidered hats, the whole kit) helps other teams find us.</p>

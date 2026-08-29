@@ -11,7 +11,7 @@ import { teamOrders, orders } from "@/db/schema";
 import { emailOrderShipped, emailAdditionalShipment } from "@/lib/email";
 import { sendFollowUpSms } from "@/lib/sms";
 import { archiveDiscordThread } from "@/lib/discord-bot";
-import { trackingUrlFor, carrierFor } from "@/lib/tracking";
+import { trackingUrlFor, inboundTrackingUrlFor, carrierFor } from "@/lib/tracking";
 import { ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 
 export { trackingUrlFor };
@@ -87,6 +87,7 @@ export async function markShipped(
   id: string,
   trackingNumber?: string,
   labelUrl?: string,
+  options?: { directFromProduction?: boolean; carrier?: string },
 ): Promise<{ reference: string; emailed: boolean } | null> {
   const db = getDb();
   const now = new Date();
@@ -101,7 +102,7 @@ export async function markShipped(
     if (!tracking) return null;
     const [row] = await db
       .update(teamOrders)
-      .set({ status: "shipped", trackingNumber: tracking, shipCarrier: carrierFor(tracking), labelUrl: labelUrl ?? existing?.label ?? null, shippedAt: now, updatedAt: now })
+      .set({ status: "shipped", trackingNumber: tracking, shipCarrier: options?.carrier ?? carrierFor(tracking), labelUrl: labelUrl ?? existing?.label ?? null, shippedAt: now, updatedAt: now })
       .where(eq(teamOrders.id, id))
       .returning({
         id: teamOrders.id,
@@ -113,16 +114,20 @@ export async function markShipped(
         designRequestId: teamOrders.designRequestId,
       });
     if (!row) return null;
+    const trackingUrl = options?.carrier
+      ? inboundTrackingUrlFor(tracking, options.carrier)
+      : trackingUrlFor(tracking);
     await sendFollowUpSms({
       phone: row.phone,
-      body: `Slugger Athletics: your ${row.reference} order shipped! 🚚 Track it: ${trackingUrlFor(tracking)}\nReply STOP to opt out.`,
+      body: `Slugger Athletics: your ${row.reference} order shipped${options?.directFromProduction ? " directly from production" : ""}! 🚚 Track it: ${trackingUrl}\nReply STOP to opt out.`,
     });
     const emailed = await emailOrderShipped({
       to: row.email,
       name: row.name,
       reference: row.reference,
       trackingNumber: tracking,
-      trackingUrl: trackingUrlFor(tracking),
+      trackingUrl,
+      directFromProduction: options?.directFromProduction,
     });
     // Shipped = this project's Discord thread is done; archive it (no-op
     // without a bot token).

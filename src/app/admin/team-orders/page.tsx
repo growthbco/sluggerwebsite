@@ -564,6 +564,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                                 manageToken={o.manageToken}
                                 initialCarrier={o.inboundCarrier}
                                 initialNumber={o.inboundTrackingNumber}
+                                canShipDirect={Boolean(o.invoicePaidAt)}
                               />
                             )}
                             {/* Buy an extra parcel's label once the primary one

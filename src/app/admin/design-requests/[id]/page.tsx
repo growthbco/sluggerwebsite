@@ -298,6 +298,7 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
       {linkedOrder && linkedOrder.manageToken && (
         <InboundTracking
           token={linkedOrder.manageToken}
+          canShipDirect={Boolean(linkedOrder.invoicePaidAt)}
           initial={
             linkedOrder.inboundTrackingNumber
               ? { trackingNumber: linkedOrder.inboundTrackingNumber, carrier: linkedOrder.inboundCarrier ?? "Other" }

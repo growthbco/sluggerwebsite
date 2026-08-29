@@ -36,6 +36,7 @@ export default async function DesignerTrackingPage() {
       inboundCarrier: teamOrders.inboundCarrier,
       inboundTrackingNumber: teamOrders.inboundTrackingNumber,
       inboundTrackingAddedAt: teamOrders.inboundTrackingAddedAt,
+      invoicePaidAt: teamOrders.invoicePaidAt,
       updatedAt: teamOrders.updatedAt,
     })
     .from(teamOrders)
@@ -53,7 +54,7 @@ export default async function DesignerTrackingPage() {
         <Link href="/admin" className="text-xs display text-muted border border-line px-3 py-2 hover:border-brand/50 hover:text-foreground">Back to portal</Link>
       </AdminPageHeader>
       <div className="-mt-3 mb-6 flex flex-wrap items-center gap-2 text-sm text-muted">
-        <span>Factory → Slugger tracking only. Customers never see these numbers.</span>
+        <span>Every tracking upload must be routed to Slugger or directly to the customer.</span>
         <span className={`rounded-full px-2.5 py-1 text-xs ${missing ? "bg-amber-500/10 text-amber-300" : "bg-green-500/10 text-green-300"}`}>
           {missing ? `${missing} waiting for tracking` : "All active shipments tracked"}
         </span>
@@ -61,7 +62,7 @@ export default async function DesignerTrackingPage() {
 
       <section className="rounded-xl border border-line bg-steel overflow-hidden">
         <div className="hidden md:grid grid-cols-[minmax(0,1.3fr)_8rem_minmax(0,1.2fr)_7rem] gap-4 px-4 py-2.5 border-b border-line text-[10px] uppercase tracking-wider text-muted">
-          <span>Team / order</span><span>Stage</span><span>Inbound shipment</span><span>Updated</span>
+          <span>Team / order</span><span>Stage</span><span>Production shipment</span><span>Updated</span>
         </div>
         {orders.length === 0 ? (
           <div className="px-5 py-10 text-center text-sm text-muted">No orders are currently in production.</div>
@@ -94,6 +95,7 @@ export default async function DesignerTrackingPage() {
                     manageToken={order.manageToken!}
                     initialCarrier={order.inboundCarrier}
                     initialNumber={order.inboundTrackingNumber}
+                    canShipDirect={Boolean(order.invoicePaidAt)}
                   />
                 </div>
                 <p className="text-xs text-muted">{dateLabel(order.inboundTrackingAddedAt ?? order.updatedAt)}</p>
