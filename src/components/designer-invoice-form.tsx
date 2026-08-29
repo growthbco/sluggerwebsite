@@ -92,17 +92,8 @@ export function DesignerInvoiceForm({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("unbilled");
-  // Jobs the vendor marked "already paid by us" this session - hidden optimistically.
-  const [settledIds, setSettledIds] = useState<Set<string>>(new Set());
-  const [settling, setSettling] = useState<string | null>(null);
 
   const num = (s: string) => Math.max(0, Number(s) || 0);
-
-  // Billable jobs minus any the vendor just cleared as already-paid.
-  const visible = useMemo(
-    () => billable.filter((o) => !(o.teamOrderId && settledIds.has(o.teamOrderId))),
-    [billable, settledIds],
-  );
 
   const subtotal = useMemo(() => lines.reduce((s, l) => s + num(l.qty) * num(l.unit), 0), [lines]);
   const dutyN = num(duty);
@@ -116,26 +107,26 @@ export function DesignerInvoiceForm({
   // Counts per filter, before search - drives the tab labels.
   const counts = useMemo(() => {
     let unbilled = 0, addons = 0, billed = 0;
-    for (const o of visible) {
+    for (const o of billable) {
       if (o.alreadyBilledOn) billed++;
       else { unbilled++; if (isTopUp(o)) addons++; }
     }
     return { unbilled, addons, billed };
-  }, [visible]);
+  }, [billable]);
 
   // The rows for the active filter + search. Search matches team, buyer, group,
   // or order ref (so "Dawgs" or "TO-…" both work). Duplicates are distinct rows
   // because each carries its own order ref.
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return visible.filter((o) => {
+    return billable.filter((o) => {
       if (filter === "billed" && !o.alreadyBilledOn) return false;
       if (filter === "unbilled" && o.alreadyBilledOn) return false;
       if (filter === "addons" && !(!o.alreadyBilledOn && isTopUp(o))) return false;
       if (!q) return true;
       return [o.teamName, o.chipLabel, o.group, o.reference].some((s) => (s ?? "").toLowerCase().includes(q));
     });
-  }, [visible, filter, query]);
+  }, [billable, filter, query]);
 
   function addFromOrder(o: BillableOrder) {
     if (o.alreadyBilledOn) return;
@@ -175,31 +166,6 @@ export function DesignerInvoiceForm({
   // free text here (no order to tie to), qty/cost as usual.
   function addCustomLine() {
     setLines((prev) => [...prev, { team: "", garment: "", qty: "1", unit: "" }]);
-  }
-
-  // The vendor says "you already paid me for this" - settle it so it drops off.
-  async function markPaid(o: BillableOrder) {
-    if (!o.teamOrderId || settling) return;
-    if (!window.confirm(`Mark ${o.teamName} (${o.reference}) as already paid by Slugger? It will drop off your list.`)) return;
-    setSettling(o.teamOrderId);
-    try {
-      const res = await fetch(`/api/designer/invoice/${token}/settle`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamOrderId: o.teamOrderId, kind: o.kind }),
-      });
-      if (res.ok) {
-        setSettledIds((prev) => new Set(prev).add(o.teamOrderId!));
-        setLines((prev) => prev.filter((l) => l.teamOrderId !== o.teamOrderId));
-      } else {
-        const d = await res.json().catch(() => null);
-        setError(d?.error || "Could not mark it paid.");
-      }
-    } catch {
-      setError("Connection problem - try again.");
-    } finally {
-      setSettling(null);
-    }
   }
 
   function startEdit(inv: EditableInvoice) {
@@ -343,6 +309,7 @@ export function DesignerInvoiceForm({
           <header className="mb-4">
             <h1 className="display text-2xl sm:text-3xl">Your invoice to Slugger</h1>
             <p className="mt-1 text-sm text-muted">Find the job, add it, set your cost, submit. Slugger is pinged instantly and pays you.</p>
+            <p className="mt-2 text-xs text-muted">Only Slugger staff can approve an invoice or mark it paid.</p>
           </header>
 
           {editingId && (
@@ -430,22 +397,12 @@ export function DesignerInvoiceForm({
                       ) : added ? (
                         <span className="text-xs text-brand self-center sm:self-end">✓ added</span>
                       ) : (
-                        <>
-                          <button
-                            onClick={() => addFromOrder(o)}
-                            className="flex-1 sm:flex-none bg-brand text-on-brand display text-sm px-4 py-1.5 clip-slant hover:bg-brand-dark transition-colors"
-                          >
-                            Add
-                          </button>
-                          <button
-                            onClick={() => markPaid(o)}
-                            disabled={settling === o.teamOrderId}
-                            title="You already paid me for this - drop it off the list"
-                            className="text-[11px] text-muted hover:text-brand disabled:opacity-50 whitespace-nowrap self-center sm:self-end"
-                          >
-                            {settling === o.teamOrderId ? "saving…" : "already paid"}
-                          </button>
-                        </>
+                        <button
+                          onClick={() => addFromOrder(o)}
+                          className="flex-1 sm:flex-none bg-brand text-on-brand display text-sm px-4 py-1.5 clip-slant hover:bg-brand-dark transition-colors"
+                        >
+                          Add
+                        </button>
                       )}
                     </div>
                   </div>
