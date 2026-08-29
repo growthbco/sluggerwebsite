@@ -55,11 +55,15 @@ export function DesignConversation({
   token,
   phone,
   name,
+  currentUserName,
+  restricted = false,
   initialDesignMessages,
 }: {
   token: string;
   phone: string | null;
   name?: string | null;
+  currentUserName: string;
+  restricted?: boolean;
   initialDesignMessages: DesignMessage[];
 }) {
   const [designMsgs, setDesignMsgs] = useState<DesignMessage[]>(initialDesignMessages);
@@ -70,32 +74,37 @@ export function DesignConversation({
   const [senderName, setSenderName] = useState("");
   const [pending, setPending] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [busy, setBusy] = useState<"" | "sending" | "refreshing">("");
+  const [busy, setBusy] = useState<"" | "sending" | "refreshing" | "suggesting">("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(NAME_KEY);
-      if (saved && STAFF_NAMES.includes(saved)) setSenderName(saved);
-    } catch {}
-  }, []);
+    if (restricted) return;
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = localStorage.getItem(NAME_KEY);
+        if (saved && STAFF_NAMES.includes(saved)) setSenderName(saved);
+      } catch {}
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [restricted]);
 
   const loadSms = useCallback(async () => {
-    if (!phone) return;
+    if (restricted || !phone) return;
     try {
       const res = await fetch(`/api/admin/sms?phone=${encodeURIComponent(phone)}`);
       if (!res.ok) return;
       const data = await res.json();
       setSmsMsgs(data.messages ?? []);
     } catch {}
-  }, [phone]);
+  }, [phone, restricted]);
 
   useEffect(() => {
-    loadSms();
+    const timer = window.setTimeout(() => void loadSms(), 0);
+    return () => window.clearTimeout(timer);
   }, [loadSms]);
 
   // If there are no texts, don't offer the Text channel/filter at all.
-  const hasSms = Boolean(phone);
+  const hasSms = !restricted && Boolean(phone);
 
   // Merge both sources into one timeline.
   const items: Item[] = [
@@ -149,7 +158,8 @@ export function DesignConversation({
   async function send() {
     const text = draft.trim();
     if (!text && pending.length === 0) return;
-    if (channel === "email" && !senderName) {
+    const effectiveSenderName = restricted ? currentUserName : senderName;
+    if (channel === "email" && !effectiveSenderName) {
       setError("Pick who's replying first.");
       return;
     }
@@ -157,11 +167,11 @@ export function DesignConversation({
     setError("");
     try {
       if (channel === "email") {
-        try { if (senderName) localStorage.setItem(NAME_KEY, senderName); } catch {}
+        try { if (!restricted && effectiveSenderName) localStorage.setItem(NAME_KEY, effectiveSenderName); } catch {}
         const res = await fetch(`/api/design-request/${token}/message`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, name: senderName, attachments: pending }),
+          body: JSON.stringify({ text, ...(!restricted ? { name: effectiveSenderName } : {}), attachments: pending }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Could not send");
@@ -180,6 +190,29 @@ export function DesignConversation({
       setPending([]);
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function suggestReply() {
+    if (channel !== "email") return;
+    setBusy("suggesting");
+    setError("");
+    try {
+      const res = await fetch(`/api/design-request/${token}/suggest-reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(!restricted ? { name: senderName.trim() || undefined } : {}),
+          direction: draft.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not draft a reply.");
+      setDraft(data.draft ?? "");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not draft a reply.");
     } finally {
       setBusy("");
     }
@@ -231,6 +264,7 @@ export function DesignConversation({
         </div>
       </div>
       {hasSms && <p className="text-xs text-muted mt-1">Email = the design thread the customer sees. Texts = SMS to {name ? `${name} at ` : ""}{phone}. Only logged-in staff see texts.</p>}
+      {restricted && <p className="text-xs text-muted mt-1">Design conversation only. Customer contact, order, and payment details stay private.</p>}
 
       <div className="mt-4 space-y-3">
         {items.length === 0 ? (
@@ -277,15 +311,33 @@ export function DesignConversation({
             <button type="button" onClick={() => setChannel("email")} className={`display text-xs px-3 py-1.5 ${channel === "email" ? "bg-brand text-on-brand" : "text-muted hover:text-foreground"}`}>Email</button>
             {hasSms && <button type="button" onClick={() => setChannel("text")} className={`display text-xs px-3 py-1.5 ${channel === "text" ? "bg-brand text-on-brand" : "text-muted hover:text-foreground"}`}>Text</button>}
           </div>
-          <select
-            value={senderName}
-            onChange={(e) => setSenderName(e.target.value)}
-            className="bg-steel border border-line px-3 py-1.5 text-sm text-foreground focus:border-brand focus:outline-none"
-          >
-            <option value="">Who&apos;s replying?</option>
-            {STAFF_NAMES.map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
+          {restricted ? (
+            <span className="border border-line bg-steel px-3 py-1.5 text-sm text-foreground">Sending as {currentUserName}</span>
+          ) : (
+            <select
+              value={senderName}
+              onChange={(e) => setSenderName(e.target.value)}
+              className="bg-steel border border-line px-3 py-1.5 text-sm text-foreground focus:border-brand focus:outline-none"
+            >
+              <option value="">Who&apos;s replying?</option>
+              {STAFF_NAMES.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          )}
         </div>
+
+        {channel === "email" && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={suggestReply}
+              disabled={busy !== ""}
+              className="border border-brand/50 px-3 py-2 text-xs display text-brand hover:bg-brand/10 disabled:opacity-50"
+            >
+              {busy === "suggesting" ? "Writing…" : draft.trim() ? "✨ Fix my English" : "✨ Suggest a reply"}
+            </button>
+            <span className="text-xs text-muted">AI fills the box. Review it before you send.</span>
+          </div>
+        )}
 
         {pending.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">

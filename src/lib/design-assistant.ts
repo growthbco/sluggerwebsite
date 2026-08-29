@@ -295,28 +295,57 @@ export async function suggestStaffReply(input: {
   /** Text the staff member already typed - THE answer/direction to finish,
    *  not a topic suggestion. Their intent wins over everything else. */
   direction?: string;
+  /** Restricted designer mode: design conversation only, with no business,
+   *  customer-contact, pricing, payment, or shipping context. */
+  limited?: boolean;
 }): Promise<string | null> {
   const taughtFacts = await loadTaughtFacts();
+  const designerGrounding = [
+    "DESIGN THREAD CONTEXT:",
+    `Reference: ${input.design.reference}`,
+    `Team: ${input.design.teamName}`,
+    `Sport: ${input.design.sport?.trim() || "not specified"}`,
+    `Design status: ${input.design.status} (${statusMeaning(input.design.status)})`,
+    `Revision rounds used: ${input.design.revisionsUsed ?? 0} of ${MAX_REVISIONS}`,
+    `Proof images sent so far: ${input.design.proofCount}`,
+    "",
+    "CONVERSATION (oldest first):",
+    input.messages
+      .slice(-12)
+      .map((m) => `${m.from === "client" ? "CUSTOMER" : `SLUGGER${m.name ? ` (${m.name})` : ""}`}: ${(m.text || "(attachment)").slice(0, 500)}`)
+      .join("\n"),
+  ].join("\n");
   const prompt = [
     `You are drafting a message for ${input.staffName || "a staff member"} at Slugger Athletics to send to the client on their design-request thread. The draft goes into the staff member's message box for them to edit before sending - it is a suggestion, not an auto-reply.`,
     "",
-    buildGrounding(input.design, input.order, input.messages, taughtFacts),
+    input.limited ? designerGrounding : buildGrounding(input.design, input.order, input.messages, taughtFacts),
     "",
     ...(input.direction
       ? [
           "THE STAFF MEMBER STARTED THE REPLY THEMSELVES. This is their answer and their intent - finish it, do not replace it:",
           `"""${input.direction}"""`,
           "",
-          "Turn that into one complete, polished, client-ready message: keep their meaning, decisions, and any facts or numbers they state (their words are AUTHORITATIVE and override the general facts above if they conflict), fix grammar and flow, keep their tone, and complete any unfinished thought in the direction they were clearly going. Do not add new promises, prices, or topics they did not raise.",
+          input.limited
+            ? "Turn that into one complete, polished, client-ready message. Preserve the designer's intended artwork question or answer, correct or translate imperfect English, and do not add facts, promises, prices, dates, or topics."
+            : "Turn that into one complete, polished, client-ready message: keep their meaning, decisions, and any facts or numbers they state (their words are AUTHORITATIVE and override the general facts above if they conflict), fix grammar and flow, keep their tone, and complete any unfinished thought in the direction they were clearly going. Do not add new promises, prices, or topics they did not raise.",
         ]
       : [
           "Draft the most helpful next message from staff to the client:",
           "- Usually that means answering the client's most recent unanswered question(s); if everything is answered, a short, useful next-step nudge.",
         ]),
-    "- Everything Slugger makes is custom: when the client asks whether something can be done (a quarter-zip, cursive name instead of a number, etc.), the answer is that it is their choice - confirm it is doable and ask which way they want it.",
-    "- Discount asks: follow the discount policy in the facts - we can work with them, it depends on the total piece count, ask what number they were hoping for, and offer a quick phone call. Never name a specific discount or price.",
-    "- Design changes after approval/payment: the design is locked once approved and production starts on payment. Draft a reply that says the team will check whether production has already started before anything can be considered - never promise the change.",
-    "- You may address other sensitive topics (complaints, exceptions) since a human reviews this, but NEVER invent a specific price, amount, or date that is not in the facts. Where a business decision is needed, insert a placeholder like [YOUR CALL: amount] so the staff member fills it in.",
+    ...(input.limited
+      ? [
+          "- This designer may write in imperfect English or another language. Quietly turn their intended meaning into clear, friendly, professional English unless the customer is writing in another language.",
+          "- Help only with artwork, proofs, colors, logos, names, numbers, layout, and design revisions.",
+          "- If the customer asks about price, payment, refunds, discounts, shipping, tracking, deadlines, account details, or an order change, do not answer it. Draft: 'I’ll have the Slugger team follow up with you about that.'",
+          "- Never include or request a customer's email address, phone number, payment information, or private account details.",
+        ]
+      : [
+          "- Everything Slugger makes is custom: when the client asks whether something can be done (a quarter-zip, cursive name instead of a number, etc.), the answer is that it is their choice - confirm it is doable and ask which way they want it.",
+          "- Discount asks: follow the discount policy in the facts - we can work with them, it depends on the total piece count, ask what number they were hoping to be at, and offer a quick phone call. Never name a specific discount or price.",
+          "- Design changes after approval/payment: the design is locked once approved and production starts on payment. Draft a reply that says the team will check whether production has already started before anything can be considered - never promise the change.",
+          "- You may address other sensitive topics (complaints, exceptions) since a human reviews this, but NEVER invent a specific price, amount, or date that is not in the facts. Where a business decision is needed, insert a placeholder like [YOUR CALL: amount] so the staff member fills it in.",
+        ]),
     "- Match the tone of earlier staff messages: friendly, brief, plain text. 2-6 sentences. No markdown. Do not sign a name.",
     ...TONE_RULES,
     "- Write in the language the client writes in.",

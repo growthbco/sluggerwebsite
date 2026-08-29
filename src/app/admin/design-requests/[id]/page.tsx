@@ -120,10 +120,8 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
     nextAction = "Review the requested changes and send an updated proof.";
     nextTab = "proofs";
   } else if (needsAction && lastMessage?.from === "client") {
-    nextAction = restricted
-      ? "Review the latest requested changes and update the artwork."
-      : "Reply to the customer’s latest message.";
-    nextTab = restricted ? "proofs" : "messages";
+    nextAction = "Reply to the customer’s latest message.";
+    nextTab = "messages";
   } else if (needsAction && request.status === "submitted") {
     nextAction = "Review the brief and begin the first design.";
   } else if (linkedOrder && printRoster.length > 0 && !printFileVerified) {
@@ -349,7 +347,7 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
   const tabs: ManageTab[] = [
     { key: "overview", label: "Overview", content: overview },
     { key: "proofs", label: `Proofs (${request.proofImages?.length ?? 0})`, content: managePanel("proofs") },
-    ...(!restricted ? [{
+    ...[{
       key: "messages",
       label: `Messages (${request.messages?.length ?? 0})`,
       content: (
@@ -357,10 +355,12 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
           token={token}
           phone={smsPhone}
           name={restricted ? null : request.contactName}
+          currentUserName={session.name}
+          restricted={restricted}
           initialDesignMessages={(request.messages ?? []).map((message) => restricted && message.from === "client" ? { ...message, name: "Customer" } : message)}
         />
       ),
-    }] : []),
+    }],
     {
       key: "studio",
       label: "Studio",

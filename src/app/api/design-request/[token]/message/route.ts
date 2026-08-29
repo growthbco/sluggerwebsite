@@ -8,7 +8,7 @@ import { assistDesignThread } from "@/lib/design-assistant";
 import { emailDesignerMessage } from "@/lib/email";
 import { postDesignThreadUpdate } from "@/lib/discord";
 import { smsIfConsented, textedRecently } from "@/lib/sms";
-import { requireApiRole } from "@/lib/admin-auth";
+import { requireApiRole, type AdminSession } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 // Headroom for the human-like reply pause below (client's own message still
@@ -46,7 +46,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   if (resolved.from === "designer") {
     const gate = await requireApiRole("production");
     if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
-    if (gate.session.role === "designer") return NextResponse.json({ error: "Designer messages are handled by Slugger staff." }, { status: 403 });
   }
   return NextResponse.json({ messages: safeMessagesForRole(resolved.request.messages, resolved.from) });
 }
@@ -56,10 +55,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const { token } = await params;
   const resolved = await resolve(token);
   if (!resolved) return NextResponse.json({ error: "Link not found" }, { status: 404 });
+  let authenticatedSender: AdminSession | undefined;
   if (resolved.from === "designer") {
     const gate = await requireApiRole("production");
     if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
-    if (gate.session.role === "designer") return NextResponse.json({ error: "Designer messages are handled by Slugger staff." }, { status: 403 });
+    authenticatedSender = gate.session;
   }
   const { request, from } = resolved;
 
@@ -75,8 +75,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (!text && attachments.length === 0) {
     return NextResponse.json({ error: "Write a message or attach a file first." }, { status: 400 });
   }
-  // Sender name personalizes designer-side messages only ("Gary · Slugger Athletics").
-  const name = from === "designer" ? (body.name ?? "").trim().slice(0, 40) || undefined : undefined;
+  // A restricted designer is always attributed to their authenticated login
+  // and cannot impersonate staff. Owner/staff retain the existing sender picker.
+  const name = from === "designer"
+    ? authenticatedSender?.role === "designer"
+      ? authenticatedSender.name
+      : (body.name ?? "").trim().slice(0, 40) || authenticatedSender?.name
+    : undefined;
 
   try {
     const messages = await addDesignMessage(request.id, from, text, name, attachments);
