@@ -567,16 +567,18 @@ export async function emailOrderDelivered(args: {
   deliveredDate: string;
   reportByDate: string;
   reportUrl: string;
+  method?: "delivery" | "pickup";
 }): Promise<boolean> {
+  const pickup = args.method === "pickup";
   return sendEmail({
     to: args.to,
-    subject: `📦 Your Slugger Athletics order was delivered (${args.reference})`,
+    subject: `${pickup ? "✅" : "📦"} Your Slugger Athletics order was ${pickup ? "picked up" : "delivered"} (${args.reference})`,
     html: brandedEmail({
       preheader: `Please inspect your order and report any issue by ${args.reportByDate}`,
-      heading: `Delivered${args.name ? `, ${esc(args.name.split(" ")[0])}` : ""}!`,
+      heading: `${pickup ? "Pickup complete" : "Delivered"}${args.name ? `, ${esc(args.name.split(" ")[0])}` : ""}!`,
       intro: `Order reference: <strong>${esc(args.reference)}</strong>`,
       bodyHtml: `
-        <p style="margin:0 0 12px;">The carrier marked your complete order delivered on <strong>${esc(args.deliveredDate)}</strong>.</p>
+        <p style="margin:0 0 12px;">${pickup ? "We recorded your complete order as picked up" : "The carrier marked your complete order delivered"} on <strong>${esc(args.deliveredDate)}</strong>.</p>
         <p style="margin:0 0 12px;background:#fff8df;padding:12px 14px;border-left:3px solid #b8a36c;">
           Please open every package and inspect all items before they are worn, washed, altered, or decorated further. Report a suspected defect, production error, wrong item, missing item, or shipping damage by <strong>${esc(args.reportByDate)}</strong>.
         </p>

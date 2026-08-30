@@ -19,8 +19,8 @@ type DeliveryResult = {
   waitingOn?: string[];
 };
 
-function issueUrl(reference: string): string {
-  const query = new URLSearchParams({ topic: "delivery", order: reference });
+function issueUrl(reference: string, topic: "delivery" | "pickup" = "delivery"): string {
+  const query = new URLSearchParams({ topic, order: reference });
   return `${SITE}/contact?${query}`;
 }
 
@@ -55,15 +55,16 @@ async function notifyTeamOrder(row: typeof teamOrders.$inferSelect, deliveredAt:
   const deadline = claimDeadlineFromDelivery(deliveredAt);
   const deliveredDate = formatCustomerDate(deliveredAt);
   const reportByDate = formatCustomerDate(deadline);
-  const reportUrl = issueUrl(row.reference);
+  const pickup = row.localPickup;
+  const reportUrl = issueUrl(row.reference, pickup ? "pickup" : "delivery");
   const [emailed, texted] = await Promise.all([
     row.contactEmail
-      ? emailOrderDelivered({ to: row.contactEmail, name: row.contactName, reference: row.reference, deliveredDate, reportByDate, reportUrl })
+      ? emailOrderDelivered({ to: row.contactEmail, name: row.contactName, reference: row.reference, deliveredDate, reportByDate, reportUrl, method: pickup ? "pickup" : "delivery" })
       : Promise.resolve(false),
     smsIfConsented({
       phone: row.contactPhone,
       optInAt: row.smsOptInAt,
-      body: `Slugger Athletics: ${row.reference} was delivered. Please inspect every item and report any problem by ${reportByDate}: ${reportUrl}\nReply STOP to opt out.`,
+      body: `Slugger Athletics: ${pickup ? "pickup is complete for" : "delivery is complete for"} ${row.reference}. Please inspect every item and report any problem by ${reportByDate}: ${reportUrl}\nReply STOP to opt out.`,
     }),
   ]);
   if (!emailed && !texted) {

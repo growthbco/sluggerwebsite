@@ -35,8 +35,8 @@ export const MANUFACTURING_COPY =
 export const SHIPPING_CARRIER_COPY =
   "We select from major carriers such as UPS, USPS, FedEx, and DHL based on the shipment, destination, price, and confirmed timeline.";
 
-/** The reporting clock begins at the carrier's recorded delivery time. For
- * multi-package orders, callers pass the final package's delivery time. */
+/** The reporting clock begins at carrier-recorded delivery or the recorded
+ * local-pickup handoff. Multi-package orders pass the final delivery time. */
 export function claimDeadlineFromDelivery(deliveredAt: Date | string): Date {
   return new Date(new Date(deliveredAt).getTime() + CLAIM_REPORT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 }

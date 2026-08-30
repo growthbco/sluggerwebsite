@@ -48,7 +48,7 @@ export function readPortalToken(token: string): string | null {
 
 export type PortalData = {
   teamOrders: {
-    reference: string; teamName: string; status: string; manageToken: string | null; trackingNumber: string | null; deliveredAt: Date | null; createdAt: Date;
+    reference: string; teamName: string; status: string; manageToken: string | null; trackingNumber: string | null; deliveredAt: Date | null; localPickup: boolean; createdAt: Date;
     totalCents: number; shippingCents: number; depositCents: number | null; invoiceUrl: string | null; fullInvoiceUrl: string | null; balanceInvoiceUrl: string | null; depositPaidAt: Date | null; invoicePaidAt: Date | null; pieceLabel: string;
     deliveryTargetAt: Date | null; deliveryTargetKind: "ship" | "pickup" | null;
   }[];
@@ -135,6 +135,7 @@ export async function getCustomerOrders(email: string): Promise<PortalData> {
       manageToken: o.manageToken,
       trackingNumber: o.trackingNumber,
       deliveredAt: o.deliveredAt,
+      localPickup: o.localPickup,
       createdAt: o.createdAt,
       totalCents: o.quotedTotalCents ?? 0,
       shippingCents: o.shippingChargedCents ?? 0,

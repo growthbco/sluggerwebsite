@@ -30,6 +30,7 @@ import { AdminArchiveButton } from "@/components/admin-archive-button";
 import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
 import { AdminPickupButton } from "@/components/admin-pickup-button";
+import { AdminCustomerPickupButton } from "@/components/admin-customer-pickup-button";
 import { AdminPendingAddons } from "@/components/admin-pending-addons";
 import { TrackingInfo } from "@/components/tracking-info";
 import { AdminRequote } from "@/components/admin-requote";
@@ -154,9 +155,13 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
   const nextStep = o.archivedAt
     ? { text: `Archived${o.archivedNote ? ` - ${o.archivedNote}` : ""}`, tone: "text-muted" }
     : o.shippedAt
-      ? { text: "Shipped - nothing left to do", tone: "text-green-400" }
+      ? o.localPickup && !o.deliveredAt
+        ? { text: "Local pickup needs customer handoff confirmation", tone: "text-amber-300" }
+        : { text: `${o.localPickup ? "Picked up" : "Shipped"} - nothing left to do`, tone: "text-green-400" }
       : paid
-        ? o.trackingNumber
+        ? o.localPickup
+          ? { text: "Paid in full - hand off the complete order and mark it picked up", tone: "text-green-400" }
+          : o.trackingNumber
           ? { text: "Label ready - mark it shipped to email the customer tracking", tone: "text-amber-300" }
           : { text: "Paid in full - buy the shipping label", tone: "text-green-400" }
         : designBlocksOrder
@@ -177,13 +182,15 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
   // sections below keep only secondary / edge controls to avoid a second big
   // button for the same stage.
   const nextAction =
-    o.archivedAt || o.shippedAt ? null
+    o.archivedAt || (o.shippedAt && (!o.localPickup || o.deliveredAt)) ? null
       : designBlocksOrder
         ? design
           ? <Link href={`/admin/design-requests/${design.id}`} className="clip-slant bg-brand text-on-brand display text-sm px-5 py-2.5 hover:bg-brand-dark whitespace-nowrap">Open design</Link>
           : null
       : paid
-        ? o.trackingNumber
+        ? o.localPickup
+          ? <AdminCustomerPickupButton teamOrderId={o.id} teamName={o.teamName} />
+          : o.trackingNumber
           ? <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="Mark shipped + email customer" />
           : <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} suggestedLb={Math.max(1, Math.round(((parcels.apparelOz || parcels.hatOz) / 16) * 10) / 10)} />
         : o.depositPaidAt
@@ -490,9 +497,9 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
             )}
           </Field>
           <Field label="Est. weight">{weightOz > 0 ? `${(weightOz / 16).toFixed(1)} lb${twoBoxes ? " · 2 boxes (hats ship separately)" : ""}` : "-"}</Field>
-          <Field label="Shipped">{o.shippedAt ? `${fmtDate(o.shippedAt)}` : "not yet"}</Field>
-          <Field label="Delivered">{o.deliveredAt ? fmtDate(o.deliveredAt) : "not yet"}</Field>
-          <Field label="Customer report-by">{o.deliveredAt ? fmtDate(claimDeadlineFromDelivery(o.deliveredAt)) : "starts after final package delivery"}</Field>
+          <Field label={o.localPickup ? "Picked up" : "Shipped"}>{o.shippedAt ? `${fmtDate(o.shippedAt)}` : "not yet"}</Field>
+          {!o.localPickup && <Field label="Delivered">{o.deliveredAt ? fmtDate(o.deliveredAt) : "not yet"}</Field>}
+          <Field label="Customer report-by">{o.deliveredAt ? fmtDate(claimDeadlineFromDelivery(o.deliveredAt)) : o.localPickup ? "starts when pickup is recorded" : "starts after final package delivery"}</Field>
         </dl>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {!o.balanceInvoiceUrl && !paid && <AdminPickupToggle teamOrderId={o.id} pickup={o.localPickup} />}
@@ -500,17 +507,17 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
               live in the Next step banner. The same label button stays here for
               production-stage (deposit paid) pickup-first orders. After a label
               exists, Schedule pickup appears below - label, then pickup. */}
-          {o.depositPaidAt && !paid && !o.shippedAt && !o.trackingNumber && (
+          {!o.localPickup && o.depositPaidAt && !paid && !o.shippedAt && !o.trackingNumber && (
             <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} suggestedLb={Math.max(1, Math.round(((parcels.apparelOz || parcels.hatOz) / 16) * 10) / 10)} />
           )}
-          {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
+          {!o.localPickup && o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
           {/* Once a primary label exists, allow buying MORE parcels - a second
               box, a reship, or the hats going out separately. Each one emails
               the customer its tracking right away. */}
-          {paid && o.trackingNumber && (
+          {!o.localPickup && paid && o.trackingNumber && (
             <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} additional suggestedLb={twoBoxes ? Math.max(1, Math.round((parcels.hatOz / 16) * 10) / 10) : undefined} label="Buy another label + email" />
           )}
-          {(o.shipTransactionId || (o.additionalShipments ?? []).some((s) => s.transactionId)) && (
+          {!o.localPickup && (o.shipTransactionId || (o.additionalShipments ?? []).some((s) => s.transactionId)) && (
             <AdminPickupButton kind="team_order" id={o.id} />
           )}
         </div>

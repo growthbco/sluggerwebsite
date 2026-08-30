@@ -131,11 +131,13 @@ export default function TermsPage() {
             finished order and prepare it for final shipment.
           </p>
           <p className="mt-2">
-            Carrier tracking determines the recorded delivery time. Please inspect every package and
+            Carrier tracking determines the recorded delivery time; for local pickup, Slugger Athletics
+            records the customer handoff time. Please inspect every package and
             item promptly and report a suspected defect, production error, wrong or missing item, or
             shipping damage within 7 calendar days. If an order arrives in multiple packages, the
-            reporting window begins when the final package is marked delivered. We email a delivery
-            confirmation and display the report-by date in the customer portal when tracking is available.
+            reporting window begins when the final package is marked delivered. For pickup, it begins
+            when staff marks the complete order picked up. We email a confirmation and display the
+            report-by date in the customer portal.
           </p>
         </div>
         <div>

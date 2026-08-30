@@ -27,10 +27,11 @@ const jsonLd = {
 
 export default async function ContactPage({ searchParams }: { searchParams: Promise<{ topic?: string; order?: string }> }) {
   const { topic, order } = await searchParams;
-  const reportingDelivery = topic === "delivery";
+  const reportingDelivery = topic === "delivery" || topic === "pickup";
+  const reportingPickup = topic === "pickup";
   const cleanReference = (order ?? "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
   const initialMessage = reportingDelivery
-    ? `Order reference: ${cleanReference || ""}\n\nThe package was delivered, and I need help with:\n\nAffected player/item(s):\n\nPlease attach or send photos of the full item and close-ups of the issue.`
+    ? `Order reference: ${cleanReference || ""}\n\nThe order was ${reportingPickup ? "picked up" : "delivered"}, and I need help with:\n\nAffected player/item(s):\n\nPlease attach or send photos of the full item and close-ups of the issue.`
     : undefined;
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 py-14">

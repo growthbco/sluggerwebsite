@@ -216,7 +216,9 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
     localPickup: order.localPickup,
   });
   const statusLabel = order.deliveredAt
-    ? "Delivered"
+    ? order.localPickup ? "Picked up" : "Delivered"
+    : order.localPickup && order.status === "shipped"
+      ? "Pickup pending"
     : order.status === "shipped" || order.shippedAt
     ? "Shipped"
     : paid
@@ -231,7 +233,9 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
             ? "Awaiting payment"
             : titleCaseStatus(order.status);
   const nextStepHeading = order.deliveredAt
-    ? "Your order was delivered"
+    ? order.localPickup ? "Your pickup is complete" : "Your order was delivered"
+    : order.localPickup && paid
+      ? "Your pickup is being prepared"
     : outboundTrack
     ? "Your order is on the way"
     : started
@@ -338,16 +342,16 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
       <CustomerDeliveryTimeline
         timeline={deliveryTimeline}
         localPickup={order.localPickup}
-        shippedAt={order.shippedAt}
+        shippedAt={order.localPickup ? order.deliveredAt : order.shippedAt}
       />
 
       {order.deliveredAt && (
         <section className="rounded-xl border border-brand/50 bg-brand/[0.07] p-5">
-          <p className="display text-lg text-foreground">Delivered {formatCustomerDate(order.deliveredAt)}</p>
+          <p className="display text-lg text-foreground">{order.localPickup ? "Picked up" : "Delivered"} {formatCustomerDate(order.deliveredAt)}</p>
           <p className="mt-2 max-w-2xl text-sm text-muted">
             Please inspect every package and item before it is worn, washed, altered, or decorated. Report a suspected defect, production error, wrong or missing item, or shipping damage by <strong className="text-foreground">{formatCustomerDate(claimDeadlineFromDelivery(order.deliveredAt))}</strong>.
           </p>
-          <a href={`/contact?topic=delivery&order=${encodeURIComponent(order.reference)}`} className="mt-4 inline-flex min-h-[44px] items-center rounded bg-brand px-5 display text-sm text-on-brand hover:bg-brand-dark">Report an order issue</a>
+          <a href={`/contact?topic=${order.localPickup ? "pickup" : "delivery"}&order=${encodeURIComponent(order.reference)}`} className="mt-4 inline-flex min-h-[44px] items-center rounded bg-brand px-5 display text-sm text-on-brand hover:bg-brand-dark">Report an order issue</a>
         </section>
       )}
 

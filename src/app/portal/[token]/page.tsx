@@ -24,7 +24,8 @@ function balanceDueCents(o: TeamOrder): number {
 }
 
 function statusFor(o: TeamOrder): { label: string; tone: "green" | "amber" | "gold" } {
-  if (o.deliveredAt) return { label: "Delivered", tone: "green" };
+  if (o.deliveredAt) return { label: o.localPickup ? "Picked up" : "Delivered", tone: "green" };
+  if (o.localPickup && o.status === "shipped") return { label: "Pickup pending", tone: "amber" };
   if (o.status === "shipped") return { label: "Shipped", tone: "green" };
   if (o.invoicePaidAt) return { label: "Paid", tone: "green" };
   if (balanceDueCents(o) > 0) return { label: "Balance due", tone: "amber" };
@@ -67,7 +68,7 @@ export default async function PortalOrdersPage({ params }: { params: Promise<{ t
         totalCents: o.totalCents + o.shippingCents,
         dateLabel: o.createdAt ? shortDate(o.createdAt) : "",
         timelineLabel: o.deliveredAt
-          ? `Delivered ${shortDate(o.deliveredAt)} · report issues by ${shortDate(claimDeadlineFromDelivery(o.deliveredAt))}`
+          ? `${o.localPickup ? "Picked up" : "Delivered"} ${shortDate(o.deliveredAt)} · report issues by ${shortDate(claimDeadlineFromDelivery(o.deliveredAt))}`
           : o.deliveryTargetAt
             ? `${o.deliveryTargetKind === "pickup" ? "Pickup target" : "Ready to ship target"} ${shortDate(o.deliveryTargetAt)}`
             : undefined,

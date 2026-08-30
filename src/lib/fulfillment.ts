@@ -8,12 +8,13 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrders, orders } from "@/db/schema";
-import { emailOrderShipped, emailAdditionalShipment } from "@/lib/email";
-import { sendFollowUpSms } from "@/lib/sms";
+import { emailOrderShipped, emailAdditionalShipment, emailOrderDelivered } from "@/lib/email";
+import { sendFollowUpSms, smsIfConsented } from "@/lib/sms";
 import { archiveDiscordThread } from "@/lib/discord-bot";
 import { trackingUrlFor, inboundTrackingUrlFor, carrierFor } from "@/lib/tracking";
 import { ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { registerTrackingWebhook } from "@/lib/shippo";
+import { claimDeadlineFromDelivery, formatCustomerDate } from "@/lib/customer-policy";
 
 export { trackingUrlFor };
 
@@ -210,4 +211,54 @@ export async function markShipped(
       })
     : false;
   return { reference: row.reference, emailed };
+}
+
+/** Record the moment a fully paid local-pickup order is handed to the
+ * customer. The handoff starts the same seven-day inspection window as a
+ * carrier delivery. */
+export async function markCustomerPickedUp(id: string): Promise<{ ok: true; reference: string; notified: boolean } | { ok: false; error: string }> {
+  const db = getDb();
+  const [order] = await db.select().from(teamOrders).where(eq(teamOrders.id, id)).limit(1);
+  if (!order) return { ok: false, error: "Order not found." };
+  if (!order.localPickup) return { ok: false, error: "This order is not set for local pickup." };
+  if (!order.invoicePaidAt && !["paid", "shipped"].includes(order.status)) {
+    return { ok: false, error: "The order must be paid in full before it can be marked picked up." };
+  }
+  if (order.deliveredAt) return { ok: true, reference: order.reference, notified: Boolean(order.deliveryNoticeSentAt) };
+
+  const pickedUpAt = new Date();
+  await db.update(teamOrders).set({
+    status: "shipped",
+    shippedAt: pickedUpAt,
+    deliveredAt: pickedUpAt,
+    updatedAt: pickedUpAt,
+  }).where(eq(teamOrders.id, id));
+
+  const reportBy = claimDeadlineFromDelivery(pickedUpAt);
+  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+  const reportUrl = `${site}/contact?${new URLSearchParams({ topic: "pickup", order: order.reference })}`;
+  const reportByDate = formatCustomerDate(reportBy);
+  const [emailed, texted] = await Promise.all([
+    order.contactEmail
+      ? emailOrderDelivered({
+          to: order.contactEmail,
+          name: order.contactName,
+          reference: order.reference,
+          deliveredDate: formatCustomerDate(pickedUpAt),
+          reportByDate,
+          reportUrl,
+          method: "pickup",
+        })
+      : Promise.resolve(false),
+    smsIfConsented({
+      phone: order.contactPhone,
+      optInAt: order.smsOptInAt,
+      body: `Slugger Athletics: pickup is complete for ${order.reference}. Please inspect every item and report any problem by ${reportByDate}: ${reportUrl}\nReply STOP to opt out.`,
+    }),
+  ]);
+  if (emailed || texted) {
+    await db.update(teamOrders).set({ deliveryNoticeSentAt: new Date(), updatedAt: new Date() }).where(eq(teamOrders.id, id));
+  }
+  await archiveDiscordThread(await ensureTeamOrderDiscordThread(order.id));
+  return { ok: true, reference: order.reference, notified: emailed || texted };
 }

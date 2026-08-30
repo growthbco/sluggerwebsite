@@ -40,7 +40,7 @@ export function CustomerDeliveryTimeline({
           <p className="display text-xs uppercase tracking-[0.16em] text-brand">Delivery timeline</p>
           <h2 id="delivery-timeline-heading" className="display text-2xl text-foreground mt-1">
             {hasValidShippedDate
-              ? `Shipped ${formatTimelineDate(shipped)}`
+              ? `${localPickup ? "Picked up" : "Shipped"} ${formatTimelineDate(shipped)}`
               : arrivalTargetDate
                 ? `Target arrival: ${arrivalTargetDate}`
               : timeline.selectedTargetAt
@@ -90,7 +90,9 @@ export function CustomerDeliveryTimeline({
 
       <p className="mt-4 text-xs text-muted">
         {localPickup
-          ? "We will contact you when the order is ready for pickup in Ocala."
+          ? hasValidShippedDate
+            ? "Pickup is complete. Your seven-day inspection window begins from the recorded handoff time."
+            : "We will contact you when the order is ready for pickup in Ocala."
           : arrivalTargetAt
             ? `We are producing and shipping this order toward the ${arrivalTargetDate} arrival target. Tracking will show the carrier's latest estimate once the package is on its way.`
             : "The production target is when we expect the order to be ready to ship. Carrier transit comes afterward, and tracking will show the delivery estimate once the final package is on its way."}

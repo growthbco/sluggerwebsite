@@ -79,7 +79,7 @@ const SECTIONS: PolicySection[] = [
   {
     h: "7. How to report a problem",
     body: [
-      `Report a suspected defect, production error, wrong or missing item, or shipping damage within ${CLAIM_REPORT_WINDOW_DAYS} calendar days of the carrier-recorded delivery time. For an order delivered in multiple packages, the window begins when the final package is marked delivered. Contact us before returning anything; packages sent without authorization may be delayed or refused.`,
+      `Report a suspected defect, production error, wrong or missing item, or shipping damage within ${CLAIM_REPORT_WINDOW_DAYS} calendar days of carrier-recorded delivery or the recorded local-pickup handoff. For an order delivered in multiple packages, the window begins when the final package is marked delivered. Contact us before returning anything; packages sent without authorization may be delayed or refused.`,
       "Keep the affected item, tags, original packaging, and shipping carton until the claim is resolved. We may request additional photographs, measurements, or return of the item so we can confirm the cause and prevent it from happening again.",
     ],
     bullets: [
@@ -111,7 +111,7 @@ const SECTIONS: PolicySection[] = [
     h: "10. Stock items without customization",
     body: [
       "An item qualifies for the stock-item return policy only when it was sold as an in-stock product and has no custom design, team decoration, name, number, embroidery, alteration, or other personalization.",
-      `Eligible stock items may be returned within ${CLAIM_REPORT_WINDOW_DAYS} calendar days of carrier-recorded delivery if they are unworn, unwashed, unused, unaltered, and returned with their original tags and packaging. Contact us first for authorization. The customer pays return shipping, and original shipping is not refundable unless Slugger Athletics shipped the wrong item or the item has a covered defect.`,
+      `Eligible stock items may be returned within ${CLAIM_REPORT_WINDOW_DAYS} calendar days of carrier-recorded delivery or the recorded local-pickup handoff if they are unworn, unwashed, unused, unaltered, and returned with their original tags and packaging. Contact us first for authorization. The customer pays return shipping, and original shipping is not refundable unless Slugger Athletics shipped the wrong item or the item has a covered defect.`,
       "A refund is issued to the original payment method after the returned item is received and inspected. Items showing wear, washing, odor, damage, missing tags, or incomplete packaging may be refused or have their refund reduced to reflect lost value where permitted by law.",
     ],
   },
@@ -175,7 +175,7 @@ export default function ReturnsPage() {
       <div className="mt-12 bg-steel border border-line p-6 text-center">
         <h2 className="display text-xl text-foreground">Something not right with your order?</h2>
         <p className="mt-2 text-muted text-sm">
-          Contact us within 7 days of carrier-recorded delivery with your order reference and clear photos. Email{" "}
+          Contact us within 7 days of carrier-recorded delivery or recorded local pickup with your order reference and clear photos. Email{" "}
           <a href="mailto:apparel@sluggerathletics.com" className="text-brand hover:underline">apparel@sluggerathletics.com</a> or call{" "}
           <a href="tel:+13524147270" className="text-brand hover:underline">352-414-7270</a>.
         </p>

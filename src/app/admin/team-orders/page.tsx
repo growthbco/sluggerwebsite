@@ -27,6 +27,7 @@ import { AdminTaxToggle } from "@/components/admin-tax-toggle";
 import { AdminSearch } from "@/components/admin-search";
 import { AdminRecordPayment } from "@/components/admin-record-payment";
 import { AdminPickupToggle } from "@/components/admin-pickup-toggle";
+import { AdminCustomerPickupButton } from "@/components/admin-customer-pickup-button";
 import { AdminRowMenu } from "@/components/admin-row-menu";
 import { AdminCustomPrice } from "@/components/admin-custom-price";
 import { AdminInboundTracking } from "@/components/admin-inbound-tracking";
@@ -55,6 +56,7 @@ const STATUS_TONE: Record<string, string> = {
   in_production: "border-sky-500/50 text-sky-400",
   paid: "border-green-500/50 text-green-400",
   shipped: "border-green-500/50 text-green-400",
+  picked_up: "border-green-500/50 text-green-400",
 };
 
 function Badge({ label }: { label: string }) {
@@ -151,6 +153,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
         trackingNumber: teamOrders.trackingNumber,
         labelUrl: teamOrders.labelUrl,
         shippedAt: teamOrders.shippedAt,
+        deliveredAt: teamOrders.deliveredAt,
         shippingChargedCents: teamOrders.shippingChargedCents,
         shippingProtectionCents: teamOrders.shippingProtectionCents,
         shippingProtectionValueCents: teamOrders.shippingProtectionValueCents,
@@ -445,7 +448,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                         <span title={o.source ?? "unknown (pre-tracking)"}>{srcShort(o.source)}</span>
                       </div>
                     </td>
-                    <td className="px-3 py-3"><Badge label={o.status} /></td>
+                    <td className="px-3 py-3"><Badge label={o.localPickup && o.deliveredAt ? "picked_up" : o.status} /></td>
                     <td className="px-3 py-3 text-foreground">
                       <span className="flex flex-wrap items-center gap-1.5">
                         <span className="whitespace-nowrap">
@@ -544,12 +547,24 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                         {/* ONE primary action per state - everything else
                             lives in the ⋯ menu so rows stay scannable. */}
                         {o.shippedAt ? (
-                          <>
-                            <span className="text-xs display text-green-400 whitespace-nowrap">SHIPPED</span>
-                            {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
-                          </>
+                          o.localPickup && !o.deliveredAt ? (
+                            <>
+                              <span className="text-xs display text-amber-400 whitespace-nowrap">PICKUP NEEDS CONFIRMATION</span>
+                              <AdminCustomerPickupButton teamOrderId={o.id} teamName={o.teamName} />
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-xs display text-green-400 whitespace-nowrap">{o.localPickup ? "PICKED UP" : "SHIPPED"}</span>
+                              {!o.localPickup && o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
+                            </>
+                          )
                         ) : paid ? (
-                          o.trackingNumber ? (
+                          o.localPickup ? (
+                            <>
+                              <span className="text-xs display text-green-400 whitespace-nowrap">PAID · LOCAL PICKUP</span>
+                              <AdminCustomerPickupButton teamOrderId={o.id} teamName={o.teamName} />
+                            </>
+                          ) : o.trackingNumber ? (
                             <>
                               <span className="text-xs display text-amber-400 whitespace-nowrap" title="Label/tracking ready - customer not emailed yet">READY TO SHIP</span>
                               <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="Mark shipped + email" />
@@ -620,7 +635,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                                 <AdminTaxToggle teamOrderId={o.id} exempt={o.taxExempt} />
                               </>
                             )}
-                            {o.depositPaidAt && !o.shippedAt && !paid && (
+                            {!o.localPickup && o.depositPaidAt && !o.shippedAt && !paid && (
                               o.trackingNumber ? (
                                 <>
                                   <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
@@ -633,10 +648,10 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                                 </>
                               )
                             )}
-                            {paid && !o.shippedAt && (
+                            {!o.localPickup && paid && !o.shippedAt && (
                               <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber ?? undefined} label="Add tracking" />
                             )}
-                            {paid && !o.shippedAt && o.trackingNumber && (
+                            {!o.localPickup && paid && !o.shippedAt && o.trackingNumber && (
                               <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />
                             )}
                             {!o.shippedAt && o.manageToken && (
@@ -649,7 +664,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                             )}
                             {/* Buy an extra parcel's label once the primary one
                                 exists - emails the customer that tracking. */}
-                            {paid && o.trackingNumber && (
+                            {!o.localPickup && paid && o.trackingNumber && (
                               <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} additional suggestedLb={labelWeights.get(o.id)?.hatLb} label="Buy another label + email" />
                             )}
                             <AdminArchiveButton kind="team_order" id={o.id} archived={false} />
