@@ -13,6 +13,7 @@ import { sendFollowUpSms } from "@/lib/sms";
 import { archiveDiscordThread } from "@/lib/discord-bot";
 import { trackingUrlFor, inboundTrackingUrlFor, carrierFor } from "@/lib/tracking";
 import { ensureTeamOrderDiscordThread } from "@/lib/team-orders";
+import { registerTrackingWebhook } from "@/lib/shippo";
 
 export { trackingUrlFor };
 
@@ -122,6 +123,7 @@ export async function appendAdditionalShipment(
       .where(eq(orders.id, id));
     email = row.customerEmail; name = row.customerName; reference = row.reference;
   }
+  await registerTrackingWebhook(carrier ?? carrierFor(trackingNumber), trackingNumber, reference);
   if (!email) return false;
   return emailAdditionalShipment({ to: email, name, reference, trackingNumber, trackingUrl: trackingUrlFor(trackingNumber), note });
 }
@@ -158,6 +160,7 @@ export async function markShipped(
         designRequestId: teamOrders.designRequestId,
       });
     if (!row) return null;
+    await registerTrackingWebhook(options?.carrier ?? carrierFor(tracking), tracking, row.reference);
     const trackingUrl = options?.carrier
       ? inboundTrackingUrlFor(tracking, options.carrier)
       : trackingUrlFor(tracking);
@@ -192,6 +195,7 @@ export async function markShipped(
     .where(eq(orders.id, id))
     .returning({ reference: orders.reference, email: orders.customerEmail, name: orders.customerName, phone: orders.customerPhone });
   if (!row) return null;
+  await registerTrackingWebhook(carrierFor(tracking), tracking, row.reference);
   await sendFollowUpSms({
     phone: row.phone,
     body: `Slugger Athletics: your ${row.reference} order shipped! 🚚 Track it: ${trackingUrlFor(tracking)}\nReply STOP to opt out.`,

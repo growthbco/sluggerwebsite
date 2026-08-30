@@ -288,6 +288,27 @@ function shippoTrackingCarrier(carrier: string | null | undefined): string | nul
   return null;
 }
 
+/** Ensure Shippo sends track_updated events even for a manually entered or
+ * direct-from-production tracking number that was not bought through Shippo. */
+export async function registerTrackingWebhook(carrier: string | null | undefined, trackingNumber: string, metadata?: string): Promise<boolean> {
+  if (!shippoEnabled() || !trackingNumber) return false;
+  const slug = shippoTrackingCarrier(carrier);
+  if (!slug) return false;
+  try {
+    const res = await fetch(`${API}/tracks/`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ carrier: slug, tracking_number: trackingNumber, metadata: metadata?.slice(0, 100) }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) console.error("Shippo tracking registration failed:", res.status, await res.text());
+    return res.ok;
+  } catch (error) {
+    console.error("Shippo tracking registration error:", error);
+    return false;
+  }
+}
+
 export type LiveTracking = {
   status: string; // e.g. "In transit", "Delivered"
   detail?: string;
