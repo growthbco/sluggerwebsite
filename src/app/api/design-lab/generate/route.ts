@@ -7,7 +7,7 @@ import { getDb, dbEnabled } from "@/db";
 import { designLabVisitors } from "@/db/schema";
 import { getOrCreateVisitor, tierFor, LAB_COOKIE, encryptCleanUrl, FREE_GENS } from "@/lib/design-lab";
 import { watermarkImage, generateJerseyImage, type ImagePart } from "@/lib/jersey-image";
-import { buildProductPrompt, productNoun, productAspect, PRODUCTS, JERSEY_BRANDING, type ProductType } from "@/lib/product-mockups";
+import { buildProductPrompt, hatReferenceAsset, productNoun, productAspect, PRODUCTS, JERSEY_BRANDING, type ProductType } from "@/lib/product-mockups";
 import { reserveDesignLabGeneration } from "@/lib/ai-usage";
 
 export const runtime = "nodejs";
@@ -87,7 +87,8 @@ export async function POST(req: Request) {
   const teamName = clean(body.teamName, 40);
   const idea = clean(body.idea, 500);
   const refinement = clean(body.refinement, 500);
-  const backNumber = clean(body.backNumber, 4) || "12";
+  const requestedBackNumber = clean(body.backNumber, 4);
+  const backNumber = requestedBackNumber || "12";
   const extraColors = (body.extraColors ?? []).map((x) => clean(String(x), 20)).filter(Boolean).slice(0, 3);
 
   const parts: ImagePart[] = [];
@@ -141,11 +142,32 @@ export async function POST(req: Request) {
     // sleeveless tank, matching the staff studio).
     const reference = parseDataUrl(body.reference);
     const logo = parseDataUrl(body.logo);
+    let hatBlank: { mime_type: string; data: string } | null = null;
+    let hatBlankLabel = "";
+    if (product === "hat") {
+      const asset = hatReferenceAsset(style);
+      hatBlankLabel = asset.label;
+      try {
+        const sampleRes = await fetch(new URL(asset.src, req.url));
+        if (sampleRes.ok) {
+          hatBlank = {
+            mime_type: asset.mime,
+            data: Buffer.from(await sampleRes.arrayBuffer()).toString("base64"),
+          };
+        }
+      } catch (error) {
+        console.error("hat sample load failed:", error);
+      }
+    }
     const colorStr = [clean(body.primaryColor, 30), clean(body.secondaryColor, 30), ...extraColors].filter(Boolean).join(", ") || "team colors";
     const prompt =
-      buildProductPrompt(product, { sport, style, colors: colorStr, teamName, vision: idea, hasRef: !!(reference || logo) }) +
+      buildProductPrompt(product, { sport, style, colors: colorStr, teamName, backNumber: requestedBackNumber, vision: idea, hasRef: !!(reference || logo) }) +
       " Do NOT add any MLB/NBA/NFL or other league logos, pro-team marks, or brand swooshes - only the team's own name and provided logo. No watermark.";
     parts.push({ text: prompt });
+    if (hatBlank) {
+      parts.push({ text: `HAT BLANK CONSTRUCTION REFERENCE (${hatBlankLabel}): match ONLY this cap's silhouette, panel construction, brim, fit, and closure. Completely remove and ignore its existing embroidery, logo, lettering, colors, retail sticker, and background. Apply the customer's new colors and team artwork instead:` });
+      parts.push({ inline_data: hatBlank });
+    }
     if (reference) { parts.push({ text: "REFERENCE (style inspiration - recreate the vibe as a NEW original design, don't copy logos):" }); parts.push({ inline_data: reference }); }
     if (logo) { parts.push({ text: "TEAM LOGO (incorporate this naturally):" }); parts.push({ inline_data: logo }); }
   } else {

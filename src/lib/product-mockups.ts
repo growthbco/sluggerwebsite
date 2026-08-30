@@ -20,6 +20,31 @@ export const JERSEY_BRANDING =
 export type StudioItem = { product: ProductType; label: string; sport?: string; styles: string[] };
 export type StudioSport = { key: string; label: string; items: StudioItem[] };
 
+export type HatReferenceAsset = {
+  src: string;
+  mime: "image/png" | "image/jpeg";
+  label: string;
+};
+
+const FITTED_HAT_REFERENCE: HatReferenceAsset = {
+  src: "/products/hats/mamba-m-flexfit.jpg",
+  mime: "image/jpeg",
+  label: "Fitted Flexfit sample",
+};
+
+const SNAPBACK_HAT_REFERENCE: HatReferenceAsset = {
+  src: "/media/90s-Snap-Back.png",
+  mime: "image/png",
+  label: "Structured mesh-back snapback sample",
+};
+
+/** The real hat blank/photo used to hold the correct silhouette during image
+ * generation. The AI is told to copy only its construction, never its existing
+ * embroidery, colors, labels, or stickers. */
+export function hatReferenceAsset(style?: string | null): HatReferenceAsset {
+  return /snap|trucker/i.test(style ?? "") ? SNAPBACK_HAT_REFERENCE : FITTED_HAT_REFERENCE;
+}
+
 export const SPORT_MENU: StudioSport[] = [
   {
     key: "baseball",
@@ -94,6 +119,14 @@ export const SPORT_MENU: StudioSport[] = [
     items: [
       // Hockey "jersey" is a sweater; the prompt renders proper hockey styling.
       { product: "jersey", label: "Jersey", sport: "hockey", styles: ["Standard Collar", "Lace-Up Collar"] },
+    ],
+  },
+  {
+    key: "hats",
+    label: "Hats",
+    items: [
+      { product: "hat", label: "Fitted Hat", sport: "baseball", styles: ["Fitted"] },
+      { product: "hat", label: "Snapback Hat", sport: "baseball", styles: ["Snapback"] },
     ],
   },
   {
@@ -185,6 +218,7 @@ type PromptInput = {
   style?: string;
   colors: string; // comma-separated
   teamName?: string | null;
+  backNumber?: string | null;
   vision?: string | null;
   instruction?: string;
   hasRef?: boolean;
@@ -200,10 +234,21 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
 
   switch (product) {
     case "hat":
+      if (/snap|trucker/i.test(style)) {
+        lines.push(
+          "Professional e-commerce product mockup of a custom EMBROIDERED structured trucker-style SNAPBACK cap, floating on a pure white background with studio lighting. Show a FRONT three-quarter view (left) and a REAR three-quarter view (right) of the same cap so the adjustable snap closure is visible.",
+          "Construction must be a high-profile structured solid front crown, breathable mesh back panels, curved stitched brim, and adjustable plastic snap closure. It is one-size-fits-most; it is NOT a closed-back fitted cap.",
+        );
+      } else {
+        lines.push(
+          "Professional e-commerce product mockup of a custom EMBROIDERED Flexfit-style FITTED cap, floating on a pure white background with studio lighting. Show a FRONT three-quarter view (left) and a REAR/SIDE three-quarter view (right) of the same cap.",
+          "Construction must be a structured six-panel stretch-fit cap with a closed fabric back, no opening and no plastic snap closure, clean stitched eyelets, and a structured flat-to-gently-curved brim.",
+        );
+      }
       lines.push(
-        `Professional e-commerce product mockup of a custom EMBROIDERED team cap (structured baseball / Flexfit-style fitted hat)${style ? `, ${style}` : ""}, floating on a pure white background with studio lighting. Show a FRONT three-quarter view (left) and a SIDE view (right) of the same cap.`,
-        "The team emblem is EMBROIDERED on the front crown with realistic raised 3D thread texture and stitching; add a small matching embroidered mark on the side panel. Clean stitched eyelets and a structured brim.",
-        `Colors: ${i.colors} (crown, brim, and emblem thread).`,
+        "The team emblem is EMBROIDERED on the front crown with realistic raised 3D thread texture and stitching; add a small matching embroidered mark on one side panel.",
+        i.backNumber ? `Embroider player number "${i.backNumber}" small and centered on the back of the cap.` : "",
+        `Colors: ${i.colors} (crown, brim, mesh when applicable, and emblem thread).`,
         team ? `Team emblem/name: "${team}".` : "",
       );
       break;
@@ -328,9 +373,9 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
   // One product per mockup: each product the client wants gets its OWN proof.
   // Without this, inspiration images of other pieces (a hat photo on a jersey
   // brief) leak into the shot and the model lumps products together.
-  lines.push(
-    `Show ONLY the ${productNoun(product)} - exactly one product in the frame. Do NOT include any other items (no hats, jerseys, hoodies, pants, socks, or chains that aren't the ${productNoun(product)} itself), even if reference or inspiration images show them.`,
-  );
+  lines.push(product === "hat"
+    ? "Show ONLY the cap in the requested two-view layout. Both views must depict the SAME cap design and construction; do not add a jersey, hoodie, pants, socks, chain, or any other product."
+    : `Show ONLY the ${productNoun(product)} - exactly one product in the frame. Do NOT include any other items (no hats, jerseys, hoodies, pants, socks, or chains that aren't the ${productNoun(product)} itself), even if reference or inspiration images show them.`);
   lines.push(GUARDRAIL);
   return lines.filter(Boolean).join(" ");
 }

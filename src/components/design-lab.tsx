@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
+import Image from "next/image";
 import { DropZone, firstImageFile } from "@/components/drop-zone";
 import { SmsConsentNote } from "@/components/sms-consent";
-import { SPORT_MENU } from "@/lib/product-mockups";
+import { hatReferenceAsset, SPORT_MENU } from "@/lib/product-mockups";
 
 /** Private AI jersey designer preview. Each generation ~13 cents; the API
  *  enforces a daily cap and requires the test key or an admin session. */
@@ -16,16 +17,8 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
   const currentItem = currentSport.items[itemIdx] ?? currentSport.items[0];
   const product = currentItem.product;
   const sport = currentItem.sport ?? "baseball"; // sport string sent to the AI
-  const pickSport = (key: string) => {
-    const sp = SPORT_MENU.find((s) => s.key === key) ?? SPORT_MENU[0];
-    setSportKey(key);
-    setItemIdx(0);
-    setStyle(sp.items[0].styles[0]);
-  };
-  const pickItem = (idx: number) => {
-    setItemIdx(idx);
-    setStyle(currentSport.items[idx].styles[0]);
-  };
+  const isHat = product === "hat";
+  const selectedHatReference = isHat ? hatReferenceAsset(style) : null;
   const [primaryColor, setPrimaryColor] = useState("#0A0A0A");
   const [secondaryColor, setSecondaryColor] = useState("#B8A36C");
   const [extraColors, setExtraColors] = useState<string[]>([]);
@@ -40,7 +33,6 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
   const [refinement, setRefinement] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [usage, setUsage] = useState<{ used: number; cap: number } | null>(null);
   const [need, setNeed] = useState<"email" | "upgrade" | null>(null);
   const [proceedOpen, setProceedOpen] = useState(false);
   const [contactName, setContactName] = useState("");
@@ -58,10 +50,41 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
   const [smsOptIn, setSmsOptIn] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  function resetConceptForNewProduct() {
+    setImage(null);
+    setCleanToken(undefined);
+    setHistory([]);
+    setRefinement("");
+    setSubmitted(null);
+    setProceedOpen(false);
+    setError(null);
+  }
+
+  function pickSport(key: string) {
+    const sp = SPORT_MENU.find((s) => s.key === key) ?? SPORT_MENU[0];
+    resetConceptForNewProduct();
+    setSportKey(key);
+    setItemIdx(0);
+    setStyle(sp.items[0].styles[0]);
+  }
+
+  function pickItem(idx: number) {
+    resetConceptForNewProduct();
+    setItemIdx(idx);
+    setStyle(currentSport.items[idx].styles[0]);
+  }
+
+  function pickStyle(nextStyle: string) {
+    if (nextStyle === style) return;
+    resetConceptForNewProduct();
+    setStyle(nextStyle);
+  }
+
   // Persist the whole working session to localStorage so an accidental reload
   // or a new window doesn't wipe the design in progress. Restored on mount.
   const LS_KEY = "slugger_jersey_maker_v1";
   const restored = useRef(false);
+  /* eslint-disable react-hooks/set-state-in-effect -- this one-time effect hydrates client-only localStorage state after SSR */
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
@@ -85,6 +108,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
       if (Array.isArray(d.history)) setHistory(d.history);
     } catch { /* ignore corrupt/oversized */ }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!restored.current) return;
@@ -148,7 +172,6 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
       setCleanToken(data.cleanToken);
       setHistory((h) => [{ img: data.image, token: data.cleanToken }, ...h].slice(0, 12));
       setRefinement("");
-      if (data.usedToday) setUsage({ used: data.usedToday, cap: data.capToday });
     } catch {
       setError("Connection problem - try again");
     } finally {
@@ -185,11 +208,20 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
           </div>
           <div>
             <label className={label}>STYLE</label>
-            <select value={style} onChange={(e) => setStyle(e.target.value)} className={input}>
+            <select value={style} onChange={(e) => pickStyle(e.target.value)} className={input}>
               {currentItem.styles.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
         </div>
+        {selectedHatReference ? (
+          <div className="flex items-center gap-3 border border-brand/35 bg-brand/[0.05] p-3">
+            <Image src={selectedHatReference.src} alt={selectedHatReference.label} width={80} height={80} className="h-20 w-20 shrink-0 bg-white object-contain" />
+            <div>
+              <p className="display text-sm text-foreground">Using our {selectedHatReference.label}</p>
+              <p className="mt-1 text-xs text-muted">The generator matches this hat&apos;s construction and shape, then replaces its existing artwork with your team design.</p>
+            </div>
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <label className={label}>PRIMARY</label>
@@ -222,7 +254,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
         </div>
         <div className="grid grid-cols-[1fr_7rem] gap-3">
           <div>
-            <label className={label}>TEAM NAME (ON THE CHEST)</label>
+            <label className={label}>{isHat ? "TEAM NAME / FRONT TEXT" : "TEAM NAME (ON THE CHEST)"}</label>
             <input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="e.g. MONSTARS" className={input} maxLength={30} />
           </div>
           <div>
@@ -233,7 +265,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
         <div>
           <label className={label}>DESCRIBE YOUR IDEA</label>
           <textarea value={idea} onChange={(e) => setIdea(e.target.value)} rows={3} maxLength={500}
-            placeholder="e.g. lightning bolts down the sides, faded smoke pattern, retro 90s vibe, pinstripes…" className={`${input} resize-y`} />
+            placeholder={isHat ? "e.g. black crown, red brim, 3D puff logo, player number on the back…" : "e.g. lightning bolts down the sides, faded smoke pattern, retro 90s vibe, pinstripes…"} className={`${input} resize-y`} />
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
@@ -254,7 +286,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
               onChange={(e) => pickImage(e.target.files?.[0], setLogo)} />
           </div>
           <div>
-            <label className={label}>REFERENCE JERSEY (OPTIONAL)</label>
+            <label className={label}>REFERENCE {isHat ? "HAT" : "JERSEY"} (OPTIONAL)</label>
             <DropZone onFiles={(fs) => pickImage(firstImageFile(fs), setReference)} className="flex items-center gap-2 mt-1">
               <button type="button" onClick={() => refFileRef.current?.click()} className="border border-line text-foreground display text-sm px-3 py-2.5 hover:border-brand/60">
                 {reference ? "Change" : "Upload reference"}
@@ -267,14 +299,14 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
                 </>
               )}
             </DropZone>
-            <p className="mt-1 text-[11px] text-muted">A jersey you like - we restyle its look in your colors.</p>
+            <p className="mt-1 text-[11px] text-muted">A {isHat ? "hat" : "jersey"} you like - we restyle its look in your colors.</p>
             <input ref={refFileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
               onChange={(e) => pickImage(e.target.files?.[0], setReference)} />
           </div>
         </div>
         <button type="button" onClick={() => generate(false)} disabled={busy}
           className="w-full clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg py-3.5 transition-colors disabled:opacity-60">
-          {busy ? "Designing… (about 15 seconds)" : image ? "Generate a Fresh Design" : "Generate My Jersey"}
+          {busy ? "Designing… (about 15 seconds)" : image ? `Generate a Fresh ${currentItem.label}` : `Generate My ${currentItem.label}`}
         </button>
         {error && <p className="text-sm text-red-400">{error}</p>}
       </div>
@@ -285,13 +317,13 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
           {image ? (
             <button type="button" onClick={() => setZoomOpen(true)} className="h-full w-full cursor-zoom-in" title="Tap to zoom">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={image} alt="AI jersey concept" className="h-full w-full object-contain" />
+              <img src={image} alt={`AI ${currentItem.label.toLowerCase()} concept`} className="h-full w-full object-contain" />
               <span className="absolute bottom-1.5 right-2 text-[11px] bg-ink/80 text-foreground px-1.5 py-0.5 rounded">🔍 tap to zoom</span>
             </button>
           ) : (
             <div className="text-center px-8">
               <svg className="mx-auto mb-3 opacity-30" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M16 3l5 3-2 4-2-1v11H7V9L5 10 3 6l5-3c0 1.1 1.8 2 4 2s4-.9 4-2z" strokeLinejoin="round"/></svg>
-              <p className="text-muted text-sm">Your concept appears here - front and back, side by side.</p>
+              <p className="text-muted text-sm">Your {currentItem.label.toLowerCase()} concept appears here - two production-friendly views, side by side.</p>
             </div>
           )}
           {busy && <div className="absolute inset-0 bg-black/40 grid place-items-center"><p className="display text-white">Designing…</p></div>}
@@ -299,7 +331,7 @@ export function DesignLab({ testKey, ladder, paidJustNow }: { testKey?: string; 
         {zoomOpen && image && (
           <div className="fixed inset-0 z-[90] bg-black/85 grid place-items-center p-3 cursor-zoom-out" onClick={() => setZoomOpen(false)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={image} alt="AI jersey concept - full size" className="max-h-[95vh] max-w-[98vw] object-contain bg-white rounded" />
+            <img src={image} alt={`AI ${currentItem.label.toLowerCase()} concept - full size`} className="max-h-[95vh] max-w-[98vw] object-contain bg-white rounded" />
             <button type="button" className="absolute top-4 right-4 text-white text-3xl" aria-label="Close">×</button>
           </div>
         )}

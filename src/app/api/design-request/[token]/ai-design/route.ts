@@ -5,7 +5,7 @@ import { dbEnabled, getDb } from "@/db";
 import { designRequests } from "@/db/schema";
 import { getByManageToken } from "@/lib/design-requests";
 import { generateJerseyImage, parseDataUrl, watermarkImage, type ImagePart } from "@/lib/jersey-image";
-import { buildProductPrompt, buildRefinePrompt, buildReferencePrompt, productAspect, colorName, PRODUCTS, type ProductType } from "@/lib/product-mockups";
+import { buildProductPrompt, buildRefinePrompt, buildReferencePrompt, hatReferenceAsset, productAspect, colorName, PRODUCTS, type ProductType } from "@/lib/product-mockups";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -84,7 +84,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     const style = (body.style ?? request.jerseyStyle ?? "").trim();
     const fetchImage = async (url: string, mime = "image/png") => {
       try {
-        const buf = Buffer.from(await (await fetch(url)).arrayBuffer());
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const buf = Buffer.from(await response.arrayBuffer());
         return { mime_type: mime, data: buf.toString("base64") };
       } catch { return null; }
     };
@@ -108,6 +110,35 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       if (pendantLogo) {
         parts.push({ text: "PENDANT LOGO (the bottom pendant is this logo):" });
         parts.push({ inline_data: pendantLogo });
+      }
+    } else if (product === "hat") {
+      const asset = hatReferenceAsset(style);
+      const hatBlank = await fetchImage(`${new URL(req.url).origin}${asset.src}`, asset.mime);
+      const seeds: { mime_type: string; data: string }[] = [];
+      if (refImage) {
+        seeds.push(refImage);
+      } else {
+        for (const url of (request.inspirationImages ?? []).slice(0, 2)) {
+          const seed = await fetchImage(url);
+          if (seed) seeds.push(seed);
+        }
+      }
+      parts.push({ text: buildProductPrompt(product, {
+        sport: sport ?? request.sport,
+        style,
+        colors,
+        teamName: request.teamName,
+        vision: request.vision,
+        instruction,
+        hasRef: seeds.length > 0,
+      }) });
+      if (hatBlank) {
+        parts.push({ text: `HAT BLANK CONSTRUCTION REFERENCE (${asset.label}): match ONLY this cap's silhouette, panel construction, brim, fit, and closure. Completely remove and ignore its existing embroidery, logo, lettering, colors, retail sticker, and background. Apply the customer's new colors and artwork instead:` });
+        parts.push({ inline_data: hatBlank });
+      }
+      for (const seed of seeds) {
+        parts.push({ text: "CUSTOMER LOGO OR HAT STYLE REFERENCE: use its artwork or design direction on the new hat; do not copy any unrelated brand marks:" });
+        parts.push({ inline_data: seed });
       }
     } else if (refImage) {
       // Reference-driven: lean on the staff's uploaded image with a minimal
@@ -172,7 +203,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const blob = await put(`design-studio/${request.reference}-${stamp}.png`, Buffer.from(watermarked, "base64"), {
     access: "public", contentType: "image/png", addRandomSuffix: true,
   });
-  const productLabel = PRODUCTS.find((p) => p.id === product)?.label ?? "Jersey";
+  const productLabel = product === "hat"
+    ? (/snap|trucker/i.test(body.style ?? "") ? "Snapback Hat" : "Fitted Hat")
+    : PRODUCTS.find((p) => p.id === product)?.label ?? "Jersey";
   const version = {
     url: blob.url,
     cleanUrl: cleanBlob.url,

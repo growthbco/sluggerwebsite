@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
+import NextImage from "next/image";
 import { DropZone, firstImageFile } from "@/components/drop-zone";
-import { SPORT_MENU } from "@/lib/product-mockups";
+import { hatReferenceAsset, SPORT_MENU } from "@/lib/product-mockups";
 
 type Version = { url: string; cleanUrl?: string; product?: string; note: string; at: string };
 
@@ -38,6 +39,7 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
   const currentSport = SPORT_MENU.find((s) => s.key === sportKey) ?? SPORT_MENU[0];
   const currentItem = currentSport.items[itemIdx] ?? currentSport.items[0];
   const product = currentItem.product;
+  const selectedHatReference = product === "hat" ? hatReferenceAsset(style) : null;
   const pickSport = (key: string) => {
     const sp = SPORT_MENU.find((s) => s.key === key) ?? SPORT_MENU[0];
     setSportKey(key);
@@ -93,7 +95,7 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
 
   /** One tap: use one of the client's inspiration uploads as the reference -
    *  no download/re-upload round trip. */
-  async function useInspiration(url: string, idx: number) {
+  async function selectInspiration(url: string, idx: number) {
     try {
       setError(null);
       const res = await fetch(url);
@@ -278,6 +280,15 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
                     ))}
                   </div>
                 </div>
+                {selectedHatReference ? (
+                  <div className="flex items-center gap-3 border border-brand/35 bg-brand/[0.05] p-3">
+                    <NextImage src={selectedHatReference.src} alt={selectedHatReference.label} width={64} height={64} className="h-16 w-16 shrink-0 bg-white object-contain" />
+                    <div>
+                      <p className="display text-sm text-foreground">{selectedHatReference.label}</p>
+                      <p className="mt-1 text-xs text-muted">Automatically used for the cap shape and construction. Its existing logo and colors are ignored.</p>
+                    </div>
+                  </div>
+                ) : null}
               </div>
               <div>
                 <label className="display text-xs text-muted tracking-wide">REFERENCE IMAGE (optional)</label>
@@ -310,7 +321,7 @@ export function AiDesignStudio({ token, teamName, latestChangeRequest, initialVe
                         <div key={u} className="relative h-24 w-24">
                           <button
                             type="button"
-                            onClick={() => useInspiration(u, i)}
+                            onClick={() => selectInspiration(u, i)}
                             title="Use as the reference image"
                             className={`h-full w-full rounded overflow-hidden border-2 bg-white ${inspoIdx === i ? "border-brand ring-1 ring-brand" : "border-line hover:border-brand/60"}`}
                           >
