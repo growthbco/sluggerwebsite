@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { categories } from "@/lib/sample-data";
+import { heroPhoto } from "@/lib/gallery";
 import { SystemSection, Reviews, AboutBand, FaqTeaser } from "@/components/home-extras";
 import { RecentDesigns } from "@/components/recent-designs";
 
@@ -15,13 +16,6 @@ export const metadata = {
 // dynamic on every request.
 export const revalidate = 600;
 
-const HERO_SPORTS = [
-  { href: "/custom-baseball-uniforms", label: "Baseball", image: "/sports/generated/baseball-sa-catalog.png" },
-  { href: "/custom-basketball-uniforms", label: "Basketball", image: "/sports/generated/basketball-sa-catalog.png" },
-  { href: "/custom-cheer-uniforms", label: "Cheer", image: "/sports/generated/cheer-sa-catalog.png" },
-  { href: "/custom-volleyball-uniforms", label: "Volleyball", image: "/sports/generated/volleyball-sa-catalog.png" },
-];
-
 export default function Home() {
   return (
     <>
@@ -29,6 +23,20 @@ export default function Home() {
       {/* Hero                                                             */}
       {/* ---------------------------------------------------------------- */}
       <section className="relative bg-ink overflow-hidden">
+        {heroPhoto && (
+          <>
+            <Image
+              src={heroPhoto}
+              alt="Custom team uniforms and jerseys by Slugger Athletics"
+              fill
+              preload
+              sizes="100vw"
+              className="object-cover object-[center_25%]"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-ink via-ink/80 to-ink/25" />
+            <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-transparent to-transparent" />
+          </>
+        )}
         <div className="absolute inset-0 bg-grid opacity-60" />
         <div
           className="absolute inset-0 opacity-30"
@@ -37,7 +45,7 @@ export default function Home() {
               "radial-gradient(ellipse at 70% 30%, rgba(184,163,108,0.40), transparent 55%)",
           }}
         />
-        <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1.08fr_0.92fr] lg:py-24">
+        <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
           <div className="max-w-3xl">
             <span className="inline-block clip-slant bg-brand text-on-brand display text-xs px-3 py-1">
               Free Custom Designs · All Sports
@@ -82,28 +90,6 @@ export default function Home() {
                 See our recent work →
               </Link>
             </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3" aria-label="Custom uniform examples by sport">
-            {HERO_SPORTS.map((sport, index) => (
-              <Link
-                key={sport.href}
-                href={sport.href}
-                className="group relative aspect-square overflow-hidden border border-brand/35 bg-[#f4f1e9] shadow-2xl shadow-black/20"
-              >
-                <Image
-                  src={sport.image}
-                  alt={`Custom black and gold ${sport.label.toLowerCase()} uniform by Slugger Athletics`}
-                  fill
-                  preload={index === 0}
-                  sizes="(max-width: 1024px) 50vw, 22vw"
-                  className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                />
-                <span className="absolute bottom-2 left-2 bg-ink/90 px-2.5 py-1 display text-[10px] text-foreground sm:text-xs">
-                  {sport.label} →
-                </span>
-              </Link>
-            ))}
           </div>
         </div>
       </section>
