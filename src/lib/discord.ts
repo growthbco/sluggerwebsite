@@ -1,7 +1,7 @@
 // Posts new orders to Discord via an incoming webhook (no bot to host).
 // Used for paid Shop/Buy-In orders (#orders) and custom projects in the
 // Design Requests forum.
-import { itemLabel, notDesignerMade } from "@/lib/order-items";
+import { itemLabel, notDesignerMade, sizeFieldsForItems, sizeValueForField } from "@/lib/order-items";
 
 const GOLD = 0xb8a36c;
 
@@ -190,6 +190,7 @@ type RosterRow = {
   // right artwork to the right size without hunting through notes.
   design?: string;
   notes?: string;
+  quantity?: number;
 };
 
 type TeamOrderPayload = {
@@ -198,6 +199,7 @@ type TeamOrderPayload = {
   contactName: string;
   contactEmail?: string;
   contactPhone?: string;
+  sport?: string;
   jerseyStyle?: string;
   jerseyMaterial?: string;
   items?: string[];
@@ -212,6 +214,27 @@ type TeamOrderPayload = {
   whiteLabel?: boolean;
 };
 
+function designerRosterText(order: Pick<TeamOrderPayload, "items" | "sport" | "roster">): string {
+  const itemKeys = (order.items?.length ? order.items : ["jersey"]).filter((key) => !notDesignerMade(key));
+  const sizeFields = sizeFieldsForItems(itemKeys, order.sport);
+  return order.roster
+    .filter((row) => row.name || row.number || row.size || (row.sizes && Object.keys(row.sizes).length))
+    .map((row, index) => {
+      const sizeText = sizeFields
+        .map((field) => {
+          const value = sizeValueForField(field, row.sizes, row.size);
+          return value ? `${field.label}: ${value}` : null;
+        })
+        .filter(Boolean)
+        .join(" · ");
+      const design = row.design ? `**${row.design}** · ` : "";
+      const quantity = row.quantity && row.quantity > 1 ? ` ×${row.quantity}` : "";
+      const note = row.notes ? ` — ${row.notes}` : "";
+      return `${index + 1}. ${design}${row.name || "-"} · #${row.number || "-"} · ${sizeText || "-"}${quantity}${note}`;
+    })
+    .join("\n");
+}
+
 /** Announce a custom-order payment in its Design Requests forum thread. */
 export async function postTeamOrderPaidToDiscord(args: {
   reference: string;
@@ -221,6 +244,9 @@ export async function postTeamOrderPaidToDiscord(args: {
   designThreadId?: string | null;
   /** Extra lines appended under the amount (itemized add-on breakdown, etc.). */
   details?: string;
+  /** Final roster captured at the payment boundary. Customer edits are locked
+   * after this, so one snapshot replaces noisy per-row change alerts. */
+  finalRoster?: Pick<TeamOrderPayload, "items" | "sport" | "jerseyStyle" | "jerseyMaterial" | "roster">;
 }): Promise<boolean> {
   const designUrl = process.env.DISCORD_DESIGN_REQUESTS_WEBHOOK_URL;
   // Prefer the order's persistent project thread. A missing id opens a new
@@ -237,6 +263,13 @@ export async function postTeamOrderPaidToDiscord(args: {
   if (!url) return false;
   const amt = `$${(args.totalCents / 100).toFixed(2)}`;
   const isDeposit = args.stage === "deposit";
+  const finalRosterRaw = args.finalRoster ? designerRosterText(args.finalRoster) : "";
+  const finalRoster = finalRosterRaw.length > 3200
+    ? `${finalRosterRaw.slice(0, 3200)}\n…Open the order for the remaining rows.`
+    : finalRosterRaw;
+  const rosterLock = finalRoster
+    ? `\n\n🔒 **FINAL ORDER SPEC — LOCKED FOR PRODUCTION**\n**Style:** ${args.finalRoster?.jerseyStyle || "-"}\n**Material:** ${args.finalRoster?.jerseyMaterial || "-"}\nCustomer edits are now closed. Use this roster snapshot for the print file:\n\n${finalRoster}`
+    : "";
   return send(url, {
     username: "Slugger Custom Orders",
     // Payments always ping - these gate production and shipping.
@@ -252,7 +285,8 @@ export async function postTeamOrderPaidToDiscord(args: {
           (isDeposit
             ? `Deposit received: **${amt}**. Clear to START production.`
             : `Balance received: **${amt}**. Clear to ship when ready.`) +
-          (args.details ? `\n\n${args.details}` : ""),
+          (args.details ? `\n\n${args.details}` : "") +
+          rosterLock,
         color: GOLD,
         timestamp: new Date().toISOString(),
       },
@@ -328,23 +362,8 @@ export async function postTeamOrderToDiscord(
   // the designer never needs to see them, so they're filtered out of this
   // production-facing post entirely.
   const itemKeys = (order.items?.length ? order.items : ["jersey"]).filter((k) => !notDesignerMade(k));
-
   // Production only needs: name / number / sizes per item (+ optional note). No prices.
-  const rows = order.roster
-    .filter((r) => r.name || r.number || r.size || (r.sizes && Object.keys(r.sizes).length))
-    .map((r, i) => {
-      const sizeStr = itemKeys
-        .map((k) => {
-          const v = r.sizes?.[k] ?? (k === "jersey" ? r.size : undefined);
-          return v ? `${itemLabel(k)}: ${v}` : null;
-        })
-        .filter(Boolean)
-        .join(" · ");
-      const note = r.notes ? ` - ${r.notes}` : "";
-      const designTag = r.design ? `**${r.design}** · ` : "";
-      return `${i + 1}. ${designTag}${r.name || "-"} · #${r.number || "-"} · ${sizeStr || "-"}${note}`;
-    })
-    .join("\n");
+  const rows = designerRosterText(order);
 
   // NOTE: customer contact (email/phone) is intentionally NOT posted here - this
   // channel is designer/production-facing, and the business already has the
@@ -453,7 +472,7 @@ export async function postDesignRequestToDiscord(req: DesignRequestPayload): Pro
   if (needed) {
     fields.push({
       name: req.rush ? "Needed by 🚨 RUSH" : "Needed by",
-      value: req.rush ? `${needed} - within 2 weeks (flat $100 rush fee; confirm timeline)` : needed,
+      value: req.rush ? `${needed} - inside standard 3-week window (confirm rush or priority before promising)` : needed,
       inline: true,
     });
   }
@@ -476,7 +495,7 @@ export async function postDesignRequestToDiscord(req: DesignRequestPayload): Pro
     // confirm the timeline and final rush fee before design starts.
     ...(req.rush
       ? {
-          content: `@here # 🚨🚨 RUSH ORDER 🚨🚨\n**Needed by ${fmtNeededBy(req.neededBy ?? null) ?? "ASAP"}. Rush is a flat $100 fee and ships direct. DO NOT promise the date until staff approves it on the manage page.**`,
+          content: `@here # 🚨🚨 EXPEDITED DATE REVIEW 🚨🚨\n**Needed by ${fmtNeededBy(req.neededBy ?? null) ?? "ASAP"}. Two-week rush is $100; deadlines inside two weeks require a manual priority quote. DO NOT promise the date until the full timeline is approved.**`,
           allowed_mentions: { parse: ["everyone"] },
         }
       : {}),
@@ -549,6 +568,7 @@ export async function postInvoiceToDiscord(inv: {
   dutyFlag: boolean;
   anyQtyMismatch: boolean;
   anyDoubleBill: boolean;
+  paymentBlockers?: string[];
   lineCount: number;
   adminUrl: string;
 }): Promise<{ ok: boolean; threadId?: string }> {
@@ -571,9 +591,13 @@ export async function postInvoiceToDiscord(inv: {
 
   const money = (c: number) => `$${(c / 100).toFixed(2)}`;
   const flags: string[] = [];
-  if (inv.anyDoubleBill) flags.push("🛑 An order here was already billed on a prior invoice — do not pay twice");
-  if (inv.dutyFlag) flags.push(`⚠️ Duty ${(inv.dutyBps / 100).toFixed(1)}% is outside the normal 15-19% range`);
-  if (inv.anyQtyMismatch) flags.push("⚠️ A quantity does not match our records");
+  if (inv.paymentBlockers?.length) {
+    flags.push(...inv.paymentBlockers.map((blocker) => `🛑 ${blocker}`));
+  } else {
+    if (inv.anyDoubleBill) flags.push("🛑 An order here was already billed on a prior invoice — do not pay twice");
+    if (inv.dutyFlag) flags.push(`⚠️ Duty ${(inv.dutyBps / 100).toFixed(1)}% is outside the normal 15-19% range`);
+    if (inv.anyQtyMismatch) flags.push("⚠️ A quantity does not match our records");
+  }
 
   const fields = [
     { name: "Goods", value: money(inv.subtotalCents), inline: true },

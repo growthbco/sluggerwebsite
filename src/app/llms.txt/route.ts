@@ -40,7 +40,7 @@ export function GET() {
 - Text: (352) 414-7270
 - Email: apparel@sluggerathletics.com
 - Location: Ocala, Florida
-- Order flow: free design mockup, then a 50% deposit starts production and the balance is due before shipping. Most orders ship 2-3 weeks after approval; rush is about a week.
+- Order flow: free design mockup, then the production clock starts after final design approval, final roster submission, and deposit payment. Standard production is 3 weeks; confirmed $100 rush targets 2 weeks; shipping time is additional. Shorter deadlines require a custom priority review.
 
 ${sections}
 

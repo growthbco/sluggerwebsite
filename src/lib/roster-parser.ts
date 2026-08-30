@@ -3,7 +3,7 @@
 // is ALWAYS reviewed by the coach before it's saved - the AI only fills the
 // grid, it never submits.
 
-import { sizesFor, itemLabel } from "@/lib/order-items";
+import { sizeFieldsForItems } from "@/lib/order-items";
 import { generateOpenAiStructured, type OpenAiInputPart } from "@/lib/openai-structured";
 
 export type ParsedRosterRow = {
@@ -28,11 +28,7 @@ export async function parseRoster(input: {
   const defs: ParseItemDef[] =
     input.itemDefs?.length
       ? input.itemDefs
-      : (input.itemKeys.length ? input.itemKeys : ["jersey"]).map((k) => ({
-          key: k,
-          label: itemLabel(k),
-          sizes: sizesFor(k),
-        }));
+      : sizeFieldsForItems(input.itemKeys);
   const items = defs.map((d) => d.key);
   const sizeRules = defs
     .map((d) => `  - "${d.key}" (${d.label}): allowed sizes are exactly: ${d.sizes.join(", ")}`)

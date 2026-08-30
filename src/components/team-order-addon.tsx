@@ -11,6 +11,7 @@ export function TeamOrderAddon({
   token,
   items,
   prices,
+  sport,
   designs = [],
   shipped,
   embedded = false,
@@ -18,6 +19,7 @@ export function TeamOrderAddon({
   token: string;
   items: string[];
   prices: Record<string, number>;
+  sport?: string | null;
   designs?: { label: string; image: string; sku?: string | null }[];
   shipped?: boolean;
   /** Rendered inside the "Add to this order" block on the roster tab: drop the
@@ -118,7 +120,7 @@ export function TeamOrderAddon({
           aria-label="Size"
         >
           <option value="">Pick a size</option>
-          {sizesFor(draft.key).map((s) => (
+          {sizesFor(draft.key, sport).map((s) => (
             <option key={s}>{s}</option>
           ))}
         </select>

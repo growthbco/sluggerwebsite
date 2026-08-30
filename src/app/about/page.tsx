@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { MANUFACTURING_COPY } from "@/lib/customer-policy";
 
 export const metadata: Metadata = {
   title: "About Slugger Athletics - Custom Uniforms Made in Ocala, FL",
   description:
-    "Slugger Athletics is an Ocala, Florida custom team-uniform shop - jerseys, hats, embroidery, and hype chains designed and produced in-house, with free design proofs and no per-color charges. Locally owned, shipping nationwide.",
+    "Slugger Athletics is an Ocala, Florida custom team-uniform shop offering in-house design and embroidery, trusted production partners, free proofs, and nationwide shipping.",
   alternates: { canonical: "/about" },
 };
 
@@ -32,9 +33,9 @@ export default function AboutPage() {
         <span className="display text-brand text-sm">Ocala, Florida · Ships Nationwide</span>
         <h1 className="display text-4xl sm:text-6xl text-foreground mt-2">About Slugger Athletics</h1>
         <p className="mt-5 text-lg text-muted max-w-2xl mx-auto">
-          We&apos;re a locally owned custom team-uniform shop in Ocala, Florida. We design and produce
-          custom jerseys, uniforms, embroidered hats, and 3D hype chains in-house - for youth,
-          travel, rec, school, and adult teams across Central Florida and around the country.
+          We&apos;re a locally owned custom team-uniform shop in Ocala, Florida. We design custom
+          jerseys and uniforms, embroider team hats in our shop, and coordinate quality production
+          for youth, travel, rec, school, and adult teams nationwide.
         </p>
       </section>
 
@@ -47,6 +48,7 @@ export default function AboutPage() {
             has been simple: make it easy for a coach or a team parent to get gear that looks like the
             big travel programs&apos; without the runaround, the hidden fees, or the guesswork.
           </p>
+          <p>{MANUFACTURING_COPY}</p>
           <p>
             Everything runs through our own in-house design team. You send a logo or just an idea, we
             send back a real mockup, and nothing goes to production until you approve exactly what you

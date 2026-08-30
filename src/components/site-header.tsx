@@ -11,15 +11,12 @@ import { SPORT_PAGES } from "@/lib/sport-pages";
 // entry points (Free Design + Team Order) live as buttons on the right so
 // they're the most obvious actions, not lost in a list of links.
 const nav = [
-  { href: "/", label: "Home" },
   { href: "/team-uniforms", label: "Uniforms" },
-  // Flag football is our fastest-growing search source, so it gets its own
-  // top-level link (a site-wide internal link into that page).
-  { href: "/custom-flag-football-uniforms", label: "Flag Football" },
-  { href: "/custom-hats", label: "Custom Hats" },
+  { href: "/#how-it-works", label: "How It Works" },
   { href: "/pricing", label: "Pricing" },
   { href: "/gallery", label: "Gallery" },
-  { href: "/contact", label: "Contact" },
+  { href: "/faq", label: "Support" },
+  { href: "/portal", label: "My Order" },
 ];
 
 // "Uniforms" expands into every sport page (plus the hub itself). Flag football
@@ -56,7 +53,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50">
       {/* Announcement bar */}
       <div className="bg-brand text-on-brand text-center text-xs sm:text-sm font-semibold tracking-wide py-2 px-4">
-        FALL DATES FILL FAST · ORDER EARLY · FLAT $100 RUSH SERVICE
+        3-WEEK STANDARD · 2-WEEK RUSH $100 · SHIPPING EXTRA
       </div>
 
       <div className="bg-ink/95 backdrop-blur border-b border-line">
@@ -118,15 +115,15 @@ export function SiteHeader() {
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <Link
                 href="/design"
-                className="hidden sm:inline-flex clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-xs sm:text-sm px-3 sm:px-5 py-2.5 transition-colors"
+                className="hidden min-h-11 sm:inline-flex items-center clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-xs sm:text-sm px-3 sm:px-5 py-2.5 transition-colors"
               >
                 Free Design
               </Link>
               <Link
                 href="/team-order"
-                className="hidden sm:inline-flex border border-brand/70 text-foreground hover:bg-brand/10 display text-xs sm:text-sm px-3 sm:px-5 py-2.5 transition-colors"
+                className="hidden min-h-11 sm:inline-flex items-center border border-brand/70 text-foreground hover:bg-brand/10 display text-xs sm:text-sm px-3 sm:px-5 py-2.5 transition-colors"
               >
-                Team Order
+                Build Roster
               </Link>
               <CartButton />
               {/* Hamburger - shown on anything below lg (covers mobile + tablet
@@ -135,7 +132,7 @@ export function SiteHeader() {
                 onClick={() => setOpen((v) => !v)}
                 aria-label="Open menu"
                 aria-expanded={open}
-                className="lg:hidden grid place-items-center h-10 w-10 border border-line text-foreground hover:bg-foreground/5"
+                className="lg:hidden grid place-items-center h-11 w-11 border border-line text-foreground hover:bg-foreground/5"
               >
                 <span className="sr-only">Menu</span>
                 {open ? (
@@ -159,15 +156,15 @@ export function SiteHeader() {
           <div className="sm:hidden flex gap-2 pb-3">
             <Link
               href="/design"
-              className="flex-1 text-center clip-slant bg-brand text-on-brand display text-xs px-3 py-2.5"
+              className="flex min-h-11 flex-1 items-center justify-center text-center clip-slant bg-brand text-on-brand display text-xs px-3 py-2.5"
             >
               Free Design
             </Link>
             <Link
               href="/team-order"
-              className="flex-1 text-center border border-brand/70 text-foreground display text-xs px-3 py-2.5"
+              className="flex min-h-11 flex-1 items-center justify-center text-center border border-brand/70 text-foreground display text-xs px-3 py-2.5"
             >
-              Team Order
+              Build Roster
             </Link>
           </div>
         </div>
@@ -192,7 +189,7 @@ export function SiteHeader() {
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close menu"
-                className="h-9 w-9 grid place-items-center border border-line hover:bg-foreground/5"
+                className="h-11 w-11 grid place-items-center border border-line hover:bg-foreground/5"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
@@ -238,7 +235,7 @@ export function SiteHeader() {
                 href="/team-order"
                 className="block text-center border border-brand/70 text-foreground display text-sm px-4 py-3"
               >
-                Start a Team Order
+                Already approved? Build your roster
               </Link>
             </div>
 

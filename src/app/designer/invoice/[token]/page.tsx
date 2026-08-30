@@ -43,6 +43,10 @@ export default async function DesignerInvoicePage({
     getEditableDesignerInvoices(),
     getPaidDesignerInvoices(),
   ]);
+  const expectedUnitByOrder = new Map<string, number>();
+  for (const order of billable) {
+    if (typeof order.unitCostCents === "number") expectedUnitByOrder.set(order.teamOrderId, order.unitCostCents);
+  }
   const editable: EditableInvoice[] = editableRows.map((inv) => ({
     id: inv.id,
     reference: inv.reference,
@@ -61,6 +65,7 @@ export default async function DesignerInvoicePage({
       unitCents: l.unitCents,
       teamOrderId: l.teamOrderId,
       ourQty: l.ourQty,
+      ourUnitCents: l.ourUnitCents ?? (l.teamOrderId ? expectedUnitByOrder.get(l.teamOrderId) : undefined),
     })),
   }));
   const paid: PaidInvoice[] = paidRows.map((inv) => ({

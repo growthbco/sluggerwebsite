@@ -3,10 +3,12 @@ import { waitUntil } from "@vercel/functions";
 import { autoInvoiceOnSubmit } from "@/lib/team-order-invoicing";
 import { dbEnabled } from "@/db";
 import { getByManageToken, getRoster, submitTeamOrder, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
-import { minPiecesForItems } from "@/lib/order-items";
+import { JERSEY_MATERIALS, minPiecesForItems } from "@/lib/order-items";
 import { postTeamOrderToDiscord } from "@/lib/discord";
 import { markOrdered, getById, approvedMockupImages } from "@/lib/design-requests";
 import { setThreadStageTag } from "@/lib/discord-bot";
+import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
+import { buildCustomerOrderSpec } from "@/lib/order-spec";
 
 export const runtime = "nodejs";
 
@@ -19,14 +21,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const { token } = await params;
 
   let deliveryTermsAccepted = false;
+  let specConfirmed = false;
   try {
     const body = await req.json();
     deliveryTermsAccepted = body.deliveryTermsAccepted === true;
+    specConfirmed = body.specConfirmed === true;
   } catch {
     // A missing/invalid body cannot count as an affirmative acceptance.
   }
   if (!deliveryTermsAccepted) {
     return NextResponse.json({ error: "Please accept the delivery and carrier-delay policy before submitting." }, { status: 400 });
+  }
+  if (!specConfirmed) {
+    return NextResponse.json({ error: "Please confirm the order specification before submitting." }, { status: 400 });
   }
 
   const order = await getByManageToken(token);
@@ -38,6 +45,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const roster = await getRoster(order.id);
   if (roster.length === 0) {
     return NextResponse.json({ error: "Add at least one player before submitting." }, { status: 400 });
+  }
+  if ((order.items ?? ["jersey"]).some((item) => item.includes("jersey")) && !JERSEY_MATERIALS.some((material) => material.key === order.jerseyMaterial)) {
+    return NextResponse.json({ error: "Choose and confirm the jersey material before submitting." }, { status: 400 });
   }
   // Elevated per-item minimums (e.g. cheer sets require 12). Default-6 items
   // aren't hard-blocked here, preserving existing jersey flows.
@@ -67,7 +77,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   }
 
   try {
-    await submitTeamOrder(order.id, new Date());
+    const preview = design
+      ? {
+          neededBy: design.neededBy,
+          colors: [design.colors?.trim(), (design.colorHexes ?? []).join(", ")].filter(Boolean).join(" · ") || null,
+          designs: approvedMockupImages(design).map((image, index) => ({
+            image,
+            label: (design.proofLabels?.[image] || `Design ${index + 1}`).trim(),
+          })),
+        }
+      : null;
+    const spec = buildCustomerOrderSpec(order, roster, preview, computeTeamOrderQuote(order, roster));
+    await submitTeamOrder(order.id, new Date(), spec);
     // Linked orders post into the design's existing thread (one project, one
     // thread); standalone orders get their own thread in the same forum.
     const discordThreadId = await ensureTeamOrderDiscordThread(order.id);
@@ -78,6 +99,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         contactName: order.contactName,
         contactEmail: order.contactEmail ?? undefined,
         contactPhone: order.contactPhone ?? undefined,
+        sport: order.sport ?? undefined,
         jerseyStyle: order.jerseyStyle ?? undefined,
         jerseyMaterial: order.jerseyMaterial ?? undefined,
         items: order.items ?? ["jersey"],

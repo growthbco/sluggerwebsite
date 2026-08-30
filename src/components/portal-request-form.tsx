@@ -56,8 +56,11 @@ export function PortalRequestForm() {
   }
 
   return (
-    <div className="bg-steel border border-line p-6">
-      <label className="display text-sm text-foreground">Your email</label>
+    <form
+      className="bg-steel border border-line p-6"
+      onSubmit={(event) => { event.preventDefault(); void submit(); }}
+    >
+      <label htmlFor="portal-email" className="display text-sm text-foreground">Your email</label>
       <p className="text-sm text-muted mt-1">
         {usePassword
           ? "Log in with the password you set on your portal."
@@ -65,28 +68,36 @@ export function PortalRequestForm() {
       </p>
       <div className="mt-3 flex flex-col gap-2">
         <input
+          id="portal-email"
+          name="email"
           type="email"
+          autoComplete="email"
+          required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !usePassword) submit(); }}
           placeholder="you@email.com"
-          className="w-full bg-ink border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+          className="min-h-11 w-full bg-ink border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
         />
         {usePassword && (
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-            placeholder="Your password"
-            className="w-full bg-ink border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-          />
+          <div>
+            <label htmlFor="portal-password" className="sr-only">Password</label>
+            <input
+              id="portal-password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Your password"
+              className="min-h-11 w-full bg-ink border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+            />
+          </div>
         )}
         <button
-          type="button"
-          onClick={submit}
+          type="submit"
           disabled={busy || !email.trim() || (usePassword && !password)}
-          className="rounded bg-brand hover:bg-brand-dark text-on-brand display px-6 py-2.5 disabled:opacity-50"
+          className="min-h-11 rounded bg-brand hover:bg-brand-dark text-on-brand display px-6 py-2.5 disabled:opacity-50"
         >
           {busy ? (usePassword ? "Logging in…" : "Sending…") : usePassword ? "Log in" : "Access my portal"}
         </button>
@@ -95,10 +106,10 @@ export function PortalRequestForm() {
       <button
         type="button"
         onClick={() => { setUsePassword(!usePassword); setErr(""); }}
-        className="mt-4 text-sm text-brand hover:underline"
+        className="mt-4 min-h-11 text-sm text-brand hover:underline"
       >
         {usePassword ? "← Email me a link instead (no password)" : "Have a password? Log in instead →"}
       </button>
-    </div>
+    </form>
   );
 }

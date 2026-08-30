@@ -319,6 +319,12 @@ export const orders = pgTable(
 
     subtotalCents: integer("subtotal_cents").notNull().default(0),
     shippingCents: integer("shipping_cents").notNull().default(0),
+    // Optional customer-funded XCover package protection. `value` is the
+    // merchandise value the customer chose to protect; `covered` is allocated
+    // across purchased Shippo labels (important when one order uses 2 boxes).
+    shippingProtectionCents: integer("shipping_protection_cents").notNull().default(0),
+    shippingProtectionValueCents: integer("shipping_protection_value_cents").notNull().default(0),
+    shippingProtectionCoveredCents: integer("shipping_protection_covered_cents").notNull().default(0),
     totalCents: integer("total_cents").notNull().default(0),
 
     // Stripe linkage
@@ -348,7 +354,7 @@ export const orders = pgTable(
     // Extra parcels beyond the first (a second box, a reship, hats shipping
     // on their own). Each carries its own tracking + label + emailed flag.
     additionalShipments: jsonb("additional_shipments").$type<
-      { trackingNumber: string; labelUrl?: string; carrier?: string; service?: string; transactionId?: string; at: string }[]
+      { trackingNumber: string; labelUrl?: string; carrier?: string; service?: string; transactionId?: string; insuredValueCents?: number; at: string }[]
     >(),
     shippedAt: timestamp("shipped_at", { withTimezone: true }),
     // Admin can hide a fulfilled/void shop or store order from the active list.
@@ -444,6 +450,19 @@ export const teamOrders = pgTable(
     // Which item types this order covers, e.g. ["jersey","pants","socks"].
     items: jsonb("items").$type<string[]>().default(["jersey"]),
     rushShipping: boolean("rush_shipping").notNull().default(false),
+    // Manual-order timeline override. Website orders derive their clock from
+    // approval + final roster + deposit; orders entered by staff must record
+    // these facts explicitly so a missing legacy timestamp never invents a
+    // customer promise.
+    manualEntryAt: timestamp("manual_entry_at", { withTimezone: true }),
+    timelineStartAt: timestamp("timeline_start_at", { withTimezone: true }),
+    turnaroundTier: text("turnaround_tier"), // standard | rush | priority
+    requestedInHandAt: timestamp("requested_in_hand_at", { withTimezone: true }),
+    customerDatePromised: boolean("customer_date_promised").notNull().default(false),
+    promisedInHandAt: timestamp("promised_in_hand_at", { withTimezone: true }),
+    // One-week Priority is never auto-priced. Staff must enter the premium
+    // amount when creating the manual order; it becomes a labeled quote line.
+    priorityFeeCents: integer("priority_fee_cents").notNull().default(0),
     // "Do players need a name on the back?" survey answer for the roster form.
     // Default true (most jerseys); auto-set false at provisioning for name-less
     // items like cheer sets. When false, the roster hides the name field so
@@ -521,6 +540,11 @@ export const teamOrders = pgTable(
     balanceInvoiceUrl: text("balance_invoice_url"),
     // Shipping charged to the customer on the final invoice (0 = local pickup).
     shippingChargedCents: integer("shipping_charged_cents"),
+    // Optional customer-funded XCover package protection. Coverage is offered
+    // on pay-in-full/final-balance links, then allocated across Shippo labels.
+    shippingProtectionCents: integer("shipping_protection_cents").notNull().default(0),
+    shippingProtectionValueCents: integer("shipping_protection_value_cents").notNull().default(0),
+    shippingProtectionCoveredCents: integer("shipping_protection_covered_cents").notNull().default(0),
     // Local order: customer picks up in Ocala - no shipping anywhere (admin
     // estimates, invoices, balance default all show pickup instead).
     localPickup: boolean("local_pickup").notNull().default(false),
@@ -556,7 +580,7 @@ export const teamOrders = pgTable(
     // Extra parcels beyond the first (a second box, a reship, hats shipping
     // on their own). Each carries its own tracking + label + emailed flag.
     additionalShipments: jsonb("additional_shipments").$type<
-      { trackingNumber: string; labelUrl?: string; carrier?: string; service?: string; transactionId?: string; at: string }[]
+      { trackingNumber: string; labelUrl?: string; carrier?: string; service?: string; transactionId?: string; insuredValueCents?: number; at: string }[]
     >(),
     shippedAt: timestamp("shipped_at", { withTimezone: true }),
     // When the post-delivery "how'd it turn out? leave a review" text went out
@@ -587,6 +611,11 @@ export const teamOrders = pgTable(
     // final roster submission (standard dates are estimates, rush must be
     // confirmed, and carrier delays are outside Slugger's control).
     deliveryTermsAcceptedAt: timestamp("delivery_terms_accepted_at", { withTimezone: true }),
+    // Immutable customer-facing summary accepted with the final roster. This
+    // preserves the exact material, artwork, sizes, service level and subtotal
+    // the coach reviewed even if catalog copy or pricing changes later.
+    specConfirmedAt: timestamp("spec_confirmed_at", { withTimezone: true }),
+    specSnapshot: jsonb("spec_snapshot").$type<import("@/lib/order-spec").CustomerOrderSpec>(),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -705,9 +734,9 @@ export const designRequests = pgTable(
     // "#000000"]). The free-form `colors` text still holds names/notes.
     colorHexes: jsonb("color_hexes").$type<string[]>().default([]),
 
-    // When the customer needs the uniforms in hand. Anything < 14 days triggers
-    // the rush flag: rush is a flat $100 fee (order ships direct), and staff
-    // must confirm the timeline before design work starts.
+    // When the customer wants the uniforms in hand. Anything inside the standard
+    // 3-week window triggers review: 2-week rush is $100, while shorter dates
+    // require a manually priced internal priority review.
     neededBy: timestamp("needed_by", { withTimezone: true }),
     rush: boolean("rush").notNull().default(false),
     // When the customer ticked the required "delivery dates are estimates and
@@ -745,6 +774,12 @@ export const designRequests = pgTable(
     inspirationImages: jsonb("inspiration_images").$type<string[]>().default([]),
     // Proof/mockup images uploaded by the designer.
     proofImages: jsonb("proof_images").$type<string[]>().default([]),
+    // Exact proof batch currently in front of the customer. Uploading a newer
+    // batch moves these URLs to supersededProofUrls and clears the old approval,
+    // so approval always belongs to an immutable file/version rather than the
+    // overall design request.
+    proofReviewUrls: jsonb("proof_review_urls").$type<string[]>().default([]),
+    supersededProofUrls: jsonb("superseded_proof_urls").$type<string[]>().default([]),
     // Optional human labels for proofs, keyed by image URL (e.g. "Practice
     // Jersey 1"), shown to staff and the client.
     proofLabels: jsonb("proof_labels").$type<Record<string, string>>().default({}),
@@ -795,6 +830,10 @@ export const designRequests = pgTable(
     // the last one went out. Capped so clients never get spammed.
     followUpsSent: integer("follow_ups_sent").notNull().default(0),
     lastFollowUpAt: timestamp("last_follow_up_at", { withTimezone: true }),
+    // Staff can temporarily park a quiet proof without archiving the customer.
+    // The shared follow-up policy resumes from the existing reminder round
+    // after this timestamp passes.
+    followUpSnoozedUntil: timestamp("follow_up_snoozed_until", { withTimezone: true }),
     // Internal SLA: last time we pinged the designer that this design has been
     // waiting with no first proof sent (>24h).
     designerRemindedAt: timestamp("designer_reminded_at", { withTimezone: true }),
@@ -1197,6 +1236,10 @@ export const designerInvoices = pgTable(
           teamOrderId?: string;
           orderRef?: string;
           ourQty?: number;
+          // Contract rate Slugger had on file when the invoice was submitted.
+          // Stored with the line so later price-list edits cannot hide an
+          // overcharge on an older invoice.
+          ourUnitCents?: number;
           // If this order was already billed on an earlier (non-void) invoice,
           // the ref it was billed on. Guards against paying for it twice.
           alreadyBilledOn?: string;

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { ITEM_TYPES, formatSize } from "@/lib/order-items";
+import { formatSize, missingCheerSizeLabels, sizeFieldsForItems } from "@/lib/order-items";
 
-export function SelfEntryForm({ token, items, designs = [], requiresNames = true }: { token: string; items: string[]; designs?: { label: string; image: string; sku?: string | null }[]; requiresNames?: boolean }) {
+export function SelfEntryForm({ token, items, sport, designs = [], requiresNames = true }: { token: string; items: string[]; sport?: string | null; designs?: { label: string; image: string; sku?: string | null }[]; requiresNames?: boolean }) {
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
   const [sizes, setSizes] = useState<Record<string, string>>({});
@@ -13,7 +13,7 @@ export function SelfEntryForm({ token, items, designs = [], requiresNames = true
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
 
-  const selected = ITEM_TYPES.filter((t) => (items.length ? items : ["jersey"]).includes(t.key));
+  const sizeFields = sizeFieldsForItems(items, sport);
   const inputCls =
     "w-full bg-steel border border-line px-3 py-2.5 text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none";
 
@@ -25,8 +25,9 @@ export function SelfEntryForm({ token, items, designs = [], requiresNames = true
   }
 
   const hasSize = Object.values(sizes).some(Boolean);
+  const missingCheerSizes = missingCheerSizeLabels(items, sizes);
   const needsDesign = designs.length > 1;
-  const canSubmit = hasSize && (!needsDesign || picked.length > 0);
+  const canSubmit = hasSize && missingCheerSizes.length === 0 && (!needsDesign || picked.length > 0);
 
   async function submit() {
     setStatus("sending");
@@ -97,16 +98,19 @@ export function SelfEntryForm({ token, items, designs = [], requiresNames = true
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3">
-        {selected.map((t) => (
-          <div key={t.key}>
-            <label className="display text-sm text-foreground">{t.label} Size *</label>
-            <select className={`mt-2 ${inputCls}`} value={sizes[t.key] ?? ""} onChange={(e) => setSize(t.key, e.target.value)}>
+        {sizeFields.map((field) => (
+          <div key={field.key}>
+            <label className="display text-sm text-foreground">{field.label} Size *</label>
+            <select className={`mt-2 ${inputCls}`} value={sizes[field.key] ?? ""} onChange={(e) => setSize(field.key, e.target.value)}>
               <option value="">Select</option>
-              {t.sizes.map((s) => <option key={s} value={s}>{formatSize(s)}</option>)}
+              {field.sizes.map((s) => <option key={s} value={s}>{formatSize(s)}</option>)}
             </select>
           </div>
         ))}
       </div>
+      {missingCheerSizes.length > 0 && hasSize && (
+        <p className="text-xs text-brand">Choose both a cheer top size and bottom size.</p>
+      )}
 
       <div>
         <label className="display text-sm text-foreground">Notes (optional)</label>

@@ -43,6 +43,7 @@ type ShippoRate = {
   provider: string;
   servicelevel: { name: string };
   estimated_days: number | null;
+  included_insurance_price?: string | null;
 };
 
 function parcelFor(weightOz: number) {
@@ -69,6 +70,7 @@ export type QuotedRate = {
   costCents: number;
   chargedCents: number;
   estimatedDays: number | null;
+  insuranceCostCents: number;
 };
 
 function toQuoted(r: ShippoRate): QuotedRate {
@@ -80,6 +82,7 @@ function toQuoted(r: ShippoRate): QuotedRate {
     costCents,
     chargedCents: Math.ceil((costCents * (1 + SHIPPING_MARGIN)) / 25) * 25,
     estimatedDays: r.estimated_days,
+    insuranceCostCents: Math.round(parseFloat(r.included_insurance_price ?? "0") * 100) || 0,
   };
 }
 
@@ -88,6 +91,7 @@ function toQuoted(r: ShippoRate): QuotedRate {
 export async function getRates(
   to: { zip: string; street1?: string; street2?: string; city?: string; state?: string; name?: string },
   weightOz: number,
+  insuranceValueCents = 0,
 ): Promise<QuotedRate[]> {
   if (!shippoEnabled()) throw new Error("SHIPPO_API_KEY not configured");
   const res = await fetch(`${API}/shipments/`, {
@@ -106,6 +110,11 @@ export async function getRates(
         country: "US",
       },
       parcels: [parcelFor(weightOz)],
+      // Omitting provider tells Shippo to use its recommended XCover policy
+      // rather than carrier-declared-value coverage.
+      ...(insuranceValueCents > 0
+        ? { extra: { insurance: { amount: (insuranceValueCents / 100).toFixed(2), currency: "USD" } } }
+        : {}),
       async: false,
     }),
   });
@@ -125,9 +134,10 @@ export async function getRates(
 export async function getLabelRates(
   to: { name: string; street1: string; street2?: string; city: string; state: string; zip: string },
   weightOz: number,
+  insuranceValueCents = 0,
 ): Promise<QuotedRate[]> {
   if (!labelReady()) throw new Error("Set SHIP_FROM_STREET (your ship-from address) before buying labels.");
-  return getRates(to, weightOz);
+  return getRates(to, weightOz, insuranceValueCents);
 }
 
 /** Cheapest ground charge for a ZIP + weight, with a monotonicity guard:
@@ -153,7 +163,7 @@ export async function quoteChargedShipping(
 }
 
 /** Buy the label for a previously quoted rate. Returns tracking + label PDF. */
-export async function buyLabel(rateId: string): Promise<{ trackingNumber: string; labelUrl: string; costCents: number; transactionId: string; provider: string; service: string }> {
+export async function buyLabel(rateId: string): Promise<{ trackingNumber: string; labelUrl: string; costCents: number; insuranceCostCents: number; transactionId: string; provider: string; service: string }> {
   if (!labelReady()) throw new Error("Set SHIP_FROM_STREET (your ship-from address) before buying labels.");
   const res = await fetch(`${API}/transactions/`, {
     method: "POST",
@@ -174,6 +184,7 @@ export async function buyLabel(rateId: string): Promise<{ trackingNumber: string
     trackingNumber: t.tracking_number,
     labelUrl: t.label_url,
     costCents: Math.round(parseFloat(t.rate?.amount ?? "0") * 100),
+    insuranceCostCents: Math.round(parseFloat(t.rate?.included_insurance_price ?? "0") * 100) || 0,
     transactionId: t.object_id,
     provider: t.rate?.provider ?? "",
     service: t.rate?.servicelevel?.name ?? "",

@@ -5,6 +5,7 @@ import {
   createDesignerInvoice,
   updateDesignerInvoice,
   reconcileInvoice,
+  getInvoicePaymentReview,
   setInvoiceThreadId,
   type DesignerInvoiceLineInput,
 } from "@/lib/designer-invoices";
@@ -18,6 +19,7 @@ export const runtime = "nodejs";
 async function pingInvoiceDiscord(inv: typeof designerInvoices.$inferSelect, edited = false) {
   try {
     const recon = reconcileInvoice(inv);
+    const paymentReview = await getInvoicePaymentReview(inv);
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const res = await postInvoiceToDiscord({
       reference: inv.reference + (edited ? " (edited)" : ""),
@@ -30,6 +32,7 @@ async function pingInvoiceDiscord(inv: typeof designerInvoices.$inferSelect, edi
       dutyFlag: recon.dutyFlag,
       anyQtyMismatch: recon.anyQtyMismatch,
       anyDoubleBill: recon.anyDoubleBill,
+      paymentBlockers: paymentReview.blockers,
       lineCount: inv.lines.length,
       adminUrl: `${SITE}/admin/invoices`,
     });
@@ -76,7 +79,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       designerName: body.designerName,
       lines,
       dutyCents: body.dutyCents ?? 0,
-      previousBalanceCents: body.previousBalanceCents ?? 0,
+      // Carryover balances are notes-only until Slugger verifies them. The
+      // vendor cannot add an unlinked amount directly to the payable total.
+      previousBalanceCents: 0,
       notes: body.notes,
       vendorRef: body.vendorRef,
       attachmentUrls: body.attachmentUrls,
@@ -120,7 +125,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ token:
       designerName: body.designerName,
       lines,
       dutyCents: body.dutyCents ?? 0,
-      previousBalanceCents: body.previousBalanceCents ?? 0,
+      previousBalanceCents: 0,
       notes: body.notes,
       vendorRef: body.vendorRef,
       attachmentUrls: body.attachmentUrls,

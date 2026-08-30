@@ -33,6 +33,28 @@ export async function archiveDiscordThread(threadId: string | null | undefined):
   }
 }
 
+/** Bring an archived thread back before posting or changing its forum tag.
+ *  Discord rejects tag updates on archived threads, so restores and customer
+ *  re-engagements explicitly reopen first. */
+export async function unarchiveDiscordThread(threadId: string | null | undefined): Promise<boolean> {
+  if (!threadId || !discordBotEnabled()) return false;
+  try {
+    const res = await fetch(`${API}/channels/${threadId}`, {
+      method: "PATCH",
+      headers: botHeaders(),
+      body: JSON.stringify({ archived: false, locked: false }),
+    });
+    if (!res.ok) {
+      console.error("Discord thread unarchive failed:", res.status, await res.text());
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("Discord thread unarchive error:", e);
+    return false;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Forum stage tags                                                    */
 /* ------------------------------------------------------------------ */
@@ -46,6 +68,7 @@ export const STAGE_TAGS = [
   "💰 Deposit Paid",
   "💸 Paid in Full",
   "🚚 Shipped",
+  "💤 Unresponsive",
 ] as const;
 export type StageTag = (typeof STAGE_TAGS)[number];
 
@@ -56,7 +79,7 @@ const botHeaders = () => ({
 
 /** Set a forum thread's stage tag (replacing any previous stage tag).
  *  Auto-creates the tag on the forum if it doesn't exist yet (needs the bot
- *  to have Manage Channels; without it, pre-create the six STAGE_TAGS on the
+ *  to have Manage Channels; without it, pre-create the STAGE_TAGS on the
  *  forum by hand once). Best-effort: never throws. */
 export async function setThreadStageTag(threadId: string | null | undefined, tag: StageTag): Promise<boolean> {
   if (!threadId || !discordBotEnabled()) return false;

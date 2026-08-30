@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
-import { dbEnabled } from "@/db";
+import { dbEnabled, getDb } from "@/db";
+import { teamOrders } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { createTeamOrder } from "@/lib/team-orders";
 import { getByStatusToken, findActiveDesignByEmail } from "@/lib/design-requests";
+import { JERSEY_MATERIALS } from "@/lib/order-items";
 
 export const runtime = "nodejs";
 
@@ -13,7 +16,7 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { teamName?: string; contactName?: string; contactEmail?: string; contactPhone?: string; smsConsent?: boolean; jerseyStyle?: string; jerseyMaterial?: string; items?: string[]; designToken?: string };
+  let body: { teamName?: string; contactName?: string; contactEmail?: string; contactPhone?: string; smsConsent?: boolean; sport?: string; jerseyStyle?: string; jerseyMaterial?: string; items?: string[]; designToken?: string };
   try {
     body = await req.json();
   } catch {
@@ -26,15 +29,19 @@ export async function POST(req: Request) {
   let contactName = body.contactName;
   let contactEmail = body.contactEmail;
   let contactPhone = body.contactPhone;
+  let sport = body.sport;
   let designRequestId: string | undefined;
   let discordThreadId: string | undefined;
   let rushFromDesign = false;
+  let trustedDesignToken = false;
   if (body.designToken) {
     const design = await getByStatusToken(body.designToken);
     if (design && design.status !== "cancelled") {
+      trustedDesignToken = true;
       designRequestId = design.id;
       discordThreadId = design.discordThreadId ?? undefined;
       rushFromDesign = Boolean(design.rush);
+      sport = design.sport ?? sport;
       if (design.status === "approved" || design.status === "ordered") {
         teamName = design.teamName;
         contactName = design.contactName;
@@ -52,6 +59,7 @@ export async function POST(req: Request) {
       designRequestId = design.id;
       discordThreadId = design.discordThreadId ?? undefined;
       rushFromDesign = Boolean(design.rush);
+      sport = design.sport ?? sport;
     }
   }
 
@@ -67,6 +75,21 @@ export async function POST(req: Request) {
     const existing = await getByDesignRequestId(designRequestId);
     const OPEN_UNPAID = ["draft", "collecting", "submitted", "quoted"];
     if (existing && OPEN_UNPAID.includes(existing.status) && !existing.depositPaidAt && !existing.invoicePaidAt) {
+      const selectedMaterial = JERSEY_MATERIALS.some((material) => material.key === body.jerseyMaterial)
+        ? body.jerseyMaterial
+        : undefined;
+      if (trustedDesignToken) {
+        await getDb()
+          .update(teamOrders)
+          .set({
+            sport: sport ?? existing.sport,
+            jerseyStyle: body.jerseyStyle ?? existing.jerseyStyle,
+            jerseyMaterial: selectedMaterial ?? existing.jerseyMaterial,
+            items: body.items?.length ? body.items : existing.items,
+            updatedAt: new Date(),
+          })
+          .where(eq(teamOrders.id, existing.id));
+      }
       const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
       return NextResponse.json({
         reference: existing.reference,
@@ -82,8 +105,11 @@ export async function POST(req: Request) {
       contactName,
       contactEmail,
       contactPhone,
+      sport,
       jerseyStyle: body.jerseyStyle,
-      jerseyMaterial: body.jerseyMaterial,
+      jerseyMaterial: JERSEY_MATERIALS.some((material) => material.key === body.jerseyMaterial)
+        ? body.jerseyMaterial
+        : undefined,
       items: body.items,
       designRequestId,
       discordThreadId,

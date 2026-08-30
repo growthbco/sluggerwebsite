@@ -42,6 +42,30 @@ export const products: CatalogProduct[] = (migrated as CatalogProduct[]).map((p)
   images: resolveImages(p),
 }));
 
+// The migrated WooCommerce export includes old private buy-ins and expired
+// seasonal/IP-themed drops. Keep those URLs available for prior customers, but
+// do not feature or index them as the current public catalog.
+const PUBLIC_PRODUCT_SLUGS = new Set([
+  "sa-cosmic-invaders-hoodie",
+  "cosmic-invaders-jersey",
+  "sa-teal-black-hoodie",
+  "sa-black-hoodie",
+  "sa-red-black-hoodie",
+  "vice-sa-hat",
+  "vice-city",
+  "sa-5-inch-inseam-shorts",
+  "military-jersey",
+  "90s-jersey",
+  "sunset-jersey",
+  "slugger-athletics-90s-themed-hat",
+  "custom-hype-chain",
+]);
+
+export const publicProducts = products.filter((product) => PUBLIC_PRODUCT_SLUGS.has(product.slug));
+export function isPublicProduct(product: CatalogProduct): boolean {
+  return PUBLIC_PRODUCT_SLUGS.has(product.slug);
+}
+
 export function primaryImage(p: CatalogProduct): string {
   return p.images[0]?.src ?? FALLBACK_IMG;
 }
@@ -55,17 +79,17 @@ export function getProduct(slug: string): CatalogProduct | undefined {
 }
 
 export function byCategory(cat: Category): CatalogProduct[] {
-  return products.filter((p) => p.category === cat);
+  return publicProducts.filter((p) => p.category === cat);
 }
 
 // Products whose names match Slugger's themed drop collections.
 export function featured(limit = 8): CatalogProduct[] {
-  return products.filter((p) => p.inStock).slice(0, limit);
+  return publicProducts.filter((p) => p.inStock).slice(0, limit);
 }
 
 const DROP_KEYWORDS = ["horror", "myers", "freddy", "pennywise", "jason", "neon", "christmas", "vice"];
 export function dropProducts(limit = 6): CatalogProduct[] {
-  return products
+  return publicProducts
     .filter((p) => DROP_KEYWORDS.some((k) => p.name.toLowerCase().includes(k)))
     .slice(0, limit);
 }

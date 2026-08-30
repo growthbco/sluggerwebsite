@@ -3,10 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProductGallery } from "@/components/product-gallery";
 import { ProductPurchase } from "@/components/product-purchase";
-import { getProduct, products, primaryImage, formatPrice } from "@/lib/catalog";
+import { getProduct, publicProducts, isPublicProduct, primaryImage, formatPrice } from "@/lib/catalog";
 
 export function generateStaticParams() {
-  return products.map((p) => ({ slug: p.slug }));
+  return publicProducts.map((p) => ({ slug: p.slug }));
 }
 
 export async function generateMetadata({
@@ -22,6 +22,7 @@ export async function generateMetadata({
     description: p.description?.slice(0, 155) || `${p.name} - custom gear from Slugger Athletics.`,
     alternates: { canonical: `/product/${p.slug}` },
     openGraph: { title: p.name, images: [primaryImage(p)] },
+    robots: isPublicProduct(p) ? undefined : { index: false, follow: false },
   };
 }
 
@@ -107,7 +108,7 @@ export default async function ProductPage({
           )}
 
           <div className="mt-4 flex items-center gap-2 text-sm text-muted">
-            <span className="text-brand">✓</span> Free custom design · 2-3 week turnaround
+            <span className="text-brand">✓</span> Free custom design · 3-week standard production
           </div>
 
           <div className="mt-7">

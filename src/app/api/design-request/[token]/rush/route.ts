@@ -18,6 +18,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (!request) return NextResponse.json({ error: "Link not found" }, { status: 404 });
   if (!request.rush) return NextResponse.json({ error: "This isn't a rush request." }, { status: 400 });
   if (request.rushApprovedAt) return NextResponse.json({ error: "Rush already approved." }, { status: 409 });
+  if (request.neededBy && request.neededBy.getTime() - Date.now() < 14 * 24 * 60 * 60 * 1000) {
+    return NextResponse.json({ error: "This date is inside two weeks. Quote and approve the internal priority upgrade manually." }, { status: 409 });
+  }
 
   let body: { name?: string } = {};
   try {
@@ -48,8 +51,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     }),
     postDesignThreadUpdate({
       threadId: request.discordThreadId ?? undefined,
-      title: `✅ RUSH approved by ${name} - ${request.teamName} (${request.reference})`,
-      description: `Timeline confirmed for **${neededStr}**. Rush is a flat $100 fee and ships direct. Client has been emailed.`,
+      title: `✅ TWO-WEEK RUSH approved by ${name} - ${request.teamName} (${request.reference})`,
+      description: `Two-week production service approved. Requested in-hand date: **${neededStr}**. Rush is a flat $100 fee; shipping time is additional. Client has been emailed.`,
     }),
   ]);
 

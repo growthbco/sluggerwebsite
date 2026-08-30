@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
-import { getBySelfEntryToken, addRosterRow } from "@/lib/team-orders";
+import { customerRosterLockMessage, getBySelfEntryToken, addRosterRow } from "@/lib/team-orders";
+import { missingCheerSizeLabels } from "@/lib/order-items";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   const order = await getBySelfEntryToken(token);
   if (!order) return NextResponse.json({ error: "Link not found" }, { status: 404 });
+  const lockMessage = customerRosterLockMessage(order);
+  if (lockMessage) return NextResponse.json({ error: lockMessage, code: "ROSTER_LOCKED" }, { status: 409 });
   if (!order.selfEntryOpen) {
     return NextResponse.json({ error: "This roster is closed - it's already been submitted." }, { status: 409 });
   }
@@ -28,6 +31,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const hasSize = body.sizes && Object.values(body.sizes).some(Boolean);
   if (!hasSize) {
     return NextResponse.json({ error: "Pick at least one size." }, { status: 400 });
+  }
+  if (missingCheerSizeLabels(order.items ?? ["jersey"], body.sizes).length) {
+    return NextResponse.json({ error: "Choose both a cheer top size and bottom size." }, { status: 400 });
   }
 
   // One jersey per selected design (same name/number/size). No design picked

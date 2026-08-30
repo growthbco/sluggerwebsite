@@ -66,9 +66,64 @@ export async function sendEmail({ to, subject, html, replyTo }: SendArgs): Promi
 }
 
 import { brandedEmail } from "@/lib/email-template";
+import {
+  formatRequestedDate,
+  formatTimelineDate,
+  type DeliveryTimeline,
+} from "@/lib/delivery-timeline";
 
 function esc(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function deliveryTimelineEmailHtml(timeline: DeliveryTimeline, localPickup = false): string {
+  if (!timeline.startAt || !timeline.selectedTargetAt) return "";
+  const targetLabel = localPickup ? "Pickup target" : "Ready-to-ship target";
+  return `
+    <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+      <tr><td style="padding:8px 12px;background:#f6f4ee;border-left:3px solid #b8a36c;color:#666;">Service level</td><td style="padding:8px 12px;background:#f6f4ee;text-align:right;"><strong>${esc(timeline.tierLabel)}</strong></td></tr>
+      <tr><td style="padding:8px 12px;background:#f6f4ee;border-left:3px solid #b8a36c;color:#666;">Production started</td><td style="padding:8px 12px;background:#f6f4ee;text-align:right;"><strong>${formatTimelineDate(timeline.startAt)}</strong></td></tr>
+      <tr><td style="padding:8px 12px;background:#f6f4ee;border-left:3px solid #b8a36c;color:#666;">${targetLabel}</td><td style="padding:8px 12px;background:#f6f4ee;text-align:right;"><strong>${formatTimelineDate(timeline.selectedTargetAt)}</strong></td></tr>
+      ${timeline.requestedInHandAt ? `<tr><td style="padding:8px 12px;background:#f6f4ee;border-left:3px solid #b8a36c;color:#666;">Requested in hand</td><td style="padding:8px 12px;background:#f6f4ee;text-align:right;">${formatRequestedDate(timeline.requestedInHandAt)}${timeline.promisedInHandAt ? "" : ` <span style="display:block;font-size:11px;color:#888;">request, not a confirmed date</span>`}</td></tr>` : ""}
+      ${timeline.promisedInHandAt ? `<tr><td style="padding:8px 12px;background:#fff8df;border-left:3px solid #b8a36c;color:#806d35;"><strong>Confirmed in-hand date</strong></td><td style="padding:8px 12px;background:#fff8df;text-align:right;"><strong>${formatRequestedDate(timeline.promisedInHandAt)}</strong></td></tr>` : ""}
+    </table>
+    <p style="margin:0 0 12px;font-size:13px;color:#666;">${localPickup ? "We will contact you when the order is ready for pickup in Ocala." : "The production target is when we expect your order to be ready to ship. Carrier transit comes afterward, and tracking will show the delivery estimate once the final package is on its way."}</p>
+  `;
+}
+
+export type OrderTimelineEmailContent = {
+  teamName: string;
+  reference: string;
+  timeline: DeliveryTimeline;
+  localPickup?: boolean;
+  manageUrl: string;
+};
+
+export function renderOrderTimelineConfirmation(args: OrderTimelineEmailContent): { subject: string; html: string } {
+  const target = formatTimelineDate(args.timeline.selectedTargetAt);
+  const action = args.localPickup ? "pickup" : "ready to ship";
+  return {
+    subject: `Your ${args.teamName} order timeline (${args.reference})`,
+    html: brandedEmail({
+      preheader: `Your order is currently expected to be ${action} by ${target}.`,
+      heading: "Your order timeline is set",
+      intro: `Order reference: <strong>${esc(args.reference)}</strong>`,
+      bodyHtml: `
+        <p style="margin:0 0 12px;">Here is the production and delivery information we have on file for <strong>${esc(args.teamName)}</strong>.</p>
+        ${deliveryTimelineEmailHtml(args.timeline, args.localPickup)}
+        <p style="margin:0;">You can return to your order page anytime for the latest status. We will also email tracking when the final package is on its way.</p>
+        ${portalLinkHtml}
+      `,
+      ctaText: "View order timeline",
+      ctaUrl: args.manageUrl,
+      footerNote: "Questions? Reply to this email or text (352) 414-7270",
+    }),
+  };
+}
+
+export async function emailOrderTimelineConfirmation(args: OrderTimelineEmailContent & { to: string }): Promise<boolean> {
+  const { subject, html } = renderOrderTimelineConfirmation(args);
+  return sendEmail({ to: args.to, subject, html, replyTo: CONTACT_INBOX });
 }
 
 /** Email the designer/business that a new design request came in. */
@@ -95,9 +150,9 @@ export async function emailDesignRequestToDesigner(req: {
     const d = typeof req.neededBy === "string" ? new Date(req.neededBy) : req.neededBy;
     if (!isNaN(d.getTime())) neededByStr = d.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" });
   }
-  const subjectPrefix = req.rush ? "🚨 RUSH " : "";
+  const subjectPrefix = req.rush ? "🚨 DATE REVIEW " : "";
   const bodyHtml = `
-    ${req.rush ? `<p style="background:#fff3cd;padding:10px 14px;border-left:4px solid #b8a36c;margin:0 0 16px;"><strong style="color:#13160b;">🚨 RUSH request:</strong> needed within 2 weeks. Rush is a flat $100 fee and ships direct. Approve the timeline BEFORE promising the date.</p>` : ""}
+    ${req.rush ? `<p style="background:#fff3cd;padding:10px 14px;border-left:4px solid #b8a36c;margin:0 0 16px;"><strong style="color:#13160b;">🚨 Expedited date review:</strong> this date is inside the standard three-week window. Two-week rush is $100; shorter deadlines require a manual priority quote. Approve the full timeline BEFORE promising the date.</p>` : ""}
     <p style="margin:0 0 10px;"><strong>Team:</strong> ${esc(req.teamName)} ${req.sport ? `(${esc(req.sport)})` : ""}</p>
     ${neededByStr ? `<p style="margin:0 0 10px;"><strong>Needed by:</strong> ${neededByStr}</p>` : ""}
     <p style="margin:0 0 10px;"><strong>Contact:</strong> ${esc(req.contactName)} · ${esc(req.contactEmail)}${req.contactPhone ? ` · ${esc(req.contactPhone)}` : ""}</p>
@@ -111,7 +166,7 @@ export async function emailDesignRequestToDesigner(req: {
     subject: `${subjectPrefix}New design request: ${req.teamName} - ${req.reference}`,
     html: brandedEmail({
       preheader: `${req.teamName} - ${req.reference}`,
-      heading: `${req.rush ? "🚨 RUSH · " : ""}New design request`,
+      heading: `${req.rush ? "🚨 DATE REVIEW · " : ""}New design request`,
       intro: `Reference: <strong>${esc(req.reference)}</strong>`,
       bodyHtml,
       ctaText: req.manageUrl ? "Open manage view" : undefined,
@@ -155,6 +210,9 @@ export async function emailPaymentReceived(args: {
   teamName: string;
   reference: string;
   stage: "deposit" | "balance";
+  timeline?: DeliveryTimeline;
+  localPickup?: boolean;
+  manageUrl?: string;
 }): Promise<boolean> {
   const dep = args.stage === "deposit";
   return sendEmail({
@@ -166,10 +224,11 @@ export async function emailPaymentReceived(args: {
       intro: `Reference: <strong>${esc(args.reference)}</strong>`,
       bodyHtml: `
         <p style="margin:0 0 12px;">We received your ${dep ? "50% deposit" : "payment"} for <strong>${esc(args.teamName)}</strong>. ${dep ? "Your order is now in production." : "Your order is paid in full."}</p>
+        ${args.timeline ? deliveryTimelineEmailHtml(args.timeline, args.localPickup) : ""}
         <p style="margin:0;">From your order portal you can check status and tracking, pay a balance, update your shipping address, or add players anytime.</p>
       `,
-      ctaText: "View my orders",
-      ctaUrl: `${SITE}/portal`,
+      ctaText: args.timeline ? "View order timeline" : "View my orders",
+      ctaUrl: args.manageUrl ?? `${SITE}/portal`,
       footerNote: "Track everything at sluggerathletics.com/portal · Text us at (352) 414-7270",
     }),
   });
@@ -226,6 +285,8 @@ export type TeamOrderInvoiceContent = {
   payFullCreditCents?: number;
   /** Order is local pickup in Ocala - no shipping is ever charged. */
   localPickup?: boolean;
+  /** Rush orders ship direct from production with no additional shipping fee. */
+  shippingIncludedWithRush?: boolean;
 };
 
 /** The invoice email as { subject, html } - shared by the actual send and the
@@ -269,7 +330,9 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
           ${
             args.shipCents && args.shipCents > 0
               ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping${args.shipBoxes && args.shipBoxes > 1 ? ` <span style="color:#8a8570;">(${args.shipBoxes} boxes - hats ship separately)</span>` : ""}</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;">${money(args.shipCents)}</td></tr>`
-              : args.localPickup
+              : args.shippingIncludedWithRush
+                ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Direct shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;color:#2e7d32;">included with Rush</td></tr>`
+                : args.localPickup
                 ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;color:#8a8570;">free local pickup in Ocala</td></tr>`
                 : isDeposit
                   ? `<tr><td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">Shipping</td><td style="padding:6px 14px;background:#f6f4ee;text-align:right;color:#8a8570;">added to your final invoice</td></tr>`
@@ -287,7 +350,9 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
         </table>
         ${
           isDeposit
-            ? args.localPickup
+            ? args.shippingIncludedWithRush
+              ? `<p style="margin:0 0 14px;font-size:13px;color:#666;">This order includes direct shipping from production as part of the Rush fee. No additional shipping charge will be added.</p>`
+              : args.localPickup
               ? `<p style="margin:0 0 14px;font-size:13px;color:#666;">This order is set for free local pickup at our Ocala shop - no shipping charges, ever. We'll let you know the moment it's ready to grab.</p>`
               : `<p style="margin:0 0 14px;font-size:13px;color:#666;">Why is shipping on the final invoice? Teams often add pieces while we're in production - extra jerseys, hats, a team hype chain. Charging shipping at the end means everything ships together and you pay the exact real rate, never an estimate. And if you pick up at our Ocala shop, shipping is simply $0.</p>`
             : ""
@@ -315,7 +380,7 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
         }
         ${
           isDeposit
-            ? `<p style="margin:0;">Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} plus tax and shipping is due before your order ships. You'll enter your <strong>shipping address</strong> on the payment page so we know exactly where your gear is headed. Questions or roster changes first? Just reply to this email.</p>
+            ? `<p style="margin:0;">${args.shippingIncludedWithRush ? `Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} plus tax is due before your order ships. Direct shipping is included with Rush, with no added shipping charge.` : `Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} plus tax and shipping is due before your order ships.`} You'll enter your <strong>shipping address</strong> on the payment page so we know exactly where your gear is headed. Questions or roster changes first? Just reply to this email.</p>
         <table style="width:100%;border-collapse:collapse;margin:18px 0 0;"><tr><td style="padding:14px 16px;background:#f6f4ee;border:1px solid #e6e0cf;border-left:3px solid #b8a36c;">
           <p style="margin:0 0 6px;font-weight:bold;color:#13160b;">🏆 Make it official: add a Custom Team Hype Chain</p>
           <p style="margin:0 0 8px;font-size:14px;color:#444;">The chain your players fight for after every big play - custom built in 3D to match your team's logo and colors. Chains start at $40 each (one-time $50 design file charge per design), and the mockup is free. Add one now and it ships right alongside your uniforms.</p>
@@ -331,7 +396,9 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
       `,
       ctaText: isDeposit ? "Pay your deposit" : "Pay the balance",
       ctaUrl: args.payUrl,
-      footerNote: "Standard 2-3 week turnaround · Free local pickup in Ocala",
+      footerNote: args.shippingIncludedWithRush
+        ? "Rush production: 2 weeks · Direct shipping included · Carrier transit follows production"
+        : "Standard production: 3 weeks · Shipping time additional · Free local pickup in Ocala",
     }),
   };
 }
@@ -439,6 +506,7 @@ export async function emailOrderShipped(args: {
   reference: string;
   trackingNumber: string;
   trackingUrl: string;
+  directFromProduction?: boolean;
 }): Promise<boolean> {
   return sendEmail({
     to: args.to,
@@ -450,6 +518,11 @@ export async function emailOrderShipped(args: {
       bodyHtml: `
         <p style="margin:0 0 12px;">Your custom gear just shipped. Track it here:</p>
         <p style="margin:0 0 12px;background:#f6f4ee;padding:12px 14px;border-left:3px solid #b8a36c;font-family:monospace;">${esc(args.trackingNumber)}</p>
+        ${args.directFromProduction ? `
+          <p style="margin:0 0 12px;background:#fff8df;padding:12px 14px;border-left:3px solid #b8a36c;">
+            This order is shipping directly from one of our production partners. Carrier tracking may display the shipment&apos;s origin facility or country. Slugger Athletics remains your point of contact for the order and any delivery questions.
+          </p>
+        ` : ""}
         <p style="margin:0 0 16px;">Once it lands, we'd love to see it on the field - tag us @sluggerathletics!</p>
         <p style="margin:0 0 6px;"><strong>Happy with your gear?</strong> A quick Google review helps our small shop more than you'd think.</p>
         <p style="margin:0 0 12px;font-size:13px;color:#555;">One sentence about what we made for you (jerseys, embroidered hats, the whole kit) helps other teams find us.</p>
@@ -535,7 +608,7 @@ export async function emailProofFollowUp(args: {
     args.neededBy && !isNaN(args.neededBy.getTime())
       ? args.neededBy.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric" })
       : null;
-  const isFinal = args.round >= 2;
+  const isFinal = args.round >= 3;
   return sendEmail({
     to: args.to,
     subject: isFinal
@@ -547,7 +620,7 @@ export async function emailProofFollowUp(args: {
       intro: `Reference: <strong>${esc(args.reference)}</strong>`,
       bodyHtml: `
         <p style="margin:0 0 12px;">Your custom design proof is ready and waiting for your review. Approve it and we move straight into production, or drop a pin on anything you'd like changed.</p>
-        ${deadline ? `<p style="margin:0 0 12px;">Heads up: you told us you need your gear by <strong>${deadline}</strong>. Production takes 2-3 weeks after approval, so a quick review keeps you on schedule.</p>` : ""}
+        ${deadline ? `<p style="margin:0 0 12px;">Heads up: you requested your gear in hand by <strong>${deadline}</strong>. Standard production is three weeks after final approval, final roster, and deposit, with shipping time additional. A quick review helps keep the order moving.</p>` : ""}
         <p style="margin:0;">Questions first? Just reply to this email or use the message box on your design page.</p>
       `,
       ctaText: "Review your proof",
@@ -583,7 +656,8 @@ export async function emailDesignerMessage(args: {
   });
 }
 
-/** Rush timeline approved by staff: confirm the date + rush fee terms. */
+/** Two-week rush service approved by staff. The requested in-hand date remains
+ * separate from the production target unless it is explicitly confirmed. */
 export async function emailRushConfirmed(args: {
   to: string;
   teamName: string;
@@ -599,13 +673,13 @@ export async function emailRushConfirmed(args: {
     to: args.to,
     subject: `🚨 Rush confirmed - ${args.teamName} (${args.reference})`,
     html: brandedEmail({
-      preheader: `We can meet your date. Here's how your rush order works.`,
-      heading: `Your rush timeline is confirmed`,
+      preheader: `Your two-week rush service has been approved.`,
+      heading: `Your rush service is confirmed`,
       intro: `Reference: <strong>${esc(args.reference)}</strong>`,
       bodyHtml: `
-        <p style="margin:0 0 12px;">${args.approvedBy ? `${esc(args.approvedBy)} at Slugger` : "Our team"} reviewed your deadline and we can have your order in hand by <strong>${esc(date)}</strong>.</p>
-        <p style="margin:0 0 12px;">Rush orders get priority production and ship direct to you. Rush is a flat <strong>$100</strong> fee and will appear on your invoice.</p>
-        <p style="margin:0;">To keep the timeline, please approve your design and pay the deposit as soon as they're ready - the clock starts there.</p>
+        <p style="margin:0 0 12px;">${args.approvedBy ? `${esc(args.approvedBy)} at Slugger` : "Our team"} approved two-week rush production for your order. Your requested in-hand date is <strong>${esc(date)}</strong>.</p>
+        <p style="margin:0 0 12px;">Rush is a flat <strong>$100</strong> fee and will appear on your invoice. The two-week production clock starts only after your final design, final roster, and deposit are complete.</p>
+        <p style="margin:0;">Direct shipping from production is included in the Rush fee, so there is no additional shipping charge. Carrier transit follows the production window, and delivery dates are estimates. We will send tracking when the final package is on its way.</p>
       `,
       ctaText: "View your design",
       ctaUrl: args.statusUrl,
@@ -649,7 +723,7 @@ export async function emailOrderConfirmation(args: {
           </tr>
         </table>
         ${args.shipping ? `<p style="margin:0 0 12px;"><strong>Ships to:</strong><br>${esc(args.shipping).replace(/\n/g, "<br>")}</p>` : ""}
-        <p style="margin:0;">Custom gear is made to order - standard turnaround is <strong>2-3 weeks</strong>. We'll email you again when your order ships. Questions in the meantime? Just reply to this email.</p>
+        <p style="margin:0;">Custom gear is made to order. Standard production is <strong>three weeks</strong> after final design approval, final roster submission, and deposit payment. Shipping time is additional. We'll email you again when your order ships.</p>
         ${welcomeHtml}
         ${portalLinkHtml}
       `,

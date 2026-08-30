@@ -3,8 +3,7 @@ import { healMissingSheets } from "@/lib/design-lab-assets";
 import { dbEnabled } from "@/db";
 import {
   findProofFollowUpCandidates,
-  recordFollowUp,
-  MAX_FOLLOW_UPS,
+  findProofCloseoutCandidates,
   findInvoiceReminderCandidates,
   recordInvoiceReminder,
   MAX_INVOICE_REMINDERS,
@@ -25,8 +24,10 @@ import {
   recordReorderPrompt,
 } from "@/lib/follow-ups";
 import { getOrCreateCustomer } from "@/lib/customers";
-import { emailProofFollowUp, emailInvoiceReminder } from "@/lib/email";
+import { emailInvoiceReminder } from "@/lib/email";
 import { sendFollowUpSms, smsIfConsented } from "@/lib/sms";
+import { sendProofFollowUp } from "@/lib/proof-follow-up";
+import { markDesignUnresponsive } from "@/lib/design-requests";
 import { sendTeamOrderInvoice } from "@/lib/team-order-invoicing";
 import { postDesignThreadUpdate } from "@/lib/discord";
 import { getDb } from "@/db";
@@ -38,9 +39,9 @@ import { ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Daily Vercel Cron (see vercel.json). Sends up to MAX_FOLLOW_UPS reminder
-// emails to clients who haven't reviewed a sent proof. ?dryRun=1 lists who
-// WOULD be nudged without sending anything.
+// Daily Vercel Cron (see vercel.json). Sends proof reminders on days 2, 5,
+// and 10; day 14 moves still-quiet requests to Unresponsive. ?dryRun=1 lists
+// what would happen without sending or archiving anything.
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.get("authorization");
@@ -54,21 +55,6 @@ export async function GET(req: Request) {
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
   const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
-  // A rotating set of daily proof-nudge texts so a customer who gets one every
-  // day doesn't see the exact same message (reads as robotic + trips spam
-  // filters). No emoji, no dashes - matches our texting tone.
-  const proofText = (first: string, team: string, url: string, round: number): string => {
-    const variants = [
-      `Hi ${first}, this is Slugger Athletics. Your ${team} design proof is ready to look over. Approve it or ask for any changes here: ${url}. Happy to answer questions.`,
-      `Hi ${first}, just checking in on your ${team} proof. Whenever you have a minute, take a look and tell us what you think: ${url}`,
-      `Hi ${first}, your ${team} design is saved and ready to go. Approve it or request tweaks here: ${url}. We can start production as soon as you give the word.`,
-      `Hi ${first}, following up on the ${team} proof. If anything needs adjusting we are glad to help. Review it here: ${url}`,
-      `Hi ${first}, we do not want your ${team} order to stall. Your proof is waiting for approval here: ${url}. Reply here anytime with questions.`,
-      `Hi ${first}, still holding your ${team} design ready to print. Take a look when you can: ${url}`,
-    ];
-    return `${variants[(round - 1) % variants.length]}\nReply STOP to opt out.`;
-  };
-
   const results: { reference: string; team: string; round: number; sent?: boolean }[] = [];
   for (const c of candidates) {
     const round = c.followUpsSent + 1;
@@ -77,36 +63,32 @@ export async function GET(req: Request) {
       continue;
     }
     try {
-      const statusUrl = `${SITE}/design/status/${c.statusToken}`;
-      const first = (c.contactName || "").trim().split(/\s+/)[0] || "there";
-      // Text goes out EVERY day. Email only on the 1st and 4th nudge so we keep
-      // a paper trail without hammering their inbox daily (hurts deliverability).
-      const textSent = await sendFollowUpSms({ phone: c.contactPhone, body: proofText(first, c.teamName, statusUrl, round) });
-      let emailSent = false;
-      if (round === 1 || round === 4) {
-        emailSent = await emailProofFollowUp({
-          to: c.contactEmail,
-          teamName: c.teamName,
-          reference: c.reference,
-          statusUrl,
-          round,
-          neededBy: c.neededBy,
-        });
-      }
-      // Advance the cadence if we reached them on either channel.
-      if (textSent || emailSent) {
-        await recordFollowUp(c.id);
-        await postDesignThreadUpdate({
-          threadId: c.discordThreadId ?? undefined,
-          title: `Auto follow-up ${round}/${MAX_FOLLOW_UPS} - ${c.teamName} (${c.reference})`,
-          description: `Client hasn't acted on the proof sent ${c.proofSentAt.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" })}. Daily ${textSent ? "text" : ""}${textSent && emailSent ? " + email" : emailSent ? "email" : ""} reminder sent automatically.`,
-          username: "Slugger Design Requests",
-        });
-      }
-      results.push({ reference: c.reference, team: c.teamName, round, sent: textSent || emailSent });
+      const sent = await sendProofFollowUp(c, round);
+      results.push({ reference: c.reference, team: c.teamName, round, sent: sent.sent });
     } catch (e) {
       console.error(`Follow-up failed for ${c.reference}:`, e);
       results.push({ reference: c.reference, team: c.teamName, round, sent: false });
+    }
+  }
+
+  const closeoutCandidates = await findProofCloseoutCandidates();
+  const closeoutResults: { reference: string; team: string; archived?: boolean; reason?: string }[] = [];
+  for (const candidate of closeoutCandidates) {
+    if (dryRun) {
+      closeoutResults.push({ reference: candidate.reference, team: candidate.teamName });
+      continue;
+    }
+    try {
+      const closed = await markDesignUnresponsive(candidate.id);
+      closeoutResults.push({
+        reference: candidate.reference,
+        team: candidate.teamName,
+        archived: closed.ok,
+        reason: closed.reason,
+      });
+    } catch (error) {
+      console.error(`Unresponsive closeout failed for ${candidate.reference}:`, error);
+      closeoutResults.push({ reference: candidate.reference, team: candidate.teamName, archived: false, reason: "error" });
     }
   }
 
@@ -470,8 +452,9 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     dryRun,
-    count: results.length + invoiceResults.length + addonResults.length + stuckInvoiceResults.length + staleResults.length + inboundResults.length + aiLeadResults.length + referralResults.length + reorderResults.length + reviewResults.length + healedSheets.length,
+    count: results.length + closeoutResults.length + invoiceResults.length + addonResults.length + stuckInvoiceResults.length + staleResults.length + inboundResults.length + aiLeadResults.length + referralResults.length + reorderResults.length + reviewResults.length + healedSheets.length,
     results,
+    unresponsiveCloseouts: closeoutResults,
     addonNudges: addonResults,
     stuckInvoices: stuckInvoiceResults,
     invoiceReminders: invoiceResults,

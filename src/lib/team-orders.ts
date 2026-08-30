@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { eq, and, ne, asc, isNull, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrders, teamOrderRoster, designRequests } from "@/db/schema";
-import { notDesignerMade, defaultRequiresNames, fabricForStyle } from "@/lib/order-items";
+import { notDesignerMade, defaultRequiresNames, fabricForStyle, formatSize, itemLabel } from "@/lib/order-items";
+import type { CustomerOrderSpec } from "@/lib/order-spec";
 
 export type JerseyLine = {
   id: string;
@@ -19,6 +20,7 @@ export type NewTeamOrder = {
   contactName: string;
   contactEmail: string;
   contactPhone?: string;
+  sport?: string;
   jerseyStyle?: string;
   jerseyMaterial?: string;
   items?: string[];
@@ -27,6 +29,16 @@ export type NewTeamOrder = {
   discordThreadId?: string;
   // Inherited from a rush design request: flags the flat $100 rush fee.
   rushShipping?: boolean;
+  /** Explicit timeline facts for an order entered by staff rather than the
+   * customer workflow. All fields are validated together upstream. */
+  manualTimeline?: {
+    startAt: Date;
+    tier: "standard" | "rush" | "priority";
+    requestedInHandAt: Date;
+    customerDatePromised: boolean;
+    promisedInHandAt?: Date;
+    priorityFeeCents?: number;
+  };
   // Active SMS opt-in checked on the order form.
   smsOptIn?: boolean;
   // "Names on the back?" - defaults from the items (cheer -> No) when omitted.
@@ -42,6 +54,25 @@ export type RosterInput = {
   design?: string;
   quantity?: number;
 };
+
+type CustomerRosterLockable = {
+  status: string;
+  depositPaidAt?: Date | null;
+  invoicePaidAt?: Date | null;
+};
+
+/** Customer roster changes stop the instant production is funded. Keep this
+ * server-side and reuse it in every token-authenticated mutation so a stale
+ * browser tab cannot bypass the lock. Staff may still make an exceptional
+ * correction through the consolidated bulk-update path below. */
+export function customerRosterLockMessage(order: CustomerRosterLockable): string | null {
+  if (order.status === "cancelled") return "This order was cancelled, so its roster is locked.";
+  if (order.status === "shipped") return "This order has already shipped, so its roster is locked.";
+  if (order.depositPaidAt || order.invoicePaidAt || order.status === "in_production" || order.status === "paid") {
+    return "Your deposit has been received and production has started, so this roster is locked. Contact Slugger Athletics if an urgent correction is needed.";
+  }
+  return null;
+}
 
 function ref() {
   return `TO-${Date.now().toString(36).toUpperCase().slice(-6)}`;
@@ -63,6 +94,7 @@ export async function createTeamOrder(input: NewTeamOrder) {
       contactName: input.contactName,
       contactEmail: input.contactEmail,
       contactPhone: input.contactPhone,
+      sport: input.sport,
       jerseyStyle: input.jerseyStyle,
       // Never blanket-default to Mesh: if no fabric was chosen, derive it from
       // the style (button-front / zip = polyester, else mesh).
@@ -71,6 +103,13 @@ export async function createTeamOrder(input: NewTeamOrder) {
       designRequestId: input.designRequestId,
       discordThreadId: input.discordThreadId,
       rushShipping: input.rushShipping ?? false,
+      manualEntryAt: input.manualTimeline ? new Date() : undefined,
+      timelineStartAt: input.manualTimeline?.startAt,
+      turnaroundTier: input.manualTimeline?.tier,
+      requestedInHandAt: input.manualTimeline?.requestedInHandAt,
+      customerDatePromised: input.manualTimeline?.customerDatePromised ?? false,
+      promisedInHandAt: input.manualTimeline?.promisedInHandAt,
+      priorityFeeCents: input.manualTimeline?.priorityFeeCents ?? 0,
       requiresNames: input.requiresNames ?? defaultRequiresNames(input.items),
       smsOptInAt: input.smsOptIn ? new Date() : undefined,
       selfEntryToken,
@@ -87,6 +126,16 @@ export async function createTeamOrder(input: NewTeamOrder) {
 export async function setRequiresNames(orderId: string, requiresNames: boolean) {
   const db = getDb();
   await db.update(teamOrders).set({ requiresNames }).where(eq(teamOrders.id, orderId));
+}
+
+/** Customer-selected jersey fabric. This is deliberately editable only before
+ * payment; after the deposit the same production lock as roster edits applies. */
+export async function setJerseyMaterial(orderId: string, jerseyMaterial: string) {
+  const db = getDb();
+  await db
+    .update(teamOrders)
+    .set({ jerseyMaterial, updatedAt: new Date() })
+    .where(eq(teamOrders.id, orderId));
 }
 
 export async function getBySelfEntryToken(token: string) {
@@ -371,6 +420,78 @@ export async function updateRosterRow(teamOrderId: string, rowId: string, patch:
   return true;
 }
 
+export type BulkRosterUpdate = { rowId: string; patch: RosterInput };
+
+/** Staff-only bulk correction path. It validates every target first, applies
+ * all requested rows, resets print QA through updateRosterRow, then sends ONE
+ * consolidated Discord summary instead of one @here alert per jersey. */
+export async function updateRosterRowsBulkAndNotify(
+  teamOrderId: string,
+  updates: BulkRosterUpdate[],
+): Promise<{ updated: number; notified: boolean; summary: string[] }> {
+  if (!updates.length) return { updated: 0, notified: false, summary: [] };
+  const db = getDb();
+  const [order] = await db.select().from(teamOrders).where(eq(teamOrders.id, teamOrderId)).limit(1);
+  if (!order) throw new Error("Team order not found.");
+
+  const roster = await getRoster(teamOrderId);
+  const byId = new Map(roster.map((row) => [row.id, row]));
+  const uniqueIds = new Set(updates.map((update) => update.rowId));
+  if (uniqueIds.size !== updates.length) throw new Error("A roster row was included more than once.");
+  for (const update of updates) {
+    if (!byId.has(update.rowId)) throw new Error("A requested roster row does not belong to this order.");
+  }
+
+  const summary = updates.map(({ rowId, patch }) => {
+    const before = byId.get(rowId)!;
+    const who = [
+      before.playerNumber ? `#${before.playerNumber}` : before.playerName || "Player",
+      before.design ? `(${before.design})` : null,
+    ].filter(Boolean).join(" ");
+    const parts: string[] = [];
+    if (patch.playerName !== undefined && patch.playerName !== before.playerName) {
+      parts.push(`name: ${before.playerName || "-"} → ${patch.playerName || "-"}`);
+    }
+    if (patch.playerNumber !== undefined && patch.playerNumber !== before.playerNumber) {
+      parts.push(`number: #${before.playerNumber || "-"} → #${patch.playerNumber || "-"}`);
+    }
+    for (const [key, value] of Object.entries(patch.sizes ?? {})) {
+      const oldValue = before.sizes?.[key] ?? (key === "jersey" ? before.size : null);
+      if (value !== oldValue) parts.push(`${itemLabel(key)}: ${formatSize(oldValue)} → ${formatSize(value)}`);
+    }
+    if (patch.design !== undefined && patch.design !== before.design) {
+      parts.push(`design: ${before.design || "-"} → ${patch.design || "-"}`);
+    }
+    if (patch.notes !== undefined && patch.notes !== before.notes) parts.push("notes updated");
+    return `• **${who}** — ${parts.join(" · ") || "details reviewed"}`;
+  });
+
+  for (const update of updates) {
+    const ok = await updateRosterRow(teamOrderId, update.rowId, update.patch);
+    if (!ok) throw new Error("A roster row disappeared during the bulk update.");
+  }
+
+  const { postDesignThreadUpdate } = await import("@/lib/discord");
+  const threadId = await ensureTeamOrderDiscordThread(teamOrderId);
+  const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+  const fullDescription = [
+    `**${updates.length} roster ${updates.length === 1 ? "change" : "changes"} applied in one batch.** Use this summary instead of the earlier roster snapshot:`,
+    "",
+    ...summary,
+    "",
+    "Print-file QA was reset for every affected jersey. Update the print file and re-run verification before printing.",
+    `🔗 [Open order](${SITE}/team-order/manage/${order.manageToken})`,
+  ].join("\n");
+  const notified = await postDesignThreadUpdate({
+    threadId,
+    title: `⚠️ BULK ROSTER UPDATE — ${order.teamName} (${order.reference})`,
+    description: fullDescription.slice(0, 4000),
+    mention: true,
+    username: "Slugger Custom Orders",
+  });
+  return { updated: updates.length, notified, summary };
+}
+
 /** Coach removes a roster row. Scoped to the order. */
 export async function deleteRosterRow(teamOrderId: string, rowId: string): Promise<boolean> {
   const db = getDb();
@@ -409,6 +530,8 @@ export async function addRosterRow(teamOrderId: string, input: RosterInput, fill
 export type LinkedDesignPreview = {
   reference: string;
   status: string;
+  approvedAt: Date | null;
+  neededBy: Date | null;
   /** Approved image if status=approved, else most recent proof image. */
   imageUrl: string | null;
   /** True when the design hasn't been approved yet (we're showing latest proof). */
@@ -428,7 +551,8 @@ export async function getLinkedDesignPreview(designRequestId: string | null | un
   const [d] = await db.select().from(designRequests).where(eq(designRequests.id, designRequestId)).limit(1);
   if (!d) return null;
   const approved = d.approvedDesignUrl ?? null;
-  const latestProof = d.proofImages?.length ? d.proofImages[d.proofImages.length - 1] : null;
+  const currentProofs = d.proofReviewUrls?.length ? d.proofReviewUrls : d.proofImages ?? [];
+  const latestProof = currentProofs.length ? currentProofs[currentProofs.length - 1] : null;
   const colors = [d.colors?.trim(), (d.colorHexes ?? []).join(", ")].filter(Boolean).join(" · ") || null;
   // All approved colorways players can pick from - labeled from proofLabels
   // when set, otherwise "Design 1/2/…".
@@ -439,6 +563,8 @@ export async function getLinkedDesignPreview(designRequestId: string | null | un
   return {
     reference: d.reference,
     status: d.status,
+    approvedAt: d.approvedAt,
+    neededBy: d.neededBy,
     imageUrl: approved ?? latestProof,
     // "ordered" comes AFTER approval - it's still an approved design.
     pending: d.status !== "approved" && d.status !== "ordered",
@@ -487,11 +613,23 @@ export async function saveInboundTracking(
 /** Coach submits the order; records delivery-policy acceptance, locks
  * self-entry, and marks it submitted. Requiring the timestamp here prevents a
  * future submission path from silently skipping the acknowledgment. */
-export async function submitTeamOrder(teamOrderId: string, deliveryTermsAcceptedAt: Date) {
+export async function submitTeamOrder(
+  teamOrderId: string,
+  deliveryTermsAcceptedAt: Date,
+  specSnapshot: CustomerOrderSpec,
+) {
   const db = getDb();
   await db
     .update(teamOrders)
-    .set({ status: "submitted", selfEntryOpen: false, deliveryTermsAcceptedAt, submittedAt: new Date(), updatedAt: new Date() })
+    .set({
+      status: "submitted",
+      selfEntryOpen: false,
+      deliveryTermsAcceptedAt,
+      specConfirmedAt: new Date(),
+      specSnapshot,
+      submittedAt: new Date(),
+      updatedAt: new Date(),
+    })
     .where(eq(teamOrders.id, teamOrderId));
 }
 

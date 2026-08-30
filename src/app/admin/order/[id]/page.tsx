@@ -127,6 +127,9 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
               <tr className="text-muted"><td colSpan={2}>Sales tax</td><td className="text-right">{money(taxCents)}</td></tr>
             )}
             <tr className="text-muted"><td colSpan={2}>Shipping</td><td className="text-right">{o.shippingCents ? money(o.shippingCents) : "Free / pickup"}</td></tr>
+            {o.shippingProtectionCents > 0 && (
+              <tr className="text-green-400"><td colSpan={2}>Package protection (XCover)</td><td className="text-right">{money(o.shippingProtectionCents)}</td></tr>
+            )}
             {o.fundraiseCents > 0 && (
               <tr className="text-muted"><td colSpan={2}>Team fundraising portion</td><td className="text-right text-brand">{money(o.fundraiseCents)}</td></tr>
             )}
@@ -157,6 +160,11 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
           </Field>
           <Field label="Shipped">{o.shippedAt ? `${fmtDate(o.shippedAt)}` : "not yet"}</Field>
           <Field label="Tracking">{o.trackingNumber ?? "-"}</Field>
+          <Field label="Package protection">
+            {o.shippingProtectionCents > 0
+              ? `${money(o.shippingProtectionCoveredCents)} of ${money(o.shippingProtectionValueCents)} assigned to labels`
+              : "not purchased"}
+          </Field>
         </dl>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {paid && !o.shippedAt && !o.trackingNumber && <AdminLabelButton kind="order" id={o.id} who={o.customerName ?? o.reference} />}

@@ -29,11 +29,11 @@ export type StoreItem = {
 // store is created. Prices mirror src/lib/pricing.ts at snapshot time.
 export const STORE_ITEM_PRESETS: StoreItem[] = [
   { key: "round_neck_jersey", label: "Round-Neck Jersey", priceCents: 2800, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 10 },
-  { key: "v_neck_jersey", label: "V-Neck Jersey", priceCents: 2900, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 10 },
+  { key: "v_neck_jersey", label: "V-Neck Jersey", priceCents: 3000, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 10 },
   { key: "long_sleeve_shirt", label: "Long-Sleeve Shirt", priceCents: 3200, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 12 },
   { key: "two_button_jersey", label: "Two-Button Jersey", priceCents: 3200, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 11 },
   { key: "full_button_jersey", label: "Full-Button Jersey", priceCents: 3500, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 12 },
-  { key: "quarter_zip_jersey", label: "Quarter-Zip Jersey", priceCents: 3800, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 13 },
+  { key: "quarter_zip_jersey", label: "Quarter-Zip Jersey", priceCents: 4000, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 13 },
   { key: "reversible_basketball", label: "Reversible Basketball Uniform", priceCents: 8500, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 16 },
   { key: "practice_jersey", label: "Dry-Fit Practice Jersey", priceCents: 2000, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 10 },
   { key: "hoodie", label: "Heavyweight Hoodie", priceCents: 4000, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 24 },

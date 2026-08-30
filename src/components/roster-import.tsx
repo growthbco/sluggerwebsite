@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { DropZone, firstImageFile } from "@/components/drop-zone";
-import { sizesFor, itemLabel, formatSize } from "@/lib/order-items";
+import { formatSize, sizeFieldsForItems } from "@/lib/order-items";
 
 export type ImportedRow = {
   name: string;
@@ -19,17 +19,18 @@ export type ImportItemDef = { key: string; label: string; sizes: string[] };
 export function RosterImport({
   itemKeys,
   itemDefs,
+  sport,
   onConfirm,
   confirmLabel,
 }: {
   itemKeys: string[];
   /** Explicit item definitions (store items). Defaults to team-order types. */
   itemDefs?: ImportItemDef[];
+  sport?: string | null;
   onConfirm: (rows: ImportedRow[]) => Promise<void> | void;
   confirmLabel?: string;
 }) {
-  const defs: ImportItemDef[] =
-    itemDefs ?? itemKeys.map((k) => ({ key: k, label: itemLabel(k), sizes: sizesFor(k) }));
+  const defs: ImportItemDef[] = itemDefs ?? sizeFieldsForItems(itemKeys, sport);
   const [text, setText] = useState("");
   const [fileName, setFileName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -44,7 +45,9 @@ export function RosterImport({
       const form = new FormData();
       form.set("text", text);
       form.set("items", JSON.stringify(defs.map((d) => d.key)));
-      if (itemDefs) form.set("itemDefs", JSON.stringify(itemDefs));
+      // Send the exact sport-aware choices shown in the preview. Otherwise the
+      // parser falls back to the generic jersey scale and can discard AXS/YXS.
+      form.set("itemDefs", JSON.stringify(defs));
       const file = fileRef.current?.files?.[0];
       if (file) form.set("image", file);
       const res = await fetch("/api/roster/parse", { method: "POST", body: form });

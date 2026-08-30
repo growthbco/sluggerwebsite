@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-type Rate = { rateId: string; provider: string; service: string; costCents: number; estimatedDays: number | null };
+type Rate = { rateId: string; provider: string; service: string; costCents: number; estimatedDays: number | null; insuranceCostCents: number };
+type Protection = { selected: boolean; paidCents: number; valueCents: number; coveredCents: number; remainingCents: number };
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
@@ -57,6 +58,26 @@ export function AdminLabelButton({
   const [confirming, setConfirming] = useState<Rate | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [protection, setProtection] = useState<Protection | null>(null);
+  const [insuredValue, setInsuredValue] = useState("");
+
+  async function openModal() {
+    setOpen(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/label", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "details", kind, id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not load order details");
+      setProtection(data.protection);
+      setInsuredValue(data.protection.selected ? (data.protection.remainingCents / 100).toFixed(2) : "");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
 
   function reset() {
     setOpen(false);
@@ -64,6 +85,8 @@ export function AdminLabelButton({
     setRates([]);
     setConfirming(null);
     setError("");
+    setProtection(null);
+    setInsuredValue("");
   }
 
   async function getRates() {
@@ -78,11 +101,19 @@ export function AdminLabelButton({
       const res = await fetch("/api/admin/label", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "quote", kind, id, weightOz: Math.round(lb * 16) }),
+        body: JSON.stringify({
+          action: "quote",
+          kind,
+          id,
+          weightOz: Math.round(lb * 16),
+          insuredValueCents: Math.max(0, Math.round((parseFloat(insuredValue) || 0) * 100)),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not get rates");
       setRates(data.rates);
+      setProtection(data.protection);
+      setInsuredValue(data.insuredValueCents > 0 ? (data.insuredValueCents / 100).toFixed(2) : "0.00");
       setStep("rates");
     } catch (e) {
       setError((e as Error).message);
@@ -98,7 +129,14 @@ export function AdminLabelButton({
       const res = await fetch("/api/admin/label", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "buy", kind, id, rateId: rate.rateId, additional }),
+        body: JSON.stringify({
+          action: "buy",
+          kind,
+          id,
+          rateId: rate.rateId,
+          additional,
+          insuredValueCents: Math.max(0, Math.round((parseFloat(insuredValue) || 0) * 100)),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Purchase failed");
@@ -115,7 +153,7 @@ export function AdminLabelButton({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={openModal}
         className="text-xs display text-foreground border border-brand/50 px-2.5 py-1 hover:bg-brand/10 whitespace-nowrap"
       >
         {label ?? "Buy label"}
@@ -136,6 +174,36 @@ export function AdminLabelButton({
               {/* Step 1: weight */}
               {step === "weight" && (
                 <>
+                  {protection?.selected ? (
+                    <div className="border border-green-500/40 bg-green-500/5 p-3">
+                      <p className="display text-sm text-green-400">PACKAGE PROTECTION PURCHASED</p>
+                      <p className="mt-1 text-xs text-muted">
+                        Customer paid {money(protection.paidCents)} to protect {money(protection.valueCents)} of merchandise.
+                        {protection.coveredCents > 0 ? ` ${money(protection.coveredCents)} is already assigned to an earlier label.` : ""}
+                      </p>
+                      {protection.remainingCents > 0 ? (
+                        <label className="mt-3 block">
+                          <span className="text-xs text-foreground">Merchandise value inside this box</span>
+                          <div className="mt-1 flex items-center border border-line bg-steel focus-within:border-brand">
+                            <span className="pl-3 text-muted">$</span>
+                            <input
+                              value={insuredValue}
+                              onChange={(e) => setInsuredValue(e.target.value.replace(/[^0-9.]/g, ""))}
+                              inputMode="decimal"
+                              className="w-full bg-transparent px-2 py-2 text-foreground focus:outline-none"
+                            />
+                          </div>
+                          <span className="mt-1 block text-[11px] text-muted">
+                            Up to {money(protection.remainingCents)} remains. For two boxes, enter only this box&apos;s contents and leave the rest for the next label.
+                          </span>
+                        </label>
+                      ) : (
+                        <p className="mt-2 text-xs text-green-400">All purchased coverage is already assigned.</p>
+                      )}
+                    </div>
+                  ) : protection ? (
+                    <p className="border border-line px-3 py-2 text-xs text-muted">Customer did not add optional package protection.</p>
+                  ) : null}
                   <label className="block">
                     <span className="text-sm text-foreground">Package weight (pounds)</span>
                     <input
@@ -186,6 +254,7 @@ export function AdminLabelButton({
                       <span>
                         <span className="display text-sm text-foreground">{r.provider} {r.service}</span>
                         <span className="block text-xs text-muted mt-0.5">{arrivalLabel(r.estimatedDays, shipDate)}</span>
+                        {r.insuranceCostCents > 0 && <span className="block text-[11px] text-green-400 mt-0.5">Includes {money(r.insuranceCostCents)} XCover protection</span>}
                       </span>
                       <span className="display text-base text-foreground shrink-0">{money(r.costCents)}</span>
                     </button>
@@ -203,6 +272,9 @@ export function AdminLabelButton({
                     <p className="display text-foreground">{confirming.provider} {confirming.service}</p>
                     <p className="text-xs text-muted mt-0.5">{arrivalLabel(confirming.estimatedDays, shipDate)}</p>
                     <p className="display text-2xl text-foreground mt-2">{money(confirming.costCents)}</p>
+                    {confirming.insuranceCostCents > 0 && (
+                      <p className="text-xs text-green-400 mt-1">XCover attached for {money(Math.round((parseFloat(insuredValue) || 0) * 100))} of merchandise.</p>
+                    )}
                     <p className="text-xs text-muted mt-1">{additional ? "Charges your Shippo account and emails the customer this tracking right away as a second package." : "Charges your Shippo account and saves the label + tracking. The customer isn\u2019t emailed until you hit \u201cMark shipped.\u201d"}</p>
                   </div>
                   <button

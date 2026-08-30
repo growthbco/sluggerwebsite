@@ -45,7 +45,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (request.status === "approved" || request.status === "ordered") {
     return NextResponse.json({ ok: true, alreadyApproved: true });
   }
-  if (!request.proofImages?.length) {
+  const reviewProofs = request.proofReviewUrls?.length ? request.proofReviewUrls : request.proofImages ?? [];
+  if (!reviewProofs.length) {
     return NextResponse.json({ error: "There's no proof to approve yet." }, { status: 400 });
   }
 
@@ -56,9 +57,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   // Accept one or many selected proofs; keep only URLs that are real proofs.
   const requested = body.approvedUrls?.length ? body.approvedUrls : body.approvedUrl ? [body.approvedUrl] : [];
-  const valid = requested.filter((u) => request.proofImages!.includes(u));
+  const valid = requested.filter((u) => reviewProofs.includes(u));
   // Default to the most recent proof image if none specified/valid.
-  const approvedUrls = valid.length ? valid : [request.proofImages[request.proofImages.length - 1]];
+  const approvedUrls = valid.length ? valid : [reviewProofs[reviewProofs.length - 1]];
 
   try {
     await approveDesign(request.id, approvedUrls);
@@ -93,6 +94,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         contactName: request.contactName,
         contactEmail: request.contactEmail,
         contactPhone: request.contactPhone ?? undefined,
+        sport: request.sport ?? undefined,
         jerseyStyle: request.jerseyStyle ?? undefined,
         // Fabric follows the style (Full/Two Button + Quarter-Zip = polyester),
         // never a blanket Mesh default that mislabels button-front jerseys.

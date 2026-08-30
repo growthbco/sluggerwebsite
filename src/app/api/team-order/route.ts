@@ -2,10 +2,15 @@ import { NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { postTeamOrderToDiscord } from "@/lib/discord";
 import { setThreadStageTag } from "@/lib/discord-bot";
-import { dbEnabled } from "@/db";
+import { dbEnabled, getDb } from "@/db";
+import { teamOrders } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { getByStatusToken, findActiveDesignByEmail, markOrdered, approvedMockupImages } from "@/lib/design-requests";
 import { createTeamOrder, addRosterRow, submitTeamOrder, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { autoInvoiceOnSubmit } from "@/lib/team-order-invoicing";
+import { JERSEY_MATERIALS, missingCheerSizeLabels } from "@/lib/order-items";
+import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
+import { buildCustomerOrderSpec } from "@/lib/order-spec";
 
 export const runtime = "nodejs";
 
@@ -20,12 +25,14 @@ export async function POST(req: Request) {
     contactEmail?: string;
     contactPhone?: string;
     smsConsent?: boolean;
+    sport?: string;
     jerseyStyle?: string;
     jerseyMaterial?: string;
     items?: string[];
     roster?: RosterRow[];
     designToken?: string;
     deliveryTermsAccepted?: boolean;
+    specConfirmed?: boolean;
   };
   try {
     body = await req.json();
@@ -72,6 +79,9 @@ export async function POST(req: Request) {
   if (body.deliveryTermsAccepted !== true) {
     return NextResponse.json({ error: "Please accept the delivery and carrier-delay policy before submitting." }, { status: 400 });
   }
+  if (body.specConfirmed !== true) {
+    return NextResponse.json({ error: "Please confirm the order specification before submitting." }, { status: 400 });
+  }
   if (roster.length === 0) {
     return NextResponse.json({ error: "Add at least one player to the roster." }, { status: 400 });
   }
@@ -98,6 +108,15 @@ export async function POST(req: Request) {
   }
 
   const items = body.items?.length ? body.items : ["jersey"];
+  const selectedMaterial = JERSEY_MATERIALS.some((material) => material.key === body.jerseyMaterial)
+    ? body.jerseyMaterial
+    : undefined;
+  if (items.includes("jersey") && !selectedMaterial) {
+    return NextResponse.json({ error: "Choose and confirm the jersey material before submitting." }, { status: 400 });
+  }
+  if (roster.some((r) => missingCheerSizeLabels(items, r.sizes).length)) {
+    return NextResponse.json({ error: "Every cheer uniform needs both a top size and bottom size." }, { status: 400 });
+  }
 
   try {
     // 1. Persist: order + roster rows, then lock it as submitted.
@@ -114,6 +133,22 @@ export async function POST(req: Request) {
       existing && OPEN_UNPAID.includes(existing.status) && !existing.depositPaidAt && !existing.invoicePaidAt
         ? existing
         : null;
+    // The approval flow may have already provisioned a draft with a default
+    // material. When the customer later chooses Dry-Fit on the actual order
+    // form, carry that choice onto the reused record instead of silently
+    // keeping the earlier Mesh default.
+    if (reuse && body.designToken && design) {
+      await getDb()
+        .update(teamOrders)
+        .set({
+          sport: design.sport ?? body.sport ?? reuse.sport,
+          jerseyStyle: body.jerseyStyle ?? reuse.jerseyStyle,
+          jerseyMaterial: selectedMaterial ?? reuse.jerseyMaterial,
+          items,
+          updatedAt: new Date(),
+        })
+        .where(eq(teamOrders.id, reuse.id));
+    }
     const created = reuse
       ? { id: reuse.id, reference: reuse.reference, selfEntryToken: reuse.selfEntryToken!, manageToken: reuse.manageToken! }
       : await createTeamOrder({
@@ -121,8 +156,9 @@ export async function POST(req: Request) {
           contactName,
           contactEmail,
           contactPhone,
+          sport: design?.sport ?? body.sport,
           jerseyStyle: body.jerseyStyle,
-          jerseyMaterial: body.jerseyMaterial,
+          jerseyMaterial: selectedMaterial,
           items,
           designRequestId: design?.id,
           discordThreadId: design?.discordThreadId ?? undefined,
@@ -144,7 +180,26 @@ export async function POST(req: Request) {
         "coach",
       );
     }
-    await submitTeamOrder(created.id, new Date());
+    const persistedRoster = await (await import("@/lib/team-orders")).getRoster(created.id);
+    const [persistedOrder] = await getDb().select().from(teamOrders).where(eq(teamOrders.id, created.id)).limit(1);
+    if (!persistedOrder) throw new Error("Order disappeared before submission");
+    const designImages = design ? approvedMockupImages(design) : [];
+    const spec = buildCustomerOrderSpec(
+      persistedOrder,
+      persistedRoster,
+      design
+        ? {
+            neededBy: design.neededBy,
+            colors: [design.colors?.trim(), (design.colorHexes ?? []).join(", ")].filter(Boolean).join(" · ") || null,
+            designs: designImages.map((image, index) => ({
+              image,
+              label: (design.proofLabels?.[image] || `Design ${index + 1}`).trim(),
+            })),
+          }
+        : null,
+      computeTeamOrderQuote(persistedOrder, persistedRoster),
+    );
+    await submitTeamOrder(created.id, new Date(), spec);
     // Auto-invoice ONLY when the submitter proved they own this funnel by
     // presenting a valid design token. This endpoint is public and takes an
     // attacker-controlled teamName / email / phone; without the proof, auto-
@@ -192,8 +247,9 @@ export async function POST(req: Request) {
       contactName,
       contactEmail,
       contactPhone,
+      sport: design?.sport ?? body.sport,
       jerseyStyle: body.jerseyStyle,
-      jerseyMaterial: body.jerseyMaterial,
+      jerseyMaterial: selectedMaterial ?? reuse?.jerseyMaterial ?? undefined,
       items,
         designImages: design ? approvedMockupImages(design) : undefined,
         roster: roster.map((r) => ({

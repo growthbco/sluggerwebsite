@@ -12,6 +12,7 @@ type Props = {
   productTypes?: string[];
   status: string;
   proofImages: string[];
+  supersededProofImages?: string[];
   proofLabels?: Record<string, string>;
   initialApprovedUrl: string | null;
   approvedUrls?: string[];
@@ -36,6 +37,7 @@ export function DesignStatusPanel({
   productTypes = [],
   status,
   proofImages,
+  supersededProofImages = [],
   proofLabels = {},
   initialApprovedUrl,
   approvedUrls = [],
@@ -182,12 +184,22 @@ export function DesignStatusPanel({
               return (
                 <div
                   key={u}
-                  onClick={() => toggleSelect(u)}
-                  className={`group relative aspect-[4/3] bg-white border-2 overflow-hidden ${isApproved ? "" : "cursor-pointer"} ${
+                  className={`group relative aspect-[4/3] bg-white border-2 overflow-hidden ${
                     isSel ? "border-brand ring-2 ring-brand/40" : "border-line hover:border-brand/50"
                   }`}
                 >
                   <Image src={u} alt={proofLabels[u] || "Proof"} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-contain p-2" unoptimized />
+                  {!isApproved && (
+                    <button
+                      type="button"
+                      onClick={() => toggleSelect(u)}
+                      aria-pressed={isSel}
+                      aria-label={`${isSel ? "Deselect" : "Select"} ${proofLabels[u] || "proof"} for approval`}
+                      className="absolute inset-0 z-10 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand/70"
+                    >
+                      <span className="sr-only">{isSel ? "Selected" : "Not selected"}</span>
+                    </button>
+                  )}
                   {!isApproved && (
                     <span className={`absolute top-2 right-2 grid place-items-center h-7 w-7 display text-sm rounded-full border-2 ${isSel ? "bg-brand text-on-brand border-brand" : "bg-white/90 text-muted border-line"}`}>
                       {isSel ? "✓" : ""}
@@ -200,7 +212,7 @@ export function DesignStatusPanel({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setExpanded(u); }}
-                    className="absolute bottom-2 right-2 grid place-items-center h-8 w-8 bg-black/70 text-white rounded hover:bg-black/85"
+                    className="absolute bottom-2 right-2 z-20 grid place-items-center h-11 w-11 bg-black/70 text-white rounded hover:bg-black/85"
                     title="Enlarge"
                     aria-label="Enlarge proof"
                   >
@@ -211,6 +223,22 @@ export function DesignStatusPanel({
             })}
           </div>
         </section>
+      )}
+
+      {supersededProofImages.length > 0 && (
+        <details className="border border-line bg-foreground/[0.02]">
+          <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm text-muted">
+            View {supersededProofImages.length} superseded proof{supersededProofImages.length === 1 ? "" : "s"}
+          </summary>
+          <div className="grid gap-3 border-t border-line p-4 sm:grid-cols-3">
+            {supersededProofImages.map((url) => (
+              <button key={url} type="button" onClick={() => setExpanded(url)} className="relative aspect-[4/3] overflow-hidden border border-line bg-white opacity-70 hover:opacity-100">
+                <Image src={url} alt={`${proofLabels[url] || "Previous proof"} — superseded`} fill sizes="(max-width: 640px) 100vw, 33vw" className="object-contain p-2" unoptimized />
+                <span className="absolute bottom-2 left-2 bg-black/80 px-2 py-1 text-[11px] text-white">Superseded · do not approve</span>
+              </button>
+            ))}
+          </div>
+        </details>
       )}
 
       {hasProof && !isApproved && (

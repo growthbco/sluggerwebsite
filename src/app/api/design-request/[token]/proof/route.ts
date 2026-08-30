@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { getByManageToken, addProofImages, removeProofImage } from "@/lib/design-requests";
+import { customerRosterLockMessage, getByDesignRequestId } from "@/lib/team-orders";
 import { emailProofReady } from "@/lib/email";
 import { smsIfConsented } from "@/lib/sms";
 import { postDesignThreadUpdate } from "@/lib/discord";
@@ -16,6 +17,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const { token } = await params;
   const request = await getByManageToken(token);
   if (!request) return NextResponse.json({ error: "Link not found" }, { status: 404 });
+  const linkedOrder = await getByDesignRequestId(request.id);
+  const productionLock = linkedOrder ? customerRosterLockMessage(linkedOrder) : null;
+  if (productionLock) {
+    return NextResponse.json({ error: `A new proof cannot be sent after production is funded. ${productionLock}` }, { status: 409 });
+  }
 
   let body: { urls?: string[]; labels?: Record<string, string> };
   try {

@@ -27,8 +27,7 @@ const cols = [
     links: [
       { href: "/services", label: "All Services & Pricing" },
       { href: "/pricing", label: "Pricing" },
-      { href: "/track", label: "Track Order" },
-      { href: "/portal", label: "My Orders" },
+      { href: "/portal", label: "My Order & Tracking" },
       { href: "/faq", label: "FAQs" },
       { href: "/shipping", label: "Shipping & Delivery" },
       { href: "/returns", label: "Returns & Exchanges" },
@@ -52,8 +51,8 @@ export function SiteFooter() {
               className="h-12 w-auto"
             />
             <p className="mt-4 text-sm text-muted max-w-xs">
-              Your team&apos;s partner in performance. Custom uniforms, embroidered
-              hats, and hype chains - designed in-house, shipped fast.
+              Custom uniforms designed and quality-checked in Ocala, in-house
+              embroidery, and clear order tracking from proof to delivery.
             </p>
             {/* Push texting as the fastest way to reach us. */}
             <a

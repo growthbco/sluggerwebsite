@@ -2,10 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { SmsConsentNote } from "@/components/sms-consent";
-import { ITEM_TYPES, JERSEY_MATERIALS } from "@/lib/order-items";
+import { ITEM_TYPES, JERSEY_MATERIALS, fabricForStyle, missingCheerSizeLabels, sizeFieldsForItems } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
 import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-acknowledgment";
+import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
+import { buildCustomerOrderSpec } from "@/lib/order-spec";
+import { OrderSpecificationCard } from "@/components/order-specification-card";
 
 const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button", "Quarter-Zip"];
 
@@ -21,7 +24,10 @@ type Prefill = {
   contactPhone: string;
   approvedDesignUrl: string | null;
   items?: string[];
+  sport?: string | null;
   designJerseyStyle?: string | null;
+  rush?: boolean;
+  neededBy?: string | null;
   /** Approved colorways to choose from. >1 means the roster shows a per-row
    *  design picker (which artwork each player gets). */
   designs?: { label: string; image: string; sku?: string | null }[];
@@ -53,10 +59,10 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [contactPhone, setContactPhone] = useState(prefill?.contactPhone ?? "");
   // No design style specified -> leave blank rather than silently stamping
   // "Standard Crew Neck" on the order. Blank prices the same as crew neck.
-  const [jerseyStyle, setJerseyStyle] = useState(styleFromDesign(prefill?.designJerseyStyle) ?? "");
-  const [material, setMaterial] = useState(
-    (JERSEY_MATERIALS.find((m) => m.recommended) ?? JERSEY_MATERIALS[0]).key,
-  );
+  const initialJerseyStyle = styleFromDesign(prefill?.designJerseyStyle) ?? "";
+  const [jerseyStyle, setJerseyStyle] = useState(initialJerseyStyle);
+  const [material, setMaterial] = useState(fabricForStyle(initialJerseyStyle));
+  const [materialTouched, setMaterialTouched] = useState(false);
   // Orders from an approved design start with the items the design actually
   // covers (a hoodie design pre-selects hoodie, not the jersey default).
   const [items, setItems] = useState<string[]>(prefill?.items?.length ? prefill.items : ["jersey"]);
@@ -111,6 +117,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const perPlayerSelected = selected.filter((t) => !t.inHouse && !t.outsourced);
   const bulkSelected = selected.filter((t) => t.inHouse || t.outsourced);
   const perPlayerKeys = perPlayerSelected.map((t) => t.key);
+  const perPlayerSizeFields = sizeFieldsForItems(perPlayerKeys, prefill?.sport);
   const bulkRows = () =>
     bulkSelected.flatMap((t) =>
       t.sizes
@@ -120,6 +127,35 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   // Jersey style/material only apply when a jersey is actually being ordered
   // - a hoodie-only order must not carry a phantom jersey style.
   const hasJersey = items.includes("jersey");
+  const orderSetupComplete = items.length > 0 && (!hasJersey || Boolean(jerseyStyle && material));
+  const sizeGuideHref = /volleyball/i.test(prefill?.sport ?? "") ? "/size-guide#girls-volleyball" : "/size-guide#jerseys";
+  const submissionRoster = [
+    ...rows.map((row) => ({ ...row, quantity: 1 })),
+    ...bulkRows(),
+  ].filter((row) => row.name || row.number || Object.values(row.sizes).some(Boolean));
+  const submissionRosterForPricing = submissionRoster.map((row, index) => ({
+    id: `preview-${index}`,
+    playerName: row.name,
+    playerNumber: row.number,
+    sizes: row.sizes,
+    quantity: row.quantity,
+  }));
+  const submissionOrder = {
+    teamName,
+    items,
+    sport: prefill?.sport,
+    jerseyStyle: hasJersey ? jerseyStyle : null,
+    jerseyMaterial: hasJersey ? material : null,
+    rushShipping: prefill?.rush ?? false,
+    requestedInHandAt: prefill?.neededBy ? new Date(`${prefill.neededBy}T12:00:00`) : null,
+  };
+  const submissionQuote = computeTeamOrderQuote(submissionOrder, submissionRosterForPricing);
+  const submissionSpec = buildCustomerOrderSpec(
+    submissionOrder,
+    submissionRosterForPricing,
+    { designs, colors: null },
+    submissionQuote,
+  );
 
   async function submit() {
     if (!rosterAck || !deliveryAck) return;
@@ -129,12 +165,15 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const missing = rows.some((r) => (r.name || r.number || Object.keys(r.sizes).length) && !r.design);
       if (missing) { setStatus("error"); setMessage("This team has more than one design - pick which one each player gets."); return; }
     }
+    if (rows.some((r) => (r.name || r.number || Object.values(r.sizes).some(Boolean)) && missingCheerSizeLabels(items, r.sizes).length)) {
+      setStatus("error"); setMessage("Choose both a cheer top size and bottom size for every cheerleader."); return;
+    }
     setStatus("sending"); setMessage("");
     try {
       const res = await fetch("/api/team-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn, deliveryTermsAccepted: true }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn, deliveryTermsAccepted: true, specConfirmed: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
@@ -151,7 +190,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, designToken: prefill?.designToken, smsConsent: smsOptIn }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, designToken: prefill?.designToken, smsConsent: smsOptIn }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create link");
@@ -240,20 +279,20 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="display text-sm text-foreground">Team Name *</label>
-            <input className={`mt-2 ${inputCls}`} value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="e.g. Sandstorm" />
+            <label htmlFor="team-order-team-name" className="display text-sm text-foreground">Team Name *</label>
+            <input id="team-order-team-name" name="teamName" autoComplete="organization" required className={`mt-2 ${inputCls}`} value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="e.g. Sandstorm" />
           </div>
           <div>
-            <label className="display text-sm text-foreground">Your Name *</label>
-            <input className={`mt-2 ${inputCls}`} value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Coach / contact" />
+            <label htmlFor="team-order-contact-name" className="display text-sm text-foreground">Your Name *</label>
+            <input id="team-order-contact-name" name="contactName" autoComplete="name" required className={`mt-2 ${inputCls}`} value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Coach / contact" />
           </div>
           <div>
-            <label className="display text-sm text-foreground">Email{mode === "link" ? " *" : ""}</label>
-            <input className={`mt-2 ${inputCls}`} value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="email@team.com" />
+            <label htmlFor="team-order-email" className="display text-sm text-foreground">Email *</label>
+            <input id="team-order-email" name="contactEmail" type="email" autoComplete="email" required className={`mt-2 ${inputCls}`} value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="email@team.com" />
           </div>
           <div>
-            <label className="display text-sm text-foreground">Phone</label>
-            <input className={`mt-2 ${inputCls}`} value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(000) 000-0000" />
+            <label htmlFor="team-order-phone" className="display text-sm text-foreground">Phone</label>
+            <input id="team-order-phone" name="contactPhone" type="tel" autoComplete="tel" className={`mt-2 ${inputCls}`} value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(000) 000-0000" />
           </div>
           <div className="sm:col-span-2">
             <SmsConsentNote onChange={setSmsOptIn} />
@@ -264,12 +303,23 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       {/* Jersey style - editable in both flows; only relevant with a jersey */}
       {hasJersey && (
       <div>
-        <label className="display text-sm text-foreground">Jersey Style *</label>
-        <select className={`mt-2 ${inputCls}`} value={jerseyStyle} onChange={(e) => setJerseyStyle(e.target.value)}>
+        <label htmlFor="team-order-jersey-style" className="display text-sm text-foreground">Jersey Style *</label>
+        <select
+          id="team-order-jersey-style"
+          name="jerseyStyle"
+          required
+          className={`mt-2 ${inputCls}`}
+          value={jerseyStyle}
+          onChange={(event) => {
+            const nextStyle = event.target.value;
+            setJerseyStyle(nextStyle);
+            if (!materialTouched) setMaterial(fabricForStyle(nextStyle));
+          }}
+        >
           <option value="">Select a style</option>
           {JERSEY_STYLES.map((s) => (
             <option key={s} value={s}>
-              {s} — ${s === "V-Neck" ? 29 : s === "Two Button" ? 32 : s === "Full Button" ? 35 : s === "Quarter-Zip" ? 38 : 28}
+              {s} — ${s === "V-Neck" ? 30 : s === "Two Button" ? 32 : s === "Full Button" ? 35 : s === "Quarter-Zip" ? 40 : 28}
             </option>
           ))}
         </select>
@@ -279,15 +329,18 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       {/* Jersey material */}
       {hasJersey && (
       <div>
-        <label className="display text-sm text-foreground">Jersey Material</label>
+        <p className="display text-sm text-foreground">Jersey Material *</p>
+        <p className="mt-1 text-sm text-muted">Choose the fabric you expect to receive. You will confirm it again before submission.</p>
         <div className="mt-3 grid sm:grid-cols-2 gap-3">
           {JERSEY_MATERIALS.map((m) => {
             const on = material === m.key;
             return (
               <button
                 key={m.key}
-                onClick={() => setMaterial(m.key)}
-                className={`relative text-left p-4 border transition-colors ${on ? "border-brand bg-steel" : "border-line hover:border-brand/50"}`}
+                type="button"
+                onClick={() => { setMaterial(m.key); setMaterialTouched(true); }}
+                aria-pressed={on}
+                className={`relative min-h-11 text-left p-4 border transition-colors ${on ? "border-brand bg-steel" : "border-line hover:border-brand/50"}`}
               >
                 {m.recommended && (
                   <span className="absolute top-3 right-3 display text-[10px] uppercase tracking-wider text-on-brand bg-brand px-1.5 py-0.5">
@@ -305,7 +358,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
 
       {/* Item types */}
       <div>
-        <label className="display text-sm text-foreground">What is the team ordering?</label>
+        <p className="display text-sm text-foreground">What is the team ordering?</p>
         <p className="text-sm text-muted mt-1">Jersey is included by default - add any extras. Each player chooses their own items below (leave a size blank if they&apos;re not getting that item).</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {ITEM_TYPES.map((t) => {
@@ -313,8 +366,10 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
             return (
               <button
                 key={t.key}
+                type="button"
                 onClick={() => toggleItem(t.key)}
-                className={`clip-slant display text-sm px-4 py-2 transition-colors ${on ? "bg-brand text-on-brand" : "bg-steel border border-line text-foreground/80 hover:border-brand/50"}`}
+                aria-pressed={on}
+                className={`min-h-11 clip-slant display text-sm px-4 py-2 transition-colors ${on ? "bg-brand text-on-brand" : "bg-steel border border-line text-foreground/80 hover:border-brand/50"}`}
               >
                 {on ? "✓ " : "+ "}{t.label}
               </button>
@@ -331,7 +386,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
               <h2 className="display text-xl text-foreground">Roster</h2>
               <span className="text-sm text-muted">{filledRows.length} players</span>
             </div>
-            <p className="text-sm text-muted mt-1">A size for each item is all we need - name and number are optional (leave them blank for plain gear with no personalization). Names print in CAPS.</p>
+            <p className="text-sm text-muted mt-1">A size for each item is all we need - name and number are optional (leave them blank for plain gear with no personalization). Names print in CAPS. <a href={sizeGuideHref} target="_blank" className="text-brand underline underline-offset-2">Open the right size guide ↗</a></p>
 
             {needsDesign && hasJersey && (
               <div className="mt-3 bg-steel border border-brand/40 p-3">
@@ -351,6 +406,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
             <div className="mt-4">
               <RosterImport
                 itemKeys={perPlayerKeys}
+                sport={prefill?.sport}
                 confirmLabel={undefined}
                 onConfirm={(imported: ImportedRow[]) => {
                   const asRows: Row[] = imported.map((r) => ({
@@ -373,9 +429,9 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
               {rows.map((row, i) => (
                 <div key={i} className="border border-line p-3 space-y-3">
                   <div className="flex gap-2 items-start">
-                    <input className={inputCls} value={row.name} onChange={(e) => update(i, "name", e.target.value)} placeholder="Player name" />
-                    <input className={`${inputCls} max-w-24`} value={row.number} onChange={(e) => update(i, "number", e.target.value)} placeholder="#" maxLength={4} />
-                    <button onClick={() => removeRow(i)} className="text-muted hover:text-brand px-2 py-2.5" aria-label="Remove player">✕</button>
+                    <input name={`player-${i}-name`} aria-label={`Player ${i + 1} name`} className={inputCls} value={row.name} onChange={(e) => update(i, "name", e.target.value)} placeholder="Player name" />
+                    <input name={`player-${i}-number`} aria-label={`Player ${i + 1} number`} className={`${inputCls} max-w-24`} value={row.number} onChange={(e) => update(i, "number", e.target.value)} placeholder="#" maxLength={4} />
+                    <button type="button" onClick={() => removeRow(i)} className="min-h-11 min-w-11 text-muted hover:text-brand px-2 py-2.5" aria-label={`Remove player ${i + 1}`}>✕</button>
                   </div>
                   {needsDesign && hasJersey && (
                     <select
@@ -388,17 +444,17 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
                       {designs.map((d) => <option key={d.label} value={d.label} className="text-foreground">{d.label}</option>)}
                     </select>
                   )}
-                  {perPlayerSelected.length > 0 && (
+                  {perPlayerSizeFields.length > 0 && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {perPlayerSelected.map((t) => (
-                        <select key={t.key} className={inputCls} value={row.sizes[t.key] ?? ""} onChange={(e) => updateSize(i, t.key, e.target.value)}>
-                          <option value="">{t.label} size</option>
-                          {t.sizes.map((s) => <option key={s}>{s}</option>)}
+                      {perPlayerSizeFields.map((field) => (
+                        <select key={field.key} name={`player-${i}-${field.key}-size`} aria-label={`Player ${i + 1} ${field.label} size`} className={inputCls} value={row.sizes[field.key] ?? ""} onChange={(e) => updateSize(i, field.key, e.target.value)}>
+                          <option value="">{field.label} size</option>
+                          {field.sizes.map((s) => <option key={s}>{s}</option>)}
                         </select>
                       ))}
                     </div>
                   )}
-                  <input className={inputCls} value={row.notes} onChange={(e) => update(i, "notes", e.target.value)} placeholder="Notes (optional)" />
+                  <input name={`player-${i}-notes`} aria-label={`Player ${i + 1} notes`} className={inputCls} value={row.notes} onChange={(e) => update(i, "notes", e.target.value)} placeholder="Notes (optional)" />
                 </div>
               ))}
             </div>
@@ -449,10 +505,16 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
 
           <button
             onClick={() => { setRosterAck(false); setDeliveryAck(false); setConfirmingSubmit(true); }}
-            disabled={status === "sending" || !hasApprovedDesign}
+            disabled={status === "sending" || !hasApprovedDesign || !orderSetupComplete}
             className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors disabled:opacity-60"
           >
-            {status === "sending" ? "Submitting…" : hasApprovedDesign ? "Review & Submit Team Order" : "Approved design required"}
+            {status === "sending"
+              ? "Submitting…"
+              : !hasApprovedDesign
+                ? "Approved design required"
+                : !orderSetupComplete
+                  ? "Choose products, style, and material"
+                  : "Review & Submit Team Order"}
           </button>
           <p className="text-xs text-muted">
             {hasApprovedDesign
@@ -472,7 +534,11 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
               <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-steel border border-brand/60 p-6 text-left">
                 <p className="display text-xs uppercase tracking-[0.16em] text-brand">Final review</p>
                 <h2 id="direct-order-confirm-title" className="display text-2xl text-foreground mt-1">Confirm your team order</h2>
-                <p className="mt-2 text-sm text-muted">Please review the roster and delivery expectations before submitting.</p>
+                <p className="mt-2 text-sm text-muted">This exact summary is saved with your order when you submit.</p>
+
+                <div className="mt-4">
+                  <OrderSpecificationCard spec={submissionSpec} compact />
+                </div>
 
                 <label className="mt-4 flex cursor-pointer select-none items-start gap-2.5 border border-line p-3 text-sm text-foreground">
                   <input
@@ -481,7 +547,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
                     onChange={(event) => setRosterAck(event.target.checked)}
                     className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
                   />
-                  <span>I confirm the approved design, products, roster, and sizes are correct.</span>
+                  <span>I confirm the material, approved artwork, products, roster, sizes, service level, date, and subtotal above are correct.</span>
                 </label>
 
                 <div className="mt-4">

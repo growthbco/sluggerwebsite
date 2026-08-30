@@ -30,6 +30,8 @@ export async function persistPaidOrder(args: {
   };
   subtotalCents: number;
   shippingCents: number;
+  shippingProtectionCents?: number;
+  shippingProtectionValueCents?: number;
   totalCents: number;
   teamId?: string;
   customerNote?: string;
@@ -50,6 +52,8 @@ export async function persistPaidOrder(args: {
       shippingAddress: args.shippingAddress,
       subtotalCents: args.subtotalCents,
       shippingCents: args.shippingCents,
+      shippingProtectionCents: args.shippingProtectionCents ?? 0,
+      shippingProtectionValueCents: args.shippingProtectionValueCents ?? 0,
       totalCents: args.totalCents,
       stripeCheckoutSessionId: args.stripeCheckoutSessionId,
       stripePaymentIntentId: args.stripePaymentIntentId,

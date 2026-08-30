@@ -5,7 +5,7 @@ import { teamOrders } from "@/db/schema";
 import { getRoster, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
 import { postTeamOrderPaidToDiscord } from "@/lib/discord";
-import { setThreadStageTag } from "@/lib/discord-bot";
+import { setThreadStageTag, unarchiveDiscordThread } from "@/lib/discord-bot";
 import { requireApiRole } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
@@ -69,6 +69,8 @@ export async function POST(req: Request) {
             depositCents: paidCents || depositCents || null,
             paymentNote,
             invoiceRemindersSent: 0,
+            archivedAt: null,
+            archivedNote: null,
             updatedAt: now,
           }
         : {
@@ -78,6 +80,8 @@ export async function POST(req: Request) {
             quotedTotalCents: quotedTotalCents || null,
             paymentNote,
             invoiceRemindersSent: 0,
+            archivedAt: null,
+            archivedNote: null,
             updatedAt: now,
           },
     )
@@ -86,6 +90,7 @@ export async function POST(req: Request) {
   // Same Discord moment a Stripe payment gets, plus a heads-up that any
   // previously emailed Stripe links are now stale.
   const discordThreadId = await ensureTeamOrderDiscordThread(order.id);
+  await unarchiveDiscordThread(discordThreadId);
   await postTeamOrderPaidToDiscord({
     reference: order.reference,
     teamName: order.teamName,
@@ -97,6 +102,21 @@ export async function POST(req: Request) {
         ? " A Stripe invoice link was previously sent - let the customer know to ignore it."
         : ""
     }`,
+    finalRoster: stage === "deposit" || stage === "full"
+      ? {
+          items: order.items ?? ["jersey"],
+          sport: order.sport ?? undefined,
+          roster: roster.map((entry) => ({
+            name: entry.playerName ?? undefined,
+            number: entry.playerNumber ?? undefined,
+            size: entry.size ?? undefined,
+            sizes: entry.sizes ?? undefined,
+            design: entry.design ?? undefined,
+            notes: entry.notes ?? undefined,
+            quantity: entry.quantity,
+          })),
+        }
+      : undefined,
   });
 
   await setThreadStageTag(discordThreadId, stage === "deposit" ? "💰 Deposit Paid" : "💸 Paid in Full");

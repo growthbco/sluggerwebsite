@@ -20,7 +20,7 @@ export default function CheckoutSuccessPage() {
       <h1 className="display text-4xl text-foreground mt-6">Order Confirmed</h1>
       <p className="mt-4 text-muted">
         Thanks for your order! You&apos;ll get a confirmation email shortly, and our
-        team is already on it. Free design proofs and your 2-3 week turnaround
+        team is already on it. Standard production is three weeks after final approval, roster, and payment
         start now.
       </p>
       <Link

@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { products } from "@/lib/catalog";
+import { publicProducts } from "@/lib/catalog";
 import { SPORT_PAGES } from "@/lib/sport-pages";
 import { SERVICE_AREAS } from "@/lib/service-areas";
 
@@ -8,7 +8,7 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticPaths = [
     "", "/team-uniforms", "/embroidery", "/custom-hats", "/custom-beanies", "/hype-chains", "/gallery",
-    "/team-order", "/services", "/pricing", "/track", "/size-guide", "/faq", "/contact", "/about", "/shipping", "/returns",
+    "/team-order", "/services", "/pricing", "/portal", "/size-guide", "/faq", "/contact", "/about", "/shipping", "/returns",
     "/privacy", "/terms",
     "/custom-sublimated-jerseys", "/custom-practice-jerseys", "/design", "/custom-jersey-maker", "/team-stores",
     "/squadlocker-alternative",
@@ -25,7 +25,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: p === "" ? 1 : 0.7,
   }));
 
-  const productEntries: MetadataRoute.Sitemap = products.map((p) => ({
+  const productEntries: MetadataRoute.Sitemap = publicProducts.map((p) => ({
     url: `${SITE}/product/${p.slug}`,
     lastModified: now,
     changeFrequency: "weekly",

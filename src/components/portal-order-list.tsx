@@ -11,6 +11,7 @@ export type OrderRow = {
   statusTone: "green" | "amber" | "gold";
   totalCents: number;
   dateLabel: string;
+  timelineLabel?: string;
   href: string;
 };
 
@@ -30,18 +31,24 @@ export function PortalOrderList({ orders }: { orders: OrderRow[] }) {
   const [q, setQ] = useState("");
   const query = q.trim().toLowerCase();
   const visible = useMemo(
-    () => (query ? orders.filter((o) => `${o.reference} ${o.teamName} ${o.summary} ${o.statusLabel}`.toLowerCase().includes(query)) : orders),
+    () => (query ? orders.filter((o) => `${o.reference} ${o.teamName} ${o.summary} ${o.statusLabel} ${o.timelineLabel ?? ""}`.toLowerCase().includes(query)) : orders),
     [orders, query],
   );
 
   return (
     <div className="space-y-4">
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Find an order  ·  TO-NQ6BVA"
-        className="w-full bg-ink border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-      />
+      <div>
+        <label htmlFor="portal-order-search" className="sr-only">Search your orders</label>
+        <input
+          id="portal-order-search"
+          name="orderSearch"
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Find an order  ·  TO-NQ6BVA"
+          className="min-h-11 w-full bg-ink border border-line px-3 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+        />
+      </div>
       <div className="space-y-2">
         {visible.map((o) => (
           <Link
@@ -57,6 +64,7 @@ export function PortalOrderList({ orders }: { orders: OrderRow[] }) {
                 </div>
                 <p className="text-xs text-muted mt-0.5">{o.reference}</p>
                 {o.summary && <p className="text-sm text-foreground/90 mt-1">{o.summary}</p>}
+                {o.timelineLabel && <p className="text-xs display text-brand mt-1.5">{o.timelineLabel}</p>}
               </div>
               <div className="text-right shrink-0">
                 <p className="display text-foreground tabular-nums">{money(o.totalCents)}</p>

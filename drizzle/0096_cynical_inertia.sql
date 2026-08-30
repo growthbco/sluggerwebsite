@@ -1,0 +1,1 @@
+ALTER TABLE "design_requests" ADD COLUMN "follow_up_snoozed_until" timestamp with time zone;

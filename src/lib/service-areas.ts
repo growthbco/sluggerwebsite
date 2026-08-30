@@ -39,16 +39,16 @@ const PORTFOLIO_PHOTOS = [
 const metroProcess = (city: string) => [
   { t: "1. Free design mockup", d: `Send your logo, colors, or an idea. Our designer sends back a ${city}-ready mockup, revisions included, before you pay anything.` },
   { t: "2. Share the roster link", d: `Approve the design, then share one link so every ${city} player picks their own size, name, and number. No spreadsheets, no chasing parents.` },
-  { t: "3. Deposit and production", d: "A 50% deposit starts full sublimation production. Standard turnaround is 2 to 3 weeks, with rush available when your season sneaks up." },
+  { t: "3. Deposit and production", d: "A 50% deposit starts full sublimation production. Standard production is 3 weeks after the final proof, final roster, and deposit. Confirmed 2-week Rush is $100; shipping time is additional." },
   { t: `4. Delivery to ${city}`, d: `We deliver the finished set to your ${city} team or ship it, and each family keeps ordering through your free team store.` },
 ];
 
 // Common closing FAQs every metro shares (cost, minimum, drive, turnaround).
 const metroCommonFaqs = (city: string) => [
-  { q: `How much do custom uniforms cost in ${city}?`, a: "Sublimated jerseys start at $28 with the design, names, and numbers included: $32 two-button, $35 full-button, $38 quarter-zip. Pants are $40 and embroidered hats $25 to $30. The same price applies to every size, and there are no per-color charges." },
+  { q: `How much do custom uniforms cost in ${city}?`, a: "Sublimated jerseys start at $28 with the design, names, and numbers included: $30 V-neck, $32 two-button, $35 full-button, $40 quarter-zip. Pants are $40 and embroidered hats $25 to $30. The same price applies to every size, and there are no per-color charges." },
   { q: "Is there a minimum order?", a: `We run a six-piece minimum per design, which most ${city} teams clear easily. Embroidered hats have a six-hat minimum per design and are often ready in days.` },
   { q: "Do I have to drive to Ocala to order?", a: `No. We deliver finished orders to ${city} or ship them, and the whole design and roster process happens online, so you never have to make the drive.` },
-  { q: `How long does a ${city} uniform order take?`, a: "Most orders are ready 2 to 3 weeks after you approve the design and pay the 50% deposit. Rush production is available when your season sneaks up on you." },
+  { q: `How long does a ${city} uniform order take?`, a: "Standard production is 3 weeks after the final proof, final roster, and deposit are complete. Confirmed 2-week Rush is $100. Shipping time is additional." },
 ];
 
 export const SERVICE_AREAS: ServiceArea[] = [
@@ -72,7 +72,7 @@ export const SERVICE_AREAS: ServiceArea[] = [
     process: [
       { t: "1. Free design mockup", d: "Send your logo, colors, or an idea. Our designer sends back an Orlando-ready mockup, revisions included, before you pay anything." },
       { t: "2. Share the roster link", d: "Approve the design, then share one link so every Orlando player picks their own size, name, and number. No spreadsheets, no chasing parents." },
-      { t: "3. Deposit and production", d: "A 50% deposit starts full sublimation production. Standard turnaround is 2 to 3 weeks, with rush available when your season sneaks up." },
+      { t: "3. Deposit and production", d: "A 50% deposit starts full sublimation production. Standard production is 3 weeks after the final proof, final roster, and deposit. Confirmed 2-week Rush is $100; shipping time is additional." },
       { t: "4. Delivery to Orlando", d: "We deliver the finished set to your Orlando team or ship it, and each family keeps ordering through your free team store." },
     ],
     delivery:
@@ -84,11 +84,11 @@ export const SERVICE_AREAS: ServiceArea[] = [
       { src: "/styles/football-game-jersey.jpg", alt: "Custom sublimated football game jersey by Slugger Athletics" },
     ],
     faqs: [
-      { q: "How much do custom uniforms cost in Orlando?", a: "Sublimated jerseys start at $28 with the design, names, and numbers included: $32 two-button, $35 full-button, $38 quarter-zip. Pants are $40 and embroidered hats $25 to $30. The same price applies to every size, and there are no per-color charges." },
+      { q: "How much do custom uniforms cost in Orlando?", a: "Sublimated jerseys start at $28 with the design, names, and numbers included: $30 V-neck, $32 two-button, $35 full-button, $40 quarter-zip. Pants are $40 and embroidered hats $25 to $30. The same price applies to every size, and there are no per-color charges." },
       { q: "What sports do you make uniforms for in Orlando?", a: "Baseball, softball, basketball, soccer, flag football, and volleyball, plus custom hats and full uniform bundles. Every sport uses the same free-design, roster-based ordering." },
       { q: "Is there a minimum order for Orlando teams?", a: "We run a six-piece minimum per design, which most Orlando teams clear easily. Embroidered hats have a six-hat minimum per design and are often ready in days." },
       { q: "Do I have to drive to Ocala to order?", a: "No. We deliver finished orders to Orlando or ship them, and the whole design and roster process happens online, so you never have to make the drive." },
-      { q: "How long does an Orlando uniform order take?", a: "Most orders are ready 2 to 3 weeks after you approve the design and pay the 50% deposit. Rush production is available when your season sneaks up on you." },
+      { q: "How long does an Orlando uniform order take?", a: "Standard production is 3 weeks after the final proof, final roster, and deposit are complete. Confirmed 2-week Rush is $100. Shipping time is additional." },
       { q: "Are the jerseys really fully sublimated?", a: "Yes. Colors, logos, numbers, and pinstripes are dyed into the fabric, not pressed on top, so they will not crack or peel through an Orlando season." },
     ],
   },
@@ -156,7 +156,7 @@ export const SERVICE_AREAS: ServiceArea[] = [
     intro:
       "Slugger Athletics builds custom sports uniforms for Clearwater, FL teams: fully sublimated jerseys, complete sets, and embroidered hats, designed free and produced in our Central Florida shop. Clearwater is a Pinellas ball town with a packed youth-sports calendar, and we outfit its teams with names, numbers, and unlimited colors sublimated in, at honest 2026 pricing from $28.",
     blurb:
-      "Clearwater teams get big-shop custom uniforms with small-shop service from Slugger: free design proofs with revisions, per-player roster entry, a free team store for parent orders, and delivery right to Clearwater. No per-color charges, no surprises on price.",
+      "Clearwater teams get big-shop custom uniforms with small-shop service from Slugger: free design proofs with revisions, per-player roster entry, a free team store for parent orders, and delivery right to Clearwater. No per-color charges, with all charges shown before payment.",
     deepDive: [
       "Between the beaches and the ballfields, Clearwater teams put their uniforms through a lot of sun. Fully sublimated construction is why ours last: your colors, logos, numbers, and pinstripes are dyed into the polyester instead of pressed on top, so nothing cracks or peels through a full Clearwater season.",
       "Ordering is one clean process for the whole team. Our in-house designer sends a free mockup from your logo and colors, you approve it, and a shared roster link lets every Clearwater player pick their own size, name, and number, checked against a print file before production.",
@@ -182,7 +182,7 @@ export const SERVICE_AREAS: ServiceArea[] = [
     intro:
       "Slugger Athletics builds custom sports uniforms for Lakeland, FL teams: fully sublimated jerseys, complete sets, and in-house embroidered hats, designed free and produced right up the road in our Ocala shop. Polk County is ball country, and we outfit its travel, rec, school, and adult teams with names, numbers, and unlimited colors sublimated in, at honest 2026 pricing from $28.",
     blurb:
-      "Lakeland teams are close enough that Slugger feels like a local uniform shop: free design proofs with revisions, per-player roster entry, a free team store for parent orders, and either delivery to Lakeland or pickup at our Ocala shop. Same week on embroidered hats, no surprises on price.",
+      "Lakeland teams are close enough that Slugger feels like a local uniform shop: free design proofs with revisions, per-player roster entry, a free team store for parent orders, and either delivery to Lakeland or pickup at our Ocala shop. Same week on embroidered hats, with all charges shown before payment.",
     deepDive: [
       "Lakeland teams play a long Florida season, and cheap heat-pressed jerseys do not survive it. Ours are fully sublimated: your colors, logos, numbers, and pinstripes are dyed into the fabric, so they hold up tournament after tournament with no cracking or peeling.",
       "The whole team orders from one process. Our in-house designer sends a free mockup from your logo and colors, you approve it, and a shared roster link lets every Lakeland player pick their own size, name, and number, verified against a print file before production starts.",
@@ -234,7 +234,7 @@ export const SERVICE_AREAS: ServiceArea[] = [
     intro:
       "Slugger Athletics builds custom sports uniforms for Clermont, FL teams: fully sublimated jerseys, complete sets, and in-house embroidered hats, designed free and produced just up the road in our Ocala shop. Lake County's sports scene is growing fast, anchored by the National Training Center, and we outfit its teams with names, numbers, and unlimited colors sublimated in, at honest 2026 pricing from $28.",
     blurb:
-      "Clermont is close enough that Slugger is practically your local uniform shop: free design proofs with revisions, per-player roster entry, a free team store for parent orders, and either delivery to Clermont or pickup at our Ocala shop. No per-color charges, no surprises on price.",
+      "Clermont is close enough that Slugger is practically your local uniform shop: free design proofs with revisions, per-player roster entry, a free team store for parent orders, and either delivery to Clermont or pickup at our Ocala shop. No per-color charges, with all charges shown before payment.",
     deepDive: [
       "Clermont teams train and compete hard, and their uniforms should match. Fully sublimated construction dyes your colors, logos, numbers, and pinstripes into the fabric instead of pressing them on top, so they hold up season after season with no cracking or peeling.",
       "The whole team orders from one simple process. Our in-house designer sends a free mockup from your logo and colors, you approve it, and a shared roster link lets every Clermont player pick their own size, name, and number, verified against a print file before production.",
@@ -267,7 +267,7 @@ export const SERVICE_AREAS: ServiceArea[] = [
     city: "Belleview",
     proximity: "just 15 minutes south of our Ocala shop",
     blurb:
-      "Belleview teams are practically neighbors - order custom jerseys and hats and pick them up in Ocala the same week for embroidered caps, or have full uniform sets delivered when production wraps. Free design, no surprises on price.",
+      "Belleview teams are practically neighbors - order custom jerseys and hats and pick them up in Ocala the same week for embroidered caps, or have full uniform sets delivered when production wraps. Free design, with all charges shown before payment.",
   },
   {
     slug: "summerfield",

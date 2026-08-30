@@ -12,13 +12,13 @@ export const PRICE_LIST: PriceGroup[] = [
     group: "Jerseys & Shirts",
     rows: [
       { item: "Round-Neck Jersey (any sport)", priceCents: 2800, note: "Baseball, softball, soccer, pickleball & more - your choice of mesh or dry-fit material" },
-      { item: "V-Neck Jersey", priceCents: 2900, note: "Fully sublimated with names, numbers, and custom design included" },
+      { item: "V-Neck Jersey", priceCents: 3000, note: "Fully sublimated with names, numbers, and custom design included" },
       { item: "Dry-Fit Practice Jersey", priceCents: 2000, note: "Lightweight practice-weight shirt (not a game jersey) - practice sets, coaches, parents & fans" },
       { item: "Long-Sleeve Shirt", priceCents: 3200 },
       { item: "Two-Button Jersey", priceCents: 3200 },
       { item: "Full-Button Jersey", priceCents: 3500 },
       { item: "Bowling Shirt (full-button)", priceCents: 4200, note: "Camp-collar / full-button bowling shirt in premium microfiber. Crew-cut bowling shirts start at $28." },
-      { item: "Quarter-Zip Jersey", priceCents: 3800, note: "Premium quarter-zip pullover in full custom sublimation" },
+      { item: "Quarter-Zip Jersey", priceCents: 4000, note: "Premium quarter-zip pullover in full custom sublimation" },
       { item: "Reversible Basketball Uniform", priceCents: 8500, note: "Two looks in one - home & away" },
       { item: "Hockey Jersey", priceCents: 5500, note: "Fully sublimated ice-hockey jersey (sweater) - standard or lace-up collar" },
       { item: "Cheer Uniform (Set)", priceCents: 12000, note: "Simple sublimated cheer set; rhinestone sets are $175. Same price youth to adult. Accessories: crop top $48, brief $35, pom-poms $40, bow $25, socks $20, team bag $90" },
@@ -91,7 +91,7 @@ export const BUNDLES: Bundle[] = [
 ];
 
 export const BUNDLE_UPGRADE_NOTE =
-  "Bundle prices are estimated for crew-style (over-the-head) jerseys with a snapback hat. V-neck adds $1 per jersey, two-button adds $4, full-button adds $7, quarter-zip adds $10, and a water-resistant performance cap instead of a snapback adds $8.";
+  "Bundle prices are estimated for crew-style (over-the-head) jerseys with a snapback hat. V-neck adds $2 per jersey, two-button adds $4, full-button adds $7, quarter-zip adds $12, and a water-resistant performance cap instead of a snapback adds $8.";
 
 export function formatDollars(cents: number) {
   return `$${(cents / 100).toFixed(0)}`;

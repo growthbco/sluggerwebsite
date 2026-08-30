@@ -22,7 +22,7 @@ const COMPARE: { label: string; slugger: string; catalog: string }[] = [
   { label: "Minimums", slugger: "Order individually through the store - no per-item minimum", catalog: "Often catalog-driven, with brand/style limits" },
   { label: "Fundraising", slugger: "Add your own margin - the store doubles as a fundraiser", catalog: "Fundraising built in, but on stock decorated goods" },
   { label: "Support", slugger: "Talk to a real person in Ocala, FL - not a ticket queue", catalog: "Large-platform, mostly self-serve support" },
-  { label: "Turnaround", slugger: "Most orders ship in 2-3 weeks; rush in about a week", catalog: "Varies by item and print method" },
+  { label: "Turnaround", slugger: "3-week standard production; confirmed 2-week rush", catalog: "Varies by item and print method" },
 ];
 
 const PERKS = [

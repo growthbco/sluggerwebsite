@@ -18,7 +18,7 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14">
+    <div className="mx-auto max-w-5xl px-4 sm:px-6 py-10 sm:py-12">
       <TeamOrderManageSection order={order} />
     </div>
   );

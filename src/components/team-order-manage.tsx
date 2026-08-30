@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-acknowledgment";
-import { itemLabel, sizesFor, sizeBreakdown, formatSize, JERSEY_MATERIALS } from "@/lib/order-items";
+import { itemLabel, sizeBreakdown, formatSize, JERSEY_MATERIALS, missingCheerSizeLabels, sizeFieldsForItems, sizeValueForField } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
+import { OrderSpecificationCard } from "@/components/order-specification-card";
+import type { CustomerOrderSpec } from "@/lib/order-spec";
 
 type RosterRow = {
   id: string;
@@ -23,6 +25,7 @@ type Props = {
   jerseyStyle: string | null;
   jerseyMaterial: string | null;
   items: string[];
+  sport?: string | null;
   /** Approved colorways/designs. >1 turns on the per-row design picker so each
    *  player ties to the right artwork (Pin Daddy / Pin Mommy, etc.). */
   designs?: { label: string; image: string; sku?: string | null }[];
@@ -30,7 +33,8 @@ type Props = {
   roster: RosterRow[];
   submitted: boolean;
   colors?: string | null;
-  locked?: boolean; // order shipped/cancelled: roster is read-only
+  locked?: boolean; // paid/in production/shipped/cancelled: roster is read-only
+  lockMessage?: string | null;
   requiresNames?: boolean; // "names on the back?" survey answer
   minPieces?: number; // order minimum (6 default, cheer 12)
   // True when this order came from an already-approved design (proof is done) -
@@ -39,17 +43,19 @@ type Props = {
   // Final submission is only available once approved artwork is attached. A
   // draft roster remains editable while artwork is missing or pending.
   designState?: "approved" | "pending" | "missing";
-  quote?: { lines: { label: string; quantity: number; unitPriceCents: number; totalCents: number }[]; rushFeeCents?: number; totalCents: number } | null; // live running total
+  quote?: { lines: { label: string; quantity: number; unitPriceCents: number; totalCents: number }[]; rushFeeCents?: number; priorityFeeCents?: number; totalCents: number } | null; // live running total
   // "Add to this order" block (the add-on form), shown right under the submitted
   // banner so coaches actually find it - the #1 thing they ask for.
   addonSlot?: React.ReactNode;
+  /** Live before submission; immutable persisted snapshot afterward. */
+  orderSpec: CustomerOrderSpec;
 };
 
-function rowSizes(r: RosterRow, items: string[]): string {
-  return items
-    .map((k) => {
-      const v = r.sizes?.[k] ?? (k === "jersey" ? r.size : undefined);
-      return v ? `${itemLabel(k)}: ${formatSize(v)}` : null;
+function rowSizes(r: RosterRow, items: string[], sport?: string | null): string {
+  return sizeFieldsForItems(items, sport)
+    .map((field) => {
+      const v = sizeValueForField(field, r.sizes, r.size);
+      return v ? `${field.label}: ${formatSize(v)}` : null;
     })
     .filter(Boolean)
     .join(" · ");
@@ -57,15 +63,18 @@ function rowSizes(r: RosterRow, items: string[]): string {
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, items, designs = [], shareUrl, roster, submitted, colors, locked, requiresNames = true, minPieces = 6, quote, nextIsDeposit = false, designState = "approved", addonSlot }: Props) {
+export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, items, sport, designs = [], shareUrl, roster, submitted, colors, locked, lockMessage, requiresNames = true, minPieces = 6, quote, nextIsDeposit = false, designState = "approved", addonSlot, orderSpec }: Props) {
   // >1 approved design -> show the "which design?" picker on every add/edit row.
   const needsDesign = designs.length > 1;
   const soleDesign = designs.length === 1 ? designs[0].label : "";
   const nextStepCopy = nextIsDeposit
     ? "We'll email your total and the 50% deposit invoice to start production."
     : "We'll email your total and a design proof to approve.";
-  const materialLabel = items.some((k) => k.includes("jersey")) && jerseyMaterial
-    ? JERSEY_MATERIALS.find((m) => m.key === jerseyMaterial)?.label ?? jerseyMaterial
+  const hasJersey = items.some((key) => key.includes("jersey"));
+  const [materialChoice, setMaterialChoice] = useState(jerseyMaterial ?? "");
+  const [materialBusy, setMaterialBusy] = useState(false);
+  const materialLabel = hasJersey && materialChoice
+    ? JERSEY_MATERIALS.find((m) => m.key === materialChoice)?.label ?? materialChoice
     : null;
   const router = useRouter();
   const [copied, setCopied] = useState(false);
@@ -74,6 +83,25 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
   const [confirmingSubmit, setConfirmingSubmit] = useState(false);
   const [submitAck, setSubmitAck] = useState(false);
   const [deliveryAck, setDeliveryAck] = useState(false);
+
+  async function saveMaterial(value: string) {
+    const previous = materialChoice;
+    setMaterialChoice(value);
+    setMaterialBusy(true);
+    try {
+      const response = await fetch(`/api/team-order/${token}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jerseyMaterial: value }),
+      });
+      if (!response.ok) throw new Error();
+      router.refresh();
+    } catch {
+      setMaterialChoice(previous);
+    } finally {
+      setMaterialBusy(false);
+    }
+  }
 
   // "Names on the back?" survey. Controls whether the name field shows for
   // players and in the coach's add/edit rows. Saved to the order on change.
@@ -126,6 +154,7 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
   async function addManual() {
     if (!canAddManual) return;
     if (needsDesign && !manual.design) { setManualError("Pick a design for this player."); return; }
+    if (missingCheerSizeLabels(items, manual.sizes).length) { setManualError("Choose both a cheer top size and bottom size."); return; }
     setManualBusy(true);
     setManualError("");
     try {
@@ -161,7 +190,7 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
       const res = await fetch(`/api/team-order/${token}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deliveryTermsAccepted: true }),
+        body: JSON.stringify({ deliveryTermsAccepted: true, specConfirmed: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not submit");
@@ -182,27 +211,47 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
 
   return (
     <div className="space-y-8">
-      <header>
-        <span className="display text-brand text-sm">{teamName}</span>
-        <h1 className="display text-2xl sm:text-3xl text-foreground mt-1">
-          {collecting ? "Fill Your Team Roster" : "Team Order"}
-        </h1>
-        <p className="text-muted mt-1 text-sm">
-          {[items.map((k) => itemLabel(k)).join(" · ") || "Jersey", jerseyStyle, materialLabel, colors]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
-        {collecting && (
+      {collecting && (
+        <header>
+          <span className="display text-brand text-sm">{teamName}</span>
+          <h2 className="display text-2xl sm:text-3xl text-foreground mt-1">Fill Your Team Roster</h2>
+          <p className="text-muted mt-1 text-sm">
+            {[items.map((k) => itemLabel(k)).join(" · ") || "Jersey", jerseyStyle, materialLabel, colors]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
           <p className="mt-2 text-sm text-muted">
             Add everyone below, then submit. {nextStepCopy}
           </p>
-        )}
-      </header>
+        </header>
+      )}
 
       {collecting ? (
         <>
           {/* Step 1 - one-time setup: names on the back or not. */}
-          <Step n={1} title="Do players need a name on the back?">
+          <Step n={1} title="Confirm the uniform setup">
+            {hasJersey && (
+              <div className="mb-5 border border-brand/40 bg-brand/[0.05] p-4">
+                <p className="display text-foreground">Jersey material</p>
+                <p className="mt-1 text-sm text-muted">Pick the fabric you expect to receive. This choice appears again in your final order confirmation.</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {JERSEY_MATERIALS.map((material) => (
+                    <button
+                      key={material.key}
+                      type="button"
+                      onClick={() => saveMaterial(material.key)}
+                      disabled={materialBusy}
+                      aria-pressed={materialChoice === material.key}
+                      className={`min-h-11 border p-3 text-left transition-colors disabled:opacity-60 ${materialChoice === material.key ? "border-brand bg-brand/10" : "border-line bg-ink/40 hover:border-brand/60"}`}
+                    >
+                      <span className="display text-sm text-foreground">{materialChoice === material.key ? "✓ " : ""}{material.label}</span>
+                      <span className="mt-1 block text-xs text-muted">{material.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="display text-foreground">Do players need a name on the back?</p>
             <p className="text-sm text-muted mb-3">
               {needsNames
                 ? "Each player enters a name (and number) with their size."
@@ -255,7 +304,7 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
 
               {/* Paste / photograph a roster you were sent. */}
               <div className="mt-4">
-                <RosterImport itemKeys={items} onConfirm={importRows} />
+                <RosterImport itemKeys={items} sport={sport} onConfirm={importRows} />
               </div>
 
               {/* Type one player at a time. */}
@@ -289,16 +338,16 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
                       {designs.map((d) => <option key={d.label} value={d.label} className="text-foreground">{d.label}</option>)}
                     </select>
                   )}
-                  {items.map((k) => (
+                  {sizeFieldsForItems(items, sport).map((field) => (
                     <select
-                      key={k}
-                      value={manual.sizes[k] ?? ""}
-                      onChange={(e) => setManual((m) => ({ ...m, sizes: { ...m.sizes, [k]: e.target.value } }))}
+                      key={field.key}
+                      value={manual.sizes[field.key] ?? ""}
+                      onChange={(e) => setManual((m) => ({ ...m, sizes: { ...m.sizes, [field.key]: e.target.value } }))}
                       className="bg-ink border border-line px-2 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
-                      aria-label={`${itemLabel(k)} size`}
+                      aria-label={`${field.label} size`}
                     >
-                      <option value="">{itemLabel(k)}: -</option>
-                      {sizesFor(k).map((s) => (
+                      <option value="">{field.label}: -</option>
+                      {field.sizes.map((s) => (
                         <option key={s} value={s}>{formatSize(s)}</option>
                       ))}
                     </select>
@@ -325,6 +374,7 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
               token={token}
               roster={roster}
               items={items}
+              sport={sport}
               designs={designs}
               needsDesign={needsDesign}
               locked={locked}
@@ -377,7 +427,7 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
                 <span className="text-sm text-brand">{minPieces}-piece minimum for this uniform.</span>
               )}
             </div>
-            <p className="text-xs text-muted mt-3">Submitting closes the roster and sends it to us. You can still fix a size or name afterward.</p>
+            <p className="text-xs text-muted mt-3">Submitting sends the roster to us. You may correct it until the deposit is paid; payment locks it for production.</p>
 
             {confirmingSubmit && (
               <div
@@ -390,31 +440,11 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
                 <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-steel border border-brand/60 p-6 text-left">
                   <p className="display text-xs uppercase tracking-[0.16em] text-brand">Final review</p>
                   <h2 id="submit-order-title" className="display text-2xl text-foreground mt-1">Confirm your order</h2>
-                  <p className="mt-2 text-sm text-muted">Check the product, quantity, sizes, and price before we create the deposit invoice.</p>
+                  <p className="mt-2 text-sm text-muted">This exact summary is saved with your order when you submit.</p>
 
-                  <div className="mt-4 border border-line divide-y divide-[color:var(--line)]">
-                    {(quote?.lines ?? []).map((line, i) => (
-                      <div key={i} className="flex items-start justify-between gap-4 px-4 py-3 text-sm">
-                        <div>
-                          <p className="text-foreground">{line.label}</p>
-                          <p className="text-xs text-muted mt-0.5">{line.quantity} × {money(line.unitPriceCents)}</p>
-                        </div>
-                        <span className="display text-foreground">{money(line.totalCents)}</span>
-                      </div>
-                    ))}
-                    {Boolean(quote?.rushFeeCents) && (
-                      <div className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
-                        <span className="text-foreground">Rush order fee</span>
-                        <span className="display text-foreground">{money(quote!.rushFeeCents!)}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between gap-4 bg-brand/[0.08] px-4 py-4">
-                      <span className="display text-foreground">Current subtotal</span>
-                      <span className="display text-2xl text-foreground">{quote ? money(quote.totalCents) : "—"}</span>
-                    </div>
+                  <div className="mt-4">
+                    <OrderSpecificationCard spec={orderSpec} compact />
                   </div>
-
-                  <p className="mt-3 text-xs text-muted">Tax and shipping are calculated separately on the invoice.</p>
                   <label className="mt-4 flex items-start gap-2.5 text-sm text-foreground cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -422,7 +452,7 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
                       onChange={(e) => setSubmitAck(e.target.checked)}
                       className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
                     />
-                    <span>I confirm the products, roster, and sizes above are correct.</span>
+                    <span>I confirm the material, artwork, products, roster, sizes, service level, date, and subtotal above are correct.</span>
                   </label>
 
                   <div className="mt-4">
@@ -462,17 +492,38 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
           </Step>
         </>
       ) : (
-        // Submitted or shipped/cancelled: no setup steps, just the roster (still
-        // editable until it ships) and a status note.
+        // Submitted orders stay editable until payment funds production. The
+        // current order status is shown once in the dashboard summary above.
         <>
-          {status === "done" && (
-            <div className="bg-steel border border-line p-6 text-center">
-              <div className="mx-auto h-12 w-12 grid place-items-center clip-slant bg-brand text-on-brand display text-xl">✓</div>
-              <h3 className="display text-xl text-foreground mt-3">Order Submitted</h3>
-              <p className="mt-2 text-muted text-sm">Sent to Slugger Athletics. {nextStepCopy}</p>
-            </div>
+          <OrderSpecificationCard spec={orderSpec} />
+          {hasJersey && !locked && (
+            <details className="border border-line bg-foreground/[0.02]">
+              <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm text-brand">Change jersey material before paying the deposit</summary>
+              <div className="grid gap-2 border-t border-line p-4 sm:grid-cols-2">
+                {JERSEY_MATERIALS.map((material) => (
+                  <button
+                    key={material.key}
+                    type="button"
+                    onClick={() => saveMaterial(material.key)}
+                    disabled={materialBusy}
+                    aria-pressed={materialChoice === material.key}
+                    className={`min-h-11 border p-3 text-left transition-colors disabled:opacity-60 ${materialChoice === material.key ? "border-brand bg-brand/10" : "border-line bg-ink/40 hover:border-brand/60"}`}
+                  >
+                    <span className="display text-sm text-foreground">{materialChoice === material.key ? "✓ " : ""}{material.label}</span>
+                    <span className="mt-1 block text-xs text-muted">{material.description}</span>
+                  </button>
+                ))}
+              </div>
+            </details>
           )}
           {addonSlot}
+          {lockMessage && (
+            <div className="border border-brand/50 bg-brand/[0.08] p-4" role="status">
+              <p className="display text-foreground">🔒 Roster locked for production</p>
+              <p className="mt-1 text-sm text-muted">{lockMessage}</p>
+              <p className="mt-2 text-xs text-muted">Need another jersey? Open “Add a player or item” above so it is priced and tracked separately.</p>
+            </div>
+          )}
           <div>
             <h2 className="display text-xl text-foreground mb-3">Your Roster</h2>
             <RosterBlock
@@ -534,6 +585,12 @@ function RunningTotal({ quote }: { quote: NonNullable<Props["quote"]> }) {
               <span className="text-foreground">{money(quote.rushFeeCents!)}</span>
             </div>
           )}
+          {Boolean(quote.priorityFeeCents) && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted">One-week Priority premium</span>
+              <span className="text-foreground">{money(quote.priorityFeeCents!)}</span>
+            </div>
+          )}
         </div>
       </details>
     </div>
@@ -541,32 +598,50 @@ function RunningTotal({ quote }: { quote: NonNullable<Props["quote"]> }) {
 }
 
 /** Size-breakdown summary + the editable roster list (or an empty-state hint). */
-function RosterBlock({ token, roster, items, designs = [], needsDesign = false, locked, needsNames, onChange }: {
+function RosterBlock({ token, roster, items, sport, designs = [], needsDesign = false, locked, needsNames, onChange }: {
   token: string;
   roster: RosterRow[];
   items: string[];
+  sport?: string | null;
   designs?: { label: string; image: string; sku?: string | null }[];
   needsDesign?: boolean;
   locked?: boolean;
   needsNames: boolean;
   onChange: () => void;
 }) {
-  const breakdown = roster.length > 0 ? sizeBreakdown(roster, items) : [];
+  const breakdown = roster.length > 0 ? sizeBreakdown(roster, items, sport) : [];
+  const pieceCount = roster.reduce((total, row) => total + Math.max(1, row.quantity ?? 1), 0);
+  const groupedRoster = new Map<string, { name: string; number: string; rows: { row: RosterRow; index: number }[] }>();
+  roster.forEach((row, index) => {
+    const name = (row.playerName ?? "").trim();
+    const number = (row.playerNumber ?? "").trim();
+    const identity = name || number ? `${name.toLowerCase()}|${number.toLowerCase()}` : `row:${row.id}`;
+    const group = groupedRoster.get(identity) ?? { name, number, rows: [] };
+    group.rows.push({ row, index });
+    groupedRoster.set(identity, group);
+  });
+  const athleteGroups = [...groupedRoster.values()];
+  const showGroupedRoster = needsDesign && athleteGroups.some((group) => group.rows.length > 1);
+
   return (
     <div>
       <div className="flex items-center justify-between">
-        <span className="text-sm text-muted">{roster.length} {roster.length === 1 ? "player" : "players"} on the roster</span>
+        <span className="text-sm text-muted">
+          {athleteGroups.length} {athleteGroups.length === 1 ? "athlete" : "athletes"} · {pieceCount} uniform {pieceCount === 1 ? "piece" : "pieces"}
+        </span>
       </div>
 
       {breakdown.length > 0 && (
         <div className="mt-2 border border-line bg-steel p-4">
           <p className="display text-sm text-foreground">Size breakdown</p>
-          <div className="mt-2 space-y-1.5">
+          <div className="mt-2 space-y-2">
             {breakdown.map((b) => (
-              <div key={b.key} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+              <div key={b.key} className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="text-muted min-w-[7rem]">{b.label}:</span>
-                <span className="text-foreground">{b.parts.map((p) => `${p.n} ${p.size}`).join(" · ")}</span>
-                <span className="text-muted">({b.total})</span>
+                {b.parts.map((p) => (
+                  <span key={p.size} className="border border-line bg-ink/50 px-2 py-1 text-xs text-foreground">{p.n} {p.size}</span>
+                ))}
+                <span className="text-xs text-muted">{b.total} total</span>
               </div>
             ))}
           </div>
@@ -578,29 +653,65 @@ function RosterBlock({ token, roster, items, designs = [], needsDesign = false, 
       ) : (
         <>
           {!locked && <p className="mt-4 mb-1 text-xs text-muted">Need to fix a size, name, or number? Tap <span className="text-foreground">Edit</span> on any player - changes save right away, even after you&apos;ve submitted.</p>}
-          <div className="mt-1 border border-line divide-y divide-[color:var(--line)]">
-            {roster.map((r, i) => (
-              <RosterRowItem key={r.id} token={token} row={r} index={i} items={items} designs={designs} needsDesign={needsDesign} locked={locked} needsNames={needsNames} onChange={onChange} />
-            ))}
-          </div>
+          {showGroupedRoster ? (
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {athleteGroups.map((group) => {
+                const groupPieces = group.rows.reduce((total, entry) => total + Math.max(1, entry.row.quantity ?? 1), 0);
+                const identity = [needsNames ? group.name : null, group.number ? `#${group.number}` : null].filter(Boolean).join(" · ") || "Player";
+
+                return (
+                  <section
+                    key={`${group.name}|${group.number}|${group.rows[0].row.id}`}
+                    className="overflow-hidden border border-line bg-steel/40"
+                    style={{ contentVisibility: "auto", containIntrinsicSize: "0 116px" }}
+                  >
+                    <div className="flex items-center justify-between gap-3 border-b border-line bg-steel px-3 py-2.5">
+                      <span className="display truncate text-sm text-foreground">{identity}</span>
+                      <span className="shrink-0 text-xs text-muted">{groupPieces} jerseys</span>
+                    </div>
+                    <div className="divide-y divide-[color:var(--line)]">
+                      {group.rows.map(({ row, index }) => (
+                        <RosterRowItem key={row.id} token={token} row={row} index={index} items={items} sport={sport} designs={designs} needsDesign={needsDesign} locked={locked} needsNames={needsNames} grouped onChange={onChange} />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="mt-1 border border-line divide-y divide-[color:var(--line)]">
+              {roster.map((r, i) => (
+                <RosterRowItem key={r.id} token={token} row={r} index={i} items={items} sport={sport} designs={designs} needsDesign={needsDesign} locked={locked} needsNames={needsNames} onChange={onChange} />
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>
   );
 }
 
+/** Keep roster cards compact on phones without changing the stored design
+ *  label used by production. Approval state is already shown above the design
+ *  previews, so repeating it on every jersey row only creates truncation. */
+function rosterDesignLabel(label: string | null | undefined) {
+  return label?.replace(/\s*[-–—]\s*approved\s*$/i, "").trim() || "Design";
+}
+
 /** One roster row: read-only by default, tap Edit to correct name/number/size/
- *  notes or remove the player. Works after submission (blocked only once the
- *  order has shipped). */
-function RosterRowItem({ token, row, index, items, designs = [], needsDesign = false, locked, needsNames = true, onChange }: {
+ *  notes or remove the player. Works after submission until the deposit is
+ *  paid, at which point production owns a locked roster snapshot. */
+function RosterRowItem({ token, row, index, items, sport, designs = [], needsDesign = false, locked, needsNames = true, grouped = false, onChange }: {
   token: string;
   row: RosterRow;
   index: number;
   items: string[];
+  sport?: string | null;
   designs?: { label: string; image: string; sku?: string | null }[];
   needsDesign?: boolean;
   locked?: boolean;
   needsNames?: boolean;
+  grouped?: boolean;
   onChange: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -612,7 +723,7 @@ function RosterRowItem({ token, row, index, items, designs = [], needsDesign = f
   const [design, setDesign] = useState(row.design ?? "");
   const [sizes, setSizes] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
-    for (const k of items) init[k] = row.sizes?.[k] ?? (k === "jersey" ? row.size ?? "" : "");
+    for (const field of sizeFieldsForItems(items, sport)) init[field.key] = sizeValueForField(field, row.sizes, row.size);
     return init;
   });
 
@@ -621,6 +732,7 @@ function RosterRowItem({ token, row, index, items, designs = [], needsDesign = f
     setError("");
     try {
       if (needsDesign && !design) { setError("Pick a design for this player."); setBusy(false); return; }
+      if (missingCheerSizeLabels(items, sizes).length) { setError("Choose both a cheer top size and bottom size."); setBusy(false); return; }
       const res = await fetch(`/api/team-order/${token}/roster`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -671,20 +783,32 @@ function RosterRowItem({ token, row, index, items, designs = [], needsDesign = f
               {designs.map((d) => <option key={d.label} value={d.label} className="text-foreground">{d.label}</option>)}
             </select>
           )}
-          {items.map((k) => (
-            <select key={k} value={sizes[k] ?? ""} onChange={(e) => setSizes((s) => ({ ...s, [k]: e.target.value }))} className="bg-ink border border-line px-2 py-2 text-sm text-foreground focus:border-brand focus:outline-none" aria-label={`${itemLabel(k)} size`}>
-              <option value="">{itemLabel(k)}: -</option>
-              {sizesFor(k).map((s) => (<option key={s} value={s}>{formatSize(s)}</option>))}
+          {sizeFieldsForItems(items, sport).map((field) => (
+            <select key={field.key} value={sizes[field.key] ?? ""} onChange={(e) => setSizes((s) => ({ ...s, [field.key]: e.target.value }))} className="bg-ink border border-line px-2 py-2 text-sm text-foreground focus:border-brand focus:outline-none" aria-label={`${field.label} size`}>
+              <option value="">{field.label}: -</option>
+              {field.sizes.map((s) => (<option key={s} value={s}>{formatSize(s)}</option>))}
             </select>
           ))}
         </div>
         <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes / color (optional)" maxLength={200} className="mt-2 w-full bg-ink border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none" />
         {error && <p className="mt-2 text-sm text-brand">{error}</p>}
         <div className="mt-2 flex gap-2">
-          <button type="button" onClick={save} disabled={busy} className="clip-slant bg-brand text-on-brand display text-sm px-4 py-1.5 hover:bg-brand-dark disabled:opacity-50">{busy ? "Saving…" : "Save"}</button>
-          <button type="button" onClick={() => { setEditing(false); setError(""); }} disabled={busy} className="display text-sm px-4 py-1.5 border border-line text-muted hover:text-foreground">Cancel</button>
-          <button type="button" onClick={remove} disabled={busy} className="ml-auto display text-sm px-3 py-1.5 border border-red-500/40 text-red-400/80 hover:bg-red-500/10 disabled:opacity-50">Remove</button>
+          <button type="button" onClick={save} disabled={busy} className="clip-slant inline-flex min-h-11 items-center bg-brand text-on-brand display text-sm px-4 py-1.5 hover:bg-brand-dark disabled:opacity-50">{busy ? "Saving…" : "Save"}</button>
+          <button type="button" onClick={() => { setEditing(false); setError(""); }} disabled={busy} className="inline-flex min-h-11 items-center display text-sm px-4 py-1.5 border border-line text-muted hover:text-foreground">Cancel</button>
+          <button type="button" onClick={remove} disabled={busy} className="ml-auto inline-flex min-h-11 items-center display text-sm px-3 py-1.5 border border-red-500/40 text-red-400/80 hover:bg-red-500/10 disabled:opacity-50">Remove</button>
         </div>
+      </div>
+    );
+  }
+
+  if (grouped) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2.5 text-sm">
+        <span className="min-w-0 flex-1 truncate text-brand" title={row.design || undefined}>{rosterDesignLabel(row.design)}</span>
+        <span className="min-w-0 flex-[1.5] truncate text-muted">{rowSizes(row, items, sport) || "-"}{row.quantity && row.quantity > 1 ? ` ×${row.quantity}` : ""}</span>
+        {!locked && (
+          <button type="button" onClick={() => setEditing(true)} className="inline-flex min-h-11 shrink-0 items-center display text-xs text-brand border border-brand/40 px-3 py-1 hover:bg-brand/10">Edit</button>
+        )}
       </div>
     );
   }
@@ -694,10 +818,10 @@ function RosterRowItem({ token, row, index, items, designs = [], needsDesign = f
       <span className="text-muted w-4 shrink-0">{index + 1}</span>
       {needsNames && <span className="text-foreground font-medium uppercase flex-1 min-w-0 truncate">{row.playerName || "-"}</span>}
       <span className="text-muted w-8 shrink-0">#{row.playerNumber || "-"}</span>
-      <span className="text-muted flex-[2] min-w-0 truncate">{rowSizes(row, items) || "-"}{row.quantity && row.quantity > 1 ? ` ×${row.quantity}` : ""}</span>
+      <span className="text-muted flex-[2] min-w-0 truncate">{rowSizes(row, items, sport) || "-"}{row.quantity && row.quantity > 1 ? ` ×${row.quantity}` : ""}</span>
       <span className="text-muted flex-1 min-w-0 truncate hidden sm:block">{[row.design, row.notes].filter(Boolean).join(" · ")}</span>
       {!locked && (
-        <button type="button" onClick={() => setEditing(true)} className="shrink-0 display text-xs text-brand border border-brand/40 px-2.5 py-1 hover:bg-brand/10">Edit</button>
+        <button type="button" onClick={() => setEditing(true)} className="inline-flex min-h-11 shrink-0 items-center display text-xs text-brand border border-brand/40 px-3 py-1 hover:bg-brand/10">Edit</button>
       )}
     </div>
   );

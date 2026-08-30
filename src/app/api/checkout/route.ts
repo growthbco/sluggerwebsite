@@ -4,6 +4,7 @@ import { getProduct, primaryImage } from "@/lib/catalog";
 import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 import { refCodeFromCookie } from "@/lib/referral-cookie";
 import { recordOperationalFailure } from "@/lib/operational-events";
+import { createShippingProtectionPrice, shippingProtectionCents } from "@/lib/shipping-protection";
 
 export const runtime = "nodejs";
 
@@ -80,6 +81,9 @@ export async function POST(req: Request) {
   if (lineItems.length === 0) {
     return NextResponse.json({ error: "No valid items in cart" }, { status: 400 });
   }
+  // Only physical merchandise is insured. Tax and the hype-chain design-file
+  // fee added below are services/charges, not contents of the parcel.
+  const merchandiseCents = lineItems.reduce((s, li) => s + li.price_data.unit_amount * li.quantity, 0);
 
   // One-time $50 design-file fee per order that includes a custom hype chain.
   if (hasChain) {
@@ -109,14 +113,26 @@ export async function POST(req: Request) {
 
   try {
     const stripe = getStripe();
+    // The public shop does not know the final label price until fulfillment.
+    // Charge only the merchandise portion of XCover's rate here; Slugger
+    // absorbs the small postage portion rather than ever overcharging.
+    const protectionChargeCents = shippingProtectionCents(merchandiseCents);
+    const protectionPrice = await createShippingProtectionPrice(stripe, protectionChargeCents, merchandiseCents);
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: lineItems,
+      optional_items: [{ price: protectionPrice, quantity: 1 }],
       success_url: `${SITE}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${SITE}/cart`,
       shipping_address_collection: { allowed_countries: ["US", "CA"] },
       phone_number_collection: { enabled: true },
-      metadata: { orderType: "shop", ...(referralCode ? { referralCode } : {}), ...(attributionSource ? { attributionSource } : {}) },
+      metadata: {
+        orderType: "shop",
+        shippingProtectionValueCents: String(merchandiseCents),
+        shippingProtectionQuotedCents: String(protectionChargeCents),
+        ...(referralCode ? { referralCode } : {}),
+        ...(attributionSource ? { attributionSource } : {}),
+      },
     });
     return NextResponse.json({ url: session.url });
   } catch (e) {

@@ -8,8 +8,10 @@ export type ManageTab = { key: string; label: string; content: React.ReactNode }
  *  panel at a time instead of one long scroll. All panels stay mounted (hidden
  *  when inactive) so in-progress roster edits and form state survive tab
  *  switches. The tab bar scrolls horizontally on narrow screens. */
-export function ManageTabs({ tabs }: { tabs: ManageTab[] }) {
-  const [active, setActive] = useState(tabs[0]?.key);
+export function ManageTabs({ tabs, defaultTab }: { tabs: ManageTab[]; defaultTab?: string }) {
+  const [active, setActive] = useState(
+    tabs.some((tab) => tab.key === defaultTab) ? defaultTab : tabs[0]?.key,
+  );
   return (
     <div>
       <div
@@ -21,10 +23,12 @@ export function ManageTabs({ tabs }: { tabs: ManageTab[] }) {
           return (
             <button
               key={t.key}
+              id={`tab-${t.key}`}
               role="tab"
               aria-selected={on}
+              aria-controls={`panel-${t.key}`}
               onClick={() => setActive(t.key)}
-              className={`shrink-0 display text-sm px-4 py-3 border-b-2 -mb-px whitespace-nowrap transition-colors ${
+              className={`min-h-11 shrink-0 display text-sm px-4 py-3 border-b-2 -mb-px whitespace-nowrap transition-colors ${
                 on ? "border-brand text-foreground" : "border-transparent text-muted hover:text-foreground"
               }`}
             >
@@ -35,7 +39,7 @@ export function ManageTabs({ tabs }: { tabs: ManageTab[] }) {
       </div>
       <div className="pt-6">
         {tabs.map((t) => (
-          <div key={t.key} role="tabpanel" hidden={active !== t.key}>
+          <div key={t.key} id={`panel-${t.key}`} role="tabpanel" aria-labelledby={`tab-${t.key}`} hidden={active !== t.key}>
             {t.content}
           </div>
         ))}

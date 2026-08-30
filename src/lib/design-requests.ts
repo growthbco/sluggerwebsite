@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { eq, ne, and, or, asc, desc, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { designRequests, teamOrders, designLabVisitors, designLabRenders } from "@/db/schema";
+import { UNRESPONSIVE_ARCHIVE_NOTE, isUnresponsiveArchiveNote } from "@/lib/proof-follow-up-policy";
 
 /** Human-readable "what to mock up" line: "Jersey (Two-button), Shorts, Hat".
  *  The jersey cut rides along on the jersey/shirt entry. */
@@ -38,8 +39,8 @@ export type NewDesignRequest = {
   feeWaivedRef?: string | null;
 };
 
-const RUSH_DAYS = 14;
-export const RUSH_FEE_NOTE = "Rush service is a flat $100 fee; staff must confirm the timeline.";
+const RUSH_DAYS = 21;
+export const RUSH_FEE_NOTE = "Two-week rush service is a flat $100 fee; staff must confirm the timeline. Dates inside two weeks require a manual priority review.";
 
 /** The approved mockup graphic(s) for a design, in priority order: the approved
  *  set, then the single approved URL, then the latest proof as a fallback. Used
@@ -93,7 +94,7 @@ export async function markFollowedUp(id: string, at: Date | null = new Date()) {
   await getDb().update(designRequests).set({ followedUpAt: at, updatedAt: new Date() }).where(eq(designRequests.id, id));
 }
 
-/** Returns true if a deadline date is within the rush window (< 14 days away). */
+/** Returns true when the requested date falls inside the standard 3-week window. */
 export function isRush(neededBy?: Date | string | null): boolean {
   if (!neededBy) return false;
   const d = typeof neededBy === "string" ? new Date(neededBy) : neededBy;
@@ -312,12 +313,103 @@ export async function getById(id: string) {
   return row ?? null;
 }
 
+/** Move a quiet proof out of the working queue without deleting it. A linked
+ *  funded/production order is a hard stop: money on an order always keeps it
+ *  visible for staff. Discord is tagged before it is archived because Discord
+ *  rejects tag edits on already archived threads. */
+export async function markDesignUnresponsive(id: string): Promise<{ ok: boolean; reason?: "not_found" | "funded" }> {
+  const db = getDb();
+  const [request] = await db.select().from(designRequests).where(eq(designRequests.id, id)).limit(1);
+  if (!request) return { ok: false, reason: "not_found" };
+
+  const linked = await db
+    .select({ status: teamOrders.status, depositPaidAt: teamOrders.depositPaidAt, invoicePaidAt: teamOrders.invoicePaidAt })
+    .from(teamOrders)
+    .where(eq(teamOrders.designRequestId, id));
+  const funded = linked.some((order) =>
+    Boolean(order.depositPaidAt || order.invoicePaidAt || ["in_production", "paid", "shipped"].includes(order.status)),
+  );
+  if (funded) return { ok: false, reason: "funded" };
+
+  const now = new Date();
+  await db
+    .update(designRequests)
+    .set({ archivedAt: now, archivedNote: UNRESPONSIVE_ARCHIVE_NOTE, followUpSnoozedUntil: null, updatedAt: now })
+    .where(eq(designRequests.id, id));
+
+  const [{ postDesignThreadUpdate }, { setThreadStageTag, archiveDiscordThread }] = await Promise.all([
+    import("@/lib/discord"),
+    import("@/lib/discord-bot"),
+  ]);
+  await postDesignThreadUpdate({
+    threadId: request.discordThreadId,
+    title: `💤 Moved to Unresponsive - ${request.teamName} (${request.reference})`,
+    description: "Three scheduled proof reminders were sent with no response. The request is preserved and will automatically reopen if the customer replies, approves, or requests changes.",
+    username: "Slugger Design Requests",
+  });
+  await setThreadStageTag(request.discordThreadId, "💤 Unresponsive");
+  await archiveDiscordThread(request.discordThreadId);
+  return { ok: true };
+}
+
+/** Reopen only records the automation classified as unresponsive. Other
+ *  archive reasons (lost, on hold, duplicate) remain deliberate staff choices. */
+export async function reactivateUnresponsiveDesignRequest(id: string): Promise<boolean> {
+  const db = getDb();
+  const [request] = await db
+    .select({
+      status: designRequests.status,
+      archivedAt: designRequests.archivedAt,
+      archivedNote: designRequests.archivedNote,
+      discordThreadId: designRequests.discordThreadId,
+    })
+    .from(designRequests)
+    .where(eq(designRequests.id, id))
+    .limit(1);
+  if (!request?.archivedAt || !isUnresponsiveArchiveNote(request.archivedNote)) return false;
+
+  const now = new Date();
+  await db
+    .update(designRequests)
+    .set({
+      archivedAt: null,
+      archivedNote: null,
+      followUpsSent: 0,
+      lastFollowUpAt: null,
+      followUpSnoozedUntil: null,
+      updatedAt: now,
+    })
+    .where(eq(designRequests.id, id));
+
+  const { unarchiveDiscordThread, setThreadStageTag } = await import("@/lib/discord-bot");
+  await unarchiveDiscordThread(request.discordThreadId);
+  await setThreadStageTag(
+    request.discordThreadId,
+    request.status === "approved" || request.status === "ordered" ? "✅ Approved" : "🎨 Designing",
+  );
+  return true;
+}
+
 /** Designer uploads proof image(s); auto-bumps status to proof_sent. */
 export async function addProofImages(id: string, urls: string[], labels?: Record<string, string>) {
   const db = getDb();
   const [existing] = await db.select().from(designRequests).where(eq(designRequests.id, id)).limit(1);
   if (!existing) return null;
+  if (existing.archivedAt && isUnresponsiveArchiveNote(existing.archivedNote)) {
+    await reactivateUnresponsiveDesignRequest(id);
+  }
   const merged = [...(existing.proofImages ?? []), ...urls];
+  const previousReview = existing.proofReviewUrls?.length
+    ? existing.proofReviewUrls
+    : existing.status === "proof_sent" || existing.status === "changes_requested"
+      ? existing.proofImages ?? []
+      : [];
+  const supersededProofUrls = [...new Set([
+    ...(existing.supersededProofUrls ?? []),
+    ...previousReview.filter((url) => !urls.includes(url)),
+    ...(existing.approvedDesignUrls ?? (existing.approvedDesignUrl ? [existing.approvedDesignUrl] : []))
+      .filter((url) => !urls.includes(url)),
+  ])];
   const mergedLabels = { ...(existing.proofLabels ?? {}) };
   for (const [url, label] of Object.entries(labels ?? {})) {
     if (label?.trim()) mergedLabels[url] = label.trim().slice(0, 60);
@@ -325,8 +417,26 @@ export async function addProofImages(id: string, urls: string[], labels?: Record
   const now = new Date();
   await db
     .update(designRequests)
-    .set({ proofImages: merged, proofLabels: mergedLabels, status: "proof_sent", proofSentAt: now, updatedAt: now })
+    .set({
+      proofImages: merged,
+      proofReviewUrls: urls,
+      supersededProofUrls,
+      proofLabels: mergedLabels,
+      approvedDesignUrl: null,
+      approvedDesignUrls: [],
+      approvedAt: null,
+      status: "proof_sent",
+      proofSentAt: now,
+      followUpsSent: 0,
+      lastFollowUpAt: null,
+      followUpSnoozedUntil: null,
+      updatedAt: now,
+    })
     .where(eq(designRequests.id, id));
+  await db
+    .update(teamOrders)
+    .set({ approvedDesignUrl: null, updatedAt: now })
+    .where(eq(teamOrders.designRequestId, id));
   return merged;
 }
 
@@ -336,13 +446,15 @@ export async function removeProofImage(id: string, url: string) {
   const [existing] = await db.select().from(designRequests).where(eq(designRequests.id, id)).limit(1);
   if (!existing) return null;
   const proofImages = (existing.proofImages ?? []).filter((u) => u !== url);
+  const proofReviewUrls = (existing.proofReviewUrls ?? []).filter((u) => u !== url);
+  const supersededProofUrls = (existing.supersededProofUrls ?? []).filter((u) => u !== url);
   const proofLabels = { ...(existing.proofLabels ?? {}) };
   delete proofLabels[url];
   const approvedDesignUrls = (existing.approvedDesignUrls ?? []).filter((u) => u !== url);
   const approvedDesignUrl = existing.approvedDesignUrl === url ? (approvedDesignUrls[0] ?? null) : existing.approvedDesignUrl;
   await db
     .update(designRequests)
-    .set({ proofImages, proofLabels, approvedDesignUrls, approvedDesignUrl, updatedAt: new Date() })
+    .set({ proofImages, proofReviewUrls, supersededProofUrls, proofLabels, approvedDesignUrls, approvedDesignUrl, updatedAt: new Date() })
     .where(eq(designRequests.id, id));
   return proofImages;
 }
@@ -352,6 +464,7 @@ export async function removeProofImage(id: string, url: string) {
  *  single-URL surfaces; all of them go in approvedDesignUrls. */
 export async function approveDesign(id: string, approvedUrls?: string | string[]) {
   const db = getDb();
+  await reactivateUnresponsiveDesignRequest(id);
   const now = new Date();
   const urls = (Array.isArray(approvedUrls) ? approvedUrls : approvedUrls ? [approvedUrls] : []).filter(Boolean);
   await db
@@ -364,6 +477,10 @@ export async function approveDesign(id: string, approvedUrls?: string | string[]
       updatedAt: now,
     })
     .where(eq(designRequests.id, id));
+  await db
+    .update(teamOrders)
+    .set({ approvedDesignUrl: urls[0] ?? null, updatedAt: now })
+    .where(eq(teamOrders.designRequestId, id));
 }
 
 /** Staff/designer marks a proof as approved (or removes the mark). A project
@@ -377,6 +494,8 @@ export async function toggleApprovedDesign(id: string, url: string, approved: bo
   const now = new Date();
   const [existing] = await db.select().from(designRequests).where(eq(designRequests.id, id)).limit(1);
   if (!existing) return null;
+  const currentReview = existing.proofReviewUrls?.length ? existing.proofReviewUrls : existing.proofImages ?? [];
+  if (!currentReview.includes(url)) return null;
 
   const current = existing.approvedDesignUrls ?? (existing.approvedDesignUrl ? [existing.approvedDesignUrl] : []);
   const set = new Set(current);
@@ -434,6 +553,8 @@ export async function requestChanges(
     return { ok: false, reason: "max_reached", used, max: MAX_REVISIONS };
   }
 
+  await reactivateUnresponsiveDesignRequest(id);
+
   const now = new Date();
   const entry: ChangeRequestEntry = {
     at: now.toISOString(),
@@ -470,6 +591,7 @@ export async function addDesignMessage(
   const db = getDb();
   const [existing] = await db.select().from(designRequests).where(eq(designRequests.id, id)).limit(1);
   if (!existing) return null;
+  if (from === "client") await reactivateUnresponsiveDesignRequest(id);
 
   const now = new Date();
   const messages = [

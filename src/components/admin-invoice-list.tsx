@@ -11,7 +11,9 @@ export type AdminInvoiceLine = {
   lineCents: number;
   orderRef?: string;
   ourQty?: number;
+  ourUnitCents?: number;
   qtyMismatch: boolean;
+  unitCostOverage: boolean;
   alreadyBilledOn?: string;
   /** No paid order backs this line - the customer hasn't paid us for it, so we
    *  shouldn't be paying the designer for it. */
@@ -39,8 +41,11 @@ export type AdminInvoice = {
   dutyBps: number;
   dutyFlag: boolean;
   anyQtyMismatch: boolean;
+  anyUnitCostOverage: boolean;
   anyDoubleBill: boolean;
   anyNotPaid?: boolean;
+  anyUnverifiedPay?: boolean;
+  paymentBlockers: string[];
   lines: AdminInvoiceLine[];
 };
 
@@ -131,9 +136,11 @@ function InvoiceRow({ inv, canPay, wisePay, capCents }: { inv: AdminInvoice; can
   const [payResult, setPayResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const flagged = inv.dutyFlag || inv.anyQtyMismatch || inv.anyDoubleBill || inv.anyNotPaid;
+  const paymentBlocked = inv.paymentBlockers.length > 0;
+  const flagged = paymentBlocked;
 
   async function doPay() {
+    if (paymentBlocked) return;
     setBusy(true);
     setPayResult(null);
     try {
@@ -156,6 +163,7 @@ function InvoiceRow({ inv, canPay, wisePay, capCents }: { inv: AdminInvoice; can
   }
 
   async function act(action: "paid" | "void") {
+    if (action === "paid" && paymentBlocked) return;
     if (action === "void" && !confirm("Void this invoice? It stays on record but is set aside.")) return;
     setBusy(true);
     try {
@@ -199,7 +207,7 @@ function InvoiceRow({ inv, canPay, wisePay, capCents }: { inv: AdminInvoice; can
         <td className="py-2.5 px-3 text-right whitespace-nowrap">
           <div className="flex items-center justify-end gap-2">
             {flagged && inv.status === "submitted" && <span title="Needs a look" className="text-red-400">⚠</span>}
-            {inv.status === "submitted" && canPay ? (
+            {inv.status === "submitted" && canPay && !paymentBlocked ? (
               <button
                 onClick={(e) => { e.stopPropagation(); act("paid"); }}
                 disabled={busy}
@@ -207,6 +215,8 @@ function InvoiceRow({ inv, canPay, wisePay, capCents }: { inv: AdminInvoice; can
               >
                 Mark paid
               </button>
+            ) : inv.status === "submitted" && paymentBlocked ? (
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/15 text-red-300">Review</span>
             ) : (
               statusPill
             )}
@@ -238,6 +248,15 @@ function InvoiceRow({ inv, canPay, wisePay, capCents }: { inv: AdminInvoice; can
               ))}
             </div>
 
+            {inv.status === "submitted" && paymentBlocked && (
+              <div className="mb-3 rounded-lg border border-red-500/40 bg-red-500/[0.06] px-3 py-2.5">
+                <div className="text-sm font-semibold text-red-300">Payment locked until these charges are fixed:</div>
+                <ul className="mt-1 list-disc pl-5 text-xs text-red-300/90 space-y-0.5">
+                  {inv.paymentBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
+                </ul>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full text-sm mt-1">
                 <thead>
@@ -258,6 +277,7 @@ function InvoiceRow({ inv, canPay, wisePay, capCents }: { inv: AdminInvoice; can
                         </div>
                         <div className="text-muted text-xs">{l.garment}</div>
                         {l.qtyMismatch && <div className="text-red-400 text-xs mt-0.5">We have {l.ourQty} on record, he billed {l.qty}</div>}
+                        {l.unitCostOverage && <div className="text-red-400 text-xs mt-0.5 font-semibold">Saved rate {money(l.ourUnitCents ?? 0)} each — billed {money(l.unitCents)} each</div>}
                         {l.alreadyBilledOn && <div className="text-red-400 text-xs mt-0.5 font-semibold">Already billed on {l.alreadyBilledOn} — do not pay twice</div>}
                         {l.notPaid && <div className="text-red-400 text-xs mt-0.5 font-semibold">⚠ We haven&apos;t been paid for this — do not pay</div>}
                         {l.unverifiedPay && !l.notPaid && <div className="text-amber-400 text-xs mt-0.5">Not linked to a paid order — verify the customer paid</div>}
@@ -282,13 +302,14 @@ function InvoiceRow({ inv, canPay, wisePay, capCents }: { inv: AdminInvoice; can
 
             {inv.status === "submitted" && canPay && (
               <div className="flex flex-wrap gap-2 mt-3.5 items-center">
-                {wisePay &&
+                {!paymentBlocked && wisePay &&
                   (overCap ? (
                     <span className="text-xs text-amber-400 border border-amber-500/40 rounded-lg px-3 py-2.5">Over the cap - pay this one in the Wise app</span>
                   ) : (
                     <button onClick={() => { setPayResult(null); setPayOpen(true); }} disabled={busy} className="display text-sm bg-brand text-on-brand rounded-lg px-4 py-2.5 hover:bg-brand-dark disabled:opacity-50">Pay via Wise</button>
                   ))}
-                <button onClick={() => act("paid")} disabled={busy} className="display text-sm bg-green-600 text-white rounded-lg px-4 py-2.5 hover:bg-green-500 disabled:opacity-50">Mark paid manually</button>
+                {!paymentBlocked && <button onClick={() => act("paid")} disabled={busy} className="display text-sm bg-green-600 text-white rounded-lg px-4 py-2.5 hover:bg-green-500 disabled:opacity-50">Mark paid manually</button>}
+                {paymentBlocked && <span className="text-xs text-red-300 border border-red-500/40 rounded-lg px-3 py-2.5">Remove or correct the flagged charges before paying</span>}
                 <button onClick={() => act("void")} disabled={busy} className="text-sm text-muted border border-line rounded-lg px-4 py-2.5 hover:text-foreground hover:border-foreground/30 disabled:opacity-50">Void</button>
               </div>
             )}

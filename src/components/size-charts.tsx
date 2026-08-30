@@ -48,26 +48,31 @@ export const FLAG_FOOTBALL = [
   ["XL", "21", "29"], ["2XL", "22", "30"], ["3XL", "23", "31"],
 ];
 
-// Cheer sets: chest / waist / hips (inches). Slugger Athletics' official cheer
-// uniform size chart. Fit runs snug - size up if between sizes. Row labels
+// Cheer sets use the supplier's numbered garment-size scale. These are finished
+// item measurements (inches), not body measurements. Row labels
 // mirror CHEER_SIZES in order-items.ts so a picked size lines up with the chart.
+export const CHEER_SET_HEADERS = [
+  "Size",
+  "Garment length",
+  "Chest",
+  "Skirt waist",
+  "Sleeve length",
+  "Sock thigh circumference",
+  "Sock length",
+];
 export const CHEER_SET = [
-  ["Youth XS", "20-22", "18-20", "21-22"],
-  ["Youth Small", "22-24", "20-22", "22-25"],
-  ["Youth Medium", "24-26", "22-24", "26-28"],
-  ["Youth Large", "26-28", "24-26", "28-30"],
-  ["Adult XS", "30-32", "26-28", "31-33"],
-  ["Adult Small", "32-34", "28-30", "34-36"],
-  ["Adult Medium", "34-36", "30-32", "36-38"],
-  ["Adult Large", "36-38", "32-34", "39-41"],
-  ["Adult X-Large", "38-40", "34-36", "41-44"],
-  ["Adult 2X-Large", "40-42", "36-38", "45-48"],
+  ["6", '18"', '22.5"', '20.5-27.5"', '14.5"', '7.1-18.9"', '15.7"'],
+  ["8", '20"', '24.5"', '22-29"', '15.5"', '7.1-18.9"', '15.7"'],
+  ["10", '22"', '26.5"', '23.5-30.5"', '17"', '7.1-18.9"', '18.9"'],
+  ["12", '23.5"', '28.5"', '25-32"', '18.5"', '7.1-18.9"', '18.9"'],
+  ["14", '25.5"', '30.5"', '27-33.5"', '19.5"', '7.1-18.9"', '18.9"'],
+  ["16", '27.5"', '32.5"', '28.5-35"', '21"', '7.1-18.9"', '18.9"'],
 ];
 
-export function ChartTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
+export function ChartTable({ headers, rows, wide = false }: { headers: string[]; rows: string[][]; wide?: boolean }) {
   return (
     <div className="overflow-x-auto border border-line">
-      <table className="w-full text-left text-sm">
+      <table className={`w-full text-left text-sm ${wide ? "min-w-[1050px]" : ""}`}>
         <thead>
           <tr className="bg-brand text-on-brand display">
             {headers.map((h) => (
@@ -79,7 +84,7 @@ export function ChartTable({ headers, rows }: { headers: string[]; rows: string[
           {rows.map((r, i) => (
             <tr key={r[0]} className={i % 2 ? "bg-steel" : "bg-ink"}>
               {r.map((cell, j) => (
-                <td key={j} className={`px-4 py-2.5 ${j === 0 ? "display text-foreground" : "text-muted"}`}>
+                <td key={j} className={`px-4 py-2.5 ${j === 0 ? "display text-foreground" : "text-muted"} ${wide ? "whitespace-nowrap" : ""}`}>
                   {cell}
                 </td>
               ))}
@@ -87,6 +92,23 @@ export function ChartTable({ headers, rows }: { headers: string[]; rows: string[
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+export function CheerSizingNotes() {
+  return (
+    <div className="mt-3 max-w-2xl border border-line bg-steel p-4 text-sm text-muted">
+      <p className="font-medium text-foreground">Before choosing cheer sizes</p>
+      <ul className="mt-2 list-disc space-y-1.5 pl-5">
+        <li>The chart lists finished-item measurements, not body measurements. Measure the athlete instead of relying on age or a usual clothing size.</li>
+        <li>Choose the top by chest and the skirt/bottom by the skirt waist measurement. Top and bottom sizes may be different.</li>
+        <li>If a measurement falls between two sizes, choose the larger size.</li>
+        <li>Sock thigh circumference is the stretch range. Garments are measured by hand, so minor measurement variation is normal.</li>
+        <li>Review both sizes before the roster closes. Custom uniforms cannot be returned or exchanged for a sizing change; manufacturing defects are covered under our <a href="/returns" className="text-brand hover:underline">Returns &amp; Exchanges policy</a>.</li>
+        <li>Screen colors and rhinestone placement may vary slightly on the finished uniform.</li>
+        <li>For rhinestone uniforms, wash inside out in cold water on a gentle cycle and air-dry. Do not use bleach, an iron, or high heat.</li>
+      </ul>
     </div>
   );
 }
@@ -104,6 +126,24 @@ function JerseySection() {
         <div>
           <h4 className="display text-sm text-brand mb-2">Youth</h4>
           <ChartTable headers={["Size", "Width", "Length"]} rows={JERSEYS_YOUTH} />
+        </div>
+      </div>
+    </section>
+  );
+}
+function VolleyballSection() {
+  return (
+    <section>
+      <h3 className="display text-lg text-foreground">Girls&apos; Volleyball Jerseys</h3>
+      <p className="mt-2 text-sm text-muted">Fitted volleyball cut. Width is measured across the chest; length is shoulder to hem.</p>
+      <div className="mt-3 grid md:grid-cols-2 gap-6">
+        <div>
+          <h4 className="display text-sm text-brand mb-2">Adult</h4>
+          <ChartTable headers={["Size", "Width", "Length"]} rows={VOLLEYBALL_GIRLS_ADULT} />
+        </div>
+        <div>
+          <h4 className="display text-sm text-brand mb-2">Youth</h4>
+          <ChartTable headers={["Size", "Width", "Length"]} rows={VOLLEYBALL_GIRLS_YOUTH} />
         </div>
       </div>
     </section>
@@ -138,9 +178,10 @@ function CheerSection() {
   return (
     <section>
       <h3 className="display text-lg text-foreground">Cheer Sets</h3>
-      <p className="mt-2 text-sm text-muted">Fit runs snug - if you&apos;re between sizes, size up. Take chest, waist, and hips at the fullest point.</p>
-      <div className="mt-3 max-w-xl">
-        <ChartTable headers={["Size", "Chest", "Waist", "Hips"]} rows={CHEER_SET} />
+      <CheerSizingNotes />
+      <div className="mt-3">
+        <p className="mb-2 text-xs text-muted sm:hidden">Swipe sideways to see all measurements.</p>
+        <ChartTable headers={CHEER_SET_HEADERS} rows={CHEER_SET} wide />
       </div>
     </section>
   );
@@ -177,20 +218,21 @@ function FlagFootballSection() {
 
 // Map an order-item key to the chart section it needs. Socks (self-explanatory
 // S/M, L/XL) have no chart. Keep in sync with ITEM_TYPES in order-items.ts.
-type ChartGroup = "jersey" | "flag_football" | "hoodie" | "hats" | "cheer" | "pants";
-function chartGroup(itemKey: string): ChartGroup | null {
+type ChartGroup = "jersey" | "volleyball" | "flag_football" | "hoodie" | "hats" | "cheer" | "pants";
+function chartGroup(itemKey: string, sport?: string | null): ChartGroup | null {
   const k = itemKey.toLowerCase();
   if (/cheer/.test(k)) return "cheer";
   if (/flag[_\s-]?football/.test(k)) return "flag_football"; // before /jersey/
   if (/hoodie|pullover/.test(k)) return "hoodie";
   if (/hat|beanie|cap/.test(k)) return "hats";
   if (/knicker|pant|short/.test(k)) return "pants";
-  if (/jersey|shirt/.test(k)) return "jersey";
+  if (/jersey|shirt/.test(k)) return /volleyball/i.test(sport ?? "") ? "volleyball" : "jersey";
   return null; // socks, unknown
 }
 
 const GROUP_SECTION: Record<ChartGroup, () => React.ReactElement> = {
   jersey: JerseySection,
+  volleyball: VolleyballSection,
   flag_football: FlagFootballSection,
   hoodie: HoodieSection,
   hats: HatSection,
@@ -198,14 +240,14 @@ const GROUP_SECTION: Record<ChartGroup, () => React.ReactElement> = {
   pants: PantsSection,
 };
 // Show groups in a stable, sensible order regardless of item order.
-const GROUP_ORDER: ChartGroup[] = ["jersey", "flag_football", "cheer", "hoodie", "hats", "pants"];
+const GROUP_ORDER: ChartGroup[] = ["jersey", "volleyball", "flag_football", "cheer", "hoodie", "hats", "pants"];
 
 /** Only the charts an order actually needs, based on its item keys. Falls back
  *  to the jersey chart if nothing maps (e.g. a socks-only or unknown order). */
-export function SizeChartsFor({ items }: { items: string[] }) {
+export function SizeChartsFor({ items, sport }: { items: string[]; sport?: string | null }) {
   const groups = new Set<ChartGroup>();
   for (const k of items) {
-    const g = chartGroup(k);
+    const g = chartGroup(k, sport);
     if (g) groups.add(g);
   }
   const ordered = GROUP_ORDER.filter((g) => groups.has(g));

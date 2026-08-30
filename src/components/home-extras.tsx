@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { galleryPhotos, allMedia } from "@/lib/gallery";
 import { ReviewsSection } from "@/components/reviews-section";
+import { FAQS as SITE_FAQS } from "@/lib/faqs";
 
 /* "Elevate Your Game" - feature section carried over from the current site. */
 const ELEVATE_BENEFITS = [
@@ -69,8 +70,8 @@ const SYSTEM_FEATURES = [
     d: "Secure online checkout with a 50% deposit to start production and the balance when your order is ready. No checks, no chasing.",
   },
   {
-    t: "Add Players Anytime",
-    d: "Late addition to the roster? Pay online for extra pieces and they join your existing order - and go through the same proof and AI check so they come out right.",
+    t: "Controlled Add-Ons",
+    d: "Rosters lock when the deposit is paid. Late additions are placed as separately priced add-ons so every change stays visible and production-ready.",
   },
   {
     t: "Track It All Season",
@@ -80,7 +81,7 @@ const SYSTEM_FEATURES = [
 
 export function SystemSection() {
   return (
-    <section className="bg-steel border-y border-line">
+    <section id="how-it-works" className="scroll-mt-28 bg-steel border-y border-line">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 py-16 sm:py-20">
         <div className="max-w-2xl">
           <span className="display text-brand text-sm">Why Ordering With Us Is Easy</span>
@@ -180,12 +181,12 @@ export function AboutBand() {
           <span className="display text-brand text-sm">Quality From Experience</span>
           <h2 className="display text-3xl sm:text-4xl text-foreground mt-2">More Than a Uniform Supplier</h2>
           <p className="mt-5 text-muted">
-            We&apos;re your team&apos;s partner in performance. Every set is designed
-            in-house, field-tested, and built to survive the season - not one wash.
-            From free team stores to full uniform programs, we make standing out easy.
+            We design every team&apos;s look, coordinate the production details, and
+            keep the order visible from proof through final shipment. From private
+            roster links to full uniform programs, the process stays in one place.
           </p>
           <ul className="mt-6 space-y-2 text-foreground/90">
-            {["Field-tested, durable fabrics", "Free in-house design proofs", "Order early; approved rush service is $100 flat", "Real people, real customer support"].map((b) => (
+            {["Material and style confirmed before payment", "Free in-house design proofs", "Order early; approved rush service is $100 flat", "Real people, real customer support"].map((b) => (
               <li key={b} className="flex gap-2"><span className="text-brand">✓</span> {b}</li>
             ))}
           </ul>
@@ -195,13 +196,14 @@ export function AboutBand() {
   );
 }
 
-const FAQS = [
-  { q: "How do I place a team order?", a: "Head to Team Order, pick your jersey style, then either enter your roster yourself or share a link so each player adds their own name, number, and size. We email your total and a free design proof to approve before production." },
-  { q: "Is there a minimum order?", a: "Custom orders start at 6 pieces per design - including embroidered hats. Every design takes real mockup and setup work, so 6 is the floor." },
-  { q: "How long does production take?", a: "Most orders ship in 2-3 weeks after you approve your design. Need it sooner? Rush gets you there in about a week (specialty items may add a few days)." },
-  { q: "How does sizing work?", a: "Our signature jerseys have a relaxed fit and run slightly large. Each product page has a size guide, and players pick their own size on team orders to cut down on returns." },
-  { q: "Do you really design for free?", a: "Yes, genuinely free. There's no design fee. Start a custom design, our in-house designer works up a mockup, and you see a proof and approve it with no commitment. You only pay when you place your order." },
-];
+const HOME_FAQ_QUESTIONS = new Set([
+  "How do I place a team order?",
+  "Is there a minimum order?",
+  "How long does production take?",
+  "How does sizing work?",
+  "Do you really design for free?",
+]);
+const FAQS = SITE_FAQS.filter((faq) => HOME_FAQ_QUESTIONS.has(faq.q));
 
 // FAQPage schema so Google AI Overviews / ChatGPT / Perplexity can pull these
 // Q&As directly from the homepage (a top AI-search landing page).

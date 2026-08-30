@@ -45,3 +45,10 @@ export function trackingUrlFor(num: string): string {
       return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(n)}`;
   }
 }
+
+/** Carrier-aware customer tracking URL. Direct-from-production shipments may
+ * use DHL or another international carrier whose number cannot be identified
+ * reliably from its shape alone. */
+export function trackingUrlForCarrier(num: string, carrier?: string | null): string {
+  return carrier ? inboundTrackingUrlFor(num, carrier) : trackingUrlFor(num);
+}

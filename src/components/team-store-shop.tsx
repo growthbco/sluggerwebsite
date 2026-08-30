@@ -312,7 +312,7 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
               className="mt-0.5 accent-[color:var(--brand-gold)]"
             />
             <span className="text-foreground">
-              🚨 Request rush production <span className="text-muted">(flat $100 fee · timeline confirmed by Slugger)</span>
+              🚨 Request 2-week rush production <span className="text-muted">(flat $100 fee · timeline confirmed by Slugger)</span>
             </span>
           </label>
         )}
@@ -397,7 +397,7 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
         )}
         {error && <p className="mt-2 text-sm text-brand">{error}</p>}
         <p className="mt-3 text-xs text-muted">
-          Made to order in your team&apos;s design · 2-3 week turnaround after the batch closes
+          Made to order in your team&apos;s design · 3-week standard production after the batch closes · shipping additional
         </p>
       </aside>
 

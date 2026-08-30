@@ -26,7 +26,7 @@ export default function SublimatedJerseysPage() {
       offerings={[
         { t: "Unlimited Colors, One Price", d: "Gradients, patterns, camo, pinstripes, sponsor logos - complexity costs nothing extra with full-dye sublimation." },
         { t: "Never Cracks or Peels", d: "The design is part of the polyester fiber - wash it all season, it looks like day one." },
-        { t: "Every Style & Sport", d: "Crew from $28, two-button $32, full-button $35, quarter-zip $38 - baseball, softball, basketball, soccer, and beyond." },
+        { t: "Every Style & Sport", d: "Crew from $28, V-neck $30, two-button $32, full-button $35, quarter-zip $40 - baseball, softball, basketball, soccer, and beyond." },
         { t: "Names & Numbers Included", d: "Per-player personalization is baked into the price, entered by each player through your team's roster link." },
       ]}
       exampleCategory="uniforms"

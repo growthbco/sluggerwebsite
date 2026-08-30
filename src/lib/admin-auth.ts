@@ -133,7 +133,7 @@ export function canAccess(role: AdminRole, pathname: string): boolean {
 // the API layer. "money" = pricing/invoicing/payment/shipping/store mutations
 // and customer PII; "settings" = user management. Designers are blocked from
 // both; staff and owner pass money; only owner passes settings.
-export async function requireApiRole(area: "money" | "settings"): Promise<{ ok: true; session: AdminSession } | { ok: false; status: 401 | 403 }> {
+export async function requireApiRole(area: "production" | "money" | "settings"): Promise<{ ok: true; session: AdminSession } | { ok: false; status: 401 | 403 }> {
   const session = await getAdminSession();
   if (!session) return { ok: false, status: 401 };
   if (area === "settings" && session.role !== "owner") return { ok: false, status: 403 };

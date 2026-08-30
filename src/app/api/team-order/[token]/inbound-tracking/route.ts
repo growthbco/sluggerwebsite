@@ -6,6 +6,8 @@ import { getByManageToken, saveInboundTracking, ensureTeamOrderDiscordThread } f
 import { INBOUND_CARRIERS, inboundTrackingUrlFor } from "@/lib/tracking";
 import { emailInboundShipment } from "@/lib/email";
 import { postDesignThreadUpdate } from "@/lib/discord";
+import { requireApiRole } from "@/lib/admin-auth";
+import { markShipped } from "@/lib/fulfillment";
 
 export const runtime = "nodejs";
 
@@ -29,6 +31,8 @@ async function boxmateCandidates(excludeId: string) {
 
 // The checklist of possible boxmates for the designer's tracking form.
 export async function GET(_req: Request, { params }: { params: Promise<{ token: string }> }) {
+  const gate = await requireApiRole("production");
+  if (!gate.ok) return NextResponse.json({ error: "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   const { token } = await params;
   const order = await getByManageToken(token);
@@ -37,10 +41,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   return NextResponse.json({ candidates });
 }
 
-// Designer logs the factory -> Slugger shipment. Auth: the team-order manage
-// token, same as verify-print-file - the designer reaches the form from the
-// staff-only Discord thread. The customer-facing pages never render this data.
+// Signed-in staff/designer records either an internal factory -> Slugger
+// shipment or a final direct-to-customer shipment. The private order token
+// identifies the record; the admin session authorizes the mutation.
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
+  const gate = await requireApiRole("production");
+  if (!gate.ok) return NextResponse.json({ error: "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) {
     return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   }
@@ -49,7 +55,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const order = await getByManageToken(token);
   if (!order) return NextResponse.json({ error: "Link not found" }, { status: 404 });
 
-  let body: { trackingNumber?: string; carrier?: string; notify?: boolean; alsoOrderIds?: string[] } = {};
+  let body: {
+    trackingNumber?: string;
+    carrier?: string;
+    destination?: "slugger" | "customer";
+    directConfirmed?: boolean;
+    notify?: boolean;
+    alsoOrderIds?: string[];
+  } = {};
   try { body = await req.json(); } catch {}
   // notify:false = staff entered it from the admin side; no point emailing
   // the shop about its own action. The Discord log still posts (no ping).
@@ -61,6 +74,50 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     : "Other";
   if (!trackingNumber || trackingNumber.length > 60) {
     return NextResponse.json({ error: "Enter a tracking number." }, { status: 400 });
+  }
+
+  const destination = body.destination === "customer" ? "customer" : "slugger";
+  if (destination === "customer") {
+    if (body.directConfirmed !== true) {
+      return NextResponse.json({ error: "Confirm that this package is going directly to the customer." }, { status: 400 });
+    }
+    if (order.status === "cancelled") {
+      return NextResponse.json({ error: "A cancelled order cannot be marked as shipped." }, { status: 409 });
+    }
+    if (!order.invoicePaidAt) {
+      return NextResponse.json({ error: "The final balance must be recorded before a direct shipment can be released to the customer." }, { status: 409 });
+    }
+    if (order.shippedAt) {
+      if (order.trackingNumber === trackingNumber) {
+        return NextResponse.json({
+          ok: true,
+          destination,
+          trackingNumber,
+          carrier: order.shipCarrier ?? carrier,
+          trackingUrl: inboundTrackingUrlFor(trackingNumber, order.shipCarrier ?? carrier),
+          alreadySaved: true,
+          applied: 1,
+        });
+      }
+      return NextResponse.json({ error: "This order is already marked shipped with different tracking. Ask Slugger staff to correct it." }, { status: 409 });
+    }
+
+    const result = await markShipped("team_order", order.id, trackingNumber, undefined, {
+      directFromProduction: true,
+      carrier,
+    });
+    if (!result) return NextResponse.json({ error: "Could not mark the order shipped." }, { status: 500 });
+
+    return NextResponse.json({
+      ok: true,
+      destination,
+      trackingNumber,
+      carrier,
+      trackingUrl: inboundTrackingUrlFor(trackingNumber, carrier),
+      customerNotified: result.emailed,
+      warning: result.emailed ? undefined : "Tracking was saved, but the customer email could not be sent. Ask Slugger staff to notify the customer manually.",
+      applied: 1,
+    });
   }
 
   await saveInboundTracking(order.id, trackingNumber, carrier);
@@ -103,5 +160,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     });
   }
 
-  return NextResponse.json({ ok: true, trackingNumber, carrier, trackingUrl, applied: 1 + boxmates.length });
+  return NextResponse.json({ ok: true, destination, trackingNumber, carrier, trackingUrl, applied: 1 + boxmates.length });
 }

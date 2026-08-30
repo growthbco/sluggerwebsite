@@ -38,22 +38,49 @@ const LOCAL_TEAMS = [
   },
 ];
 
+const TEAM_SPORT_IMAGES: Record<string, string> = {
+  "custom-cheer-uniforms": "/sports/generated/cheer-sa-catalog.png",
+  "custom-baseball-uniforms": "/sports/generated/baseball-sa-catalog.png",
+  "custom-softball-uniforms": "/sports/generated/softball-sa-catalog.png",
+  "custom-basketball-uniforms": "/sports/generated/basketball-sa-catalog.png",
+  "custom-soccer-uniforms": "/sports/generated/soccer-sa-catalog.png",
+  "custom-flag-football-uniforms": "/sports/generated/flag-football-sa-catalog.png",
+  "custom-football-uniforms": "/sports/generated/football-sa-catalog.png",
+  "custom-pickleball-shirts": "/sports/generated/pickleball-sa-catalog.png",
+  "custom-volleyball-uniforms": "/sports/generated/volleyball-sa-catalog.png",
+  "custom-hockey-jerseys": "/sports/generated/hockey-sa-catalog.png",
+  "custom-bowling-shirts": "/sports/generated/bowling-sa-catalog.png",
+};
+
 export default function TeamUniformsPage() {
   return (
     <>
       <InfoPage
         eyebrow="Custom Team Uniforms · Ocala, FL"
-        h1="Custom Team Uniforms in Ocala"
+        h1="Custom Team Uniforms in Ocala for Every Sport"
         intro={
           <>
-            Slugger Athletics designs and produces <strong className="text-foreground">custom team uniforms and sublimated jerseys</strong> for
-            baseball, softball, and every sport - right here in Ocala and across Central
-            Florida. Designed in-house for free, built to perform, and shipped fast.
-            Jerseys start at <strong className="text-foreground">$28</strong> with flat 2026 pricing
-            (6-piece minimum per design) -{" "}
+            Fully custom uniforms and sublimated jerseys for baseball, softball, basketball,
+            cheer, football, and more. Designed free in Ocala and shipped nationwide, with
+            jerseys starting at <strong className="text-foreground">$28</strong> and names,
+            numbers, and unlimited colors included -{" "}
             <a href="/pricing" className="text-brand hover:underline">see the full price list</a>.
           </>
         }
+        heroImages={[
+          { src: "/sports/generated/baseball-sa-catalog.png", alt: "Custom black and gold baseball uniform", label: "Baseball" },
+          { src: "/sports/generated/basketball-sa-catalog.png", alt: "Custom black and gold basketball uniform", label: "Basketball" },
+          { src: "/sports/generated/cheer-sa-catalog.png", alt: "Custom black and gold cheer uniform", label: "Cheer" },
+          { src: "/sports/generated/flag-football-sa-catalog.png", alt: "Custom black and gold flag football uniform", label: "Flag Football" },
+        ]}
+        heroHighlights={[
+          "Jerseys from $28",
+          "Free custom design before ordering",
+          "Names and numbers included",
+          "Three-week standard production",
+        ]}
+        primaryCta={{ href: "/design", label: "Get a Free Design" }}
+        secondaryCta={{ href: "/team-order", label: "Start a Team Order" }}
         offeringsTitle="Full Uniform Programs"
         offeringsBlurb="Outfit your whole roster - jerseys are our specialty, and we round out the kit."
         offerings={[
@@ -122,15 +149,24 @@ export default function TeamUniformsPage() {
       {/* Multi-sport hub links */}
       <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-20">
         <h2 className="display text-3xl sm:text-4xl text-foreground">Every Sport, One Shop</h2>
-        <div className="mt-6 grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <p className="mt-2 max-w-2xl text-muted">One consistent ordering process, whether you need a single jersey style or a complete program across multiple teams.</p>
+        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {SPORT_PAGES.map((p) => (
-            <Link key={p.slug} href={`/${p.slug}`} className="group bg-steel border border-line hover:border-brand/50 transition-colors">
-              <div className="relative aspect-square bg-white">
-                <Image src={p.mockup} alt={p.h1} fill sizes="(max-width: 1024px) 50vw, 20vw" className="object-cover" />
+            <Link key={p.slug} href={`/${p.slug}`} className="group overflow-hidden bg-steel border border-line hover:border-brand/60 transition-colors">
+              <div className="relative aspect-[4/3] bg-[#f4f1e9]">
+                <Image src={TEAM_SPORT_IMAGES[p.slug] ?? p.mockup} alt={p.h1} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" className="object-contain p-3 transition-transform duration-300 group-hover:scale-[1.03]" />
               </div>
-              <p className="px-3 py-2.5 display text-sm text-foreground group-hover:text-brand">{p.sport} →</p>
+              <p className="flex items-center justify-between px-3 py-2.5 display text-sm text-foreground group-hover:text-brand"><span>{p.sport}</span><span aria-hidden="true">→</span></p>
             </Link>
           ))}
+          <Link href="/design" className="group flex min-h-full flex-col justify-between border border-brand/50 bg-brand p-5 text-on-brand hover:bg-brand-dark transition-colors">
+            <span className="display text-[11px] tracking-wider opacity-75">DON&apos;T SEE YOUR SPORT?</span>
+            <div className="my-8">
+              <p className="display text-2xl leading-none">We&apos;ll Make It.</p>
+              <p className="mt-2 text-sm opacity-85">Tell us what your team needs and we&apos;ll build the uniform around it.</p>
+            </div>
+            <span className="display text-sm">Start a free design →</span>
+          </Link>
         </div>
       </section>
     </>

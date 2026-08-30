@@ -96,7 +96,7 @@ export default function HypeChainsPage() {
         },
         {
           q: "How long do custom hype chains take?",
-          a: "Most orders ship in about 2 to 3 weeks after you approve the mockup, and we can often turn a rush order in about a week. Timing depends on the size of the order and how many chains you need.",
+          a: "Hype-chain timing is quoted for the specific quantity and build. Plan around the standard 3-week production window after final approval and deposit; any faster date must be confirmed before payment. Shipping time is additional.",
         },
         {
           q: "Can you match our team colors and logo?",

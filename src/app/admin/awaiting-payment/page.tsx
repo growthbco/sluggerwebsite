@@ -39,6 +39,7 @@ export default async function AdminAwaitingPaymentPage() {
         depositPaidAt: teamOrders.depositPaidAt,
         taxExempt: teamOrders.taxExempt,
         localPickup: teamOrders.localPickup,
+        invoiceRemindersSent: teamOrders.invoiceRemindersSent,
         updatedAt: teamOrders.updatedAt,
       })
       .from(teamOrders),
@@ -77,6 +78,8 @@ export default async function AdminAwaitingPaymentPage() {
       sendInvoice: stage === "Final balance" && !payUrl
         ? { orderId: o.id, stage: "balance", ship: o.localPickup ? "pickup" : "auto" }
         : undefined,
+      teamOrderId: o.id,
+      canMarkUnresponsive: stage === "Deposit" && (o.invoiceRemindersSent ?? 0) >= 2,
     });
   }
 

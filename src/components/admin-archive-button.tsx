@@ -10,15 +10,18 @@ export function AdminArchiveButton({
   kind,
   id,
   archived,
+  allowUnresponsive = true,
 }: {
   kind: "team_order" | "design_request" | "order";
   id: string;
   archived: boolean;
+  allowUnresponsive?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
-  const [reason, setReason] = useState(REASONS[0]);
+  const reasons = allowUnresponsive ? REASONS : REASONS.filter((item) => item !== "Unresponsive - no reply");
+  const [reason, setReason] = useState(reasons[0]);
   const [custom, setCustom] = useState("");
   const [error, setError] = useState("");
 
@@ -70,7 +73,7 @@ export function AdminArchiveButton({
               onChange={(e) => setReason(e.target.value)}
               className="w-full bg-ink border border-line px-3 py-2.5 text-sm text-foreground focus:border-brand focus:outline-none"
             >
-              {REASONS.map((r) => (
+              {reasons.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>
@@ -113,6 +116,7 @@ export function AdminArchiveButton({
 }
 
 const REASONS = [
+  "Unresponsive - no reply",
   "Completed",
   "Lost - budget",
   "Lost - chose another vendor",

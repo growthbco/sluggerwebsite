@@ -2,16 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { redirect } from "next/navigation";
-import { desc, sql, eq, isNotNull, isNull } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
-import { designRequests, teamOrders, teams, orders, teamOrderAddons, assistantFacts, customInvoices, designLabVisitors } from "@/db/schema";
+import { designRequests, teamOrders, teamOrderAddons } from "@/db/schema";
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
 import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote, estimateOrderWeightOz, estimateOrderParcelsOz } from "@/lib/team-order-pricing";
 import { sizeBreakdown, ITEM_TYPES } from "@/lib/order-items";
 import { shippingCentsFor } from "@/lib/team-stores";
 import { getLiveTracking, type LiveTracking } from "@/lib/shippo";
-import { AdminLogout } from "@/components/admin-logout";
 import { AdminInvoiceButton } from "@/components/admin-invoice-button";
 import { AdminJerseyStyle } from "@/components/admin-jersey-style";
 import { AdminPipeline } from "@/components/admin-pipeline";
@@ -26,14 +25,16 @@ import { AdminArchiveButton } from "@/components/admin-archive-button";
 import { AdminLocalToggle } from "@/components/admin-local-toggle";
 import { AdminTaxToggle } from "@/components/admin-tax-toggle";
 import { AdminSearch } from "@/components/admin-search";
-import { AdminNewStore } from "@/components/admin-new-store";
 import { AdminRecordPayment } from "@/components/admin-record-payment";
 import { AdminPickupToggle } from "@/components/admin-pickup-toggle";
 import { AdminRowMenu } from "@/components/admin-row-menu";
 import { AdminCustomPrice } from "@/components/admin-custom-price";
 import { AdminInboundTracking } from "@/components/admin-inbound-tracking";
-import { MarkStaffDevice } from "@/components/mark-staff-device";
-import { STORE_ITEM_PRESETS } from "@/lib/team-stores";
+import {
+  buildDeliveryTimeline,
+  type DeliveryRisk,
+  type DeliveryTier,
+} from "@/lib/delivery-timeline";
 
 export const metadata: Metadata = { title: "Team Orders", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -75,6 +76,22 @@ const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 // the full string stays in the hover tooltip.
 const srcShort = (s: string | null | undefined) => (s ? s.split(" → ")[0] : "-");
 
+const DATE_RISK_TONE: Record<DeliveryRisk, string> = {
+  no_date: "text-muted",
+  waiting: "text-amber-300",
+  on_track: "text-green-400",
+  tight: "text-amber-300",
+  rush_needed: "text-orange-300",
+  priority_review: "text-orange-300",
+  not_feasible: "text-red-400",
+};
+
+function fmtRequestedDate(d: Date | null) {
+  return d
+    ? d.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" })
+    : "-";
+}
+
 export default async function AdminTeamOrdersPage({ searchParams }: { searchParams: Promise<{ status?: string; sort?: string }> }) {
   if (!adminEnabled()) {
     return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Set ADMIN_PASSWORD to enable the dashboard.</div>;
@@ -87,7 +104,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
   const db = getDb();
   const { status: initialStatus, sort } = await searchParams;
 
-  const [designs, torders, stores, recentOrders, paidAddons] = await Promise.all([
+  const [designs, torders, paidAddons] = await Promise.all([
     db
       .select({
         id: designRequests.id,
@@ -101,6 +118,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
         messages: designRequests.messages,
         source: designRequests.source,
         manageToken: designRequests.manageToken,
+        approvedAt: designRequests.approvedAt,
         archivedAt: designRequests.archivedAt,
         archivedNote: designRequests.archivedNote,
         updatedAt: designRequests.updatedAt,
@@ -117,6 +135,12 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
         manageToken: teamOrders.manageToken,
         jerseyStyle: teamOrders.jerseyStyle,
         rushShipping: teamOrders.rushShipping,
+        approvedDesignUrl: teamOrders.approvedDesignUrl,
+        timelineStartAt: teamOrders.timelineStartAt,
+        turnaroundTier: teamOrders.turnaroundTier,
+        requestedInHandAt: teamOrders.requestedInHandAt,
+        promisedInHandAt: teamOrders.promisedInHandAt,
+        submittedAt: teamOrders.submittedAt,
         localPricing: teamOrders.localPricing,
         embroideryFeeWaived: teamOrders.embroideryFeeWaived,
         taxExempt: teamOrders.taxExempt,
@@ -134,6 +158,9 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
         labelUrl: teamOrders.labelUrl,
         shippedAt: teamOrders.shippedAt,
         shippingChargedCents: teamOrders.shippingChargedCents,
+        shippingProtectionCents: teamOrders.shippingProtectionCents,
+        shippingProtectionValueCents: teamOrders.shippingProtectionValueCents,
+        shippingProtectionCoveredCents: teamOrders.shippingProtectionCoveredCents,
         paymentNote: teamOrders.paymentNote,
         localPickup: teamOrders.localPickup,
         customJerseyCents: teamOrders.customJerseyCents,
@@ -142,38 +169,11 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
         inboundTrackingAddedAt: teamOrders.inboundTrackingAddedAt,
         archivedAt: teamOrders.archivedAt,
         archivedNote: teamOrders.archivedNote,
+        createdAt: teamOrders.createdAt,
         updatedAt: teamOrders.updatedAt,
       })
       .from(teamOrders)
       .orderBy(desc(teamOrders.updatedAt)),
-    db
-      .select({
-        id: teams.id,
-        name: teams.name,
-        storeActive: teams.storeActive,
-        storeToken: teams.storeToken,
-      })
-      .from(teams)
-      .orderBy(desc(teams.createdAt)),
-    db
-      .select({
-        id: orders.id,
-        reference: orders.reference,
-        type: orders.type,
-        status: orders.status,
-        customerName: orders.customerName,
-        totalCents: orders.totalCents,
-        trackingNumber: orders.trackingNumber,
-        labelUrl: orders.labelUrl,
-        shippedAt: orders.shippedAt,
-        createdAt: orders.createdAt,
-        teamId: orders.teamId,
-        source: orders.source,
-      })
-      .from(orders)
-      .where(isNull(orders.archivedAt))
-      .orderBy(desc(orders.createdAt))
-      .limit(60),
     db
       .select({
         teamOrderId: teamOrderAddons.teamOrderId,
@@ -186,7 +186,6 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
       .where(eq(teamOrderAddons.status, "paid"))
       .orderBy(desc(teamOrderAddons.paidAt)),
   ]);
-  void stores; void recentOrders;
 
   // Paid add-ons grouped by their parent team order, so each order can show
   // the extra players (name / # / size) that were added after the fact.
@@ -201,8 +200,30 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
   const activeDesigns = designs.filter((d) => !d.archivedAt);
   // Designs a standalone order can be manually linked to.
   const linkableDesigns = activeDesigns.map((d) => ({ id: d.id, teamName: d.teamName, reference: d.reference }));
-  const archivedDesigns = designs.filter((d) => d.archivedAt);
   const activeOrders = torders.filter((o) => !o.archivedAt);
+  const designsById = new Map(activeDesigns.map((design) => [design.id, design]));
+  const orderTimelines = new Map(
+    activeOrders.map((order) => {
+      const design = order.designRequestId ? designsById.get(order.designRequestId) : null;
+      return [
+        order.id,
+        buildDeliveryTimeline({
+          approvedAt: design?.approvedAt ?? (order.approvedDesignUrl ? order.submittedAt : null),
+          rosterSubmittedAt: order.submittedAt ?? (order.depositPaidAt ? order.depositPaidAt : null),
+          depositPaidAt: order.depositPaidAt ?? order.invoicePaidAt,
+          timelineStartAt: order.timelineStartAt,
+          fallbackStartAt: (["in_production", "paid", "shipped"] as string[]).includes(order.status)
+            ? (order.depositPaidAt ?? order.invoicePaidAt ?? order.createdAt)
+            : null,
+          requestedInHandAt: order.requestedInHandAt ?? design?.neededBy,
+          promisedInHandAt: order.promisedInHandAt,
+          tier: (order.turnaroundTier as DeliveryTier | null) ?? undefined,
+          rush: order.rushShipping,
+          localPickup: order.localPickup,
+        }),
+      ] as const;
+    }),
+  );
   // Sort by who made a deposit: orders with a deposit paid float to the top,
   // most recent deposit first; orders with no deposit fall to the bottom.
   if (sort === "deposit") {
@@ -210,6 +231,15 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
       const ad = a.depositPaidAt ? new Date(a.depositPaidAt).getTime() : 0;
       const bd = b.depositPaidAt ? new Date(b.depositPaidAt).getTime() : 0;
       return bd - ad;
+    });
+  } else if (sort === "target") {
+    activeOrders.sort((a, b) => {
+      const aComplete = a.shippedAt ? 2 : (a.invoicePaidAt || a.status === "paid" ? 1 : 0);
+      const bComplete = b.shippedAt ? 2 : (b.invoicePaidAt || b.status === "paid" ? 1 : 0);
+      if (aComplete !== bComplete) return aComplete - bComplete;
+      const at = orderTimelines.get(a.id)?.selectedTargetAt?.getTime() ?? Number.POSITIVE_INFINITY;
+      const bt = orderTimelines.get(b.id)?.selectedTargetAt?.getTime() ?? Number.POSITIVE_INFINITY;
+      return at - bt;
     });
   }
   const sortHref = (s?: string) => {
@@ -238,10 +268,10 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
   // Orders with any name/number on the roster need print-file QA before
   // production; plain-gear orders skip that gate entirely.
   const personalizedOrders = new Set<string>();
-  for (const o of activeOrders) {
+  await Promise.all(activeOrders.map(async (o) => {
     try {
       const roster = await getRoster(o.id);
-      if (!roster.length) continue;
+      if (!roster.length) return;
       if (roster.some((r) => (r.playerName ?? "").trim() || (r.playerNumber ?? "").trim())) {
         personalizedOrders.add(o.id);
       }
@@ -271,7 +301,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
         }
       }
     } catch {}
-  }
+  }));
 
   // Live carrier status for inbound (factory -> shop) shipments, fetched
   // in parallel and cached a few minutes in the Shippo lib. Best-effort:
@@ -289,7 +319,11 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
-      <AdminPageHeader eyebrow="Operations" title={`Team Orders (${activeOrders.length})`} />
+      <AdminPageHeader eyebrow="Operations" title={`Team Orders (${activeOrders.length})`}>
+        <Link href="/admin/team-order/new" className="clip-slant bg-brand px-4 py-2 display text-sm text-on-brand hover:bg-brand-dark">
+          Enter manual order
+        </Link>
+      </AdminPageHeader>
       <p className="mt-2 text-muted">Quote-first team orders through the whole pipeline: roster → invoice → production → shipped.</p>
 
       <div className="mt-6">
@@ -305,23 +339,22 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
 
       <div className="mt-4 flex items-center gap-3 text-xs">
         <span className="text-muted">Sort:</span>
-        <Link href={sortHref(undefined)} className={sort !== "deposit" ? "text-brand display" : "text-muted hover:text-foreground"}>Recent</Link>
+        <Link href={sortHref(undefined)} className={!sort ? "text-brand display" : "text-muted hover:text-foreground"}>Recent</Link>
+        <Link href={sortHref("target")} className={sort === "target" ? "text-brand display" : "text-muted hover:text-foreground"}>Production target</Link>
         <Link href={sortHref("deposit")} className={sort === "deposit" ? "text-brand display" : "text-muted hover:text-foreground"}>Deposit made</Link>
       </div>
 
       <section className="mt-4 scroll-mt-16" id="team-orders">
-        <div className="overflow-x-auto border border-line">
-          <table className="w-full text-sm">
+        <p className="mb-2 text-[11px] text-muted sm:hidden">Swipe sideways to see value, fulfillment, and the last update.</p>
+        <div className="overflow-x-auto rounded-xl border border-line bg-steel/30">
+          <table className="w-full min-w-[900px] table-fixed text-sm">
             <thead>
-              <tr className="bg-steel text-left text-xs text-muted uppercase">
-                <th className="px-3 py-2">Ref</th>
-                <th className="px-3 py-2">Team</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Contact</th>
-                <th className="px-3 py-2">Source</th>
-                <th className="px-3 py-2">Total</th>
-                <th className="px-3 py-2">Invoice</th>
-                <th className="px-3 py-2">Updated</th>
+              <tr className="bg-steel text-left text-[10px] tracking-wider text-muted uppercase">
+                <th className="w-[25%] px-4 py-3">Team / order</th>
+                <th className="w-[21%] px-3 py-3">Stage / timeline</th>
+                <th className="w-[16%] px-3 py-3">Order value</th>
+                <th className="w-[31%] px-3 py-3">Next action / fulfillment</th>
+                <th className="w-[7%] px-3 py-3">Updated</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[color:var(--line)]">
@@ -329,31 +362,50 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                 const estimate = o.quotedTotalCents ?? orderEstimates.get(o.id);
                 const paid = Boolean(o.invoicePaidAt) || o.status === "paid" || o.status === "shipped";
                 const deposit = o.depositCents ?? (estimate ? Math.round(estimate / 2) : 0);
+                const timeline = orderTimelines.get(o.id)!;
+                const customerDate = timeline.promisedInHandAt ?? timeline.requestedInHandAt;
                 return (
                   <tr
                     key={o.reference}
-                    className="hover:bg-steel/60"
+                    className="align-top hover:bg-steel/60"
                     data-section="orders"
                     data-status={o.status}
-                    data-search={`${o.teamName} ${o.reference} ${o.contactEmail}`.toLowerCase()}
+                    data-search={`${o.teamName} ${o.reference} ${o.contactEmail} ${srcShort(o.source)} ${timeline.tierLabel} ${timeline.riskLabel}`.toLowerCase()}
                   >
-                    <td className="px-3 py-2 font-mono text-xs">
-                      <Link href={`/admin/team-order/${o.id}`} className="text-brand hover:underline" title="Open the full order detail page">
-                        {o.reference}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2 text-foreground max-w-[16rem]">
-                      <span className="flex flex-wrap items-center gap-2">
-                        <Link href={`/admin/team-order/${o.id}`} className="hover:text-brand hover:underline line-clamp-2" title="Open the full order detail page">{o.teamName}</Link>
+                    <td className="px-4 py-3 text-foreground">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link href={`/admin/team-order/${o.id}`} className="font-medium hover:text-brand hover:underline line-clamp-2" title="Open the full order detail page">{o.teamName}</Link>
                         {addonsByOrder.has(o.id) && (
                           <AdminAddonDetails addons={addonsByOrder.get(o.id)!} teamName={o.teamName} />
                         )}
-                      </span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted">
+                        <Link href={`/admin/team-order/${o.id}`} className="font-mono text-brand hover:underline">{o.reference}</Link>
+                        <span className="truncate max-w-[15rem]">{o.contactEmail}</span>
+                        <span title={o.source ?? "unknown (pre-tracking)"}>{srcShort(o.source)}</span>
+                      </div>
                     </td>
-                    <td className="px-3 py-2"><Badge label={o.status} /></td>
-                    <td className="px-3 py-2 text-muted">{o.contactEmail}</td>
-                    <td className="px-3 py-2 text-muted whitespace-nowrap" title={o.source ?? "unknown (pre-tracking)"}>{srcShort(o.source)}</td>
-                    <td className="px-3 py-2 text-foreground">
+                    <td className="px-3 py-3">
+                      <Badge label={o.status} />
+                      <div className="mt-2 space-y-1 text-[11px] leading-snug">
+                        <p className="text-foreground">{timeline.tierLabel}</p>
+                        <p className={timeline.startAt ? "text-muted" : "text-amber-300"}>
+                          {o.shippedAt
+                            ? `Shipped ${fmtDate(o.shippedAt)}`
+                            : paid
+                              ? "Ready to ship"
+                              : timeline.startAt
+                                ? `Production target ${fmtDate(timeline.selectedTargetAt)}`
+                                : "Production clock not started"}
+                        </p>
+                        {customerDate ? (
+                          <p className={DATE_RISK_TONE[timeline.risk]} title={timeline.riskDetail}>
+                            {timeline.promisedInHandAt ? "Promised" : "Requested"} {fmtRequestedDate(customerDate)} · {timeline.riskLabel}
+                          </p>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-foreground">
                       <span className="flex flex-wrap items-center gap-1.5">
                         <span className="whitespace-nowrap">
                           {estimate ? money(estimate) : "-"}
@@ -396,9 +448,17 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                           o.localPricing && <span className="text-xs display text-brand">OCALA</span>
                         )}
                         {o.taxExempt && <span className="text-xs display text-brand">TAX-EXEMPT</span>}
+                        {o.shippingProtectionCents > 0 && (
+                          <span
+                            className="text-xs display text-green-400"
+                            title={`${money(o.shippingProtectionCoveredCents)} of ${money(o.shippingProtectionValueCents)} assigned to purchased labels`}
+                          >
+                            PROTECTED
+                          </span>
+                        )}
                       </span>
                     </td>
-                    <td className="px-3 py-2 min-w-[16rem]">
+                    <td className="px-3 py-3">
                       <span className="flex flex-wrap items-center gap-1.5">
                         {/* Pieces we embroider in-house (hats): the factory
                             shipment won't contain these, so keep them in view
@@ -406,7 +466,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                         {inHouseWork.has(o.id) && (
                           <span
                             title="Embroidered in-house in Ocala - not part of the factory shipment"
-                            className="text-xs display text-amber-300 border border-amber-300/40 px-1.5 py-0.5 whitespace-nowrap"
+                            className="text-xs display text-amber-300 border border-amber-300/40 px-1.5 py-0.5 break-words"
                           >
                             IN-HOUSE: {inHouseWork.get(o.id)}
                           </span>
@@ -436,7 +496,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                           </span>
                         )}
                         {o.paymentNote && (
-                          <span className="text-xs text-emerald-300/90 whitespace-nowrap" title={o.paymentNote}>
+                          <span className="min-w-0 max-w-full text-xs text-emerald-300/90 break-words line-clamp-2" title={o.paymentNote}>
                             {o.paymentNote.split(";").pop()?.trim()}
                           </span>
                         )}
@@ -554,10 +614,13 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                         </AdminRowMenu>
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-muted">{fmtDate(o.updatedAt)}</td>
+                    <td className="px-3 py-3 text-xs text-muted whitespace-nowrap">{fmtDate(o.updatedAt)}</td>
                   </tr>
                 );
               })}
+              <tr data-empty-for="orders" className="hidden">
+                <td colSpan={5} className="px-5 py-10 text-center text-sm text-muted">No team orders match those filters.</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -579,7 +642,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                   </Link>
                   <span className="ml-2 text-foreground">{o.teamName}</span>
                   <span className="ml-2 text-muted">{o.contactEmail}</span>
-                  {o.archivedNote && <span className="ml-2 text-xs text-amber-400/90">"{o.archivedNote}"</span>}
+                  {o.archivedNote && <span className="ml-2 text-xs text-amber-400/90">&ldquo;{o.archivedNote}&rdquo;</span>}
                   <span className="ml-2 text-xs text-muted">archived {fmtDate(o.archivedAt)}</span>
                 </div>
                 <AdminArchiveButton kind="team_order" id={o.id} archived={true} />

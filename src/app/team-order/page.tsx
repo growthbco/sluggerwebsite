@@ -22,7 +22,10 @@ type Prefill = {
    *  the form so the order can't drift from the design (e.g. a hoodie design
    *  accidentally ordered as crew-neck jerseys). */
   items: string[];
+  sport: string | null;
   designJerseyStyle: string | null;
+  rush: boolean;
+  neededBy: string | null;
   /** Every approved colorway/design a player can pick from. When there's more
    *  than one (e.g. "Pin Daddy" / "Pin Mommy"), the roster form shows a design
    *  picker per row so each size ties to the right artwork. */
@@ -65,7 +68,10 @@ export default async function TeamOrderPage({
           contactPhone: req.contactPhone ?? "",
           approvedDesignUrl: req.approvedDesignUrl,
           items: itemKeysFromDesignProducts(req.productTypes),
+          sport: req.sport,
           designJerseyStyle: req.jerseyStyle,
+          rush: req.rush,
+          neededBy: req.neededBy?.toISOString().slice(0, 10) ?? null,
           designs,
         };
       }

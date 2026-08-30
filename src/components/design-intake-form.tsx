@@ -33,6 +33,7 @@ export function DesignIntakeForm() {
   const [welcomeBack, setWelcomeBack] = useState(false);
   const [smsOptIn, setSmsOptIn] = useState(false);
   const [ackDelays, setAckDelays] = useState(false);
+  const [formOpenedAt] = useState(() => Date.now());
 
   // Returning customer on the same device: prefill contact info so they don't
   // retype it. Saved (locally only) after each successful submit.
@@ -176,42 +177,47 @@ export function DesignIntakeForm() {
     !uploading;
 
   return (
-    <div className="space-y-6">
+    <form
+      className="space-y-8"
+      onSubmit={(event) => { event.preventDefault(); void submit(); }}
+    >
       {/* Team + contact */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <fieldset className="grid gap-4 border-0 p-0 sm:grid-cols-2">
+        <legend className="display mb-1 text-xl text-foreground">1. Team and contact</legend>
         <div>
-          <label className="display text-sm text-foreground">Team / Business Name *</label>
-          <input className={`mt-2 ${inputCls}`} value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="e.g. Sandstorm Softball" />
+          <label htmlFor="design-team-name" className="display text-sm text-foreground">Team / Business Name *</label>
+          <input id="design-team-name" name="teamName" autoComplete="organization" required className={`mt-2 ${inputCls}`} value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="e.g. Sandstorm Softball" />
         </div>
         <div>
-          <label className="display text-sm text-foreground">Sport / Use</label>
-          <input className={`mt-2 ${inputCls}`} value={sport} onChange={(e) => setSport(e.target.value)} placeholder="Softball, baseball, business..." />
+          <label htmlFor="design-sport" className="display text-sm text-foreground">Sport / Use</label>
+          <input id="design-sport" name="sport" className={`mt-2 ${inputCls}`} value={sport} onChange={(e) => setSport(e.target.value)} placeholder="Softball, baseball, business..." />
         </div>
         <div>
-          <label className="display text-sm text-foreground">Your Name *</label>
+          <label htmlFor="design-contact-name" className="display text-sm text-foreground">Your Name *</label>
           {welcomeBack && (
             <p className="mt-1 text-xs text-brand">Welcome back! We filled in your info from last time - double-check it&apos;s still right.</p>
           )}
-          <input className={`mt-2 ${inputCls}`} value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Your name" />
+          <input id="design-contact-name" name="contactName" autoComplete="name" required className={`mt-2 ${inputCls}`} value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Your name" />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="display text-sm text-foreground">Email *</label>
-            <input className={`mt-2 ${inputCls}`} type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="you@email.com" />
+            <label htmlFor="design-contact-email" className="display text-sm text-foreground">Email *</label>
+            <input id="design-contact-email" name="contactEmail" autoComplete="email" required className={`mt-2 ${inputCls}`} type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="you@email.com" />
           </div>
           <div>
-            <label className="display text-sm text-foreground">Phone</label>
-            <input className={`mt-2 ${inputCls}`} type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(000) 000-0000" />
+            <label htmlFor="design-contact-phone" className="display text-sm text-foreground">Phone</label>
+            <input id="design-contact-phone" name="contactPhone" autoComplete="tel" className={`mt-2 ${inputCls}`} type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="(000) 000-0000" />
           </div>
         </div>
         <div className="sm:col-span-2">
           <SmsConsentNote onChange={setSmsOptIn} />
         </div>
-      </div>
+      </fieldset>
 
       {/* What to mock up */}
-      <div>
-        <label className="display text-sm text-foreground">What do you want us to mock up? *</label>
+      <fieldset className="border-0 p-0">
+        <legend className="display text-xl text-foreground">2. Products and quantity</legend>
+        <p className="mt-2 display text-sm text-foreground">What do you want us to mock up? *</p>
         <p className="text-sm text-muted mt-1">Pick everything you&apos;d like designed. You can choose more than one.</p>
         <p className="mt-2 text-sm bg-brand/10 border border-brand/40 text-foreground p-3">
           Please only select the pieces you actually plan to buy. Each mockup takes real design
@@ -227,7 +233,7 @@ export function DesignIntakeForm() {
                 type="button"
                 onClick={() => toggleProduct(p)}
                 aria-pressed={on}
-                className={`display text-sm px-3.5 py-2 border transition-colors ${
+                className={`min-h-11 display text-sm px-3.5 py-2 border transition-colors ${
                   on
                     ? "bg-brand text-on-brand border-brand"
                     : "bg-steel text-foreground border-line hover:border-brand/50"
@@ -242,8 +248,10 @@ export function DesignIntakeForm() {
 
         {wantsJersey && (
           <div className="mt-4">
-            <label className="display text-sm text-foreground">Jersey / shirt style</label>
+            <label htmlFor="design-jersey-style" className="display text-sm text-foreground">Jersey / shirt style</label>
             <select
+              id="design-jersey-style"
+              name="jerseyStyle"
               className={`mt-2 ${inputCls} max-w-xs`}
               value={jerseyStyle}
               onChange={(e) => setJerseyStyle(e.target.value)}
@@ -260,8 +268,10 @@ export function DesignIntakeForm() {
 
         {wantsOther && (
           <div className="mt-4">
-            <label className="display text-sm text-foreground">Tell us what else</label>
+            <label htmlFor="design-other-product" className="display text-sm text-foreground">Tell us what else</label>
             <input
+              id="design-other-product"
+              name="otherProduct"
               className={`mt-2 ${inputCls}`}
               value={otherProduct}
               onChange={(e) => setOtherProduct(e.target.value)}
@@ -269,12 +279,12 @@ export function DesignIntakeForm() {
             />
           </div>
         )}
-      </div>
+      </fieldset>
 
       {/* Approximate order size - qualifies the request before design work
           starts. A full custom design isn't practical for a single piece. */}
-      <div>
-        <label className="display text-sm text-foreground">About how many pieces total? *</label>
+      <fieldset className="border-0 p-0">
+        <legend className="display text-sm text-foreground">About how many pieces total? *</legend>
         <p className="text-sm text-muted mt-1">A rough count is fine - players plus coaches, all items combined.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {PIECE_RANGES.map((r) => {
@@ -285,7 +295,7 @@ export function DesignIntakeForm() {
                 type="button"
                 onClick={() => setEstimatedPieces(r)}
                 aria-pressed={on}
-                className={`display text-sm px-3.5 py-2 border transition-colors ${
+                className={`min-h-11 display text-sm px-3.5 py-2 border transition-colors ${
                   on
                     ? "bg-brand text-on-brand border-brand"
                     : "bg-steel text-foreground border-line hover:border-brand/50"
@@ -304,12 +314,16 @@ export function DesignIntakeForm() {
             range you expect to end up at.
           </p>
         )}
-      </div>
+      </fieldset>
 
       {/* Brief */}
+      <fieldset className="space-y-6 border-0 p-0">
+        <legend className="display text-xl text-foreground">3. Your design brief</legend>
       <div>
-        <label className="display text-sm text-foreground">Describe your vision</label>
+        <label htmlFor="design-vision" className="display text-sm text-foreground">Describe your vision</label>
         <textarea
+          id="design-vision"
+          name="vision"
           className={`mt-2 ${inputCls} min-h-32 resize-y`}
           value={vision}
           onChange={(e) => setVision(e.target.value)}
@@ -359,17 +373,25 @@ export function DesignIntakeForm() {
           </div>
         )}
 
+        <label htmlFor="design-color-notes" className="sr-only">Additional color notes</label>
         <input
+          id="design-color-notes"
+          name="colorNotes"
           className={`mt-3 ${inputCls}`}
           value={colors}
           onChange={(e) => setColors(e.target.value)}
           placeholder="Any color notes? e.g. 'gold should be metallic', 'match our logo teal'..."
         />
       </div>
+      </fieldset>
 
+      <fieldset className="space-y-6 border-0 p-0">
+        <legend className="display text-xl text-foreground">4. Timing and references</legend>
       <div>
-        <label className="display text-sm text-foreground">When do you need the uniforms in hand?</label>
+        <label htmlFor="design-needed-by" className="display text-sm text-foreground">When do you need the uniforms in hand?</label>
         <input
+          id="design-needed-by"
+          name="neededBy"
           className={`mt-2 ${inputCls} max-w-xs`}
           type="date"
           value={neededBy}
@@ -378,19 +400,23 @@ export function DesignIntakeForm() {
         />
         {(() => {
           if (!neededBy) return null;
-          const days = (new Date(neededBy).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-          if (days >= 14) return <p className="mt-2 text-sm text-muted">✓ You&apos;re within our standard 2-3 week turnaround.</p>;
+          const days = (new Date(neededBy).getTime() - formOpenedAt) / (1000 * 60 * 60 * 24);
+          if (days >= 21) return <p className="mt-2 text-sm text-muted">✓ Your date is outside our standard 3-week production window. Shipping time is additional.</p>;
           if (days < 0) return <p className="mt-2 text-sm text-brand">That date is in the past - please pick a future date.</p>;
+          if (days >= 14) return (
+            <p className="mt-2 text-sm bg-brand/10 border border-brand/40 text-foreground p-3">
+              🚨 That date is inside our standard 3-week window. A <strong>2-week rush</strong> is a flat <strong>$100</strong> fee and must be confirmed before production.
+            </p>
+          );
           return (
             <p className="mt-2 text-sm bg-brand/10 border border-brand/40 text-foreground p-3">
-              🚨 Heads up - that&apos;s within 2 weeks, so you may need a <strong>rush order</strong>. Rush is a flat <strong>$100</strong> fee.
-              We&apos;ll confirm whether we can meet your date before design work starts.
+              🚨 That deadline is inside our 2-week rush window. It requires a <strong>manual priority review and custom quote</strong>. We&apos;ll confirm availability and pricing before anyone promises the date.
             </p>
           );
         })()}
         {neededBy && (
           <p className="mt-2 text-sm font-semibold text-foreground">
-            ⏱ This helps us plan, but shipping timeframes are estimates - carrier, customs, or weather delays outside our control can add time. Please order as early as you can and build in a buffer. If this date is firm, tell us in the notes so we can confirm before we start.
+            ⏱ This is a requested in-hand date, not a guarantee. The production clock begins only after final design approval, final roster submission, and deposit payment. Shipping time is additional.
           </p>
         )}
       </div>
@@ -402,6 +428,8 @@ export function DesignIntakeForm() {
         <DropZone onFiles={handleFiles} disabled={uploading} className="mt-3">
           <label className="block cursor-pointer border-2 border-dashed border-line hover:border-brand/50 transition-colors p-6 text-center bg-steel">
             <input
+              id="design-inspiration-files"
+              name="inspirationFiles"
               type="file"
               accept="image/*,application/pdf"
               multiple
@@ -436,6 +464,7 @@ export function DesignIntakeForm() {
           </div>
         )}
       </div>
+      </fieldset>
 
       {status === "error" && <p className="text-sm text-brand">{message}</p>}
       {message && status !== "error" && <p className="text-sm text-brand">{message}</p>}
@@ -447,9 +476,9 @@ export function DesignIntakeForm() {
       />
 
       <button
-        onClick={submit}
+        type="submit"
         disabled={!canSubmit || status === "sending"}
-        className="w-full clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg py-3.5 transition-colors disabled:opacity-60"
+        className="min-h-12 w-full clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg py-3.5 transition-colors disabled:opacity-60"
       >
         {status === "sending" ? "Submitting..." : "Submit Design Request"}
       </button>
@@ -457,6 +486,6 @@ export function DesignIntakeForm() {
         No design fee &mdash; the design is on us. Our in-house designer starts as
         soon as you submit, free to see, no commitment.
       </p>
-    </div>
+    </form>
   );
 }

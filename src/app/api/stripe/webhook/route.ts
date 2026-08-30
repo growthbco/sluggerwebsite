@@ -4,11 +4,13 @@ import { getStripe } from "@/lib/stripe";
 import { eq } from "drizzle-orm";
 import { postOrderToDiscord, postStoreOrderToDiscord, postTeamOrderPaidToDiscord, postAddonToDesignerDiscord, postDesignThreadUpdate } from "@/lib/discord";
 import { dbEnabled, getDb } from "@/db";
-import { teamOrders, teams } from "@/db/schema";
+import { designRequests, teamOrders, teams } from "@/db/schema";
 import { emailOrderConfirmation } from "@/lib/email";
 import { persistPaidOrder } from "@/lib/orders";
 import { creditCustomer } from "@/lib/customers";
 import { recordOperationalFailure } from "@/lib/operational-events";
+import { isShippingProtectionLine } from "@/lib/shipping-protection";
+import { buildDeliveryTimeline, type DeliveryTier } from "@/lib/delivery-timeline";
 
 export const runtime = "nodejs";
 
@@ -185,6 +187,16 @@ export async function POST(req: Request) {
         // (or a legacy invoice with no stage) marks it fully paid.
         const isDeposit = session.metadata.stage === "deposit";
         const isFull = session.metadata.stage === "full";
+        let protectionCents = 0;
+        const protectionValueCents = Math.max(0, Number(session.metadata.shippingProtectionValueCents) || 0);
+        if (protectionValueCents > 0) {
+          const paidLines = await getStripe().checkout.sessions.listLineItems(session.id, { limit: 100 });
+          const protectionLine = paidLines.data.find((line) => isShippingProtectionLine(line.description));
+          protectionCents = Math.max(0, protectionLine?.amount_total ?? 0);
+        }
+        const protectionPatch = protectionCents > 0
+          ? { shippingProtectionCents: protectionCents, shippingProtectionValueCents: protectionValueCents }
+          : {};
         // Save the delivery address collected on the payment page (needed for
         // label buying). Newer API versions expose it via collected_information.
         const shipTo =
@@ -208,7 +220,7 @@ export async function POST(req: Request) {
           .update(teamOrders)
           .set(
             isDeposit
-              ? { status: "in_production", depositPaidAt: now, invoiceRemindersSent: 0, updatedAt: now, ...addressPatch }
+              ? { status: "in_production", depositPaidAt: now, invoiceRemindersSent: 0, archivedAt: null, archivedNote: null, updatedAt: now, ...addressPatch }
               : {
                   status: "paid",
                   invoicePaidAt: now,
@@ -216,7 +228,10 @@ export async function POST(req: Request) {
                     ? { depositPaidAt: now, ...(session.metadata.shipCents ? { shippingChargedCents: Number(session.metadata.shipCents) || 0 } : {}) }
                     : {}),
                   invoiceRemindersSent: 0,
+                  archivedAt: null,
+                  archivedNote: null,
                   updatedAt: now,
+                  ...protectionPatch,
                   ...addressPatch,
                 },
           )
@@ -228,6 +243,18 @@ export async function POST(req: Request) {
             designRequestId: teamOrders.designRequestId,
             discordThreadId: teamOrders.discordThreadId,
             contactEmail: teamOrders.contactEmail,
+            manageToken: teamOrders.manageToken,
+            submittedAt: teamOrders.submittedAt,
+            depositPaidAt: teamOrders.depositPaidAt,
+            invoicePaidAt: teamOrders.invoicePaidAt,
+            timelineStartAt: teamOrders.timelineStartAt,
+            turnaroundTier: teamOrders.turnaroundTier,
+            requestedInHandAt: teamOrders.requestedInHandAt,
+            promisedInHandAt: teamOrders.promisedInHandAt,
+            rushShipping: teamOrders.rushShipping,
+            localPickup: teamOrders.localPickup,
+            sport: teamOrders.sport,
+            items: teamOrders.items,
           });
         if (row) {
           // Settle any referral: this coach may have been attributed when they
@@ -243,23 +270,92 @@ export async function POST(req: Request) {
               await redeemCredit(row.contactEmail, applied);
             }
           } catch (e) { console.error("referral settle (team invoice) failed:", e); }
-          const { ensureTeamOrderDiscordThread } = await import("@/lib/team-orders");
+          const { ensureTeamOrderDiscordThread, getRoster } = await import("@/lib/team-orders");
           const discordThreadId = await ensureTeamOrderDiscordThread(row.id);
+          const { setThreadStageTag, unarchiveDiscordThread } = await import("@/lib/discord-bot");
+          await unarchiveDiscordThread(discordThreadId);
+          const finalRosterEntries = isDeposit || isFull ? await getRoster(row.id) : null;
+          const [lockedOrder] = finalRosterEntries
+            ? await db.select().from(teamOrders).where(eq(teamOrders.id, row.id)).limit(1)
+            : [];
+          if (lockedOrder && finalRosterEntries) {
+            // Payment is the production lock boundary. Rebuild the persisted
+            // specification from the final live roster/material so any
+            // customer correction made after submission is captured exactly.
+            const [{ computeTeamOrderQuote }, { buildCustomerOrderSpec }, { getLinkedDesignPreview }] = await Promise.all([
+              import("@/lib/team-order-pricing"),
+              import("@/lib/order-spec"),
+              import("@/lib/team-orders"),
+            ]);
+            const designPreview = await getLinkedDesignPreview(lockedOrder.designRequestId);
+            const lockedSpec = buildCustomerOrderSpec(
+              lockedOrder,
+              finalRosterEntries,
+              designPreview,
+              computeTeamOrderQuote(lockedOrder, finalRosterEntries),
+            );
+            await db.update(teamOrders).set({ specSnapshot: lockedSpec, specConfirmedAt: now }).where(eq(teamOrders.id, row.id));
+          }
+          const finalRoster = finalRosterEntries
+            ? {
+                items: row.items ?? ["jersey"],
+                sport: row.sport ?? undefined,
+                jerseyStyle: lockedOrder?.jerseyStyle ?? undefined,
+                jerseyMaterial: lockedOrder?.jerseyMaterial ?? undefined,
+                roster: finalRosterEntries.map((entry) => ({
+                  name: entry.playerName ?? undefined,
+                  number: entry.playerNumber ?? undefined,
+                  size: entry.size ?? undefined,
+                  sizes: entry.sizes ?? undefined,
+                  design: entry.design ?? undefined,
+                  notes: entry.notes ?? undefined,
+                  quantity: entry.quantity,
+                })),
+              }
+            : undefined;
           await postTeamOrderPaidToDiscord({
             reference: row.reference,
             teamName: row.teamName,
             totalCents: session.amount_total ?? 0,
             stage: isDeposit ? "deposit" : "balance",
             designThreadId: discordThreadId,
+            finalRoster,
           });
-          const { setThreadStageTag } = await import("@/lib/discord-bot");
           await setThreadStageTag(discordThreadId, isDeposit ? "💰 Deposit Paid" : "💸 Paid in Full");
           // Confirm payment to the customer and point them to their portal so
           // they know where to track the order from here.
           if (row.contactEmail) {
             try {
+              const [design] = row.designRequestId
+                ? await db
+                    .select({ approvedAt: designRequests.approvedAt, neededBy: designRequests.neededBy })
+                    .from(designRequests)
+                    .where(eq(designRequests.id, row.designRequestId))
+                    .limit(1)
+                : [];
+              const timeline = buildDeliveryTimeline({
+                approvedAt: design?.approvedAt,
+                rosterSubmittedAt: row.submittedAt,
+                depositPaidAt: row.depositPaidAt ?? row.invoicePaidAt,
+                timelineStartAt: row.timelineStartAt,
+                fallbackStartAt: row.depositPaidAt ?? row.invoicePaidAt,
+                requestedInHandAt: row.requestedInHandAt ?? design?.neededBy,
+                promisedInHandAt: row.promisedInHandAt,
+                tier: (row.turnaroundTier as DeliveryTier | null) ?? undefined,
+                rush: row.rushShipping,
+                localPickup: row.localPickup,
+              });
               const { emailPaymentReceived } = await import("@/lib/email");
-              await emailPaymentReceived({ to: row.contactEmail, teamName: row.teamName, reference: row.reference, stage: isDeposit ? "deposit" : "balance" });
+              const site = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
+              await emailPaymentReceived({
+                to: row.contactEmail,
+                teamName: row.teamName,
+                reference: row.reference,
+                stage: isDeposit ? "deposit" : "balance",
+                timeline,
+                localPickup: row.localPickup,
+                manageUrl: row.manageToken ? `${site}/team-order/manage/${row.manageToken}` : `${site}/portal`,
+              });
             } catch (e) { console.error("payment-received email failed:", e); }
           }
         }
@@ -351,6 +447,11 @@ export async function POST(req: Request) {
         quantity: li.quantity ?? 1,
         amountCents: li.amount_total ?? 0,
       }));
+      const protectionLine = lineItems.data.find((li) => isShippingProtectionLine(li.description));
+      const protectionCents = Math.max(0, protectionLine?.amount_total ?? 0);
+      const protectionValueCents = protectionCents > 0
+        ? Math.max(0, Number(session.metadata?.shippingProtectionValueCents) || 0)
+        : 0;
 
       const reference = `SA-${session.id.slice(-8).toUpperCase()}`;
       const orderTypeKey = (session.metadata?.orderType ?? "shop") as "shop" | "buy_in" | "team_store";
@@ -380,12 +481,14 @@ export async function POST(req: Request) {
               : undefined,
             subtotalCents: session.amount_subtotal ?? 0,
             shippingCents: session.total_details?.amount_shipping ?? 0,
+            shippingProtectionCents: protectionCents,
+            shippingProtectionValueCents: protectionValueCents,
             totalCents: session.amount_total ?? 0,
             teamId: session.metadata?.teamId || undefined,
             customerNote: session.metadata?.orderNote || undefined,
             fundraiseCents: Number(session.metadata?.fundraiseCents) || 0,
             source: session.metadata?.attributionSource || undefined,
-            lines: lineItems.data.map((li) => ({
+            lines: lineItems.data.filter((li) => !isShippingProtectionLine(li.description)).map((li) => ({
               name: li.description ?? "Item",
               quantity: li.quantity ?? 1,
               unitPriceCents: li.price?.unit_amount ?? Math.round((li.amount_total ?? 0) / (li.quantity || 1)),
@@ -410,7 +513,7 @@ export async function POST(req: Request) {
             const [team] = await getDb()
               .select({ name: teams.name, slug: teams.slug, token: teams.storeToken, design: teams.approvedDesignUrl, storeThreadId: teams.storeThreadId })
               .from(teams).where(eq(teams.id, teamId)).limit(1);
-            const garmentLines = lines.filter((l) => !/tax/i.test(l.name));
+            const garmentLines = lines.filter((l) => !/tax/i.test(l.name) && !isShippingProtectionLine(l.name));
             const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
             const teamThread = team?.storeThreadId ?? null;
             const posted = await postStoreOrderToDiscord({

@@ -1,7 +1,10 @@
-export const RUSH_FEE_CENTS = 10000;
+import { RUSH_FEE_CENTS } from "@/lib/customer-policy";
 
-/** One flat $100 rush fee for every non-empty order. Availability and the
- * promised date still require staff approval. */
+export { RUSH_FEE_CENTS } from "@/lib/customer-policy";
+
+/** One flat $100 two-week rush fee for every non-empty order. Availability and
+ * any promised date still require staff approval. The internal one-week
+ * priority option is quoted manually and never added here automatically. */
 export function rushFeeCentsForPieces(pieces: number): number {
   const quantity = Math.max(0, Math.floor(pieces));
   if (quantity === 0) return 0;

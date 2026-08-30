@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-/** Toggle the flat $100 rush order fee.
+/** Toggle the flat $100 two-week rush order fee.
  *  Auto-set when the order comes from a rush design request. */
 export function AdminRushToggle({ teamOrderId, rush }: { teamOrderId: string; rush: boolean }) {
   const router = useRouter();
@@ -31,12 +31,12 @@ export function AdminRushToggle({ teamOrderId, rush }: { teamOrderId: string; ru
       type="button"
       onClick={toggle}
       disabled={busy}
-      title="Rush fee: flat $100; priority production + direct shipping"
+      title="Two-week rush target: flat $100; must be confirmed before production"
       className={`text-xs display px-2 py-0.5 border disabled:opacity-50 whitespace-nowrap ${
         rush ? "border-red-500/70 text-red-400 bg-red-500/10" : "border-line text-muted hover:border-brand/40"
       }`}
     >
-      {busy ? "..." : rush ? "Rush fee ON ($100)" : "Add rush fee ($100)"}
+      {busy ? "..." : rush ? "2-week rush ON ($100)" : "Add 2-week rush ($100)"}
     </button>
   );
 }

@@ -11,7 +11,7 @@ import { teamOrders, orders } from "@/db/schema";
 import { emailOrderShipped, emailAdditionalShipment } from "@/lib/email";
 import { sendFollowUpSms } from "@/lib/sms";
 import { archiveDiscordThread } from "@/lib/discord-bot";
-import { trackingUrlFor, carrierFor } from "@/lib/tracking";
+import { trackingUrlFor, trackingUrlForCarrier, carrierFor } from "@/lib/tracking";
 import { ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 
 export { trackingUrlFor };
@@ -25,20 +25,46 @@ export async function saveLabelPurchase(
   labelUrl: string,
   transactionId?: string,
   carrier?: string,
+  insuredValueCents = 0,
 ): Promise<boolean> {
   const db = getDb();
   const now = new Date();
   if (kind === "team_order") {
+    const [existing] = await db
+      .select({ value: teamOrders.shippingProtectionValueCents, covered: teamOrders.shippingProtectionCoveredCents })
+      .from(teamOrders)
+      .where(eq(teamOrders.id, id))
+      .limit(1);
+    if (!existing) return false;
     const [row] = await db
       .update(teamOrders)
-      .set({ trackingNumber, labelUrl, shipTransactionId: transactionId ?? null, shipCarrier: carrier ?? null, updatedAt: now })
+      .set({
+        trackingNumber,
+        labelUrl,
+        shipTransactionId: transactionId ?? null,
+        shipCarrier: carrier ?? null,
+        shippingProtectionCoveredCents: Math.min(existing.value, existing.covered + Math.max(0, insuredValueCents)),
+        updatedAt: now,
+      })
       .where(eq(teamOrders.id, id))
       .returning({ id: teamOrders.id });
     return Boolean(row);
   }
+  const [existing] = await db
+    .select({ value: orders.shippingProtectionValueCents, covered: orders.shippingProtectionCoveredCents })
+    .from(orders)
+    .where(eq(orders.id, id))
+    .limit(1);
+  if (!existing) return false;
   const [row] = await db
     .update(orders)
-    .set({ trackingNumber, labelUrl, shipTransactionId: transactionId ?? null, shipCarrier: carrier ?? null })
+    .set({
+      trackingNumber,
+      labelUrl,
+      shipTransactionId: transactionId ?? null,
+      shipCarrier: carrier ?? null,
+      shippingProtectionCoveredCents: Math.min(existing.value, existing.covered + Math.max(0, insuredValueCents)),
+    })
     .where(eq(orders.id, id))
     .returning({ id: orders.id });
   return Boolean(row);
@@ -55,9 +81,10 @@ export async function appendAdditionalShipment(
   labelUrl: string,
   note?: string,
   transactionId?: string,
+  insuredValueCents = 0,
 ): Promise<boolean> {
   const db = getDb();
-  const entry = { trackingNumber, labelUrl, transactionId, at: new Date().toISOString() };
+  const entry = { trackingNumber, labelUrl, transactionId, insuredValueCents: Math.max(0, insuredValueCents) || undefined, at: new Date().toISOString() };
   let email: string | null = null;
   let name: string | null = null;
   let reference = "";
@@ -66,7 +93,11 @@ export async function appendAdditionalShipment(
     if (!row) return false;
     await db
       .update(teamOrders)
-      .set({ additionalShipments: [...(row.additionalShipments ?? []), entry], updatedAt: new Date() })
+      .set({
+        additionalShipments: [...(row.additionalShipments ?? []), entry],
+        shippingProtectionCoveredCents: Math.min(row.shippingProtectionValueCents, row.shippingProtectionCoveredCents + Math.max(0, insuredValueCents)),
+        updatedAt: new Date(),
+      })
       .where(eq(teamOrders.id, id));
     email = row.contactEmail; name = row.contactName; reference = row.reference;
   } else {
@@ -74,7 +105,10 @@ export async function appendAdditionalShipment(
     if (!row) return false;
     await db
       .update(orders)
-      .set({ additionalShipments: [...(row.additionalShipments ?? []), entry] })
+      .set({
+        additionalShipments: [...(row.additionalShipments ?? []), entry],
+        shippingProtectionCoveredCents: Math.min(row.shippingProtectionValueCents, row.shippingProtectionCoveredCents + Math.max(0, insuredValueCents)),
+      })
       .where(eq(orders.id, id));
     email = row.customerEmail; name = row.customerName; reference = row.reference;
   }
@@ -87,6 +121,7 @@ export async function markShipped(
   id: string,
   trackingNumber?: string,
   labelUrl?: string,
+  options?: { directFromProduction?: boolean; carrier?: string },
 ): Promise<{ reference: string; emailed: boolean } | null> {
   const db = getDb();
   const now = new Date();
@@ -101,7 +136,7 @@ export async function markShipped(
     if (!tracking) return null;
     const [row] = await db
       .update(teamOrders)
-      .set({ status: "shipped", trackingNumber: tracking, shipCarrier: carrierFor(tracking), labelUrl: labelUrl ?? existing?.label ?? null, shippedAt: now, updatedAt: now })
+      .set({ status: "shipped", trackingNumber: tracking, shipCarrier: options?.carrier ?? carrierFor(tracking), labelUrl: labelUrl ?? existing?.label ?? null, shippedAt: now, updatedAt: now })
       .where(eq(teamOrders.id, id))
       .returning({
         id: teamOrders.id,
@@ -113,16 +148,18 @@ export async function markShipped(
         designRequestId: teamOrders.designRequestId,
       });
     if (!row) return null;
+    const trackingUrl = trackingUrlForCarrier(tracking, options?.carrier);
     await sendFollowUpSms({
       phone: row.phone,
-      body: `Slugger Athletics: your ${row.reference} order shipped! 🚚 Track it: ${trackingUrlFor(tracking)}\nReply STOP to opt out.`,
+      body: `Slugger Athletics: your ${row.reference} order shipped${options?.directFromProduction ? " directly from production" : ""}! 🚚 Track it: ${trackingUrl}\nReply STOP to opt out.`,
     });
     const emailed = await emailOrderShipped({
       to: row.email,
       name: row.name,
       reference: row.reference,
       trackingNumber: tracking,
-      trackingUrl: trackingUrlFor(tracking),
+      trackingUrl,
+      directFromProduction: options?.directFromProduction,
     });
     // Shipped = this project's Discord thread is done; archive it (no-op
     // without a bot token).

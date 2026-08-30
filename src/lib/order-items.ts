@@ -7,17 +7,86 @@ export const APPAREL_SIZES = [
   "2X-Large", "3X-Large", "4X-Large", "5X-Large",
 ];
 
+// Girls' volleyball jerseys use the fitted volleyball block shown in the size
+// guide, not the relaxed all-sport jersey scale. Keep these values aligned with
+// VOLLEYBALL_GIRLS_* in size-charts.tsx so every chart size is selectable.
+export const VOLLEYBALL_SIZES = [
+  "Youth XS", "Youth Small", "Youth Medium", "Youth Large", "Youth X-Large",
+  "Adult XS", "Small", "Medium", "Large", "X-Large", "2X-Large",
+];
+
 export const SOCK_SIZES = ["Youth S/M", "Youth L/XL", "Adult S/M", "Adult L/XL"];
 
-// Cheer sizing runs its own youth->adult scale (not the youth-to-5XL apparel
-// scale). NOTE: the measurement CHART (inches) still needs to come from the
-// supplier - these are the selectable size labels.
-// Slugger's official cheer size run (chart in size-charts.tsx CHEER_SET). No
-// Youth X-Large - the scale jumps from Youth Large to Adult XS.
-export const CHEER_SIZES = [
-  "Youth XS", "Youth Small", "Youth Medium", "Youth Large",
-  "Adult XS", "Adult Small", "Adult Medium", "Adult Large", "Adult X-Large", "Adult 2X-Large",
-];
+// Cheer sizing uses the supplier's numbered scale rather than the standard
+// youth/adult apparel scale. Keep these values aligned with CHEER_SET in
+// size-charts.tsx so every selectable size has an exact chart row.
+export const CHEER_SIZES = ["6", "8", "10", "12", "14", "16"];
+
+const CHEER_ITEM_KEYS = new Set(["cheer_uniform", "cheer_uniform_rhinestone"]);
+const CHEER_TOP_SUFFIX = "__top";
+const CHEER_BOTTOM_SUFFIX = "__bottom";
+
+export type SizeField = {
+  /** Key persisted in the roster's `sizes` object. */
+  key: string;
+  /** The priced/order item this measurement belongs to. */
+  itemKey: string;
+  label: string;
+  sizes: string[];
+};
+
+export function isCheerItem(key: string): boolean {
+  return CHEER_ITEM_KEYS.has(key);
+}
+
+/** Cheer uniforms are sold as one set but sized as two garments. Keeping the
+ *  two roster keys tied to one `itemKey` lets production receive both sizes
+ *  without billing the customer for two sets. */
+function isVolleyballSport(sport?: string | null): boolean {
+  return /volleyball/i.test(sport ?? "");
+}
+
+export function sizeFieldsForItem(key: string, sport?: string | null): SizeField[] {
+  const item = ITEM_TYPES.find((t) => t.key === key);
+  const sizes = key === "jersey" && isVolleyballSport(sport)
+    ? VOLLEYBALL_SIZES
+    : item?.sizes ?? APPAREL_SIZES;
+  const label = item?.label ?? key;
+  if (!isCheerItem(key)) return [{ key, itemKey: key, label, sizes }];
+  return [
+    { key: `${key}${CHEER_TOP_SUFFIX}`, itemKey: key, label: `${label} Top`, sizes },
+    { key: `${key}${CHEER_BOTTOM_SUFFIX}`, itemKey: key, label: `${label} Bottom`, sizes },
+  ];
+}
+
+export function sizeFieldsForItems(keys: string[], sport?: string | null): SizeField[] {
+  return (keys.length ? keys : ["jersey"]).flatMap((key) => sizeFieldsForItem(key, sport));
+}
+
+/** Maps a persisted size-field key back to the single product being priced. */
+export function itemKeyForSizeField(key: string): string {
+  if (key.endsWith(CHEER_TOP_SUFFIX)) return key.slice(0, -CHEER_TOP_SUFFIX.length);
+  if (key.endsWith(CHEER_BOTTOM_SUFFIX)) return key.slice(0, -CHEER_BOTTOM_SUFFIX.length);
+  return key;
+}
+
+/** Old cheer rosters stored one set size. Use it as the fallback for both
+ *  pieces until that row is edited, so existing orders remain readable. */
+export function sizeValueForField(
+  field: SizeField,
+  sizes?: Record<string, string> | null,
+  legacyJerseySize?: string | null,
+): string {
+  return sizes?.[field.key]
+    ?? (isCheerItem(field.itemKey) ? sizes?.[field.itemKey] : undefined)
+    ?? (field.itemKey === "jersey" ? legacyJerseySize ?? "" : "");
+}
+
+export function missingCheerSizeLabels(itemKeys: string[], sizes?: Record<string, string> | null): string[] {
+  return sizeFieldsForItems(itemKeys)
+    .filter((field) => isCheerItem(field.itemKey) && !sizeValueForField(field, sizes))
+    .map((field) => field.label);
+}
 
 // Flag football uniforms are SLEEVELESS COMPRESSION - their own youth-to-3XL
 // scale (chart in size-charts.tsx FLAG_FOOTBALL). A looser fit = a standard
@@ -91,7 +160,7 @@ export const EXTRA_ADDON_KEYS = [
 ];
 
 export function isInHouseItem(key: string): boolean {
-  return Boolean(ITEM_TYPES.find((t) => t.key === key)?.inHouse);
+  return Boolean(ITEM_TYPES.find((t) => t.key === itemKeyForSizeField(key))?.inHouse);
 }
 
 // Hats/caps - ordered by size, never personalized with a player name or number.
@@ -125,14 +194,14 @@ export function defaultRequiresNames(itemKeys: string[] | null | undefined): boo
 }
 
 export function isOutsourcedItem(key: string): boolean {
-  return Boolean(ITEM_TYPES.find((t) => t.key === key)?.outsourced);
+  return Boolean(ITEM_TYPES.find((t) => t.key === itemKeyForSizeField(key))?.outsourced);
 }
 
 /** True for items the overseas jersey designer does NOT produce - in-house
  *  (hats) OR outsourced (beanies). Use this for every designer-facing filter
  *  (roster posts, print QA, billing) so neither ever reaches him. */
 export function notDesignerMade(key: string): boolean {
-  const t = ITEM_TYPES.find((x) => x.key === key);
+  const t = ITEM_TYPES.find((x) => x.key === itemKeyForSizeField(key));
   return Boolean(t?.inHouse || t?.outsourced);
 }
 
@@ -216,11 +285,15 @@ export function fabricFor(style?: string | null, ...sportHints: (string | null |
 }
 
 export function itemLabel(key: string): string {
-  return ITEM_TYPES.find((t) => t.key === key)?.label ?? key;
+  const itemKey = itemKeyForSizeField(key);
+  const base = ITEM_TYPES.find((t) => t.key === itemKey)?.label ?? itemKey;
+  if (key.endsWith(CHEER_TOP_SUFFIX)) return `${base} Top`;
+  if (key.endsWith(CHEER_BOTTOM_SUFFIX)) return `${base} Bottom`;
+  return base;
 }
 
-export function sizesFor(key: string): string[] {
-  return ITEM_TYPES.find((t) => t.key === key)?.sizes ?? APPAREL_SIZES;
+export function sizesFor(key: string, sport?: string | null): string[] {
+  return sizeFieldsForItem(itemKeyForSizeField(key), sport)[0]?.sizes ?? APPAREL_SIZES;
 }
 
 /** Tally an ordered roster into a per-item size breakdown (e.g. Fitted Hat:
@@ -239,18 +312,19 @@ export function formatSize(size?: string | null): string {
 export function sizeBreakdown(
   roster: { size?: string | null; sizes?: Record<string, string> | null; quantity?: number | null }[],
   items: string[],
+  sport?: string | null,
 ): { key: string; label: string; parts: { size: string; n: number }[]; total: number }[] {
-  return items
-    .map((k) => {
+  return sizeFieldsForItems(items, sport)
+    .map((field) => {
       const counts: Record<string, number> = {};
       for (const r of roster) {
-        const v = r.sizes?.[k] ?? (k === "jersey" ? r.size ?? undefined : undefined);
+        const v = sizeValueForField(field, r.sizes, r.size);
         if (v) counts[v] = (counts[v] ?? 0) + Math.max(1, r.quantity ?? 1);
       }
-      const canonical = sizesFor(k);
+      const canonical = field.sizes;
       const parts = canonical.filter((s) => counts[s]).map((s) => ({ size: formatSize(s), n: counts[s] }));
       for (const s of Object.keys(counts)) if (!canonical.includes(s)) parts.push({ size: formatSize(s), n: counts[s] });
-      return { key: k, label: itemLabel(k), parts, total: parts.reduce((a, b) => a + b.n, 0) };
+      return { key: field.key, label: field.label, parts, total: parts.reduce((a, b) => a + b.n, 0) };
     })
     .filter((x) => x.total > 0);
 }

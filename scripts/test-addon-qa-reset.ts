@@ -23,6 +23,8 @@ async function main() {
   const { createTeamOrder, addRosterRow, submitTeamOrder, getRoster, savePrintFileVerification } =
     await import("../src/lib/team-orders");
   const { priceAddonRows, createAddon, markAddonPaid } = await import("../src/lib/team-order-addons");
+  const { computeTeamOrderQuote } = await import("../src/lib/team-order-pricing");
+  const { buildCustomerOrderSpec } = await import("../src/lib/order-spec");
 
   const db = getDb();
   let orderId: string | null = null;
@@ -47,7 +49,10 @@ async function main() {
 
     await addRosterRow(orderId, { playerName: "SMITH", playerNumber: "1", sizes: { jersey: "M" } }, "test");
     await addRosterRow(orderId, { playerName: "JONES", playerNumber: "2", sizes: { jersey: "L" } }, "test");
-    await submitTeamOrder(orderId, new Date());
+    const initialRoster = await getRoster(orderId);
+    const [initialOrder] = await db.select().from(teamOrders).where(eq(teamOrders.id, orderId)).limit(1);
+    const spec = buildCustomerOrderSpec(initialOrder, initialRoster, null, computeTeamOrderQuote(initialOrder, initialRoster));
+    await submitTeamOrder(orderId, new Date(), spec);
 
     console.log("2) Marking print file as verified (pre-add-on state)...");
     await savePrintFileVerification(orderId, ["https://example.com/fake-print-file.png"], {

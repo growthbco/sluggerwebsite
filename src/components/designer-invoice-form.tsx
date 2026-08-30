@@ -11,6 +11,7 @@ type Line = {
   unit: string;
   teamOrderId?: string;
   ourQty?: number;
+  expectedUnitCents?: number;
 };
 
 // An already-submitted (still unpaid) invoice the designer can reopen and edit.
@@ -25,7 +26,7 @@ export type EditableInvoice = {
   submittedAt: string | null;
   vendorRef?: string | null;
   attachmentUrls?: string[];
-  lines: { team: string; garment: string; qty: number; unitCents: number; teamOrderId?: string; ourQty?: number }[];
+  lines: { team: string; garment: string; qty: number; unitCents: number; teamOrderId?: string; ourQty?: number; ourUnitCents?: number }[];
 };
 
 // A paid invoice - read-only history, like a customer's past orders.
@@ -78,7 +79,6 @@ export function DesignerInvoiceForm({
   const [designerName, setDesignerName] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [duty, setDuty] = useState("");
-  const [prevBalance, setPrevBalance] = useState("");
   const [notes, setNotes] = useState("");
   const [vendorRef, setVendorRef] = useState("");
   const [attachments, setAttachments] = useState<{ url: string; name: string }[]>([]);
@@ -104,8 +104,7 @@ export function DesignerInvoiceForm({
 
   const subtotal = useMemo(() => lines.reduce((s, l) => s + num(l.qty) * num(l.unit), 0), [lines]);
   const dutyN = num(duty);
-  const prevN = num(prevBalance);
-  const total = subtotal + dutyN + prevN;
+  const total = subtotal + dutyN;
   const dutyPct = subtotal > 0 ? (dutyN / subtotal) * 100 : 0;
   const dutyOutOfBand = subtotal > 0 && dutyN > 0 && (dutyPct < 15 || dutyPct > 19);
 
@@ -153,16 +152,9 @@ export function DesignerInvoiceForm({
         unit: o.unitCostCents ? (o.unitCostCents / 100).toFixed(2) : "",
         teamOrderId: o.teamOrderId,
         ourQty: qty,
+        expectedUnitCents: o.unitCostCents,
       },
     ]);
-  }
-
-  function addAll() {
-    for (const o of rows) {
-      if (o.alreadyBilledOn) continue;
-      if (o.teamOrderId && addedIds.has(o.teamOrderId)) continue;
-      addFromOrder(o);
-    }
   }
 
   const update = (i: number, field: keyof Line, val: string) =>
@@ -206,13 +198,15 @@ export function DesignerInvoiceForm({
     setLines(inv.lines.map((l) => ({
       team: l.team,
       garment: l.garment,
-      qty: String(l.qty),
-      unit: (l.unitCents / 100).toFixed(2),
+      // Reopening a flagged linked line restores Slugger's saved quantity/rate
+      // so the vendor can fix it with one save instead of retyping figures.
+      qty: String(l.ourQty ?? l.qty),
+      unit: ((l.ourUnitCents ?? l.unitCents) / 100).toFixed(2),
       teamOrderId: l.teamOrderId,
       ourQty: l.ourQty,
+      expectedUnitCents: l.ourUnitCents,
     })));
     setDuty(inv.dutyCents ? (inv.dutyCents / 100).toFixed(2) : "");
-    setPrevBalance(inv.previousBalanceCents ? (inv.previousBalanceCents / 100).toFixed(2) : "");
     setNotes(inv.notes ?? "");
     setVendorRef(inv.vendorRef ?? "");
     setAttachments((inv.attachmentUrls ?? []).map((url) => ({ url, name: url.split("/").pop()?.split("-").slice(0, -1).join("-") || "invoice" })));
@@ -223,7 +217,6 @@ export function DesignerInvoiceForm({
   function reset() {
     setLines([]);
     setDuty("");
-    setPrevBalance("");
     setNotes("");
     setVendorRef("");
     setAttachments([]);
@@ -278,7 +271,9 @@ export function DesignerInvoiceForm({
             teamOrderId: l.teamOrderId,
           })),
           dutyCents: Math.round(dutyN * 100),
-          previousBalanceCents: Math.round(prevN * 100),
+          // Carryover balances are not accepted from the vendor form. Put a
+          // disputed balance in notes so Slugger can verify it separately.
+          previousBalanceCents: 0,
           notes: notes.trim() || undefined,
           vendorRef: vendorRef.trim() || undefined,
           attachmentUrls: attachments.map((a) => a.url),
@@ -313,7 +308,7 @@ export function DesignerInvoiceForm({
           <h1 className="display text-4xl mt-6">{done.edited ? "Invoice Updated" : "Invoice Submitted"}</h1>
           <p className="mt-4 text-muted leading-relaxed">
             Reference <span className="text-brand font-semibold">{done.reference}</span>. Slugger has been
-            notified{done.edited ? " of the change" : " and will take care of payment"}. You can close this page.
+            notified{done.edited ? " of the change" : " and will review the charges for payment"}. You can close this page.
           </p>
           <button
             onClick={() => { setDone(null); reset(); }}
@@ -340,7 +335,7 @@ export function DesignerInvoiceForm({
         <div className="min-w-0">
           <header className="mb-4">
             <h1 className="display text-2xl sm:text-3xl">Your invoice to Slugger</h1>
-            <p className="mt-1 text-sm text-muted">Find the job, add it, set your cost, submit. Slugger is pinged instantly and pays you.</p>
+            <p className="mt-1 text-sm text-muted">Add each finished job from Slugger&apos;s list and submit it for review. Saved quantities and rates stay locked to the order.</p>
           </header>
 
           {editingId && (
@@ -374,14 +369,6 @@ export function DesignerInvoiceForm({
                 {t.label} <span className="tabular-nums opacity-80">{t.n}</span>
               </button>
             ))}
-            {filter !== "billed" && rows.some((o) => !o.alreadyBilledOn && !(o.teamOrderId && addedIds.has(o.teamOrderId))) && (
-              <button
-                onClick={addAll}
-                className="ml-auto clip-slant px-3 py-1.5 text-sm border border-brand/60 text-brand hover:bg-brand/10 transition-colors whitespace-nowrap"
-              >
-                + Add all
-              </button>
-            )}
           </div>
 
           {/* Jobs list (table-like rows; no horizontal scroll) */}
@@ -506,6 +493,8 @@ export function DesignerInvoiceForm({
                 {lines.map((l, i) => {
                   const lineTotal = num(l.qty) * num(l.unit);
                   const mismatch = typeof l.ourQty === "number" && l.ourQty !== num(l.qty);
+                  const qtyLocked = Boolean(l.teamOrderId && typeof l.ourQty === "number");
+                  const rateLocked = Boolean(l.teamOrderId && typeof l.expectedUnitCents === "number");
                   return (
                     <div key={i} className={`bg-ink border clip-slant p-3 ${mismatch ? "border-[#e5533c]" : "border-line"}`}>
                       <div className="flex items-start justify-between gap-2 mb-2">
@@ -524,12 +513,12 @@ export function DesignerInvoiceForm({
                       </div>
                       <div className="flex gap-2 items-end">
                         <label className="w-16">
-                          <span className="block text-[10px] text-muted mb-1">Qty</span>
-                          <input inputMode="numeric" placeholder="0" value={l.qty} onChange={(e) => update(i, "qty", e.target.value)} className={inputCls} />
+                          <span className="block text-[10px] text-muted mb-1">Qty{qtyLocked ? " · locked" : ""}</span>
+                          <input inputMode="numeric" placeholder="0" value={l.qty} onChange={(e) => update(i, "qty", e.target.value)} readOnly={qtyLocked} className={`${inputCls} ${qtyLocked ? "opacity-70 cursor-not-allowed" : ""}`} />
                         </label>
                         <label className="flex-1">
-                          <span className="block text-[10px] text-muted mb-1">Cost each ($)</span>
-                          <input inputMode="decimal" placeholder="0.00" value={l.unit} onChange={(e) => update(i, "unit", e.target.value)} className={inputCls} />
+                          <span className="block text-[10px] text-muted mb-1">Cost each ($){rateLocked ? " · locked" : ""}</span>
+                          <input inputMode="decimal" placeholder="0.00" value={l.unit} onChange={(e) => update(i, "unit", e.target.value)} readOnly={rateLocked} className={`${inputCls} ${rateLocked ? "opacity-70 cursor-not-allowed" : ""}`} />
                         </label>
                         <div className="w-16 text-right">
                           <span className="block text-[10px] text-muted mb-1">Line</span>
@@ -547,26 +536,24 @@ export function DesignerInvoiceForm({
               </div>
             )}
 
-            {/* Something the list didn't surface - add it by hand. */}
+            {/* Missing jobs remain possible, but cannot be paid until staff link
+                and verify them against a real order. */}
             <button
               onClick={addCustomLine}
               className="mt-3 w-full border border-dashed border-line clip-slant px-3 py-2 text-xs text-muted hover:border-brand hover:text-brand transition-colors"
             >
-              + Add something not on the list
+              + Report a job missing from the list
             </button>
+            <p className="mt-1.5 text-[11px] text-muted">Manual lines are held for review and cannot be paid until Slugger verifies the order.</p>
 
-            {/* Duty + previous balance */}
-            <div className="flex gap-2 mt-4">
-              <label className="flex-1">
+            {/* Duty */}
+            <div className="mt-4">
+              <label>
                 <span className="block text-[10px] text-muted mb-1">Duty / Tax ($)</span>
                 <input inputMode="decimal" placeholder="0.00" value={duty} onChange={(e) => setDuty(e.target.value)} className={inputCls} />
               </label>
-              <label className="flex-1">
-                <span className="block text-[10px] text-muted mb-1">Prev. balance ($)</span>
-                <input inputMode="decimal" placeholder="0.00" value={prevBalance} onChange={(e) => setPrevBalance(e.target.value)} className={inputCls} />
-              </label>
             </div>
-            <p className="mt-1.5 text-[11px] text-muted">Previous balance = anything we still owe you from before, added onto this invoice.</p>
+            <p className="mt-1.5 text-[11px] text-muted">Think Slugger owes a previous balance? Put the invoice number and amount in Notes so it can be verified separately.</p>
             {dutyN > 0 && (
               <p className={`mt-1.5 text-[11px] ${dutyOutOfBand ? "text-[#e5533c]" : "text-muted"}`}>
                 Duty is {dutyPct.toFixed(1)}% of goods.{dutyOutOfBand ? " Outside 15-19% - will be flagged." : ""}
@@ -604,7 +591,6 @@ export function DesignerInvoiceForm({
             <div className="mt-4 pt-3 border-t border-line space-y-0.5">
               <Row label="Goods" value={dollars(subtotal)} />
               {dutyN > 0 && <Row label={`Duty (${dutyPct.toFixed(1)}%)`} value={dollars(dutyN)} />}
-              {prevN > 0 && <Row label="Previous balance" value={dollars(prevN)} />}
               <div className="flex items-baseline justify-between pt-1">
                 <span className="display">Total you&apos;re billing</span>
                 <span className="display text-2xl text-brand tabular-nums">{dollars(total)}</span>

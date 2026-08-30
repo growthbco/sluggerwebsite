@@ -34,9 +34,12 @@ type Props = {
   maxRevisions: number;
   changeRequests: ChangeRequest[];
   rush: boolean;
+  priorityReview: boolean;
   neededBy: string | null;
   rushApprovedAt: string | null;
   rushApprovedBy: string | null;
+  /** The admin detail page already owns the project title and status summary. */
+  showRequestHeader?: boolean;
   // Which slice of this panel to render, so the admin page can put the brief in
   // an "Overview" tab and the proof workflow in a "Proofs" tab from the SAME
   // markup. Omit to render everything (legacy single-scroll).
@@ -65,9 +68,11 @@ export function DesignManagePanel({
   maxRevisions,
   changeRequests,
   rush,
+  priorityReview,
   neededBy,
   rushApprovedAt,
   rushApprovedBy,
+  showRequestHeader = true,
   view,
 }: Props) {
   const showOverview = view !== "proofs";
@@ -230,17 +235,20 @@ export function DesignManagePanel({
   const neededStr = neededBy
     ? new Date(neededBy).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" })
     : null;
-
   return (
     <div className="space-y-8">
       {showOverview && rush && (
         <div className="border-2 border-red-500 bg-red-500/10 p-5">
-          <p className="display text-2xl sm:text-3xl text-red-400">RUSH ORDER{neededStr ? ` - NEEDED BY ${neededStr.toUpperCase()}` : ""}</p>
+          <p className="display text-2xl sm:text-3xl text-red-400">{priorityReview ? "PRIORITY REVIEW" : "2-WEEK RUSH"}{neededStr ? ` - NEEDED BY ${neededStr.toUpperCase()}` : ""}</p>
           <p className="mt-2 text-sm text-foreground">
-            Rush is a flat $100 fee, and the order ships direct.{" "}
-            {rushOk ? "Timeline is confirmed - this design is priority." : <strong>Do NOT promise this date to the client until it&apos;s approved below.</strong>}
+            {priorityReview
+              ? "This deadline is inside the two-week rush window. Quote the internal one-week priority upgrade manually and get approval before promising any date."
+              : "Two-week rush production is a flat $100 fee. Shipping time is additional. "}
+            {!priorityReview && (rushOk ? "Rush service is confirmed." : <strong>Do NOT promise the requested in-hand date until the full timeline is reviewed.</strong>)}
           </p>
-          {rushOk ? (
+          {priorityReview ? (
+            <p className="mt-3 display text-amber-300">Manual premium price + owner approval required</p>
+          ) : rushOk ? (
             <p className="mt-3 display text-green-400">Timeline approved by {rushOk.by}</p>
           ) : (
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -258,7 +266,7 @@ export function DesignManagePanel({
                 disabled={!rushName || rushBusy}
                 className="clip-slant bg-red-500 hover:bg-red-600 text-white display text-sm px-5 py-2 disabled:opacity-50"
               >
-                {rushBusy ? "Approving..." : "We can meet this date - approve rush"}
+                {rushBusy ? "Approving..." : "Approve 2-week rush service"}
               </button>
               {rushError && <span className="text-sm text-red-400">{rushError}</span>}
             </div>
@@ -267,7 +275,7 @@ export function DesignManagePanel({
       )}
       {showOverview && (
       <>
-      <header>
+      {showRequestHeader && <header>
         <span className="display text-brand text-sm">{reference} · {status.replace(/_/g, " ")}</span>
         <h1 className="display text-3xl sm:text-4xl text-foreground mt-1">{teamName}</h1>
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
@@ -285,7 +293,7 @@ export function DesignManagePanel({
             Revisions: {revisionsUsed} / {maxRevisions}
           </span>
         </div>
-      </header>
+      </header>}
 
       <section className="bg-steel border border-line p-5 grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
         <div>
@@ -524,7 +532,7 @@ export function DesignManagePanel({
       {showProofs && (
       <section>
         <h2 className="display text-xl text-foreground">Upload a proof</h2>
-        <p className="text-sm text-muted mt-1">Add one or more proof images. When you click "Send to Client", they're emailed a link to approve.</p>
+        <p className="text-sm text-muted mt-1">Add one or more proof images. When you click &quot;Send to Client,&quot; they&apos;re emailed a link to approve.</p>
 
         <label
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}

@@ -56,7 +56,7 @@ export function ReviewsSection() {
             onClick={() => setShowAll(true)}
             className="display text-sm text-brand border border-brand/40 px-5 py-2.5 hover:bg-brand/10"
           >
-            Show all {reviews.length} reviews
+            Show all written reviews
           </button>
         </div>
       )}

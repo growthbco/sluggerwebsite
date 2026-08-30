@@ -7,7 +7,7 @@ import { DesignStatusPanel } from "@/components/design-status-panel";
 import { DesignMessages } from "@/components/design-messages";
 import { TeamOrderManageSection } from "@/components/team-order-manage-section";
 import { OrderStageTracker, type Stage } from "@/components/order-stage-tracker";
-import { trackingUrlFor } from "@/lib/tracking";
+import { trackingUrlFor, trackingUrlForCarrier } from "@/lib/tracking";
 
 export const metadata: Metadata = { title: "Your Order", robots: { index: false } };
 
@@ -27,7 +27,15 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
   const request = await getByStatusToken(token);
   if (!request) return <Centered title="Link not found">This link is invalid or has expired.</Centered>;
 
-  const isApproved = request.status === "approved" || request.status === "ordered";
+  const reviewProofs = request.proofReviewUrls?.length ? request.proofReviewUrls : request.proofImages ?? [];
+  const approvedProofs = request.approvedDesignUrls?.length
+    ? request.approvedDesignUrls
+    : request.approvedDesignUrl
+      ? [request.approvedDesignUrl]
+      : [];
+  const isApproved = (request.status === "approved" || request.status === "ordered")
+    && approvedProofs.length > 0
+    && approvedProofs.every((url) => reviewProofs.includes(url));
   // The order this design turned into (auto-provisioned on approval). Drives the
   // roster / deposit / tracking stages of the hub.
   const order = isApproved ? await getByDesignRequestId(request.id) : null;
@@ -70,7 +78,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
           ? { title: "Pay the deposit", body: "Your roster is confirmed. The deposit starts production.", href: order.invoiceUrl, action: "Pay deposit →" }
           : { title: "Deposit invoice is next", body: "Your roster is confirmed. We’ll email the invoice and place it here.", href: "#deposit", action: "View payment status ↓" }
         : shipped
-          ? { title: "Your order shipped", body: "Use your carrier link to follow the delivery.", href: order?.trackingNumber ? trackingUrlFor(order.trackingNumber) : "#shipment", action: "Track shipment →" }
+          ? { title: "Your order shipped", body: "Use your carrier link to follow the delivery.", href: order?.trackingNumber ? trackingUrlForCarrier(order.trackingNumber, order.shipCarrier) : "#shipment", action: "Track shipment →" }
           : {
               title: "Your order is in production",
               body: request.rushApprovedAt
@@ -105,11 +113,11 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
         <div className={`text-sm px-4 py-3 border ${request.rushApprovedAt ? "border-brand/40 bg-brand/5" : "border-amber-500/40 bg-amber-500/5"} text-foreground`}>
           {request.rushApprovedAt ? (
             <>
-              <strong>🚨 Rush confirmed</strong>
+              <strong>🚨 Two-week rush confirmed</strong>
               {request.neededBy
-                ? ` - we'll have your order in hand by ${request.neededBy.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" })}.`
+                ? ` - your requested in-hand date is ${request.neededBy.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" })}.`
                 : "."}{" "}
-              The flat $100 rush fee will be on the invoice and your order ships direct.
+              The flat $100 fee covers a two-week production target after final approval, roster, and deposit. Shipping time is additional.
             </>
           ) : (
             <>
@@ -117,8 +125,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
               {request.neededBy
                 ? ` - needed by ${request.neededBy.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" })}.`
                 : "."}{" "}
-              We&apos;re confirming we can meet your date and will let you know shortly. Rush service is a flat $100 fee,
-              and the order ships direct.
+              We&apos;re reviewing the full timeline and will let you know shortly. Two-week rush is a flat $100 fee; shorter deadlines require a custom priority quote.
             </>
           )}
         </div>
@@ -130,10 +137,11 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
           teamName={request.teamName}
           productTypes={request.productTypes ?? []}
           status={request.status}
-          proofImages={request.proofImages ?? []}
+          proofImages={reviewProofs}
+          supersededProofImages={(request.supersededProofUrls ?? []).filter((url) => !reviewProofs.includes(url))}
           proofLabels={request.proofLabels ?? {}}
           initialApprovedUrl={request.approvedDesignUrl}
-          approvedUrls={request.approvedDesignUrls ?? []}
+          approvedUrls={approvedProofs}
           teamOrderUrl={order ? "#roster" : `/team-order?design=${token}`}
           revisionsUsed={request.revisionsUsed ?? 0}
           maxRevisions={MAX_REVISIONS}
@@ -187,7 +195,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
               </p>
               {order.trackingNumber && (
                 <p>
-                  <a href={trackingUrlFor(order.trackingNumber)} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
+                  <a href={trackingUrlForCarrier(order.trackingNumber, order.shipCarrier)} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
                     Track {order.trackingNumber} →
                   </a>
                 </p>

@@ -6,6 +6,11 @@ import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 import { refCodeFromCookie } from "@/lib/referral-cookie";
 import { recordOperationalFailure } from "@/lib/operational-events";
 import { rushFeeCentsForPieces } from "@/lib/rush-pricing";
+import {
+  createShippingProtectionPrice,
+  estimatedPostageFromChargedShipping,
+  shippingProtectionCents,
+} from "@/lib/shipping-protection";
 
 export const runtime = "nodejs";
 
@@ -168,6 +173,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (lineItems.length === 0) {
     return NextResponse.json({ error: "No valid items selected" }, { status: 400 });
   }
+  // Snapshot the physical merchandise value before rush and tax line items are
+  // added; those charges are not contents of the parcel.
+  const merchandiseCents = lineItems.reduce((s, li) => s + li.price_data.unit_amount * li.quantity, 0);
 
   // Rush production: one flat $100 fee. One explicit line keeps the
   // Stripe total identical to the site and makes the policy easy to audit.
@@ -203,22 +211,45 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   try {
     const stripe = getStripe();
+    const shippingChoices = await shipOptions([apparelOz, hatOz], shipZip, pickup);
+    // Protection is priced from estimated carrier postage, not the 25%
+    // shipping/handling charge the customer sees. If they choose the faster
+    // Stripe shipping option, Slugger absorbs the few-cent premium difference.
+    const estimatedPostageCents = pickup ? 0 : estimatedPostageFromChargedShipping(shippingChoices[0]?.amountCents ?? 0);
+    const protectionChargeCents = shippingProtectionCents(merchandiseCents, estimatedPostageCents);
+    const protectionPrice = pickup
+      ? null
+      : await createShippingProtectionPrice(stripe, protectionChargeCents, merchandiseCents);
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: lineItems,
+      ...(protectionPrice ? { optional_items: [{ price: protectionPrice, quantity: 1 }] } : {}),
       success_url: `${SITE}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${SITE}/store/${token}`,
       shipping_address_collection: { allowed_countries: ["US"] },
       phone_number_collection: { enabled: true },
       // Buyer picks: standard ground, expedited (when live-rated), or pickup.
-      shipping_options: (await shipOptions([apparelOz, hatOz], shipZip, pickup)).map((o) => ({
+      shipping_options: shippingChoices.map((o) => ({
         shipping_rate_data: {
           display_name: o.label,
           type: "fixed_amount" as const,
           fixed_amount: { amount: o.amountCents, currency: "usd" },
         },
       })),
-      metadata: { orderType: "team_store", teamId: store.id, teamName: store.name, ...(rush ? { rush: "true" } : {}), ...(referralCode ? { referralCode } : {}), ...(note ? { orderNote: note } : {}), ...(fundraiseTotal > 0 ? { fundraiseCents: String(fundraiseTotal) } : {}), ...(attributionSource ? { attributionSource } : {}) },
+      metadata: {
+        orderType: "team_store",
+        teamId: store.id,
+        teamName: store.name,
+        ...(!pickup ? {
+          shippingProtectionValueCents: String(merchandiseCents),
+          shippingProtectionQuotedCents: String(protectionChargeCents),
+        } : {}),
+        ...(rush ? { rush: "true" } : {}),
+        ...(referralCode ? { referralCode } : {}),
+        ...(note ? { orderNote: note } : {}),
+        ...(fundraiseTotal > 0 ? { fundraiseCents: String(fundraiseTotal) } : {}),
+        ...(attributionSource ? { attributionSource } : {}),
+      },
     });
     return NextResponse.json({ url: session.url });
   } catch (e) {

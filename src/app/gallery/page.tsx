@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { ExpandableImage } from "@/components/expandable-image";
 import { galleryPhotos } from "@/lib/gallery";
+import { GalleryGrid } from "@/components/gallery-grid";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/gallery" },
@@ -21,16 +21,7 @@ export default function GalleryPage() {
         </p>
       </header>
 
-      <div className="mt-10 columns-2 sm:columns-3 lg:columns-4 gap-3 [column-fill:_balance]">
-        {galleryPhotos.map((m) => (
-          <div
-            key={m.id}
-            className="mb-3 break-inside-avoid overflow-hidden bg-steel border border-line"
-          >
-            <ExpandableImage src={m.file} alt={m.alt || "Slugger Athletics custom gear"} block imgClassName="object-cover" />
-          </div>
-        ))}
-      </div>
+      <GalleryGrid photos={galleryPhotos} />
     </div>
   );
 }

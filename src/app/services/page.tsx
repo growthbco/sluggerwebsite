@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SERVICE_GROUPS, type Service } from "@/lib/services-list";
+import { PUBLIC_TIMELINE_COPY } from "@/lib/customer-policy";
 
 export const metadata: Metadata = {
   title: "Services & Pricing - Custom Hats, Uniforms & Embroidery",
   description:
-    "Every service we offer with upfront pricing - custom embroidered hats from $25, sublimated team uniforms, free mockups, and easy team ordering tools.",
+    "Every service we offer with upfront pricing - custom embroidered hats from $30, sublimated team uniforms, free mockups, and easy team ordering tools.",
   openGraph: {
     title: "Services & Pricing - Custom Hats, Uniforms & Embroidery",
     description:
-      "Every service we offer with upfront pricing - embroidered hats from $25, sublimated uniforms, free mockups, and easy team ordering tools.",
+      "Every service we offer with upfront pricing - embroidered hats from $30, sublimated uniforms, free mockups, and easy team ordering tools.",
     type: "website",
     url: "/services",
   },
@@ -60,13 +61,14 @@ export default function ServicesPage() {
 
       {/* Hero */}
       <section className="mx-auto max-w-4xl px-4 sm:px-6 py-16 text-center">
-        <span className="display text-brand text-sm">In-House Production · Free Mockups · Upfront Pricing</span>
+        <span className="display text-brand text-sm">In-House Design &amp; Embroidery · Free Mockups · Upfront Pricing</span>
         <h1 className="display text-4xl sm:text-6xl text-foreground mt-2">Our Services</h1>
         <p className="mt-5 text-lg text-muted max-w-2xl mx-auto">
           Everything we make and how much it costs - custom embroidered hats, fully sublimated
-          team uniforms, and the free design and team order tools that come with every job. No
-          setup fees, no surprises.
+          team uniforms, and the free design and team order tools that come with every job. Product
+          prices are shown up front; tax, shipping, and any disclosed specialty setup fee are separate.
         </p>
+        <p className="mt-3 text-sm text-muted max-w-2xl mx-auto">{PUBLIC_TIMELINE_COPY}</p>
         <div className="mt-8 flex flex-wrap gap-4 justify-center">
           <Link href="/team-order" className="clip-slant bg-brand text-on-brand display text-lg px-8 py-4 hover:bg-brand-dark transition-colors">
             Start an Order

@@ -48,7 +48,7 @@ export function TeamOrderShipping({ token, initial, locked }: { token: string; i
         {locked ? (
           <span className="text-xs text-muted">Shipped - locked</span>
         ) : !editing ? (
-          <button type="button" onClick={() => setEditing(true)} className="text-xs display text-brand border border-brand/50 px-2.5 py-1 rounded hover:bg-brand/10">Edit</button>
+          <button type="button" onClick={() => setEditing(true)} className="inline-flex min-h-11 items-center text-xs display text-brand border border-brand/50 px-3 py-1 rounded hover:bg-brand/10">Edit</button>
         ) : null}
       </div>
 

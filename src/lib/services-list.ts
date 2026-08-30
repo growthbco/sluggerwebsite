@@ -22,7 +22,7 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
     services: [
       {
         name: "Custom Embroidered Hats",
-        price: "From $25",
+        price: "From $30",
         description:
           "Fitted, snapback, and trucker hats embroidered with your logo - 6-hat minimum per design. Free mockup; a one-time digitizing fee applies if we create the embroidery file, or bring your own stitch file and skip it. Embroidered in-house in our Ocala shop - in-stock styles are usually ready in a couple of days, about a week if we order your blanks in.",
         href: "/custom-hats",
@@ -36,14 +36,14 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
       },
       {
         name: "Custom Snapback Hats",
-        price: "$25",
+        price: "$30",
         description:
           "Premium trucker-style snapbacks with a structured front panel and breathable mesh back, one size fits most. Embroidered with your logo - flat or 3D puff stitching.",
         href: "/custom-hats",
       },
       {
         name: "Custom Trucker Hats",
-        price: "$25",
+        price: "$30",
         description:
           "Classic mesh-back trucker caps embroidered with your design. Great for leagues, tournaments, businesses, and giveaways - 6-hat minimum per design.",
         href: "/custom-hats",
@@ -118,7 +118,7 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
       },
       {
         name: "V-Neck Jerseys",
-        price: "$29",
+        price: "$30",
         description:
           "Fully sublimated V-neck jerseys with custom design, names, and numbers included.",
         href: "/pricing",
@@ -227,10 +227,10 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
         href: "/team-stores",
       },
       {
-        name: "Rush Production (About 1 Week)",
+        name: "Rush Production (2 Weeks)",
         price: "$100 flat",
         description:
-          "Need it fast? Rush production gets priority handling for one flat $100 fee. The timeline must be confirmed before we promise a date.",
+          "A confirmed Rush targets two weeks of production for one flat $100 fee. Shipping time is additional. Deadlines inside two weeks require a separately priced Priority review.",
         href: "/faq",
       },
       {

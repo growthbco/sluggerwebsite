@@ -33,6 +33,9 @@ import { AdminPickupButton } from "@/components/admin-pickup-button";
 import { AdminPendingAddons } from "@/components/admin-pending-addons";
 import { TrackingInfo } from "@/components/tracking-info";
 import { AdminRequote } from "@/components/admin-requote";
+import { AdminDeliveryTimeline } from "@/components/admin-delivery-timeline";
+import { findActiveDesignByEmail } from "@/lib/design-requests";
+import type { DeliveryTier } from "@/lib/delivery-timeline";
 
 export const metadata: Metadata = { title: "Order Detail", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -107,6 +110,10 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
   const design = o.designRequestId
     ? (await db.select().from(designRequests).where(eq(designRequests.id, o.designRequestId)).limit(1))[0] ?? null
     : null;
+  // Older orders were not always linked back to their design request. For the
+  // timeline only, use the contact's design when there is exactly one possible
+  // match; findActiveDesignByEmail deliberately refuses to guess between two.
+  const timelineDesign = design ?? (o.contactEmail ? await findActiveDesignByEmail(o.contactEmail) : null);
   const hasApprovedDesign = Boolean(
     o.approvedDesignUrl ||
       (design &&
@@ -121,7 +128,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
   const estimate = o.quotedTotalCents ?? (quote.totalCents > 0 ? quote.totalCents : null);
   const deposit = o.depositCents ?? (estimate ? Math.round(estimate / 2) : 0);
   const paid = Boolean(o.invoicePaidAt) || o.status === "paid" || o.status === "shipped";
-  const designBlocksOrder = !hasApprovedDesign && !paid && !o.depositPaidAt;
+  const designBlocksOrder = !hasApprovedDesign && !o.timelineStartAt && !paid && !o.depositPaidAt;
   const parcels = estimateOrderParcelsOz(roster);
   const weightOz = parcels.apparelOz + parcels.hatOz;
   const twoBoxes = parcels.apparelOz > 0 && parcels.hatOz > 0;
@@ -139,7 +146,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
         )
       ).reduce((sum, q) => sum + q.chargedCents, 0);
   const verified = jerseys.filter((j) => j.verifiedAt).length;
-  const breakdown = sizeBreakdown(roster, o.items ?? ["jersey"]);
+  const breakdown = sizeBreakdown(roster, o.items ?? ["jersey"], o.sport);
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
 
   // The single most useful next step for this order, spelled out.
@@ -215,6 +222,20 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
           {nextAction && <div className="shrink-0">{nextAction}</div>}
         </div>
       </header>
+
+      <AdminDeliveryTimeline
+        approvedAt={timelineDesign?.approvedAt}
+        rosterSubmittedAt={o.submittedAt ?? (o.depositPaidAt ? o.depositPaidAt : null)}
+        depositPaidAt={o.depositPaidAt ?? o.invoicePaidAt}
+        timelineStartAt={o.timelineStartAt}
+        fallbackStartAt={(["in_production", "paid", "shipped"] as string[]).includes(o.status) ? (o.depositPaidAt ?? o.invoicePaidAt ?? o.createdAt) : null}
+        requestedInHandAt={o.requestedInHandAt ?? timelineDesign?.neededBy}
+        promisedInHandAt={o.promisedInHandAt}
+        tier={(o.turnaroundTier as DeliveryTier | null) ?? undefined}
+        rush={o.rushShipping}
+        localPickup={o.localPickup}
+        contactName={o.contactName}
+      />
 
       {/* Duplicate guard: same-contact orders. Highlights likely duplicates
           (same team, unpaid) so staff can merge/delete instead of hunting. */}
@@ -326,6 +347,11 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
           <Field label="Deposit (50%)">{deposit ? money(deposit) : "-"} {o.depositPaidAt ? <span className="text-green-400">paid {fmtDate(o.depositPaidAt)}</span> : <span className="text-muted">not paid</span>}</Field>
           <Field label="Balance">{estimate ? money(Math.max(0, estimate - (o.depositPaidAt ? deposit : 0))) : "-"} {paid ? <span className="text-green-400">paid</span> : null}</Field>
           <Field label="Shipping">{paid || o.depositPaidAt ? (o.shippingChargedCents != null ? money(o.shippingChargedCents) : o.localPickup ? "pickup" : "on final invoice") : o.localPickup ? "free pickup" : `~${money(shipEstimate)} est.`}</Field>
+          <Field label="Package protection">
+            {o.shippingProtectionCents > 0
+              ? `${money(o.shippingProtectionCoveredCents)} of ${money(o.shippingProtectionValueCents)} assigned to labels`
+              : "not purchased"}
+          </Field>
         </dl>
         {/* True per-order margin: goods revenue minus the designer cost you
             actually paid (record it to replace the estimate). */}
@@ -493,6 +519,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
                 <li key={i} className="flex flex-wrap items-center gap-2 text-sm">
                   <span className="text-muted">#{i + 2}</span>
                   <TrackingInfo trackingNumber={s.trackingNumber} labelUrl={s.labelUrl ?? null} />
+                  {s.insuredValueCents ? <span className="text-xs text-green-400">Protected: {money(s.insuredValueCents)}</span> : null}
                   <span className="text-xs text-muted">{fmtDate(s.at)} · customer emailed </span>
                 </li>
               ))}

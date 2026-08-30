@@ -10,6 +10,10 @@ export type InfoPageProps = {
   eyebrow: string;
   h1: string;
   intro: React.ReactNode;
+  heroImages?: { src: string; alt: string; label: string }[];
+  heroHighlights?: string[];
+  primaryCta?: { href: string; label: string };
+  secondaryCta?: { href: string; label: string };
   offeringsTitle: string;
   offeringsBlurb?: string;
   offerings: Offering[];
@@ -35,11 +39,14 @@ export type InfoPageProps = {
 const DEFAULT_STEPS: Step[] = [
   { n: 1, t: "Send your idea", d: "Share your logo, colors, or concept - our in-house team designs it for free." },
   { n: 2, t: "Approve a proof", d: "We send a free proof so you see exactly how it'll look before we produce anything." },
-  { n: 3, t: "We make & ship", d: "Your gear is produced and shipped fast - typically in 2-3 weeks, or one week with rush." },
+  { n: 3, t: "We make & ship", d: "Standard production is three weeks after approval, final roster, and deposit. Confirmed rush targets two weeks; shipping time is additional." },
 ];
 
 export function InfoPage(props: InfoPageProps) {
   const steps = props.steps ?? DEFAULT_STEPS;
+  const hasHeroImages = Boolean(props.heroImages?.length);
+  const primaryCta = props.primaryCta ?? { href: "/team-order", label: "Start an Order" };
+  const secondaryCta = props.secondaryCta ?? { href: "/contact", label: "Get a Quote" };
   const catalogExamples = props.exampleCategory ? byCategory(props.exampleCategory).slice(0, 4) : [];
   const examples =
     catalogExamples.length > 0
@@ -64,18 +71,47 @@ export function InfoPage(props: InfoPageProps) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(props.jsonLd) }} />
       {faqLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />}
 
-      <section className="mx-auto max-w-4xl px-4 sm:px-6 py-16 text-center">
-        <span className="display text-brand text-sm">{props.eyebrow}</span>
-        <h1 className="display text-4xl sm:text-6xl text-foreground mt-2">{props.h1}</h1>
-        <p className="mt-5 text-lg text-muted max-w-2xl mx-auto">{props.intro}</p>
-        <div className="mt-8 flex flex-wrap gap-4 justify-center">
-          <Link href="/team-order" className="clip-slant bg-brand text-on-brand display text-lg px-8 py-4 hover:bg-brand-dark transition-colors">
-            Start an Order
-          </Link>
-          <Link href="/contact" className="clip-slant border border-line text-foreground display text-lg px-8 py-4 hover:bg-foreground/5 transition-colors">
-            Get a Quote
-          </Link>
+      <section className={`mx-auto px-4 sm:px-6 py-14 sm:py-16 ${hasHeroImages ? "max-w-7xl grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]" : "max-w-4xl text-center"}`}>
+        <div>
+          <span className="display text-brand text-sm">{props.eyebrow}</span>
+          <h1 className={`display text-4xl text-foreground mt-2 ${hasHeroImages ? "sm:text-5xl" : "sm:text-6xl"}`}>{props.h1}</h1>
+          <p className={`mt-5 text-lg text-muted ${hasHeroImages ? "max-w-2xl" : "max-w-2xl mx-auto"}`}>{props.intro}</p>
+          {props.heroHighlights && props.heroHighlights.length > 0 && (
+            <div className="mt-5 grid gap-2 text-sm text-foreground sm:grid-cols-2">
+              {props.heroHighlights.map((highlight) => (
+                <p key={highlight} className="border-l-2 border-brand pl-3">{highlight}</p>
+              ))}
+            </div>
+          )}
+          <div className={`mt-7 flex flex-wrap gap-3 ${hasHeroImages ? "justify-start" : "justify-center"}`}>
+            <Link href={primaryCta.href} className="clip-slant bg-brand text-on-brand display text-lg px-8 py-4 hover:bg-brand-dark transition-colors">
+              {primaryCta.label}
+            </Link>
+            <Link href={secondaryCta.href} className="clip-slant border border-line text-foreground display text-lg px-8 py-4 hover:bg-foreground/5 transition-colors">
+              {secondaryCta.label}
+            </Link>
+          </div>
         </div>
+
+        {hasHeroImages && (
+          <div className="grid w-full max-w-[460px] grid-cols-2 gap-2 justify-self-center lg:justify-self-end">
+            {props.heroImages!.map((image, index) => (
+              <div key={image.src} className="group overflow-hidden border border-line bg-[#f4f1e9]">
+                <div className="relative aspect-square">
+                  <Image
+                    src={image.src}
+                    alt={image.alt}
+                    fill
+                    preload={index === 0}
+                    sizes="(max-width: 640px) 50vw, 220px"
+                    className="object-contain p-2 transition-transform duration-300 group-hover:scale-[1.03]"
+                  />
+                </div>
+                <p className="border-t border-line bg-ink px-3 py-2 display text-xs text-foreground">{image.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="bg-steel border-y border-line">

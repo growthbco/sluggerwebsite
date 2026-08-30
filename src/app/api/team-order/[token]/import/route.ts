@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
-import { getByManageToken, addRosterRow } from "@/lib/team-orders";
+import { customerRosterLockMessage, getByManageToken, addRosterRow } from "@/lib/team-orders";
+import { missingCheerSizeLabels } from "@/lib/order-items";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const { token } = await params;
   const order = await getByManageToken(token);
   if (!order) return NextResponse.json({ error: "Link not found" }, { status: 404 });
+  const lockMessage = customerRosterLockMessage(order);
+  if (lockMessage) return NextResponse.json({ error: lockMessage, code: "ROSTER_LOCKED" }, { status: 409 });
   if (order.status !== "draft" && order.status !== "collecting") {
     return NextResponse.json({ error: "This order is already submitted - email us to change the roster." }, { status: 409 });
   }
@@ -36,6 +39,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     )
     .slice(0, 200);
   if (rows.length === 0) return NextResponse.json({ error: "No players to add." }, { status: 400 });
+  if (rows.some((r) => missingCheerSizeLabels(order.items ?? ["jersey"], r.sizes).length)) {
+    return NextResponse.json({ error: "Every cheer uniform needs both a top size and bottom size." }, { status: 400 });
+  }
 
   let added = 0;
   for (const r of rows) {

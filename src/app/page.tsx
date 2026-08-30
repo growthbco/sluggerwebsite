@@ -1,14 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import { categories } from "@/lib/sample-data";
-import { SPORT_PAGES } from "@/lib/sport-pages";
 import { heroPhoto } from "@/lib/gallery";
-import { ElevateSection, SystemSection, Reviews, SocialGrid, AboutBand, FaqTeaser } from "@/components/home-extras";
+import { SystemSection, Reviews, AboutBand, FaqTeaser } from "@/components/home-extras";
 import { RecentDesigns } from "@/components/recent-designs";
 
 export const metadata = {
   description:
-    "Custom team uniforms and jerseys for every sport - baseball, softball, flag football, football, basketball and more - plus embroidered hats, made in Ocala FL. Design any uniform with a free AI mockup in minutes. 2-3 week turnaround, ships nationwide.",
+    "Custom team uniforms and jerseys for every sport - baseball, softball, flag football, football, basketball and more - plus embroidered hats, made in Ocala FL. Design any uniform with a free AI mockup in minutes. Three-week standard production, ships nationwide.",
   alternates: { canonical: "/" },
 };
 
@@ -30,7 +29,7 @@ export default function Home() {
               src={heroPhoto}
               alt="Custom team uniforms and jerseys by Slugger Athletics"
               fill
-              priority
+              preload
               sizes="100vw"
               className="object-cover object-[center_25%]"
             />
@@ -53,7 +52,7 @@ export default function Home() {
             <span className="inline-block clip-slant bg-brand text-on-brand display text-xs px-3 py-1">
               Free Custom Designs · All Sports
             </span>
-            <h1 className="display mt-5 text-5xl sm:text-7xl lg:text-8xl text-foreground">
+            <h1 aria-label="Custom Team Gear That Hits" className="display mt-5 text-5xl sm:text-7xl lg:text-8xl text-foreground">
               Custom Team<br />
               <span className="text-brand">Gear</span> That Hits
             </h1>
@@ -63,7 +62,7 @@ export default function Home() {
                 custom embroidered hats
               </Link>
               , and 3D hype chains. <span className="text-foreground font-semibold">Free designs, no obligation</span> -
-              ready in 2-3 weeks, or as fast as one week with rush.
+              three-week standard production, with a confirmed two-week rush option. Shipping time is additional.
             </p>
             {/* Two clearly distinct entry points - most customers fit one of
                 these two buckets, and we never want them guessing which to
@@ -83,16 +82,12 @@ export default function Home() {
                 href="/team-order"
                 className="group bg-ink/60 border border-brand/70 hover:bg-brand/10 text-foreground p-5 transition-colors"
               >
-                <span className="display text-[11px] tracking-wider text-brand">HAVE YOUR DESIGN?</span>
-                <p className="display text-xl sm:text-2xl mt-1">Start a Team Order →</p>
-                <p className="text-sm text-muted mt-1">Skip ahead and submit your roster.</p>
+                <span className="display text-[11px] tracking-wider text-brand">APPROVED ARTWORK READY?</span>
+                <p className="display text-xl sm:text-2xl mt-1">Build Your Roster →</p>
+                <p className="text-sm text-muted mt-1">Confirm your products, material, sizes, and total.</p>
               </Link>
             </div>
             <p className="mt-4 text-sm">
-              <Link href="/custom-jersey-maker" className="text-brand hover:underline underline-offset-4 display">
-                ⚡ NEW: Design your jersey with AI - see it in seconds →
-              </Link>
-              <span className="mx-2 text-muted">·</span>
               <Link href="/gallery" className="text-muted hover:text-foreground underline underline-offset-4">
                 See our recent work →
               </Link>
@@ -101,21 +96,12 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Trust strip - infinite horizontal marquee */}
-      <section className="bg-brand overflow-hidden py-3">
-        <div className="flex w-max animate-marquee text-on-brand display text-sm">
-          {/* Two identical halves so the -50% slide loops seamlessly. Each half
-              repeats the items enough to span wide screens. */}
-          {[0, 1].map((half) => (
-            <div key={half} className="flex shrink-0" aria-hidden={half === 1}>
-              {Array.from({ length: 3 }).flatMap(() =>
-                ["Fast Shipping", "Embroidered Hats", "Team Stores", "Easy Ordering", "A+ Service"],
-              ).map((t, i) => (
-                <span key={`${half}-${i}`} className="flex items-center gap-2 px-6 whitespace-nowrap">
-                  <span className="opacity-50">◆</span> {t}
-                </span>
-              ))}
-            </div>
+      <section aria-label="Ordering highlights" className="bg-brand py-3">
+        <div className="mx-auto flex max-w-7xl flex-wrap justify-center gap-x-6 gap-y-2 px-4 text-center text-on-brand display text-xs sm:text-sm">
+          {["Free design", "3-week standard production", "$100 confirmed 2-week rush", "Live order portal"].map((item) => (
+            <span key={item} className="inline-flex items-center gap-2 whitespace-nowrap">
+              <span className="opacity-50" aria-hidden="true">◆</span> {item}
+            </span>
           ))}
         </div>
       </section>
@@ -123,9 +109,6 @@ export default function Home() {
       {/* Auto-updating showcase of recently approved mockups - up high as
           social proof, right after the hero + trust strip */}
       <RecentDesigns />
-
-      {/* Elevate Your Game - feature section */}
-      <ElevateSection />
 
       {/* The automated ordering system - the "why us" pitch for new customers */}
       <SystemSection />
@@ -160,86 +143,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* Every sport                                                      */}
-      {/* ---------------------------------------------------------------- */}
-      <section className="bg-steel border-y border-line">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-16 sm:py-20">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <span className="display text-brand text-sm">Multi-Sport</span>
-              <h2 className="display text-3xl sm:text-4xl text-foreground">Every Sport, One Shop</h2>
-            </div>
-            <Link href="/team-uniforms" className="display text-sm text-muted hover:text-foreground">
-              All uniforms →
-            </Link>
-          </div>
-          <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {[...SPORT_PAGES]
-              .sort((a, b) => (a.slug === "custom-flag-football-uniforms" ? -1 : b.slug === "custom-flag-football-uniforms" ? 1 : 0))
-              .map((p) => (
-              <Link key={p.slug} href={`/${p.slug}`} className="group bg-ink border border-line hover:border-brand/60 transition-colors">
-                <div className="relative aspect-square bg-white overflow-hidden">
-                  <Image src={p.mockup} alt={p.h1} fill sizes="(max-width: 1024px) 50vw, 20vw" className="object-cover transition-transform duration-300 group-hover:scale-105" />
-                </div>
-                <p className="px-3 py-2.5 display text-sm text-foreground group-hover:text-brand">{p.sport} →</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Reviews / social proof / about / FAQ */}
+      {/* Reviews / company proof / FAQ */}
       <Reviews />
-      <SocialGrid />
       <AboutBand />
       <FaqTeaser />
 
-      {/* ---------------------------------------------------------------- */}
-      {/* Team order CTA                                                   */}
-      {/* ---------------------------------------------------------------- */}
-      <section className="relative overflow-hidden bg-ink border-t border-line">
-        <div
-          className="absolute inset-0 opacity-40"
-          style={{
-            background:
-              "linear-gradient(115deg, rgba(184,163,108,0.45), transparent 45%)",
-          }}
-        />
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 py-20 grid md:grid-cols-2 gap-10 items-center">
-          <div>
-            <span className="display text-brand text-sm">For Coaches & Teams</span>
-            <h2 className="display text-4xl sm:text-5xl text-foreground mt-2">
-              Outfit the Whole Team in Minutes
-            </h2>
-            <p className="mt-5 text-muted max-w-md">
-              Send one link, let every player enter their own name, number, and
-              size, and we handle the rest. No more chasing texts and
-              spreadsheets.
-            </p>
-            <Link
-              href="/team-order"
-              className="inline-block mt-8 clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors"
-            >
-              Start a Team Order
-            </Link>
-          </div>
-          <ol className="space-y-4">
-            {[
-              "Pick your style, material, and upload your approved design",
-              "Share your roster link - players fill in their own details",
-              "Review, submit, and we send it straight to production",
-            ].map((step, i) => (
-              <li key={i} className="flex gap-4 bg-steel border border-line p-5">
-                <span className="display text-3xl text-brand leading-none">
-                  {i + 1}
-                </span>
-                <span className="text-foreground/85 self-center">{step}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
     </>
   );
 }

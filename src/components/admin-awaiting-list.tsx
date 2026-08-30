@@ -17,6 +17,8 @@ export type Unpaid = {
   href: string | null; // where the row opens (order page, or pay page for custom)
   invoiceId?: string; // custom invoices only - enables Void
   sendInvoice?: { orderId: string; stage: "deposit" | "balance"; ship: "auto" | "pickup" }; // final invoice not sent yet
+  teamOrderId?: string;
+  canMarkUnresponsive?: boolean;
 };
 
 const money = (c: number) => `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -62,6 +64,7 @@ export function AdminAwaitingList({ items, generatedAtISO }: { items: Unpaid[]; 
   const now = new Date(generatedAtISO).getTime();
   const [voiding, setVoiding] = useState<string | null>(null);
   const [sending, setSending] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -116,6 +119,26 @@ export function AdminAwaitingList({ items, generatedAtISO }: { items: Unpaid[]; 
       alert((e as Error).message);
     } finally {
       setVoiding(null);
+    }
+  }
+
+  async function markUnresponsive(item: Unpaid) {
+    if (!item.teamOrderId || !item.canMarkUnresponsive) return;
+    if (!confirm(`Move ${item.customer} (${item.ref}) to Unresponsive? The order and Discord history stay saved and can be restored.`)) return;
+    setArchiving(item.key);
+    try {
+      const res = await fetch("/api/admin/archive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "team_order", id: item.teamOrderId, archive: true, note: "Unresponsive - no reply" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not move this order.");
+      router.refresh();
+    } catch (error) {
+      alert((error as Error).message);
+    } finally {
+      setArchiving(null);
     }
   }
 
@@ -212,7 +235,7 @@ export function AdminAwaitingList({ items, generatedAtISO }: { items: Unpaid[]; 
                       </td>
                       <td className="px-4 py-4"><Age days={days} sinceISO={it.sinceISO} /></td>
                       <td className="px-4 py-4 text-right text-base font-semibold tabular-nums text-foreground">{money(it.amountCents)}</td>
-                      <td className="px-4 py-4"><RowActions item={it} sending={sending} voiding={voiding} onSend={sendFinalInvoice} onVoid={voidInvoice} /></td>
+                      <td className="px-4 py-4"><RowActions item={it} sending={sending} voiding={voiding} archiving={archiving} onSend={sendFinalInvoice} onVoid={voidInvoice} onMarkUnresponsive={markUnresponsive} /></td>
                     </tr>
                   );
                 })}
@@ -239,7 +262,7 @@ export function AdminAwaitingList({ items, generatedAtISO }: { items: Unpaid[]; 
                     <Age days={days} sinceISO={it.sinceISO} />
                     <div className="flex flex-col items-end gap-2">
                       {it.href?.startsWith("/") && <Link href={it.href} className="text-xs font-medium text-brand hover:underline">View order</Link>}
-                      <RowActions item={it} sending={sending} voiding={voiding} onSend={sendFinalInvoice} onVoid={voidInvoice} />
+                      <RowActions item={it} sending={sending} voiding={voiding} archiving={archiving} onSend={sendFinalInvoice} onVoid={voidInvoice} onMarkUnresponsive={markUnresponsive} />
                     </div>
                   </div>
                 </article>
@@ -256,14 +279,18 @@ function RowActions({
   item,
   sending,
   voiding,
+  archiving,
   onSend,
   onVoid,
+  onMarkUnresponsive,
 }: {
   item: Unpaid;
   sending: string | null;
   voiding: string | null;
+  archiving: string | null;
   onSend: (item: Unpaid) => Promise<void>;
   onVoid: (id: string) => Promise<void>;
+  onMarkUnresponsive: (item: Unpaid) => Promise<void>;
 }) {
   return (
     <div className="flex flex-col items-end gap-2">
@@ -296,6 +323,16 @@ function RowActions({
           className="text-[11px] text-muted/70 hover:text-red-300 disabled:opacity-50"
         >
           {voiding === item.invoiceId ? "Voiding…" : "Void invoice"}
+        </button>
+      )}
+      {item.canMarkUnresponsive && (
+        <button
+          type="button"
+          onClick={() => onMarkUnresponsive(item)}
+          disabled={archiving === item.key}
+          className="text-[11px] text-muted/70 hover:text-amber-300 disabled:opacity-50"
+        >
+          {archiving === item.key ? "Moving…" : "Mark unresponsive"}
         </button>
       )}
     </div>

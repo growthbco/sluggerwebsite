@@ -1,13 +1,24 @@
 import type { Metadata } from "next";
-import { AdminPageHeader } from "@/components/admin-page-header";
 import { redirect } from "next/navigation";
 import { isAdmin, adminEnabled } from "@/lib/admin-auth";
 import { AdminConversations } from "@/components/admin-conversations";
 
-export const metadata: Metadata = { title: "Conversations", robots: { index: false } };
+export const metadata: Metadata = {
+  title: "Conversations",
+  robots: { index: false },
+};
 export const dynamic = "force-dynamic";
 
-export default async function AdminTextsPage({ searchParams }: { searchParams: Promise<{ to?: string; name?: string; tab?: string; open?: string }> }) {
+export default async function AdminTextsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    to?: string;
+    name?: string;
+    tab?: string;
+    open?: string;
+  }>;
+}) {
   if (!adminEnabled()) redirect("/admin");
   if (!(await isAdmin())) redirect("/admin/login");
   const { to, name, tab, open } = await searchParams;
@@ -16,15 +27,31 @@ export default async function AdminTextsPage({ searchParams }: { searchParams: P
   const initialTab = tab === "email" || open ? "email" : "texts";
 
   return (
-    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-14">
-      <AdminPageHeader eyebrow="Menu" title="Conversations" />
-      <p className="mt-2 text-muted">
-        Everything customers send you, in one place. Texts and WhatsApp to your shop line (352) 414-7270,
-        and email replies on their designs. Reply from here - texts send from your line, email replies go
-        back on the design thread. STOP/HELP opt-outs are handled automatically.
-      </p>
-      <div className="mt-8">
-        <AdminConversations initialTab={initialTab} initialPhone={to} initialName={name} initialOpen={open} />
+    <div className="mx-auto w-full max-w-[100rem] px-3 py-4 sm:px-5 sm:py-6">
+      <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <span className="text-[10px] uppercase tracking-[0.22em] text-muted">
+            Customer inbox
+          </span>
+          <h1 className="display mt-0.5 text-2xl text-foreground sm:text-3xl">
+            Conversations
+          </h1>
+        </div>
+        <div className="hidden items-center gap-2 text-xs text-muted sm:flex">
+          <span
+            className="h-2 w-2 rounded-full bg-emerald-400"
+            aria-hidden="true"
+          />
+          Shop line (352) 414-7270
+        </div>
+      </header>
+      <div>
+        <AdminConversations
+          initialTab={initialTab}
+          initialPhone={to}
+          initialName={name}
+          initialOpen={open}
+        />
       </div>
     </div>
   );

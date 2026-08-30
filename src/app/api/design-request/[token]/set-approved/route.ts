@@ -28,8 +28,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   const url = body.url ?? "";
   const approved = body.approved !== false;
-  if (!request.proofImages?.includes(url)) {
-    return NextResponse.json({ error: "Pick one of the sent proofs." }, { status: 400 });
+  const reviewProofs = request.proofReviewUrls?.length ? request.proofReviewUrls : request.proofImages ?? [];
+  if (!reviewProofs.includes(url)) {
+    return NextResponse.json({ error: "Only the current proof version can be approved." }, { status: 400 });
   }
 
   // Approving requires a name so it's identifiable everywhere (store, roster).

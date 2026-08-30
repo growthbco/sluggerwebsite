@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { getDb } from "@/db";
-import { designerInvoices, teamOrders, teamOrderRoster, orders as ordersTable, orderItems, teams, drops } from "@/db/schema";
+import { designerInvoices, teamOrders, teamOrderRoster, orders as ordersTable, orderItems, teams, drops, designRequests } from "@/db/schema";
 
 // Store / shop / buy-in orders the designer also produces. They're paid upfront
 // via Stripe, so any paid/fulfilled one is billable (per individual order).
@@ -28,7 +28,7 @@ function isNonGarment(name: string): boolean {
 function garmentType(name: string): string {
   return (name.split(" - ")[0] || name || "").trim() || name;
 }
-import { notDesignerMade, itemLabel } from "@/lib/order-items";
+import { itemKeyForSizeField, notDesignerMade, itemLabel } from "@/lib/order-items";
 
 // The garments the DESIGNER actually produces for an order, counted straight
 // from the roster: every piece INCLUDING paid add-ons (he makes those too),
@@ -42,7 +42,9 @@ function billableGarmentsFromRoster(
     const qty = Math.max(1, row.quantity ?? 1);
     const sized = Object.entries(row.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
     if (sized.length) {
-      for (const [key] of sized) counts.set(key, (counts.get(key) ?? 0) + qty);
+      for (const key of new Set(sized.map(([key]) => itemKeyForSizeField(key)))) {
+        counts.set(key, (counts.get(key) ?? 0) + qty);
+      }
     } else if ((row.size ?? "").trim()) {
       counts.set("jersey", (counts.get("jersey") ?? 0) + qty);
     }
@@ -61,14 +63,14 @@ function billableGarmentsFromRoster(
  *  - real landed cost runs higher, so prefer the RECORDED actual when set.
  *  Returns null if no garment cost is known. */
 export function estimatedDesignerCostCents(
-  order: { jerseyStyle: string | null; jerseyMaterial?: string | null },
+  order: { jerseyStyle: string | null; jerseyMaterial?: string | null; sport?: string | null },
   roster: { sizes: Record<string, string> | null; size: string | null; quantity: number | null }[],
 ): number | null {
   const garments = billableGarmentsFromRoster(order, roster);
   let total = 0;
   let known = false;
   for (const g of garments) {
-    const c = designerCostCents(g.garment, order.jerseyMaterial);
+    const c = designerCostCents(g.garment, order.jerseyMaterial, order.sport);
     if (c != null) { total += c * g.qty; known = true; }
   }
   return known ? total : null;
@@ -106,6 +108,9 @@ export function dutyRateBps(subtotalCents: number, dutyCents: number): number {
 }
 
 export function isDutyOutOfBand(subtotalCents: number, dutyCents: number): boolean {
+  // No duty charged is never an overbilling concern. Only review a duty line
+  // when the vendor actually adds one.
+  if (dutyCents <= 0) return false;
   if (subtotalCents <= 0) return dutyCents > 0; // duty with no goods is always suspect
   const bps = dutyRateBps(subtotalCents, dutyCents);
   return bps < DUTY_BAND_MIN_BPS || bps > DUTY_BAND_MAX_BPS;
@@ -162,13 +167,14 @@ export type BillableOrder = {
 // against our garment labels by keyword; order matters (specific before
 // generic). Edit here if his prices change. Returns null when unknown -> the
 // line is left blank for him to fill.
-export function designerCostCents(label: string, material?: string | null): number | null {
+export function designerCostCents(label: string, material?: string | null, sport?: string | null): number | null {
   const s = (label || "").toLowerCase();
   const microfiber = (material ?? "").toLowerCase() === "microfiber";
+  const bowling = /bowling/i.test(sport ?? "");
   if (/quarter|1\/4|zip/.test(s)) return 2200; // quarter-zip (not on his list; the $22 he charged for Hammer Time)
-  // Bowling full-button shirts are cut in a pricier microfiber - our cost is $21,
-  // not the $14 of a standard full-button jersey.
-  if (/full[\s-]?button/.test(s)) return microfiber ? 2100 : 1400;
+  // Bowling full-button shirts use the $21 vendor rate. Sport is the source of
+  // truth; microfiber remains a fallback for older/off-system bowling orders.
+  if (/full[\s-]?button/.test(s)) return bowling || microfiber ? 2100 : 1400;
   if (/two[\s-]?button/.test(s)) return 1300;
   if (/long[\s-]?sleeve/.test(s)) return 1200;
   if (/dri[\s-]?fit|dry[\s-]?fit|practice/.test(s)) return 1100;
@@ -260,6 +266,20 @@ export async function getBillableOrders(): Promise<BillableOrder[]> {
 
   if (!orders.length) return [];
 
+  // Older team orders did not copy sport from the linked design request. Use
+  // that design as the fallback so bowling is not priced like baseball.
+  const designIds = [...new Set(orders.map((order) => order.designRequestId).filter((id): id is string => Boolean(id)))];
+  const designSportById = new Map<string, string>();
+  if (designIds.length) {
+    const designs = await db
+      .select({ id: designRequests.id, sport: designRequests.sport })
+      .from(designRequests)
+      .where(inArray(designRequests.id, designIds));
+    for (const design of designs) {
+      if (design.sport) designSportById.set(design.id, design.sport);
+    }
+  }
+
   const rosters = await db
     .select()
     .from(teamOrderRoster)
@@ -289,7 +309,8 @@ export async function getBillableOrders(): Promise<BillableOrder[]> {
       const pieces = garments.reduce((s, g) => s + g.qty, 0);
       // Pre-fill the cost only for single-garment orders (one unit price applies).
       // Mixed orders (jersey + shorts) stay blank - he prices those himself.
-      const unitCostCents = garments.length === 1 ? (designerCostCents(garments[0].garment) ?? undefined) : undefined;
+      const sport = o.sport ?? (o.designRequestId ? designSportById.get(o.designRequestId) : undefined);
+      const unitCostCents = garments.length === 1 ? (designerCostCents(garments[0].garment, o.jerseyMaterial, sport) ?? undefined) : undefined;
 
       // Pieces already accounted for = billed on a non-void invoice PLUS pieces
       // that existed when the order was settled directly (paid the designer
@@ -521,13 +542,16 @@ async function buildInvoiceLines(inputLines: DesignerInvoiceLineInput[], exclude
         runningThisInvoice.set(l.teamOrderId, soFar + qty);
       }
       return {
-        team: String(l.team ?? "").slice(0, 120),
+        // A linked line uses our canonical order identity. This prevents a
+        // tampered request from attaching an unrelated team name to a paid id.
+        team: String(matched?.teamName ?? l.team ?? "").slice(0, 120),
         garment: String(l.garment ?? "").slice(0, 120),
         qty,
         unitCents,
         teamOrderId: l.teamOrderId,
         orderRef: matched?.reference ?? l.orderRef,
         ourQty,
+        ourUnitCents: matched?.unitCostCents,
         ...(alreadyBilledOn ? { alreadyBilledOn } : {}),
       };
     })
@@ -684,16 +708,26 @@ export type InvoiceReconciliation = {
     lineCents: number;
     orderRef?: string;
     ourQty?: number;
+    ourUnitCents?: number;
     qtyMismatch: boolean;
+    unitCostOverage: boolean;
     alreadyBilledOn?: string;
   }[];
   anyQtyMismatch: boolean;
+  anyUnitCostOverage: boolean;
   anyDoubleBill: boolean;
 };
 
-export function reconcileInvoice(inv: typeof designerInvoices.$inferSelect): InvoiceReconciliation {
+export function reconcileInvoice(
+  inv: typeof designerInvoices.$inferSelect,
+  expectedUnitByOrder: ReadonlyMap<string, number> = new Map(),
+): InvoiceReconciliation {
   const lineChecks = (inv.lines ?? []).map((l) => {
     const qtyMismatch = typeof l.ourQty === "number" && l.ourQty !== l.qty;
+    // New invoices snapshot the rate. The map lets old submitted invoices use
+    // the current matched-order rate without rewriting their history.
+    const ourUnitCents = l.ourUnitCents ?? (l.teamOrderId ? expectedUnitByOrder.get(l.teamOrderId) : undefined);
+    const unitCostOverage = typeof ourUnitCents === "number" && l.unitCents > ourUnitCents;
     return {
       team: l.team,
       garment: l.garment,
@@ -702,7 +736,9 @@ export function reconcileInvoice(inv: typeof designerInvoices.$inferSelect): Inv
       lineCents: l.qty * l.unitCents,
       orderRef: l.orderRef,
       ourQty: l.ourQty,
+      ourUnitCents,
       qtyMismatch,
+      unitCostOverage,
       alreadyBilledOn: l.alreadyBilledOn,
     };
   });
@@ -711,6 +747,7 @@ export function reconcileInvoice(inv: typeof designerInvoices.$inferSelect): Inv
     dutyFlag: isDutyOutOfBand(inv.subtotalCents, inv.dutyCents),
     lineChecks,
     anyQtyMismatch: lineChecks.some((l) => l.qtyMismatch),
+    anyUnitCostOverage: lineChecks.some((l) => l.unitCostOverage),
     anyDoubleBill: lineChecks.some((l) => Boolean(l.alreadyBilledOn)),
   };
 }
@@ -719,86 +756,95 @@ export function reconcileInvoice(inv: typeof designerInvoices.$inferSelect): Inv
 /* Paid-order cross-reference                                          */
 /* ------------------------------------------------------------------ */
 
-type OrderRef = { tokens: string[]; paid: boolean };
-export type OrderPaymentIndex = { paidById: Set<string>; orders: OrderRef[] };
+export type OrderPaymentIndex = { paidById: Set<string> };
 
-// Noise words to drop when matching a typed team name to an order name.
-const NAME_STOP = new Set(["add", "on", "addon", "the", "and", "of", "dri", "fit", "drifit", "dry", "light", "hoodie", "llc", "inc", "team", "store"]);
-function nameTokens(s: string): string[] {
-  return (s || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, " ")
-    .split(/\s+/)
-    .filter((w) => w.length >= 2 && !NAME_STOP.has(w));
-}
-// Small Levenshtein for typo-tolerant token matches ("mak" ~ "mac").
-function lev(a: string, b: string): number {
-  const m = a.length, n = b.length;
-  if (!m) return n;
-  if (!n) return m;
-  const dp = Array.from({ length: n + 1 }, (_, i) => i);
-  for (let i = 1; i <= m; i++) {
-    let prev = dp[0];
-    dp[0] = i;
-    for (let j = 1; j <= n; j++) {
-      const tmp = dp[j];
-      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
-      prev = tmp;
-    }
-  }
-  return dp[n];
-}
-function tokenMatch(a: string, b: string): boolean {
-  return a === b || (a.length >= 3 && b.length >= 3 && lev(a, b) <= 1);
-}
-
-/** All team orders with their paid status + name tokens. Powers the invoice
- *  cross-reference (have we been paid for what he billed?). */
+/** Exact ids for orders backed by customer payment. Powers the invoice
+ *  cross-reference (have we been paid for what the vendor billed?). */
 export async function getOrderPaymentIndex(): Promise<OrderPaymentIndex> {
   const db = getDb();
   const rows = await db
-    .select({ id: teamOrders.id, name: teamOrders.teamName, dep: teamOrders.depositPaidAt, inv: teamOrders.invoicePaidAt })
+    .select({ id: teamOrders.id, dep: teamOrders.depositPaidAt, inv: teamOrders.invoicePaidAt })
     .from(teamOrders);
   const paidById = new Set<string>();
-  const orders: OrderRef[] = [];
   for (const r of rows) {
     const paid = Boolean(r.dep || r.inv);
     if (paid) paidById.add(r.id);
-    if (r.name) orders.push({ tokens: nameTokens(r.name), paid });
   }
   // Store / shop / buy-in orders are paid upfront via Stripe, so any paid or
   // fulfilled one counts as paid for the "did we get paid before paying him"
   // check - otherwise a legit store line would wrongly flag as unpaid.
   const storeRows = await db
-    .select({ id: ordersTable.id, name: ordersTable.customerName })
+    .select({ id: ordersTable.id })
     .from(ordersTable)
     .where(and(inArray(ordersTable.type, [...BILLABLE_ORDER_TYPES]), inArray(ordersTable.status, [...BILLABLE_ORDER_STATUSES])));
   for (const r of storeRows) {
     paidById.add(r.id);
-    if (r.name) orders.push({ tokens: nameTokens(r.name), paid: true });
   }
-  return { paidById, orders };
+  return { paidById };
 }
 
 /** Payment status of one billed line vs our orders:
  *  - "paid": backed by an order the customer paid us for (safe to pay him)
  *  - "unpaid": matched to an order we were NOT paid for (do NOT pay)
  *  - "unknown": no confident match (manual line / off-system item) - verify
- *  Exact via team order id; otherwise a typo-tolerant token match on the team
- *  name so shorthand like "Jr mak" still matches "Jr Mac & Skis". */
-export function linePaymentStatus(line: { teamOrderId?: string | null; team: string }, idx: OrderPaymentIndex): "paid" | "unpaid" | "unknown" {
+ *  Only an exact internal order id counts as verified. A typed team name is not
+ *  proof of payment and must stay "unknown" until it is linked. */
+export function linePaymentStatus(line: { teamOrderId?: string | null }, idx: OrderPaymentIndex): "paid" | "unpaid" | "unknown" {
   if (line.teamOrderId) return idx.paidById.has(line.teamOrderId) ? "paid" : "unpaid";
-  const lt = nameTokens(line.team);
-  if (!lt.length) return "unknown";
-  let best: OrderRef | null = null;
-  let bestScore = 0;
-  for (const o of idx.orders) {
-    if (!o.tokens.length) continue;
-    let matched = 0;
-    for (const t of lt) if (o.tokens.some((ot) => tokenMatch(t, ot))) matched++;
-    const score = matched / lt.length;
-    if (score > bestScore) { bestScore = score; best = o; }
-  }
-  if (best && bestScore >= 0.6) return best.paid ? "paid" : "unpaid";
   return "unknown";
+}
+
+export type InvoicePaymentReview = InvoiceReconciliation & {
+  lines: Array<InvoiceReconciliation["lineChecks"][number] & {
+    notPaid: boolean;
+    unverifiedPay: boolean;
+  }>;
+  blockers: string[];
+  canPay: boolean;
+};
+
+/** One shared payment decision for the admin page and both payment APIs. A red
+ *  warning is not enough: any money that is unmatched, over quantity/rate, or
+ *  already billed must be resolved before the invoice can be paid. */
+export function reviewInvoiceForPayment(
+  inv: typeof designerInvoices.$inferSelect,
+  idx: OrderPaymentIndex,
+  expectedUnitByOrder: ReadonlyMap<string, number> = new Map(),
+): InvoicePaymentReview {
+  const reconciliation = reconcileInvoice(inv, expectedUnitByOrder);
+  const lines = reconciliation.lineChecks.map((line, i) => {
+    const status = linePaymentStatus(
+      { teamOrderId: inv.lines?.[i]?.teamOrderId },
+      idx,
+    );
+    return { ...line, notPaid: status === "unpaid", unverifiedPay: status === "unknown" };
+  });
+  const moneyLines = lines.filter((line) => line.lineCents > 0);
+  const blockers: string[] = [];
+  const count = (n: number, singular: string, plural = `${singular}s`) => `${n} ${n === 1 ? singular : plural}`;
+
+  const unpaid = moneyLines.filter((line) => line.notPaid).length;
+  const unverified = moneyLines.filter((line) => line.unverifiedPay).length;
+  const qty = moneyLines.filter((line) => line.qtyMismatch).length;
+  const duplicate = moneyLines.filter((line) => Boolean(line.alreadyBilledOn)).length;
+  const rate = moneyLines.filter((line) => line.unitCostOverage).length;
+  if (unpaid) blockers.push(`${count(unpaid, "line")} not backed by customer payment`);
+  if (unverified) blockers.push(`${count(unverified, "manual line")} not linked to an order`);
+  if (qty) blockers.push(`${count(qty, "line")} over or under the saved quantity`);
+  if (duplicate) blockers.push(`${count(duplicate, "line")} already billed`);
+  if (rate) blockers.push(`${count(rate, "line")} above the saved vendor rate`);
+  if (reconciliation.dutyFlag) blockers.push("duty outside the expected 15–19% range");
+  if (inv.previousBalanceCents > 0) blockers.push("previous balance is not tied to an order");
+
+  return { ...reconciliation, lines, blockers, canPay: blockers.length === 0 };
+}
+
+/** Live server-side review immediately before money/status changes. */
+export async function getInvoicePaymentReview(inv: typeof designerInvoices.$inferSelect): Promise<InvoicePaymentReview> {
+  const [idx, billable] = await Promise.all([getOrderPaymentIndex(), getBillableOrders()]);
+  const expectedUnitByOrder = new Map<string, number>();
+  for (const order of billable) {
+    if (typeof order.unitCostCents === "number") expectedUnitByOrder.set(order.teamOrderId, order.unitCostCents);
+  }
+  return reviewInvoiceForPayment(inv, idx, expectedUnitByOrder);
 }

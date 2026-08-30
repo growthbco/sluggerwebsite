@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  PRIORITY_PRODUCTION_COPY,
+  RUSH_PRODUCTION_COPY,
+  SHIPPING_CARRIER_COPY,
+  SHIPPING_TIMING_COPY,
+  STANDARD_PRODUCTION_COPY,
+} from "@/lib/customer-policy";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/shipping" },
@@ -13,15 +20,15 @@ const SECTIONS = [
     h: "Production turnaround",
     body: [
       "Custom orders are made to order, so the production clock starts after your proof is approved, your final roster is confirmed, and your deposit is paid.",
-      "Most orders ship in about 2-3 weeks after those steps are complete, but this is an estimate rather than a guaranteed delivery date. Specialty items and larger orders may take longer.",
+      `${STANDARD_PRODUCTION_COPY} This is the target for the order to be ready to ship or pick up, not a guaranteed in-hand date. Specialty items and larger orders may take longer.`,
       "Fall is our busiest season. Production queues and carrier networks can slow down, so order as early as possible and leave a buffer before your first game, event, or competition.",
-      "Need it faster? Rush service is a flat $100 fee. The timeline is not confirmed until Slugger approves it for your specific order.",
+      `${RUSH_PRODUCTION_COPY} ${PRIORITY_PRODUCTION_COPY} ${SHIPPING_TIMING_COPY}`,
     ],
   },
   {
     h: "Shipping rates & methods",
     body: [
-      "Orders ship via USPS or UPS, with the carrier chosen based on weight and destination for the best balance of speed and cost.",
+      SHIPPING_CARRIER_COPY,
       "Shipping is calculated at checkout based on your order size and address. Larger team orders typically ship as a single bulk shipment to your coach or team contact.",
       "Once a package is accepted by the carrier, weather, routing, customs, and carrier-network delays are outside Slugger Athletics' control. We will help locate and track a delayed package, but extra or upgraded shipping caused by a late order or carrier delay is the customer's responsibility unless Slugger agrees otherwise in writing.",
     ],
@@ -30,8 +37,10 @@ const SECTIONS = [
     h: "Tracking your order",
     body: [
       "For standard orders, customer tracking is created only after Slugger Athletics has the finished order in hand and prepares the final shipment to you. We email that tracking number to the address on the order; for team orders, it goes to the team contact who placed it.",
-      "Tracking from a designer, factory, or supplier to Slugger Athletics is internal production tracking. It is not customer delivery tracking, so it is not shared or displayed on the customer order page.",
-      "If you haven't seen a tracking email and it's been more than three weeks since you approved your proof, reach out and we'll track it down for you.",
+      "Some approved rush orders may ship directly from one of our production partners. When that happens, Slugger Athletics sends the customer tracking alert and remains responsible for customer service. Carrier tracking may display the production facility, shipment origin, or country of origin.",
+      "Tracking for a package traveling from a designer, factory, or supplier to Slugger Athletics remains internal production tracking. It is not customer delivery tracking, so it is not shared or displayed on the customer order page.",
+      "Direct-shipped orders should not require the customer to pay unexpected customs charges or duties. If a carrier requests an unapproved payment, contact Slugger Athletics before paying it.",
+      "If you haven't seen a tracking email by your production target, reach out and we'll track it down for you. Remember that the clock starts only after proof approval, final roster submission, and deposit payment are all complete.",
     ],
   },
   {

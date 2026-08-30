@@ -24,23 +24,41 @@ export function AdminConversations({
 
   return (
     <div>
-      <div className="mb-6 inline-flex border border-line bg-steel p-1">
-        {(["texts", "email"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`display px-5 py-2 text-sm ${tab === t ? "bg-brand text-on-brand" : "text-muted hover:text-foreground"}`}
-          >
-            {t === "texts" ? "Texts" : "Email"}
-          </button>
-        ))}
+      <div className="mb-3 flex items-center justify-between gap-3 border-b border-line">
+        <div className="flex items-center gap-6">
+          {(["texts", "email"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={`relative min-h-[44px] px-1 pb-3 pt-2 text-sm outline-none transition-colors focus-visible:ring-1 focus-visible:ring-brand ${tab === t ? "text-brand" : "text-muted hover:text-foreground"}`}
+            >
+              <span className="display">
+                {t === "texts" ? "Text messages" : "Email"}
+              </span>
+              {tab === t && (
+                <span
+                  className="absolute inset-x-0 bottom-[-1px] h-0.5 bg-brand"
+                  aria-hidden="true"
+                />
+              )}
+            </button>
+          ))}
+        </div>
+        <p className="hidden text-xs text-muted md:block">
+          {tab === "texts"
+            ? "SMS, WhatsApp and internal notes"
+            : "Design-request email threads"}
+        </p>
       </div>
 
       {/* Both mount so channel state (drafts, scroll) survives a toggle; only
           the active one is shown. */}
       <div className={tab === "texts" ? "" : "hidden"}>
-        <AdminTextsInbox initialPhone={initialPhone} initialName={initialName} />
+        <AdminTextsInbox
+          initialPhone={initialPhone}
+          initialName={initialName}
+        />
       </div>
       <div className={tab === "email" ? "" : "hidden"}>
         <AdminEmailInbox initialOpen={initialOpen} />

@@ -6,13 +6,14 @@ import { eq, ne, and, isNull, isNotNull, lt, gt, notInArray } from "drizzle-orm"
 import { getDb } from "@/db";
 import { designRequests, teamOrders, designLabVisitors, smsMessages, orders } from "@/db/schema";
 import { toE164 } from "@/lib/sms";
+import {
+  MAX_PROOF_FOLLOW_UPS,
+  proofFollowUpState,
+} from "@/lib/proof-follow-up-policy";
 
-// Daily proof follow-ups: once a design is sent and the client goes quiet, we
-// text them every day until they act or we hit the cap. Env-overridable so the
-// cadence can be tuned without a deploy.
-export const MAX_FOLLOW_UPS = Number(process.env.PROOF_FOLLOWUP_MAX) || 10;
-const FIRST_AFTER_DAYS = 1; // proof sent -> first nudge (next day)
-const NEXT_AFTER_DAYS = 1; // then once every day after
+// Three deliberate proof follow-ups: day 2, day 5, and day 10. Four quiet days
+// after the final nudge, the request moves to Unresponsive (day 14 overall).
+export const MAX_FOLLOW_UPS = MAX_PROOF_FOLLOW_UPS;
 const STALE_AFTER_DAYS = 60; // too old to auto-nudge; needs a human
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -32,44 +33,57 @@ export type FollowUpCandidate = {
   neededBy: Date | null;
 };
 
+async function fundedDesignRequestIds(): Promise<Set<string>> {
+  const rows = await getDb()
+    .select({
+      designRequestId: teamOrders.designRequestId,
+      status: teamOrders.status,
+      depositPaidAt: teamOrders.depositPaidAt,
+      invoicePaidAt: teamOrders.invoicePaidAt,
+    })
+    .from(teamOrders)
+    .where(isNotNull(teamOrders.designRequestId));
+  return new Set(
+    rows
+      .filter((order) =>
+        Boolean(order.depositPaidAt || order.invoicePaidAt || ["in_production", "paid", "shipped"].includes(order.status)),
+      )
+      .map((order) => order.designRequestId!)
+  );
+}
+
 export async function findProofFollowUpCandidates(now = new Date()): Promise<FollowUpCandidate[]> {
   const db = getDb();
   const rows = await db
     .select()
     .from(designRequests)
     .where(eq(designRequests.status, "proof_sent"));
+  const funded = await fundedDesignRequestIds();
 
   const due: FollowUpCandidate[] = [];
   for (const r of rows) {
     if (r.archivedAt) continue; // archived = deliberately parked, no robots
-    if (!r.proofSentAt || !r.contactEmail) continue;
+    if (funded.has(r.id)) continue; // paid/production work never gets auto-parked
+    if (!r.proofSentAt || !r.contactEmail || !r.statusToken) continue;
     const sent = r.followUpsSent ?? 0;
-    if (sent >= MAX_FOLLOW_UPS) continue;
 
     const ageDays = (now.getTime() - r.proofSentAt.getTime()) / DAY_MS;
     if (ageDays > STALE_AFTER_DAYS) continue;
 
-    // If the thread ends on an unanswered client message, a human should
-    // answer it - no robot nudges. But once we've replied (staff or the AI
-    // assistant) and the client goes quiet AGAIN, follow-ups resume, timed
-    // from their last activity. (The old rule - any client message after the
-    // proof disables nudges forever - silently killed all follow-ups once the
-    // AI chat launched, because nearly every client now sends messages.)
     const msgs = r.messages ?? [];
-    const base = sent === 0 ? r.proofSentAt : r.lastFollowUpAt ?? r.proofSentAt;
     const lastMsg = msgs[msgs.length - 1];
-    // Stand down ONLY if the client's last message is unanswered AND arrived
-    // AFTER our last touch (the proof, or our last nudge) - that's a real
-    // question a human should answer. A happy pre-proof comment ("sounds
-    // great!") must NOT freeze the nudges forever (that's what stranded Dona
-    // Lemoine / DR-V3FQOW with zero follow-ups since Aug 16).
-    if (lastMsg && lastMsg.from === "client" && new Date(lastMsg.at) > base) continue;
-    const lastClientMsg = [...msgs].reverse().find((m) => m.from === "client");
-
-    const clientAt = lastClientMsg ? new Date(lastClientMsg.at) : null;
-    const since = clientAt && clientAt > base ? clientAt : base;
-    const waitDays = sent === 0 ? FIRST_AFTER_DAYS : NEXT_AFTER_DAYS;
-    if (now.getTime() - since.getTime() < waitDays * DAY_MS) continue;
+    const state = proofFollowUpState({
+      status: r.status,
+      archivedAt: r.archivedAt,
+      archivedNote: r.archivedNote,
+      proofSentAt: r.proofSentAt,
+      followUpsSent: sent,
+      lastFollowUpAt: r.lastFollowUpAt,
+      followUpSnoozedUntil: r.followUpSnoozedUntil,
+      lastMessageAt: lastMsg?.at,
+      lastMessageFrom: lastMsg?.from,
+    }, now);
+    if (state !== "due" && state !== "final_due") continue;
 
     due.push({
       id: r.id,
@@ -82,6 +96,44 @@ export async function findProofFollowUpCandidates(now = new Date()): Promise<Fol
       statusToken: r.statusToken,
       discordThreadId: r.discordThreadId,
       followUpsSent: sent,
+      proofSentAt: r.proofSentAt,
+      neededBy: r.neededBy,
+    });
+  }
+  return due;
+}
+
+/** Proofs that received all three reminders and then stayed quiet for four
+ *  more days. The cron archives these through markDesignUnresponsive. */
+export async function findProofCloseoutCandidates(now = new Date()): Promise<FollowUpCandidate[]> {
+  const rows = await getDb().select().from(designRequests).where(eq(designRequests.status, "proof_sent"));
+  const funded = await fundedDesignRequestIds();
+  const due: FollowUpCandidate[] = [];
+  for (const r of rows) {
+    if (funded.has(r.id) || !r.proofSentAt || !r.contactEmail || !r.statusToken) continue;
+    const lastMsg = (r.messages ?? []).at(-1);
+    if (proofFollowUpState({
+      status: r.status,
+      archivedAt: r.archivedAt,
+      archivedNote: r.archivedNote,
+      proofSentAt: r.proofSentAt,
+      followUpsSent: r.followUpsSent,
+      lastFollowUpAt: r.lastFollowUpAt,
+      followUpSnoozedUntil: r.followUpSnoozedUntil,
+      lastMessageAt: lastMsg?.at,
+      lastMessageFrom: lastMsg?.from,
+    }, now) !== "closeout_due") continue;
+    due.push({
+      id: r.id,
+      reference: r.reference,
+      teamName: r.teamName,
+      contactName: r.contactName,
+      contactEmail: r.contactEmail,
+      contactPhone: r.contactPhone,
+      smsOptInAt: r.smsOptInAt,
+      statusToken: r.statusToken,
+      discordThreadId: r.discordThreadId,
+      followUpsSent: r.followUpsSent ?? 0,
       proofSentAt: r.proofSentAt,
       neededBy: r.neededBy,
     });
@@ -226,7 +278,7 @@ export async function recordDesignerReminder(id: string, now = new Date()) {
   await db.update(designRequests).set({ designerRemindedAt: now }).where(eq(designRequests.id, id));
 }
 
-export async function recordFollowUp(id: string, now = new Date()) {
+export async function recordFollowUp(id: string, now = new Date(), completedRound?: number) {
   const db = getDb();
   const [row] = await db
     .select({ followUpsSent: designRequests.followUpsSent })
@@ -235,7 +287,11 @@ export async function recordFollowUp(id: string, now = new Date()) {
     .limit(1);
   await db
     .update(designRequests)
-    .set({ followUpsSent: (row?.followUpsSent ?? 0) + 1, lastFollowUpAt: now })
+    .set({
+      followUpsSent: Math.max((row?.followUpsSent ?? 0) + 1, completedRound ?? 0),
+      lastFollowUpAt: now,
+      followUpSnoozedUntil: null,
+    })
     .where(eq(designRequests.id, id));
 }
 

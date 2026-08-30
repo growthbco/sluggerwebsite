@@ -69,7 +69,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
       )}
 
       <div className="mt-6">
-        <SelfEntryForm token={token} items={orderItems} designs={design?.designs ?? []} requiresNames={order.requiresNames} />
+        <SelfEntryForm token={token} items={orderItems} sport={order.sport} designs={design?.designs ?? []} requiresNames={order.requiresNames} />
       </div>
 
       <details className="mt-6 border border-line bg-steel group">
@@ -83,7 +83,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
               ? "All measurements in inches. Jerseys run slightly large - when in doubt, size down."
               : "All measurements are in inches. Use the chart for the items in this order."}
           </p>
-          <SizeChartsFor items={orderItems} />
+          <SizeChartsFor items={orderItems} sport={order.sport} />
         </div>
       </details>
 

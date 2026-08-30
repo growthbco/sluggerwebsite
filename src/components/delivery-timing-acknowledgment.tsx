@@ -14,9 +14,9 @@ export function DeliveryTimingAcknowledgment({ checked, onChange, id = "delivery
         Fall is our busiest season. Production and carrier transit can take longer, so please order early and leave a buffer before your first game, event, or competition.
       </p>
       <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-foreground/90">
-        <li>Standard turnaround and requested delivery dates are estimates, not guarantees.</li>
+        <li>Standard production is three weeks after final proof approval, final roster submission, and deposit payment. Shipping time is additional.</li>
         <li>
-          Have a firm deadline? Ask us before ordering. Rush service is a flat <strong>$100</strong> fee, and the timeline is confirmed only after Slugger approves it.
+          Have a firm deadline? Ask us before ordering. A two-week rush is a flat <strong>$100</strong> fee and must be approved before production. Shorter deadlines require a separately priced priority review.
         </li>
         <li>
           Carrier, weather, customs, and routing delays are outside Slugger&apos;s control. We&apos;ll help track the package, but extra or upgraded shipping caused by a late order or carrier delay is the customer&apos;s responsibility unless we agree otherwise in writing.
@@ -34,7 +34,7 @@ export function DeliveryTimingAcknowledgment({ checked, onChange, id = "delivery
           className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
         />
         <span>
-          I understand the delivery policy and have ordered with enough time, or I have asked Slugger to confirm a rush option for my deadline. See the{" "}
+          I understand that my requested date is not guaranteed unless Slugger confirms it in writing, and that production and shipping are separate timelines. See the{" "}
           <a href="/shipping" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">Shipping &amp; Delivery policy</a>.
         </span>
       </label>

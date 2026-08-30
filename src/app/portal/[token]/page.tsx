@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { readPortalToken, getCustomerOrdersCached, type PortalData } from "@/lib/portal";
-import { carrierFor, trackingUrlFor } from "@/lib/tracking";
+import { trackingUrlFor } from "@/lib/tracking";
 import { PortalOrderList, type OrderRow } from "@/components/portal-order-list";
 
 export const runtime = "nodejs";
@@ -23,11 +23,11 @@ function balanceDueCents(o: TeamOrder): number {
 }
 
 function statusFor(o: TeamOrder): { label: string; tone: "green" | "amber" | "gold" } {
+  if (o.status === "shipped") return { label: "Shipped", tone: "green" };
   if (o.invoicePaidAt) return { label: "Paid", tone: "green" };
   if (balanceDueCents(o) > 0) return { label: "Balance due", tone: "amber" };
   if (o.depositPaidAt) return { label: "In production", tone: "gold" };
   if (o.status === "quoted") return { label: "Quoted · unpaid", tone: "amber" };
-  if (o.status === "shipped") return { label: "Shipped", tone: "green" };
   if (o.status === "submitted") return { label: "Awaiting invoice", tone: "amber" };
   return { label: titleCase(o.status), tone: "gold" };
 }
@@ -64,6 +64,9 @@ export default async function PortalOrdersPage({ params }: { params: Promise<{ t
         statusTone: s.tone,
         totalCents: o.totalCents + o.shippingCents,
         dateLabel: o.createdAt ? shortDate(o.createdAt) : "",
+        timelineLabel: o.deliveryTargetAt
+          ? `${o.deliveryTargetKind === "pickup" ? "Pickup target" : "Ready to ship target"} ${shortDate(o.deliveryTargetAt)}`
+          : undefined,
         href: `/portal/${token}/o/${o.reference}`,
       };
     });
@@ -77,7 +80,7 @@ export default async function PortalOrdersPage({ params }: { params: Promise<{ t
         <section className="space-y-2">
           <h3 className="display text-sm uppercase tracking-wide text-muted">Store &amp; shop orders</h3>
           {data.shop.map((s) => {
-            const track = s.trackingNumber && (carrierFor(s.trackingNumber) === "UPS" || carrierFor(s.trackingNumber) === "USPS") ? s.trackingNumber : null;
+            const track = s.trackingNumber || null;
             return (
               <div key={s.reference} className="border border-line bg-steel px-4 py-3">
                 <div className="flex items-start justify-between gap-3">

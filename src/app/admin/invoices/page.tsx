@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { adminEnabled, getAdminSession, canAccess } from "@/lib/admin-auth";
 import { dbEnabled } from "@/db";
-import { listDesignerInvoices, reconcileInvoice, designerLinkToken, getBillableOrders, getOrderPaymentIndex, linePaymentStatus } from "@/lib/designer-invoices";
+import { listDesignerInvoices, designerLinkToken, getBillableOrders, getOrderPaymentIndex, reviewInvoiceForPayment } from "@/lib/designer-invoices";
 import { wiseEnabled, wisePayoutCapCents } from "@/lib/wise";
 import { AdminInvoiceList, type AdminInvoice } from "@/components/admin-invoice-list";
 import { AdminUnbilledTable, type UnbilledJob } from "@/components/admin-unbilled-table";
@@ -28,12 +28,12 @@ export default async function AdminInvoicesPage() {
   const billable = await getBillableOrders();
   const notInvoiced = billable.filter((b) => !b.alreadyBilledOn);
   const payIdx = await getOrderPaymentIndex();
+  const expectedUnitByOrder = new Map<string, number>();
+  for (const order of billable) {
+    if (typeof order.unitCostCents === "number") expectedUnitByOrder.set(order.teamOrderId, order.unitCostCents);
+  }
   const invoices: AdminInvoice[] = rows.map((inv) => {
-    const r = reconcileInvoice(inv);
-    const lines = r.lineChecks.map((lc, i) => {
-      const status = linePaymentStatus({ teamOrderId: inv.lines?.[i]?.teamOrderId, team: lc.team }, payIdx);
-      return { ...lc, notPaid: status === "unpaid", unverifiedPay: status === "unknown" };
-    });
+    const review = reviewInvoiceForPayment(inv, payIdx, expectedUnitByOrder);
     return {
       id: inv.id,
       reference: inv.reference,
@@ -50,12 +50,15 @@ export default async function AdminInvoicesPage() {
       dutyCents: inv.dutyCents,
       previousBalanceCents: inv.previousBalanceCents,
       totalCents: inv.totalCents,
-      dutyBps: r.dutyBps,
-      dutyFlag: r.dutyFlag,
-      anyQtyMismatch: r.anyQtyMismatch,
-      anyDoubleBill: r.anyDoubleBill,
-      anyNotPaid: lines.some((l) => l.notPaid),
-      lines,
+      dutyBps: review.dutyBps,
+      dutyFlag: review.dutyFlag,
+      anyQtyMismatch: review.anyQtyMismatch,
+      anyUnitCostOverage: review.anyUnitCostOverage,
+      anyDoubleBill: review.anyDoubleBill,
+      anyNotPaid: review.lines.some((line) => line.notPaid),
+      anyUnverifiedPay: review.lines.some((line) => line.unverifiedPay && line.lineCents > 0),
+      paymentBlockers: review.blockers,
+      lines: review.lines,
     };
   });
 

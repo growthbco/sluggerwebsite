@@ -5,6 +5,7 @@ import { designerInvoices } from "@/db/schema";
 import { requireApiRole } from "@/lib/admin-auth";
 import { payDesigner, wiseEnabled, wisePayoutCapCents } from "@/lib/wise";
 import { postInvoicePaidToDiscord } from "@/lib/discord";
+import { getInvoicePaymentReview } from "@/lib/designer-invoices";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -25,6 +26,13 @@ export async function POST(req: Request) {
   const [inv] = await db.select().from(designerInvoices).where(eq(designerInvoices.id, body.invoiceId)).limit(1);
   if (!inv) return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
   if (inv.status !== "submitted") return NextResponse.json({ error: `This invoice is ${inv.status} - it can't be paid.` }, { status: 409 });
+  const review = await getInvoicePaymentReview(inv);
+  if (!review.canPay) {
+    return NextResponse.json(
+      { error: `Payment blocked: ${review.blockers.join("; ")}.`, blockers: review.blockers },
+      { status: 409 },
+    );
+  }
   if (inv.totalCents > wisePayoutCapCents()) {
     return NextResponse.json({ error: `$${(inv.totalCents / 100).toFixed(2)} is over the $${(wisePayoutCapCents() / 100).toFixed(0)} Wise limit - pay this one manually in the Wise app.` }, { status: 422 });
   }

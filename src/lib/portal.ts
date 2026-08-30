@@ -7,7 +7,8 @@ import { sql, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrders, teamOrderRoster, designRequests, customInvoices, orders, orderItems, teams } from "@/db/schema";
 import { getOrCreateCustomer } from "@/lib/customers";
-import { itemLabel } from "@/lib/order-items";
+import { itemKeyForSizeField, itemLabel } from "@/lib/order-items";
+import { buildDeliveryTimeline, type DeliveryTier } from "@/lib/delivery-timeline";
 
 const TTL_MS = 45 * 60 * 1000; // 45 minutes
 
@@ -49,6 +50,7 @@ export type PortalData = {
   teamOrders: {
     reference: string; teamName: string; status: string; manageToken: string | null; trackingNumber: string | null; createdAt: Date;
     totalCents: number; shippingCents: number; depositCents: number | null; invoiceUrl: string | null; fullInvoiceUrl: string | null; balanceInvoiceUrl: string | null; depositPaidAt: Date | null; invoicePaidAt: Date | null; pieceLabel: string;
+    deliveryTargetAt: Date | null; deliveryTargetKind: "ship" | "pickup" | null;
   }[];
   designs: { reference: string; teamName: string; status: string; statusToken: string | null; createdAt: Date; mockups: string[] }[];
   invoices: { reference: string; status: string; totalCents: number; payUrl: string | null; createdAt: Date }[];
@@ -86,7 +88,11 @@ export async function getCustomerOrders(email: string): Promise<PortalData> {
     for (const r of rr) {
       const m = comp.get(r.to) ?? new Map<string, number>();
       const sized = Object.entries(r.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
-      if (sized.length) for (const [k] of sized) m.set(k, (m.get(k) ?? 0) + 1);
+      if (sized.length) {
+        for (const k of new Set(sized.map(([key]) => itemKeyForSizeField(key)))) {
+          m.set(k, (m.get(k) ?? 0) + 1);
+        }
+      }
       else if ((r.size ?? "").trim()) m.set("jersey", (m.get("jersey") ?? 0) + 1);
       comp.set(r.to, m);
     }
@@ -106,7 +112,23 @@ export async function getCustomerOrders(email: string): Promise<PortalData> {
       })
       .join(" + ");
   };
+  const designsById = new Map(designs.map((d) => [d.id, d]));
   const teamOrdersV = team.map((o) => {
+    const linkedDesign = o.designRequestId ? designsById.get(o.designRequestId) : undefined;
+    const timeline = buildDeliveryTimeline({
+      approvedAt: linkedDesign?.approvedAt,
+      rosterSubmittedAt: o.submittedAt,
+      depositPaidAt: o.depositPaidAt ?? o.invoicePaidAt,
+      timelineStartAt: o.timelineStartAt,
+      fallbackStartAt: (["in_production", "paid", "shipped"] as string[]).includes(o.status)
+        ? (o.depositPaidAt ?? o.invoicePaidAt)
+        : null,
+      requestedInHandAt: o.requestedInHandAt ?? linkedDesign?.neededBy,
+      promisedInHandAt: o.promisedInHandAt,
+      tier: (o.turnaroundTier as DeliveryTier | null) ?? undefined,
+      rush: o.rushShipping,
+      localPickup: o.localPickup,
+    });
     return {
       reference: o.reference,
       teamName: o.teamName,
@@ -123,6 +145,8 @@ export async function getCustomerOrders(email: string): Promise<PortalData> {
       depositPaidAt: o.depositPaidAt,
       invoicePaidAt: o.invoicePaidAt,
       pieceLabel: summarize(o),
+      deliveryTargetAt: o.status === "shipped" ? null : timeline.selectedTargetAt,
+      deliveryTargetKind: timeline.selectedTargetAt ? (o.localPickup ? "pickup" as const : "ship" as const) : null,
     };
   });
   const designsV = designs.map((d) => {
@@ -132,7 +156,9 @@ export async function getCustomerOrders(email: string): Promise<PortalData> {
       ? d.approvedDesignUrls
       : d.approvedDesignUrl
       ? [d.approvedDesignUrl]
-      : d.proofImages ?? [];
+      : d.proofReviewUrls?.length
+        ? d.proofReviewUrls
+        : d.proofImages ?? [];
     return {
       reference: d.reference,
       teamName: d.teamName,

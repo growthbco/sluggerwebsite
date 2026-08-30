@@ -9,6 +9,27 @@ import { requireApiRole } from "@/lib/admin-auth";
 export const runtime = "nodejs";
 
 type Addr = { name: string; street1: string; street2?: string; city: string; state: string; zip: string };
+type Protection = { selected: boolean; paidCents: number; valueCents: number; coveredCents: number; remainingCents: number };
+
+async function protectionFor(kind: "team_order" | "order", id: string): Promise<Protection | null> {
+  const db = getDb();
+  const row = kind === "team_order"
+    ? (await db.select({
+        paidCents: teamOrders.shippingProtectionCents,
+        valueCents: teamOrders.shippingProtectionValueCents,
+        coveredCents: teamOrders.shippingProtectionCoveredCents,
+      }).from(teamOrders).where(eq(teamOrders.id, id)).limit(1))[0]
+    : (await db.select({
+        paidCents: orders.shippingProtectionCents,
+        valueCents: orders.shippingProtectionValueCents,
+        coveredCents: orders.shippingProtectionCoveredCents,
+      }).from(orders).where(eq(orders.id, id)).limit(1))[0];
+  if (!row) return null;
+  const paidCents = Math.max(0, row.paidCents);
+  const valueCents = Math.max(0, row.valueCents);
+  const coveredCents = Math.max(0, Math.min(valueCents, row.coveredCents));
+  return { selected: paidCents > 0 && valueCents > 0, paidCents, valueCents, coveredCents, remainingCents: Math.max(0, valueCents - coveredCents) };
+}
 
 async function addressFor(kind: "team_order" | "order", id: string): Promise<Addr | null> {
   const db = getDb();
@@ -34,12 +55,18 @@ export async function POST(req: Request) {
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   if (!shippoEnabled()) return NextResponse.json({ error: "Shippo isn't configured (SHIPPO_API_KEY)." }, { status: 503 });
 
-  let body: { action?: string; kind?: string; id?: string; weightOz?: number; rateId?: string; additional?: boolean; note?: string } = {};
+  let body: { action?: string; kind?: string; id?: string; weightOz?: number; rateId?: string; additional?: boolean; note?: string; insuredValueCents?: number } = {};
   try {
     body = await req.json();
   } catch {}
   const kind = body.kind === "team_order" ? "team_order" : body.kind === "order" ? "order" : null;
   if (!kind || !body.id) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+
+  if (body.action === "details") {
+    const protection = await protectionFor(kind, body.id);
+    if (!protection) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    return NextResponse.json({ ok: true, protection });
+  }
 
   if (body.action === "quote") {
     if (!labelReady()) {
@@ -57,7 +84,11 @@ export async function POST(req: Request) {
       );
     }
     try {
-      const rates = await getLabelRates(to, weightOz);
+      const protection = await protectionFor(kind, body.id);
+      if (!protection) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      const requestedValue = body.insuredValueCents == null ? protection.remainingCents : Math.max(0, Math.round(Number(body.insuredValueCents) || 0));
+      const insuredValueCents = protection.selected ? Math.min(protection.remainingCents, requestedValue) : 0;
+      const rates = await getLabelRates(to, weightOz, insuredValueCents);
       if (rates.length === 0) return NextResponse.json({ error: "No USPS/UPS rates returned." }, { status: 502 });
       // rates come sorted cheapest-first. Guarantee a useful spread:
       //   - the cheapest option from EACH carrier (so USPS ground always shows
@@ -79,7 +110,7 @@ export async function POST(req: Request) {
       // Fill the rest by price.
       for (const r of rates) add(r);
       const out = Array.from(picked.values()).sort((a, b) => a.costCents - b.costCents);
-      return NextResponse.json({ ok: true, to, rates: out });
+      return NextResponse.json({ ok: true, to, rates: out, protection, insuredValueCents });
     } catch (e) {
       return NextResponse.json({ error: (e as Error).message }, { status: 502 });
     }
@@ -88,31 +119,39 @@ export async function POST(req: Request) {
   if (body.action === "buy") {
     if (!body.rateId) return NextResponse.json({ error: "Missing rateId" }, { status: 400 });
     try {
+      const protection = await protectionFor(kind, body.id);
+      if (!protection) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      const requestedValue = Math.max(0, Math.round(Number(body.insuredValueCents) || 0));
+      const insuredValueCents = protection.selected ? Math.min(protection.remainingCents, requestedValue) : 0;
       const label = await buyLabel(body.rateId);
       if (body.additional === true) {
         // A SECOND parcel on an order that already has a primary label
         // (second box, reship, hats going separately). Append it and email
         // the customer this tracking right away - this box is going out now.
         const { appendAdditionalShipment } = await import("@/lib/fulfillment");
-        const sent = await appendAdditionalShipment(kind, body.id, label.trackingNumber, label.labelUrl, (body.note ?? "").trim().slice(0, 80) || undefined, label.transactionId);
+        const sent = await appendAdditionalShipment(kind, body.id, label.trackingNumber, label.labelUrl, (body.note ?? "").trim().slice(0, 80) || undefined, label.transactionId, insuredValueCents);
         return NextResponse.json({
           ok: true,
           additional: true,
           trackingNumber: label.trackingNumber,
           labelUrl: label.labelUrl,
           costCents: label.costCents,
+          insuranceCostCents: label.insuranceCostCents,
+          insuredValueCents,
           provider: label.provider,
           emailed: sent,
         });
       }
       // Primary label: save tracking, but don't ship or email yet - buying the
       // label ahead of time is a separate step from actually sending the box.
-      await saveLabelPurchase(kind, body.id, label.trackingNumber, label.labelUrl, label.transactionId, label.provider);
+      await saveLabelPurchase(kind, body.id, label.trackingNumber, label.labelUrl, label.transactionId, label.provider, insuredValueCents);
       return NextResponse.json({
         ok: true,
         trackingNumber: label.trackingNumber,
         labelUrl: label.labelUrl,
         costCents: label.costCents,
+        insuranceCostCents: label.insuranceCostCents,
+        insuredValueCents,
         provider: label.provider,
       });
     } catch (e) {

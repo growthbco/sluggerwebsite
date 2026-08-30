@@ -57,6 +57,7 @@ export default async function AdminShopOrdersPage() {
     shippedAt: orders.shippedAt,
     createdAt: orders.createdAt,
     source: orders.source,
+    shippingProtectionCents: orders.shippingProtectionCents,
   };
   const [active, archived] = await Promise.all([
     db.select(cols).from(orders).where(isNull(orders.archivedAt)).orderBy(desc(orders.createdAt)).limit(200),
@@ -91,6 +92,7 @@ export default async function AdminShopOrdersPage() {
         </div>
         <span className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
           <span className="display text-foreground whitespace-nowrap">{money(o.totalCents)}</span>
+          {o.shippingProtectionCents > 0 && <span className="text-[10px] display text-green-400 border border-green-400/40 px-1.5 py-0.5">PROTECTED</span>}
           {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
           {!o.shippedAt && o.status === "paid" && !o.trackingNumber && (
             <AdminLabelButton kind="order" id={o.id} who={o.customerName ?? o.reference} />

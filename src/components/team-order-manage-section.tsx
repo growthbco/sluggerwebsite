@@ -1,6 +1,6 @@
 import Image from "next/image";
 import type { teamOrders } from "@/db/schema";
-import { getRoster, getLinkedDesignPreview } from "@/lib/team-orders";
+import { customerRosterLockMessage, getRoster, getLinkedDesignPreview } from "@/lib/team-orders";
 import { getStoreByDesignRequestId, teamRaisedCents } from "@/lib/team-stores";
 import { TeamFundraiseCard } from "@/components/team-fundraise-card";
 import { itemPriceCents, computeTeamOrderQuote } from "@/lib/team-order-pricing";
@@ -10,7 +10,10 @@ import { TeamOrderAddon } from "@/components/team-order-addon";
 import { TeamOrderShipping } from "@/components/team-order-shipping";
 import { ManageTabs, type ManageTab } from "@/components/manage-tabs";
 import { SizeChartsFor } from "@/components/size-charts";
-import { carrierFor, trackingUrlFor } from "@/lib/tracking";
+import { trackingUrlForCarrier } from "@/lib/tracking";
+import { buildDeliveryTimeline, type DeliveryTier } from "@/lib/delivery-timeline";
+import { CustomerDeliveryTimeline } from "@/components/customer-delivery-timeline";
+import { buildCustomerOrderSpec } from "@/lib/order-spec";
 
 type TeamOrderRow = typeof teamOrders.$inferSelect;
 
@@ -37,8 +40,32 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
   // Live running total for the coach as the roster fills (estimate; shipping and
   // tax are added at invoice). Uses the same pricing engine as the real quote.
   const quote = computeTeamOrderQuote(order, roster);
+  // Paid/submitted orders keep the exact quote the customer accepted, even if
+  // the current catalog fee has changed since invoicing. This order-level
+  // reconciliation also keeps legacy Rush fees from being rewritten in the
+  // customer-facing breakdown.
+  const lockedQuoteTotal = order.quotedTotalCents ?? null;
+  const lockedBaseTotal = quote.lines.reduce((sum, line) => sum + line.totalCents, 0) + quote.priorityFeeCents;
+  const customerQuote = lockedQuoteTotal && !["draft", "collecting"].includes(order.status)
+    ? {
+        ...quote,
+        rushFeeCents: order.rushShipping ? Math.max(0, lockedQuoteTotal - lockedBaseTotal) : 0,
+        totalCents: lockedQuoteTotal,
+      }
+    : quote;
+  const liveOrderSpec = buildCustomerOrderSpec(order, roster, design, customerQuote);
+  const currentOrderSpec = (order.depositPaidAt || order.invoicePaidAt) && order.specSnapshot
+    ? order.specSnapshot
+    : liveOrderSpec;
   const orderItems = order.items ?? ["jersey"];
   const orderMinimum = minPiecesForItems(order.items);
+  const athleteCount = new Set(roster.map((row) => {
+    const name = (row.playerName ?? "").trim().toLowerCase();
+    const number = (row.playerNumber ?? "").trim().toLowerCase();
+    return name || number ? `${name}|${number}` : `row:${row.id}`;
+  })).size;
+  const pieceCount = roster.reduce((total, row) => total + Math.max(1, row.quantity ?? 1), 0);
+  const rosterLockMessage = customerRosterLockMessage(order);
   const hasJersey = orderItems.some((item) => item.includes("jersey"));
   const collecting = ["draft", "collecting"].includes(order.status);
   const productPrices = orderItems
@@ -51,28 +78,39 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
     }))
     .filter((p) => p.unitCents > 0);
   const canAddon = !["draft", "collecting", "cancelled"].includes(order.status);
-  const addonPrices = Object.fromEntries(addonItems.map((k) => [k, itemPriceCents(k, order.jerseyStyle, order.localPricing, order.jerseyMaterial)]));
+  const addonPrices = Object.fromEntries(addonItems.map((k) => [
+    k,
+    k === "jersey" && order.customJerseyCents
+      ? order.customJerseyCents
+      : itemPriceCents(k, order.jerseyStyle, order.localPricing, order.jerseyMaterial),
+  ]));
   // The "Add to this order" block: primary gold, placed right under the
   // submitted banner on the roster tab (where coaches actually look), so nobody
   // has to hunt a back tab for it. Ship-timing disclaimer always visible.
   const addonSlot = canAddon ? (
-    <section className="rounded-xl border-2 border-brand/70 bg-brand/[0.06] p-5">
-      <h3 className="display text-lg text-foreground">Add to this order</h3>
-      <p className="text-sm text-muted mt-1">Still adding players or extras? Add them right here. You do not need a new order.</p>
-      <div className="mt-4">
+    <details key="team-order-addon" className="group rounded-xl border border-brand/60 bg-brand/[0.05]">
+      <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 px-5 py-3">
+        <span>
+          <span className="display block text-base text-foreground">Add a player or item</span>
+          <span className="block text-xs text-muted">Late addition? Add it here without starting a new order.</span>
+        </span>
+        <span className="display shrink-0 text-brand transition-transform group-open:rotate-45" aria-hidden="true">+</span>
+      </summary>
+      <div className="border-t border-brand/20 px-5 pb-5 pt-4">
         <TeamOrderAddon
           token={order.manageToken!}
           items={addonItems}
           prices={addonPrices}
+          sport={order.sport}
           designs={design?.designs ?? []}
           shipped={order.status === "shipped"}
           embedded
         />
+        <p className="mt-4 border-t border-brand/20 pt-3 text-xs text-muted">
+          Late additions may ship separately and can have their own shipping charge or delivery date.
+        </p>
       </div>
-      <p className="mt-4 border-t border-brand/20 pt-3 text-xs text-muted">
-        Adding to this order does not guarantee the original delivery date. Extra pieces may ship separately and can have their own shipping charge.
-      </p>
-    </section>
+    </details>
   ) : null;
 
   // One focused panel at a time instead of a long scroll. Roster is the home
@@ -89,6 +127,7 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
           jerseyStyle={order.jerseyStyle}
           jerseyMaterial={order.jerseyMaterial}
           items={orderItems}
+          sport={order.sport}
           designs={design?.designs ?? []}
           shareUrl={shareUrl}
           roster={roster.map((r) => ({
@@ -103,13 +142,15 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
           }))}
           submitted={!["draft", "collecting"].includes(order.status)}
           colors={design?.colors ?? null}
-          locked={["shipped", "cancelled"].includes(order.status)}
+          locked={Boolean(rosterLockMessage)}
+          lockMessage={rosterLockMessage}
           requiresNames={order.requiresNames}
           minPieces={orderMinimum}
-          quote={{ lines: quote.lines, rushFeeCents: quote.rushFeeCents, totalCents: quote.totalCents }}
+          quote={{ lines: customerQuote.lines, rushFeeCents: customerQuote.rushFeeCents, priorityFeeCents: customerQuote.priorityFeeCents, totalCents: customerQuote.totalCents }}
           nextIsDeposit={designState === "approved"}
           designState={designState}
           addonSlot={addonSlot}
+          orderSpec={currentOrderSpec}
         />
       ),
     },
@@ -123,7 +164,7 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
               ? "All measurements in inches. Jerseys run slightly large - when in doubt, size down."
               : "All measurements are in inches. Use the chart for the items in this order."}
           </p>
-          <SizeChartsFor items={orderItems} />
+          <SizeChartsFor items={orderItems} sport={order.sport} />
         </div>
       ),
     },
@@ -142,7 +183,8 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
   }
 
   // Order-level status + pay/track for the customer's order page. Customers
-  // only ever see outbound UPS/USPS tracking, never internal DHL/FedEx.
+  // see only the final outbound shipment, regardless of carrier; internal
+  // factory-to-Slugger tracking remains private.
   const money = (c: number) => `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const titleCaseStatus = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
   const paid = Boolean(order.invoicePaidAt);
@@ -155,9 +197,27 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
   const balanceDue = Math.max(0, totalCents - depositCents) + shippingCents;
   const showPayDeposit = !paid && !started && Boolean(payUrl);
   const showPayBalance = started && !paid && Boolean(order.balanceInvoiceUrl) && balanceDue > 0;
-  const outboundTrack = order.trackingNumber && ["UPS", "USPS"].includes(carrierFor(order.trackingNumber)) ? order.trackingNumber : null;
-  const statusLabel = paid
-    ? "Paid"
+  const outboundTrack = order.trackingNumber && (order.status === "shipped" || order.shippedAt)
+    ? { number: order.trackingNumber, url: trackingUrlForCarrier(order.trackingNumber, order.shipCarrier) }
+    : null;
+  const deliveryTimeline = buildDeliveryTimeline({
+    approvedAt: design?.approvedAt,
+    rosterSubmittedAt: order.submittedAt,
+    depositPaidAt: order.depositPaidAt ?? order.invoicePaidAt,
+    timelineStartAt: order.timelineStartAt,
+    fallbackStartAt: (["in_production", "paid", "shipped"] as string[]).includes(order.status)
+      ? (order.depositPaidAt ?? order.invoicePaidAt)
+      : null,
+    requestedInHandAt: order.requestedInHandAt ?? design?.neededBy,
+    promisedInHandAt: order.promisedInHandAt,
+    tier: (order.turnaroundTier as DeliveryTier | null) ?? undefined,
+    rush: order.rushShipping,
+    localPickup: order.localPickup,
+  });
+  const statusLabel = order.status === "shipped" || order.shippedAt
+    ? "Shipped"
+    : paid
+      ? "Paid"
     : started
       ? "In production"
       : ["draft", "collecting"].includes(order.status)
@@ -167,6 +227,17 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
           : order.status === "quoted"
             ? "Awaiting payment"
             : titleCaseStatus(order.status);
+  const nextStepHeading = outboundTrack
+    ? "Your order is on the way"
+    : started
+      ? "Production is underway"
+      : showPayBalance
+        ? "Pay the remaining balance"
+        : showPayDeposit
+          ? "Payment starts production"
+          : collecting
+            ? "Complete your roster"
+            : "We are reviewing your order";
   const shipAddr = order.shippingAddress?.line1
     ? { line1: order.shippingAddress.line1 ?? "", line2: order.shippingAddress.line2 ?? "", city: order.shippingAddress.city ?? "", state: order.shippingAddress.state ?? "", postalCode: order.shippingAddress.postalCode ?? "" }
     : null;
@@ -175,29 +246,39 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
     <div className="space-y-8">
       {/* Persistent product + price identity. The customer should never have
           to infer what they are buying from a roster field or an invoice. */}
-      <section className="rounded-xl border-2 border-brand/60 bg-brand/[0.07] p-5">
-        <p className="display text-xs uppercase tracking-[0.16em] text-brand">Your order</p>
-        <h2 className="display text-2xl text-foreground mt-1">
-          {orderItems.map((key) => itemLabel(key)).join(" + ")}
-        </h2>
-        {order.jerseyStyle && <p className="text-sm text-muted mt-1">{order.jerseyStyle}</p>}
+      <section className="rounded-xl border-2 border-brand/60 bg-brand/[0.07] p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="display text-xs uppercase tracking-[0.16em] text-brand">Team order dashboard</p>
+            <h1 className="display text-3xl text-foreground mt-1">{order.teamName} Team Order</h1>
+            <p className="text-sm text-muted mt-1">
+              {orderItems.map((key) => itemLabel(key)).join(" + ")}{order.jerseyStyle ? ` · ${order.jerseyStyle}` : ""}
+            </p>
+          </div>
+          <span className="rounded-full border border-brand/50 bg-brand/10 px-3 py-1.5 display text-xs text-brand">{statusLabel}</span>
+        </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <div className="border border-line bg-ink/40 px-4 py-3">
-            <p className="text-xs uppercase tracking-wider text-muted">Price</p>
+            <p className="text-xs uppercase tracking-wider text-muted">Unit price</p>
             {productPrices.map((p) => (
               <p key={p.key} className="display text-lg text-foreground mt-0.5">{money(p.unitCents)} each</p>
             ))}
           </div>
           <div className="border border-line bg-ink/40 px-4 py-3">
-            <p className="text-xs uppercase tracking-wider text-muted">Roster</p>
-            <p className="display text-lg text-foreground mt-0.5">{roster.length} {roster.length === 1 ? "athlete" : "athletes"}</p>
+            <p className="text-xs uppercase tracking-wider text-muted">Athletes</p>
+            <p className="display text-lg text-foreground mt-0.5">{athleteCount}</p>
+            <p className="text-xs text-muted mt-0.5">Unique players</p>
+          </div>
+          <div className="border border-line bg-ink/40 px-4 py-3">
+            <p className="text-xs uppercase tracking-wider text-muted">Uniform pieces</p>
+            <p className="display text-lg text-foreground mt-0.5">{pieceCount}</p>
             <p className="text-xs text-muted mt-0.5">{orderMinimum}-piece minimum</p>
           </div>
           <div className="border border-line bg-ink/40 px-4 py-3">
-            <p className="text-xs uppercase tracking-wider text-muted">Current subtotal</p>
-            <p className="display text-lg text-foreground mt-0.5">{totalCents > 0 ? money(totalCents) : "Add sizes"}</p>
-            <p className="text-xs text-muted mt-0.5">Tax and shipping added later</p>
+            <p className="text-xs uppercase tracking-wider text-muted">Order total</p>
+            <p className="display text-lg text-foreground mt-0.5">{totalCents > 0 ? money(grandTotal) : "Add sizes"}</p>
+            <p className="text-xs text-muted mt-0.5">{shippingCents > 0 ? `Includes ${money(shippingCents)} shipping` : "Tax and shipping added later"}</p>
           </div>
         </div>
 
@@ -216,7 +297,7 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
           Pay / Pay balance / Track by state. */}
       <section className="border border-line bg-steel p-4 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="display text-foreground">Order status · {statusLabel}</p>
+          <p className="display text-foreground">{nextStepHeading}</p>
           {shippingCents > 0 && (
             <p className="text-sm text-muted mt-0.5">
               {money(totalCents)} goods + {money(shippingCents)} shipping = {money(grandTotal)}
@@ -241,56 +322,51 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
             <a href={order.balanceInvoiceUrl!} target="_blank" rel="noopener noreferrer" className="display text-sm bg-brand text-on-brand px-5 min-h-[44px] inline-flex items-center rounded hover:bg-brand-dark">Pay balance {money(balanceDue)}</a>
           )}
           {outboundTrack && (
-            <a href={trackingUrlFor(outboundTrack)} target="_blank" rel="noopener noreferrer" className="display text-sm border border-brand/50 text-brand px-5 min-h-[44px] inline-flex items-center rounded hover:bg-brand/10">Track shipment</a>
+            <a href={outboundTrack.url} target="_blank" rel="noopener noreferrer" className="display text-sm border border-brand/50 text-brand px-5 min-h-[44px] inline-flex items-center rounded hover:bg-brand/10">Track shipment</a>
           )}
         </div>
       </section>
 
+      <CustomerDeliveryTimeline
+        timeline={deliveryTimeline}
+        localPickup={order.localPickup}
+        shippedAt={order.shippedAt}
+      />
+
       {/* Visual confirmation card so the coach (and screenshots they share with
           their players) make the team <-> uniform connection obvious. */}
       {design?.imageUrl && (
-        <section className="rounded-xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
-          <div className="flex flex-col sm:flex-row">
-            <a
-              href={design.imageUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Click to view full size"
-              className="sm:w-72 aspect-[4/3] sm:aspect-auto sm:h-56 relative bg-white shrink-0 block hover:opacity-90 transition-opacity"
-            >
-              <Image
-                src={design.imageUrl}
-                alt={`${order.teamName} approved design`}
-                fill
-                sizes="(max-width: 640px) 100vw, 288px"
-                className="object-contain p-1"
-                unoptimized
-              />
-              <span className="absolute bottom-1 right-1 text-[10px] bg-ink/80 text-foreground px-1.5 py-0.5">🔍 enlarge</span>
-            </a>
-            <div className="px-4 py-3 flex-1">
-              <p className="text-xs text-muted uppercase tracking-wider">
-                {design.pending ? "Latest proof (pending approval)" : "Approved design"}
-              </p>
-              <p className="display text-lg text-foreground mt-1">{order.teamName}</p>
+        <section className="overflow-hidden rounded-xl border border-foreground/10 bg-foreground/[0.02]">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line/60 px-5 py-4">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted">{designState === "approved" ? "Approved designs" : "Design proof awaiting approval"}</p>
+              <h2 className="display text-xl text-foreground mt-1">{order.teamName} Uniforms</h2>
               <p className="text-xs text-muted mt-1">Design ref: <span className="font-mono">{design.reference}</span></p>
-              <p className="text-xs text-muted mt-2">
-                Every player entry on this roster is tied to this design.
-              </p>
             </div>
+            <span className="rounded-full border border-line px-3 py-1 text-xs text-muted">
+              {design.designs.length > 1 ? `${design.designs.length} colorways` : designState === "approved" ? "Approved" : "Review needed"}
+            </span>
           </div>
-          {(design.designs?.length ?? 0) > 1 && (
-            <div className="border-t border-line/60 px-4 py-3">
-              <p className="text-xs text-muted uppercase tracking-wider mb-2">This team has {design.designs.length} approved designs - players pick which one(s) they want</p>
-              <div className="flex flex-wrap gap-2">
-                {design.designs.map((d) => (
-                  <a key={d.image} href={d.image} target="_blank" rel="noopener noreferrer" className="w-24 border border-line rounded overflow-hidden hover:ring-2 hover:ring-brand" title={`View ${d.label}`}>
-                    <Image src={d.image} alt={d.label} width={96} height={80} sizes="96px" className="h-20 w-full object-contain bg-white" unoptimized />
-                    <span className="block px-1.5 py-1 text-[11px] text-muted leading-tight">{d.label}{d.sku ? <span className="block font-mono text-[10px] opacity-70">{d.sku}</span> : null}</span>
-                  </a>
-                ))}
-              </div>
+
+          {design.designs.length > 1 ? (
+            <div className="grid gap-3 p-4 sm:grid-cols-2">
+              {design.designs.map((d) => (
+                <a key={d.image} href={d.image} target="_blank" rel="noopener noreferrer" className="group overflow-hidden border border-line bg-white" title={`View ${d.label}`}>
+                  <div className="relative aspect-[4/3]">
+                    <Image src={d.image} alt={d.label} fill sizes="(max-width: 640px) 100vw, 40vw" className="object-contain p-2 transition-transform group-hover:scale-[1.02]" unoptimized />
+                  </div>
+                  <span className="flex items-center justify-between border-t border-line bg-ink px-3 py-2 text-sm text-foreground">
+                    <span>{d.label}</span>
+                    <span className="text-xs text-brand">View larger ↗</span>
+                  </span>
+                </a>
+              ))}
             </div>
+          ) : (
+            <a href={design.imageUrl} target="_blank" rel="noopener noreferrer" title="Click to view full size" className="relative block aspect-[16/7] bg-white hover:opacity-90">
+              <Image src={design.imageUrl} alt={`${order.teamName} design`} fill sizes="(max-width: 1024px) 100vw, 900px" className="object-contain p-2" unoptimized />
+              <span className="absolute bottom-2 right-2 bg-ink/85 px-2 py-1 text-xs text-foreground">View larger ↗</span>
+            </a>
           )}
         </section>
       )}

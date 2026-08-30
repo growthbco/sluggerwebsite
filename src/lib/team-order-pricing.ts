@@ -1,7 +1,7 @@
 // Auto-pricing for quote-first team orders: roster rows x the public price
 // list. Jersey price follows the order's jersey style; rush is a flat $100.
 
-import { itemLabel } from "@/lib/order-items";
+import { itemKeyForSizeField, itemLabel } from "@/lib/order-items";
 import { rushFeeCentsForPieces } from "@/lib/rush-pricing";
 
 // Per-item retail prices in cents (mirrors src/lib/pricing.ts).
@@ -80,7 +80,8 @@ export function estimateOrderParcelsOz(
     const qty = Math.max(1, r.quantity ?? 1);
     const sized = Object.entries(r.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
     if (sized.length) {
-      for (const [key] of sized) {
+      const itemKeys = new Set(sized.map(([key]) => itemKeyForSizeField(key)));
+      for (const key of itemKeys) {
         const oz = (ITEM_WEIGHT_OZ[key] ?? 12) * qty;
         if (HAT_KEYS.includes(key)) hat += oz;
         else apparel += oz;
@@ -101,8 +102,8 @@ export function estimateOrderWeightOz(
 }
 
 // The jersey styles a team order can use, in the order shown in the form. The
-// price follows the style via jerseyPriceCents (zip $38, full $35, two $32,
-// V-neck $29, crew $28; crew/V-neck are $25 with local pricing).
+// price follows the style via jerseyPriceCents (zip $40, full $35, two $32,
+// V-neck $30, crew $28; crew/V-neck are $25 with local pricing).
 export const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button", "Quarter-Zip"] as const;
 
 export function jerseyPriceCents(jerseyStyle?: string | null, localPricing?: boolean | null, material?: string | null): number {
@@ -112,10 +113,10 @@ export function jerseyPriceCents(jerseyStyle?: string | null, localPricing?: boo
   // this premium; other bowling styles price by their normal style.
   const microfiber = (material ?? "").toLowerCase() === "microfiber";
   if (s.includes("full") && microfiber) return 4200;
-  if (s.includes("zip")) return 3800;
+  if (s.includes("zip")) return 4000;
   if (s.includes("full")) return 3500;
   if (s.includes("two")) return 3200;
-  if (/v[\s-]?neck/.test(s)) return localPricing ? LOCAL_JERSEY_CENTS : 2900;
+  if (/v[\s-]?neck/.test(s)) return localPricing ? LOCAL_JERSEY_CENTS : 3000;
   return localPricing ? LOCAL_JERSEY_CENTS : 2800; // crew / unspecified
 }
 
@@ -132,6 +133,7 @@ export type TeamOrderQuote = {
   lines: QuoteLine[];
   pieces: number;
   rushFeeCents: number;
+  priorityFeeCents: number;
   totalCents: number;
 };
 
@@ -152,6 +154,7 @@ export function computeTeamOrderQuote(
     jerseyMaterial?: string | null;
     items?: string[] | null;
     rushShipping?: boolean | null;
+    priorityFeeCents?: number | null;
     localPricing?: boolean | null;
     /** Owner-negotiated per-jersey price for this order - wins over all defaults. */
     customJerseyCents?: number | null;
@@ -173,9 +176,11 @@ export function computeTeamOrderQuote(
   for (const row of billable) {
     const qty = Math.max(1, row.quantity ?? 1);
     const sized = Object.entries(row.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
-    const matching = sized.filter(([key]) => allowedItems.has(key));
-    if (matching.length) {
-      for (const [key] of matching) counts.set(key, (counts.get(key) ?? 0) + qty);
+    const matching = new Set(
+      sized.map(([key]) => itemKeyForSizeField(key)).filter((key) => allowedItems.has(key)),
+    );
+    if (matching.size) {
+      for (const key of matching) counts.set(key, (counts.get(key) ?? 0) + qty);
     } else if (sized.length && orderItems.length === 1) {
       // Legacy safety net: if an order's product was corrected after its
       // roster was entered (for example jersey -> rhinestone cheer set), its
@@ -229,6 +234,7 @@ export function computeTeamOrderQuote(
   }
 
   const rushFeeCents = order.rushShipping ? rushFeeCentsForPieces(pieces) : 0;
-  const totalCents = lines.reduce((s, l) => s + l.totalCents, 0) + rushFeeCents;
-  return { lines, pieces, rushFeeCents, totalCents };
+  const priorityFeeCents = pieces > 0 ? Math.max(0, order.priorityFeeCents ?? 0) : 0;
+  const totalCents = lines.reduce((s, l) => s + l.totalCents, 0) + rushFeeCents + priorityFeeCents;
+  return { lines, pieces, rushFeeCents, priorityFeeCents, totalCents };
 }
