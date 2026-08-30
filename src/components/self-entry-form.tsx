@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatSize, missingCheerSizeLabels, sizeFieldsForItems } from "@/lib/order-items";
+import { formatSize, isOneSizeField, missingCheerSizeLabels, sizeFieldsForItems } from "@/lib/order-items";
 
 export function SelfEntryForm({ token, items, sport, designs = [], requiresNames = true }: { token: string; items: string[]; sport?: string | null; designs?: { label: string; image: string; sku?: string | null }[]; requiresNames?: boolean }) {
   const [name, setName] = useState("");
@@ -98,7 +98,20 @@ export function SelfEntryForm({ token, items, sport, designs = [], requiresNames
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3">
-        {sizeFields.map((field) => (
+        {sizeFields.map((field) => isOneSizeField(field) ? (
+          <label key={field.key} className="flex min-h-20 cursor-pointer items-center gap-3 border border-line bg-steel px-4 py-3 hover:border-brand/60">
+            <input
+              type="checkbox"
+              checked={sizes[field.key] === "One Size"}
+              onChange={(e) => setSize(field.key, e.target.checked ? "One Size" : "")}
+              className="h-5 w-5 shrink-0 accent-brand"
+            />
+            <span>
+              <span className="display block text-sm text-foreground">Add {field.label}</span>
+              <span className="mt-0.5 block text-xs text-muted">One size fits most</span>
+            </span>
+          </label>
+        ) : (
           <div key={field.key}>
             <label className="display text-sm text-foreground">{field.label} Size *</label>
             <select className={`mt-2 ${inputCls}`} value={sizes[field.key] ?? ""} onChange={(e) => setSize(field.key, e.target.value)}>

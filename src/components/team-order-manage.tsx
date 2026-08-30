@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-acknowledgment";
-import { itemLabel, sizeBreakdown, formatSize, JERSEY_MATERIALS, missingCheerSizeLabels, sizeFieldsForItems, sizeValueForField } from "@/lib/order-items";
+import { itemLabel, sizeBreakdown, formatSize, isOneSizeField, JERSEY_MATERIALS, missingCheerSizeLabels, sizeFieldsForItems, sizeValueForField } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 import { OrderSpecificationCard } from "@/components/order-specification-card";
 import type { CustomerOrderSpec } from "@/lib/order-spec";
@@ -338,7 +338,17 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
                       {designs.map((d) => <option key={d.label} value={d.label} className="text-foreground">{d.label}</option>)}
                     </select>
                   )}
-                  {sizeFieldsForItems(items, sport).map((field) => (
+                  {sizeFieldsForItems(items, sport).map((field) => isOneSizeField(field) ? (
+                    <label key={field.key} className="inline-flex min-h-10 cursor-pointer items-center gap-2 border border-line bg-ink px-3 py-2 text-sm text-foreground hover:border-brand/60">
+                      <input
+                        type="checkbox"
+                        checked={manual.sizes[field.key] === "One Size"}
+                        onChange={(e) => setManual((m) => ({ ...m, sizes: { ...m.sizes, [field.key]: e.target.checked ? "One Size" : "" } }))}
+                        className="h-4 w-4 accent-brand"
+                      />
+                      Add {field.label}
+                    </label>
+                  ) : (
                     <select
                       key={field.key}
                       value={manual.sizes[field.key] ?? ""}
@@ -783,7 +793,17 @@ function RosterRowItem({ token, row, index, items, sport, designs = [], needsDes
               {designs.map((d) => <option key={d.label} value={d.label} className="text-foreground">{d.label}</option>)}
             </select>
           )}
-          {sizeFieldsForItems(items, sport).map((field) => (
+          {sizeFieldsForItems(items, sport).map((field) => isOneSizeField(field) ? (
+            <label key={field.key} className="inline-flex min-h-10 cursor-pointer items-center gap-2 border border-line bg-ink px-3 py-2 text-sm text-foreground hover:border-brand/60">
+              <input
+                type="checkbox"
+                checked={sizes[field.key] === "One Size"}
+                onChange={(e) => setSizes((s) => ({ ...s, [field.key]: e.target.checked ? "One Size" : "" }))}
+                className="h-4 w-4 accent-brand"
+              />
+              Add {field.label}
+            </label>
+          ) : (
             <select key={field.key} value={sizes[field.key] ?? ""} onChange={(e) => setSizes((s) => ({ ...s, [field.key]: e.target.value }))} className="bg-ink border border-line px-2 py-2 text-sm text-foreground focus:border-brand focus:outline-none" aria-label={`${field.label} size`}>
               <option value="">{field.label}: -</option>
               {field.sizes.map((s) => (<option key={s} value={s}>{formatSize(s)}</option>))}

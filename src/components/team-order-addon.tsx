@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { itemLabel, sizesFor, itemTakesName } from "@/lib/order-items";
+import { isOneSizeList, itemLabel, sizesFor, itemTakesName } from "@/lib/order-items";
 
 type Line = { key: string; size: string; name: string; number: string; design: string; quantity: number };
 
@@ -37,6 +37,8 @@ export function TeamOrderAddon({
   const needsDesign = designs.length > 1;
   // Hats/caps are sized, not personalized - hide the name/# fields for them.
   const needsName = itemTakesName(draft.key);
+  const draftSizes = sizesFor(draft.key, sport);
+  const isOneSize = isOneSizeList(draftSizes);
   // Preview the currently-selected design (or the only one) so they see it.
   const previewDesign = designs.find((d) => d.label === draft.design) ?? (designs.length === 1 ? designs[0] : undefined);
 
@@ -44,7 +46,10 @@ export function TeamOrderAddon({
   const total = lines.reduce((s, l) => s + (prices[l.key] ?? 0) * l.quantity, 0);
 
   function add() {
-    if (!draft.size) { setError("Pick a size for this piece."); return; }
+    if (!draft.size) {
+      setError(isOneSize ? `Check “Add ${itemLabel(draft.key)}” first.` : "Pick a size for this piece.");
+      return;
+    }
     if (needsDesign && !draft.design) { setError("Pick a design for this piece."); return; }
     setError("");
     setLines((ls) => [...ls, draft]);
@@ -113,17 +118,29 @@ export function TeamOrderAddon({
             {designs.map((dz) => <option key={dz.label} value={dz.label}>{dz.label}{dz.sku ? ` (${dz.sku})` : ""}</option>)}
           </select>
         )}
-        <select
-          value={draft.size}
-          onChange={(e) => setDraft((d) => ({ ...d, size: e.target.value }))}
-          className="bg-ink border border-line px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
-          aria-label="Size"
-        >
-          <option value="">Pick a size</option>
-          {sizesFor(draft.key, sport).map((s) => (
-            <option key={s}>{s}</option>
-          ))}
-        </select>
+        {isOneSize ? (
+          <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 border border-line bg-ink px-3 py-2 text-sm text-foreground hover:border-brand/60">
+            <input
+              type="checkbox"
+              checked={draft.size === "One Size"}
+              onChange={(e) => setDraft((d) => ({ ...d, size: e.target.checked ? "One Size" : "" }))}
+              className="h-4 w-4 accent-brand"
+            />
+            Add {itemLabel(draft.key)}
+          </label>
+        ) : (
+          <select
+            value={draft.size}
+            onChange={(e) => setDraft((d) => ({ ...d, size: e.target.value }))}
+            className="bg-ink border border-line px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none"
+            aria-label="Size"
+          >
+            <option value="">Pick a size</option>
+            {draftSizes.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+        )}
         {/* Keep name + # together so the number never drops to its own line.
             Hidden for hats/caps - they're sized, not personalized. */}
         {needsName && (

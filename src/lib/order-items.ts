@@ -32,6 +32,14 @@ export type SizeField = {
   sizes: string[];
 };
 
+export function isOneSizeList(sizes: readonly string[]): boolean {
+  return sizes.length === 1 && sizes[0] === "One Size";
+}
+
+export function isOneSizeField(field: Pick<SizeField, "sizes">): boolean {
+  return isOneSizeList(field.sizes);
+}
+
 export function isCheerItem(key: string): boolean {
   return CHEER_ITEM_KEYS.has(key);
 }
