@@ -33,6 +33,7 @@ const SECTIONS: PolicySection[] = [
     body: [
       "The approved proof and final roster are the production instructions for a custom order. Before approval or submission, review the product style, artwork, spelling, logos, names, numbers, sizes, top and bottom sizes, quantities, colors, and colorway assigned to every person.",
       "For a team or group order, approval by the coach, organizer, purchaser, or other authorized order contact is treated as approval for the order. Information entered by an individual through a roster or team-store link is treated as that person's final selection unless it is corrected before production begins.",
+      "Roster and order selections may be corrected until a deposit or full payment is recorded. Payment locks the roster and confirmed order specifications for production. Later additions or requested changes must be accepted by Slugger Athletics and may be handled as separately priced add-ons with their own production and shipping timeline.",
       "A digital mockup is a design proof, not a photograph of a finished garment. Small differences caused by garment shape, size grading, seams, fabric, and the production process are expected. Anything important that is missing or incorrect must be changed before approval.",
     ],
   },

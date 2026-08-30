@@ -1,4 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import {
+  PRIORITY_PRODUCTION_COPY,
+  RUSH_PRODUCTION_COPY,
+  SHIPPING_TIMING_COPY,
+  STANDARD_PRODUCTION_COPY,
+} from "@/lib/customer-policy";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/terms" },
@@ -10,7 +17,7 @@ export default function TermsPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14">
       <h1 className="display text-4xl sm:text-5xl text-foreground">Terms &amp; Conditions</h1>
-      <p className="mt-3 text-sm text-muted">Last updated {new Date().getFullYear()}</p>
+      <p className="mt-3 text-sm text-muted">Last updated August 30, 2026</p>
 
       <div className="mt-8 space-y-6 text-muted leading-relaxed">
         <p>
@@ -33,9 +40,32 @@ export default function TermsPage() {
             proof that is not exactly what you want.
           </p>
           <p className="mt-2">
-            Approval is final. Once you approve a proof, your order moves into production
-            and cannot be changed, cancelled, or refunded. We are not responsible for any
-            errors, omissions, or missing elements in a proof you approved.
+            Proof approval is final for the artwork shown, but approval by itself does not
+            start the production clock. We are not responsible for errors, omissions, or
+            missing elements in a proof you approved.
+          </p>
+          <p className="mt-2">
+            The production clock starts only after the final proof is approved, the final
+            roster is submitted, and the deposit is paid. You may correct the roster and
+            order specifications before payment. Once a deposit or full payment is recorded,
+            the roster and confirmed order specifications are locked for production. Any
+            later addition or requested change must be accepted by Slugger Athletics and may
+            be handled as a separately priced add-on with its own production and shipping timeline.
+          </p>
+        </div>
+        <div>
+          <h2 className="display text-xl text-foreground">Payments, Deposits &amp; Balances</h2>
+          <p className="mt-2">
+            Unless your invoice states otherwise, a 50% deposit is required to begin
+            production and the remaining balance is due before the order ships or is released
+            for pickup. Tax, shipping, and clearly disclosed specialty or expedited-service
+            fees are separate from listed merchandise prices.
+          </p>
+          <p className="mt-2">
+            Payment confirms the products, material, artwork, roster, sizes, service level,
+            requested date, and subtotal shown on the order or invoice. Contact us immediately
+            if anything is incorrect; a change is not accepted until Slugger Athletics confirms
+            it in writing.
           </p>
         </div>
         <div>
@@ -66,18 +96,16 @@ export default function TermsPage() {
         <div>
           <h2 className="display text-xl text-foreground">Turnaround &amp; Shipping</h2>
           <p className="mt-2">
-            Standard production is three weeks after proof approval, final roster
-            confirmation, and deposit payment. This is a ready-to-ship or pickup target,
-            not a guaranteed in-hand date. Specialty items, larger orders, and peak fall-season
+            {STANDARD_PRODUCTION_COPY} This is a ready-to-ship or pickup target, not a
+            guaranteed in-hand date. Specialty items, larger orders, and peak fall-season
             volume may take longer.
           </p>
           <p className="mt-2">
-            Two-week rush service is a flat $100 fee. Deadlines inside two weeks require
-            a separately priced priority review. The available timeline
-            is not confirmed until Slugger
-            Athletics approves it for the specific order. Rush prioritizes production;
-            it does not guarantee carrier transit after the package ships.
-            See our Shipping page for details.
+            {RUSH_PRODUCTION_COPY} {PRIORITY_PRODUCTION_COPY} The available timeline is not
+            confirmed until Slugger Athletics approves it for the specific order. Rush
+            prioritizes production; it does not guarantee carrier transit after the package
+            ships. {SHIPPING_TIMING_COPY}{" "}
+            <Link href="/shipping" className="text-brand hover:underline">See our Shipping page for details.</Link>
           </p>
           <p className="mt-2">
             We work hard to hit every deadline and we&apos;ll always tell you up front if a
@@ -107,7 +135,8 @@ export default function TermsPage() {
           <h2 className="display text-xl text-foreground">Returns</h2>
           <p className="mt-2">
             Because items are custom-made, they generally cannot be returned or
-            exchanged unless defective. See our Returns &amp; Exchanges page.
+            exchanged unless defective.{" "}
+            <Link href="/returns" className="text-brand hover:underline">See our Returns &amp; Exchanges page.</Link>
           </p>
         </div>
         <div>
