@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
-import { getBySelfEntryToken, addRosterRow } from "@/lib/team-orders";
+import { customerRosterLockMessage, getBySelfEntryToken, addRosterRow } from "@/lib/team-orders";
 import { missingCheerSizeLabels } from "@/lib/order-items";
 
 export const runtime = "nodejs";

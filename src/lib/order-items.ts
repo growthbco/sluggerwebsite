@@ -36,9 +36,15 @@ export function isCheerItem(key: string): boolean {
   return CHEER_ITEM_KEYS.has(key);
 }
 
-export function sizeFieldsForItem(key: string): SizeField[] {
+function isVolleyballSport(sport?: string | null): boolean {
+  return /volleyball/i.test(sport ?? "");
+}
+
+export function sizeFieldsForItem(key: string, sport?: string | null): SizeField[] {
   const item = ITEM_TYPES.find((t) => t.key === key);
-  const sizes = item?.sizes ?? APPAREL_SIZES;
+  const sizes = key === "jersey" && isVolleyballSport(sport)
+    ? VOLLEYBALL_SIZES
+    : item?.sizes ?? APPAREL_SIZES;
   const label = item?.label ?? key;
   if (!isCheerItem(key)) return [{ key, itemKey: key, label, sizes }];
   return [
@@ -47,8 +53,8 @@ export function sizeFieldsForItem(key: string): SizeField[] {
   ];
 }
 
-export function sizeFieldsForItems(keys: string[]): SizeField[] {
-  return (keys.length ? keys : ["jersey"]).flatMap(sizeFieldsForItem);
+export function sizeFieldsForItems(keys: string[], sport?: string | null): SizeField[] {
+  return (keys.length ? keys : ["jersey"]).flatMap((key) => sizeFieldsForItem(key, sport));
 }
 
 export function itemKeyForSizeField(key: string): string {
@@ -286,8 +292,8 @@ export function itemLabel(key: string): string {
   return base;
 }
 
-export function sizesFor(key: string): string[] {
-  return ITEM_TYPES.find((t) => t.key === itemKeyForSizeField(key))?.sizes ?? APPAREL_SIZES;
+export function sizesFor(key: string, sport?: string | null): string[] {
+  return sizeFieldsForItem(itemKeyForSizeField(key), sport)[0]?.sizes ?? APPAREL_SIZES;
 }
 
 /** Tally an ordered roster into a per-item size breakdown (e.g. Fitted Hat:
@@ -308,7 +314,7 @@ export function sizeBreakdown(
   items: string[],
   sport?: string | null,
 ): { key: string; label: string; parts: { size: string; n: number }[]; total: number }[] {
-  return sizeFieldsForItems(items)
+  return sizeFieldsForItems(items, sport)
     .map((field) => {
       const counts: Record<string, number> = {};
       for (const r of roster) {

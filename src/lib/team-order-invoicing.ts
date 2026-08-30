@@ -16,6 +16,11 @@ import { getStripe } from "@/lib/stripe";
 import { getCustomer } from "@/lib/customers";
 import { smsIfConsented } from "@/lib/sms";
 import { shouldChargeAdditionalTeamOrderShipping } from "@/lib/team-order-shipping";
+import {
+  createShippingProtectionPrice,
+  estimatedPostageFromChargedShipping,
+  shippingProtectionCents,
+} from "@/lib/shipping-protection";
 
 export type InvoiceResult =
   | { ok: true; stage: string; totalCents: number; dueCents: number; shipCents: number; creditAppliedCents: number; taxDueCents: number; invoiceUrl: string | null; fullInvoiceUrl?: string; emailed: boolean; teamName: string; reference: string }

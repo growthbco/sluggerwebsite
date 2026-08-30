@@ -30,6 +30,11 @@ import { AdminPickupToggle } from "@/components/admin-pickup-toggle";
 import { AdminRowMenu } from "@/components/admin-row-menu";
 import { AdminCustomPrice } from "@/components/admin-custom-price";
 import { AdminInboundTracking } from "@/components/admin-inbound-tracking";
+import {
+  buildDeliveryTimeline,
+  type DeliveryRisk,
+  type DeliveryTier,
+} from "@/lib/delivery-timeline";
 
 export const metadata: Metadata = { title: "Team Orders", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -106,6 +111,8 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
         id: designRequests.id,
         reference: designRequests.reference,
         teamName: designRequests.teamName,
+        approvedAt: designRequests.approvedAt,
+        neededBy: designRequests.neededBy,
         archivedAt: designRequests.archivedAt,
         updatedAt: designRequests.updatedAt,
       })

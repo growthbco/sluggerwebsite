@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
-import { getByManageToken, updateRosterRow, deleteRosterRow, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
+import { customerRosterLockMessage, getByManageToken, updateRosterRow, deleteRosterRow, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { postDesignThreadUpdate } from "@/lib/discord";
 import { missingCheerSizeLabels } from "@/lib/order-items";
 

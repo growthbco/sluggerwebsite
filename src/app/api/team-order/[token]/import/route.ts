@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
-import { getByManageToken, addRosterRow } from "@/lib/team-orders";
+import { customerRosterLockMessage, getByManageToken, addRosterRow } from "@/lib/team-orders";
 import { missingCheerSizeLabels } from "@/lib/order-items";
 
 export const runtime = "nodejs";

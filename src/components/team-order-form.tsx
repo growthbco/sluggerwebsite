@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SmsConsentNote } from "@/components/sms-consent";
-import { ITEM_TYPES, JERSEY_MATERIALS, missingCheerSizeLabels, sizeFieldsForItems } from "@/lib/order-items";
+import { ITEM_TYPES, JERSEY_MATERIALS, fabricForStyle, missingCheerSizeLabels, sizeFieldsForItems } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
 import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-acknowledgment";
@@ -117,7 +117,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const perPlayerSelected = selected.filter((t) => !t.inHouse && !t.outsourced);
   const bulkSelected = selected.filter((t) => t.inHouse || t.outsourced);
   const perPlayerKeys = perPlayerSelected.map((t) => t.key);
-  const perPlayerSizeFields = sizeFieldsForItems(perPlayerKeys);
+  const perPlayerSizeFields = sizeFieldsForItems(perPlayerKeys, prefill?.sport);
   const bulkRows = () =>
     bulkSelected.flatMap((t) =>
       t.sizes

@@ -3,7 +3,15 @@ import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders, designRequests, orders } from "@/db/schema";
 import { requireApiRole } from "@/lib/admin-auth";
-import { archiveDiscordThread } from "@/lib/discord-bot";
+import { postDesignThreadUpdate } from "@/lib/discord";
+import {
+  archiveDiscordThread,
+  setThreadStageTag,
+  unarchiveDiscordThread,
+  type StageTag,
+} from "@/lib/discord-bot";
+import { markDesignUnresponsive, reactivateUnresponsiveDesignRequest } from "@/lib/design-requests";
+import { isUnresponsiveArchiveNote } from "@/lib/proof-follow-up-policy";
 
 export const runtime = "nodejs";
 

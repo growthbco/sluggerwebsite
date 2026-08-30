@@ -8,6 +8,7 @@ import { getDb } from "@/db";
 import { teamOrders, teamOrderRoster, designRequests, customInvoices, orders, orderItems, teams } from "@/db/schema";
 import { getOrCreateCustomer } from "@/lib/customers";
 import { itemKeyForSizeField, itemLabel } from "@/lib/order-items";
+import { buildDeliveryTimeline, type DeliveryTier } from "@/lib/delivery-timeline";
 
 const TTL_MS = 45 * 60 * 1000; // 45 minutes
 

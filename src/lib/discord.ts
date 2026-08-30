@@ -366,7 +366,7 @@ export async function postTeamOrderToDiscord(
   const rows = order.roster
     .filter((r) => r.name || r.number || r.size || (r.sizes && Object.keys(r.sizes).length))
     .map((r, i) => {
-      const sizeStr = sizeFieldsForItems(itemKeys)
+      const sizeStr = sizeFieldsForItems(itemKeys, order.sport)
         .map((field) => {
           const v = sizeValueForField(field, r.sizes, r.size);
           return v ? `${field.label}: ${v}` : null;

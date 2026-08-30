@@ -224,6 +224,7 @@ function chartGroup(itemKey: string, sport?: string | null): ChartGroup | null {
   if (/hoodie|pullover|jacket/.test(k)) return "hoodie";
   if (/hat|beanie|cap/.test(k)) return "hats";
   if (/knicker|pant|short/.test(k)) return "pants";
+  if (/jersey|shirt/.test(k) && /volleyball/i.test(sport ?? "")) return "volleyball";
   if (/jersey|shirt|polo/.test(k)) return "jersey";
   return null; // socks, unknown
 }
