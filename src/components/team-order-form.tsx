@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { SmsConsentNote } from "@/components/sms-consent";
-import { ITEM_TYPES, JERSEY_MATERIALS, fabricForStyle, missingCheerSizeLabels, sizeFieldsForItems } from "@/lib/order-items";
+import {
+  ITEM_TYPES,
+  SPEEDO_BASEBALL_MATERIAL_KEY,
+  fabricForStyle,
+  jerseyMaterialsFor,
+  missingCheerSizeLabels,
+  sizeFieldsForItems,
+  usesSpeedoBaseballMaterial,
+} from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
 import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-acknowledgment";
@@ -127,7 +135,10 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   // Jersey style/material only apply when a jersey is actually being ordered
   // - a hoodie-only order must not carry a phantom jersey style.
   const hasJersey = items.includes("jersey");
-  const orderSetupComplete = items.length > 0 && (!hasJersey || Boolean(jerseyStyle && material));
+  const fixedSpeedoMaterial = hasJersey && usesSpeedoBaseballMaterial(jerseyStyle, prefill?.sport);
+  const materialOptions = jerseyMaterialsFor(jerseyStyle, prefill?.sport);
+  const effectiveMaterial = fixedSpeedoMaterial ? SPEEDO_BASEBALL_MATERIAL_KEY : material;
+  const orderSetupComplete = items.length > 0 && (!hasJersey || Boolean(jerseyStyle && effectiveMaterial));
   const sizeGuideHref = /volleyball/i.test(prefill?.sport ?? "") ? "/size-guide#girls-volleyball" : "/size-guide#jerseys";
   const submissionRoster = [
     ...rows.map((row) => ({ ...row, quantity: 1 })),
@@ -145,7 +156,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
     items,
     sport: prefill?.sport,
     jerseyStyle: hasJersey ? jerseyStyle : null,
-    jerseyMaterial: hasJersey ? material : null,
+    jerseyMaterial: hasJersey ? effectiveMaterial : null,
     rushShipping: prefill?.rush ?? false,
     requestedInHandAt: prefill?.neededBy ? new Date(`${prefill.neededBy}T12:00:00`) : null,
   };
@@ -173,7 +184,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn, deliveryTermsAccepted: true, specConfirmed: true }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn, deliveryTermsAccepted: true, specConfirmed: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
@@ -190,7 +201,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? material : undefined, items, designToken: prefill?.designToken, smsConsent: smsOptIn }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items, designToken: prefill?.designToken, smsConsent: smsOptIn }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create link");
@@ -313,7 +324,11 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
           onChange={(event) => {
             const nextStyle = event.target.value;
             setJerseyStyle(nextStyle);
-            if (!materialTouched) setMaterial(fabricForStyle(nextStyle));
+            if (usesSpeedoBaseballMaterial(nextStyle, prefill?.sport)) {
+              setMaterial(SPEEDO_BASEBALL_MATERIAL_KEY);
+            } else if (!materialTouched) {
+              setMaterial(fabricForStyle(nextStyle));
+            }
           }}
         >
           <option value="">Select a style</option>
@@ -329,11 +344,26 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       {/* Jersey material */}
       {hasJersey && (
       <div>
-        <p className="display text-sm text-foreground">Jersey Material *</p>
-        <p className="mt-1 text-sm text-muted">Choose the fabric you expect to receive. You will confirm it again before submission.</p>
-        <div className="mt-3 grid sm:grid-cols-2 gap-3">
-          {JERSEY_MATERIALS.map((m) => {
+        <p className="display text-sm text-foreground">{fixedSpeedoMaterial ? "Included Jersey Material" : "Jersey Material *"}</p>
+        <p className="mt-1 text-sm text-muted">
+          {fixedSpeedoMaterial
+            ? "Full Button and Two Button baseball jerseys are made in this fabric, so there is nothing extra to select."
+            : "Choose the fabric you expect to receive. You will confirm it again before submission."}
+        </p>
+        <div className={`mt-3 grid gap-3 ${fixedSpeedoMaterial ? "" : "sm:grid-cols-2"}`}>
+          {materialOptions.map((m) => {
             const on = material === m.key;
+            if (fixedSpeedoMaterial) {
+              return (
+                <div key={m.key} className="border border-brand bg-brand/[0.08] p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="display text-foreground">✓ {m.label}</span>
+                    <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-on-brand">Included</span>
+                  </div>
+                  <p className="mt-1 text-sm text-muted">{m.description} This is our standard fabric for both button-front baseball cuts.</p>
+                </div>
+              );
+            }
             return (
               <button
                 key={m.key}

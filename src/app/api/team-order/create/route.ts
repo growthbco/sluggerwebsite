@@ -4,7 +4,7 @@ import { teamOrders } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { createTeamOrder } from "@/lib/team-orders";
 import { getByStatusToken, findActiveDesignByEmail } from "@/lib/design-requests";
-import { JERSEY_MATERIALS } from "@/lib/order-items";
+import { resolveJerseyMaterial } from "@/lib/order-items";
 
 export const runtime = "nodejs";
 
@@ -78,9 +78,7 @@ export async function POST(req: Request) {
     const existing = await getByDesignRequestId(designRequestId);
     const OPEN_UNPAID = ["draft", "collecting", "submitted", "quoted"];
     if (existing && OPEN_UNPAID.includes(existing.status) && !existing.depositPaidAt && !existing.invoicePaidAt) {
-      const selectedMaterial = JERSEY_MATERIALS.some((material) => material.key === body.jerseyMaterial)
-        ? body.jerseyMaterial
-        : undefined;
+      const selectedMaterial = resolveJerseyMaterial(body.jerseyMaterial, body.jerseyStyle, sport);
       if (trustedDesignToken) {
         await getDb()
           .update(teamOrders)
@@ -111,9 +109,7 @@ export async function POST(req: Request) {
       contactPhone,
       sport,
       jerseyStyle: body.jerseyStyle,
-      jerseyMaterial: JERSEY_MATERIALS.some((material) => material.key === body.jerseyMaterial)
-        ? body.jerseyMaterial
-        : undefined,
+      jerseyMaterial: resolveJerseyMaterial(body.jerseyMaterial, body.jerseyStyle, sport),
       items: body.items,
       designRequestId,
       whiteLabel: whiteLabelFromDesign,

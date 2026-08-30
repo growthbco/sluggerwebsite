@@ -10,6 +10,7 @@ import {
   itemLabel,
   itemKeysFromDesignProducts,
   fabricFor,
+  resolveJerseyMaterial,
 } from "@/lib/order-items";
 import type { CustomerOrderSpec } from "@/lib/order-spec";
 
@@ -170,7 +171,9 @@ export async function createTeamOrder(input: NewTeamOrder) {
       jerseyStyle: input.jerseyStyle,
       // Never blanket-default to Mesh: if no fabric was chosen, derive it from
       // the style (button-front / zip = polyester, else mesh).
-      jerseyMaterial: input.jerseyMaterial ?? fabricForStyle(input.jerseyStyle),
+      jerseyMaterial:
+        resolveJerseyMaterial(input.jerseyMaterial, input.jerseyStyle, input.sport) ??
+        fabricForStyle(input.jerseyStyle),
       items: input.items?.length ? input.items : ["jersey"],
       designRequestId: input.designRequestId,
       whiteLabel: input.whiteLabel ?? false,

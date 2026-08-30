@@ -259,9 +259,9 @@ export const JERSEY_MATERIALS: JerseyMaterial[] = [
   },
   {
     key: "polyester",
-    label: "Polyester",
+    label: "Speedo Performance Polyester (120–130 GSM)",
     description:
-      "A structured smooth polyester used for button-front and pro-style jerseys - holds its shape and prints crisp, not open-weave like mesh.",
+      "A lightweight, smooth performance polyester that holds its shape and produces crisp, vivid sublimation.",
   },
   {
     key: "microfiber",
@@ -285,6 +285,39 @@ export function fabricForStyle(style?: string | null): string {
  *  microfiber fabric (and full-button bowling shirts carry their own price). */
 export function isBowling(...hints: (string | null | undefined)[]): boolean {
   return hints.some((h) => (h ?? "").toLowerCase().includes("bowl"));
+}
+
+export const SPEEDO_BASEBALL_MATERIAL_KEY = "polyester";
+
+/** Full-button and two-button baseball jerseys have one production fabric.
+ * Bowling shirts are excluded because their button-front cut uses microfiber. */
+export function usesSpeedoBaseballMaterial(
+  style?: string | null,
+  ...sportHints: (string | null | undefined)[]
+): boolean {
+  const normalizedStyle = (style ?? "").toLowerCase();
+  const isButtonBaseballCut = /full[\s-]*button|two[\s-]*button|2[\s-]*button/.test(normalizedStyle);
+  return isButtonBaseballCut && !isBowling(...sportHints);
+}
+
+/** Options the customer can genuinely choose for this jersey cut. */
+export function jerseyMaterialsFor(
+  style?: string | null,
+  ...sportHints: (string | null | undefined)[]
+): JerseyMaterial[] {
+  if (!usesSpeedoBaseballMaterial(style, ...sportHints)) return JERSEY_MATERIALS;
+  return JERSEY_MATERIALS.filter((material) => material.key === SPEEDO_BASEBALL_MATERIAL_KEY);
+}
+
+/** Validate a customer material value and force fixed-fabric baseball cuts to
+ * their actual production material. Returns undefined for an invalid choice. */
+export function resolveJerseyMaterial(
+  material: string | null | undefined,
+  style?: string | null,
+  ...sportHints: (string | null | undefined)[]
+): string | undefined {
+  if (usesSpeedoBaseballMaterial(style, ...sportHints)) return SPEEDO_BASEBALL_MATERIAL_KEY;
+  return JERSEY_MATERIALS.some((option) => option.key === material) ? material ?? undefined : undefined;
 }
 
 /** Fabric for an order, aware that bowling shirts are microfiber regardless of

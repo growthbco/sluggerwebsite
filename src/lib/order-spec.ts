@@ -1,6 +1,7 @@
 import {
   JERSEY_MATERIALS,
   itemLabel,
+  resolveJerseyMaterial,
   sizeBreakdown,
 } from "@/lib/order-items";
 import type { TeamOrderQuote } from "@/lib/team-order-pricing";
@@ -80,8 +81,9 @@ export function buildCustomerOrderSpec(
   quote: TeamOrderQuote,
 ): CustomerOrderSpec {
   const items = order.items?.length ? order.items : ["jersey"];
-  const material = order.jerseyMaterial
-    ? JERSEY_MATERIALS.find((entry) => entry.key === order.jerseyMaterial)?.label ?? order.jerseyMaterial
+  const resolvedMaterial = resolveJerseyMaterial(order.jerseyMaterial, order.jerseyStyle, order.sport);
+  const material = resolvedMaterial
+    ? JERSEY_MATERIALS.find((entry) => entry.key === resolvedMaterial)?.label ?? resolvedMaterial
     : null;
   const athletes = new Set(
     roster.map((row, index) => {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
 import { customerRosterLockMessage, getByManageToken, setJerseyMaterial, setRequiresNames } from "@/lib/team-orders";
-import { JERSEY_MATERIALS } from "@/lib/order-items";
+import { resolveJerseyMaterial } from "@/lib/order-items";
 
 export const runtime = "nodejs";
 
@@ -21,8 +21,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ token:
     await setRequiresNames(order.id, body.requiresNames);
     return NextResponse.json({ ok: true });
   }
-  if (body.jerseyMaterial && JERSEY_MATERIALS.some((material) => material.key === body.jerseyMaterial)) {
-    await setJerseyMaterial(order.id, body.jerseyMaterial);
+  const selectedMaterial = body.jerseyMaterial
+    ? resolveJerseyMaterial(body.jerseyMaterial, order.jerseyStyle, order.sport)
+    : undefined;
+  if (selectedMaterial) {
+    await setJerseyMaterial(order.id, selectedMaterial);
     return NextResponse.json({ ok: true });
   }
   return NextResponse.json({ error: "Choose a valid setting." }, { status: 400 });
