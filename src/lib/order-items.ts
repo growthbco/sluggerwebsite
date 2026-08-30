@@ -246,28 +246,28 @@ export type JerseyMaterial = { key: string; label: string; description: string; 
 export const JERSEY_MATERIALS: JerseyMaterial[] = [
   {
     key: "mesh",
-    label: "Mesh (Birdseye)",
+    label: "AirFlow Birdseye Mesh",
     recommended: true,
     description:
-      "A lightweight knit with tiny textured holes (birdseye) for maximum airflow. Extra breathable and durable - a great pick for hot Florida game days.",
+      "Our most breathable jersey fabric. Tiny birdseye openings help heat escape, making it a strong choice for hot outdoor games, with a lightly textured athletic finish.",
   },
   {
     key: "dry-fit",
-    label: "Dry-Fit",
+    label: "Smooth Performance Knit",
     description:
-      "A smooth, soft, moisture-wicking fabric - like a performance dry-fit shirt. Sleek next-to-skin feel that pulls sweat away to keep players dry and cool.",
+      "A soft, smooth moisture-wicking knit without open mesh holes. It has a sleek next-to-skin feel and moves perspiration away from the body during play.",
   },
   {
     key: "polyester",
-    label: "Speedo Performance Polyester (120–130 GSM)",
+    label: "Lightweight Performance Polyester · 120–130 GSM",
     description:
-      "A lightweight, smooth performance polyester that holds its shape and produces crisp, vivid sublimation.",
+      "Our standard fabric for Full Button and Two Button baseball jerseys. It feels lightweight and smooth while giving sublimated colors a crisp, vivid finish.",
   },
   {
     key: "microfiber",
-    label: "Microfiber",
+    label: "Premium Lightweight Microfiber",
     description:
-      "A soft, lightweight microfiber used for our bowling shirts - drapes like a camp shirt, prints vivid, and wears comfortably off the lanes too.",
+      "Our premium bowling-shirt fabric. It is soft, lightweight, and smooth, with the comfortable drape of a classic camp shirt and a vivid sublimated finish.",
   },
 ];
 
