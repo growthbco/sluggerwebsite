@@ -253,7 +253,7 @@ export const JERSEY_MATERIALS: JerseyMaterial[] = [
   },
   {
     key: "dry-fit",
-    label: "Smooth Performance Knit",
+    label: "Moisture-Wicking Performance Knit",
     description:
       "A soft, smooth moisture-wicking knit without open mesh holes. It has a sleek next-to-skin feel and moves perspiration away from the body during play.",
   },
