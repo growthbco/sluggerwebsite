@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { designRequests } from "@/db/schema";
 import { getByManageToken, toggleApprovedDesign } from "@/lib/design-requests";
+import { provisionTeamOrderForApprovedDesign } from "@/lib/team-orders";
 import { generateAssetSheets, hasAssetSheets } from "@/lib/design-lab-assets";
 import { postDesignThreadUpdate } from "@/lib/discord";
 import { setThreadStageTag } from "@/lib/discord-bot";
@@ -28,9 +29,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   const url = body.url ?? "";
   const approved = body.approved !== false;
-  const reviewProofs = request.proofReviewUrls?.length ? request.proofReviewUrls : request.proofImages ?? [];
-  if (!reviewProofs.includes(url)) {
-    return NextResponse.json({ error: "Only the current proof version can be approved." }, { status: 400 });
+  const knownProofs = new Set([
+    ...(request.proofImages ?? []),
+    ...(request.proofReviewUrls ?? []),
+    ...(request.supersededProofUrls ?? []),
+  ]);
+  if (!knownProofs.has(url)) {
+    return NextResponse.json({ error: "That proof no longer belongs to this request." }, { status: 400 });
   }
 
   // Approving requires a name so it's identifiable everywhere (store, roster).
@@ -54,6 +59,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     }
     const result = await toggleApprovedDesign(request.id, url, approved);
     if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const provisionedOrder = approved ? await provisionTeamOrderForApprovedDesign(request) : null;
     const n = result.urls.length;
     await postDesignThreadUpdate({
       threadId: request.discordThreadId ?? undefined,
@@ -88,7 +94,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         }).catch((e) => console.error("generateAssetSheets (set-approved) failed:", e)),
       );
     }
-    return NextResponse.json({ ok: true, urls: result.urls });
+    return NextResponse.json({ ok: true, urls: result.urls, orderReference: provisionedOrder?.reference ?? null });
   } catch (e) {
     console.error("toggleApprovedDesign failed:", e);
     return NextResponse.json({ error: "Could not update the approved designs" }, { status: 500 });

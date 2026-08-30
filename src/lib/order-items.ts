@@ -224,6 +224,7 @@ export function itemKeysFromDesignProducts(productTypes?: string[] | null): stri
     else if (/pant/.test(p)) push("long_pants");
     else if (/short/.test(p)) push("shorts");
     else if (/sock/.test(p)) push("socks");
+    else if (/performance|water[\s-]?resistant|moisture[\s-]?wick/.test(p)) push("performance_hat");
     else if (/fitted/.test(p)) push("fitted_hat");
     else if (/snap|trucker|hat|cap/.test(p)) push("snapback_hat");
   }

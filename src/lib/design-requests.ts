@@ -494,8 +494,15 @@ export async function toggleApprovedDesign(id: string, url: string, approved: bo
   const now = new Date();
   const [existing] = await db.select().from(designRequests).where(eq(designRequests.id, id)).limit(1);
   if (!existing) return null;
-  const currentReview = existing.proofReviewUrls?.length ? existing.proofReviewUrls : existing.proofImages ?? [];
-  if (!currentReview.includes(url)) return null;
+  // Staff may intentionally choose an older proof. Keep the customer endpoint
+  // current-version-only, but accept any URL that is already known to this
+  // request here—never an arbitrary external image.
+  const knownProofs = new Set([
+    ...(existing.proofImages ?? []),
+    ...(existing.proofReviewUrls ?? []),
+    ...(existing.supersededProofUrls ?? []),
+  ]);
+  if (!knownProofs.has(url)) return null;
 
   const current = existing.approvedDesignUrls ?? (existing.approvedDesignUrl ? [existing.approvedDesignUrl] : []);
   const set = new Set(current);

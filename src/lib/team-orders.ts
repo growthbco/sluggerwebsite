@@ -2,7 +2,15 @@ import { randomUUID } from "node:crypto";
 import { eq, and, ne, asc, isNull, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teamOrders, teamOrderRoster, designRequests } from "@/db/schema";
-import { notDesignerMade, defaultRequiresNames, fabricForStyle, formatSize, itemLabel } from "@/lib/order-items";
+import {
+  notDesignerMade,
+  defaultRequiresNames,
+  fabricForStyle,
+  formatSize,
+  itemLabel,
+  itemKeysFromDesignProducts,
+  fabricFor,
+} from "@/lib/order-items";
 import type { CustomerOrderSpec } from "@/lib/order-spec";
 
 export type JerseyLine = {
@@ -56,6 +64,68 @@ export type RosterInput = {
   design?: string;
   quantity?: number;
 };
+
+type ApprovedDesignOrderInput = {
+  id: string;
+  teamName: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone?: string | null;
+  sport?: string | null;
+  jerseyStyle?: string | null;
+  productTypes?: string[] | null;
+  vision?: string | null;
+  aiDesignState?: unknown;
+  discordThreadId?: string | null;
+  rush?: boolean | null;
+  smsOptInAt?: Date | null;
+  whiteLabel?: boolean | null;
+};
+
+/** Map a design brief to the exact billable order items. Shared by customer
+ * and staff approval so both paths provision the same kind of order. */
+export function itemsForDesignRequest(request: Pick<ApprovedDesignOrderInput, "productTypes" | "vision" | "sport" | "aiDesignState">): string[] {
+  let items = itemKeysFromDesignProducts(request.productTypes);
+  if (!items.length) items = ["jersey"];
+  const state = request.aiDesignState as { style?: string; sport?: string } | null;
+  const hint = `${request.vision ?? ""} ${state?.style ?? ""} ${state?.sport ?? ""} ${request.sport ?? ""} ${(request.productTypes ?? []).join(" ")}`.toLowerCase();
+  if (items.includes("cheer_uniform") && /rhinestone|bling|crystal/.test(hint)) {
+    items = items.map((key) => (key === "cheer_uniform" ? "cheer_uniform_rhinestone" : key));
+  }
+  if (/hockey/.test(hint)) items = items.map((key) => (key === "jersey" ? "hockey_jersey" : key));
+  if (/flag football|flag-football/.test(hint)) items = items.map((key) => (key === "jersey" ? "flag_football_jersey" : key));
+  return items;
+}
+
+/** Idempotently create the roster/order that belongs to an approved design. */
+export async function provisionTeamOrderForApprovedDesign(request: ApprovedDesignOrderInput) {
+  const existing = await getByDesignRequestId(request.id);
+  if (existing) return existing;
+  const state = request.aiDesignState as { sport?: string; style?: string } | null;
+  await createTeamOrder({
+    teamName: request.teamName,
+    contactName: request.contactName,
+    contactEmail: request.contactEmail,
+    contactPhone: request.contactPhone ?? undefined,
+    sport: request.sport ?? undefined,
+    jerseyStyle: request.jerseyStyle ?? undefined,
+    jerseyMaterial: fabricFor(
+      request.jerseyStyle,
+      request.sport,
+      state?.sport,
+      state?.style,
+      request.vision,
+      ...(request.productTypes ?? []),
+    ),
+    items: itemsForDesignRequest(request),
+    designRequestId: request.id,
+    whiteLabel: Boolean(request.whiteLabel),
+    discordThreadId: request.discordThreadId ?? undefined,
+    rushShipping: Boolean(request.rush),
+    smsOptIn: Boolean(request.smsOptInAt),
+  });
+  return getByDesignRequestId(request.id);
+}
 
 type CustomerRosterLockable = {
   status: string;

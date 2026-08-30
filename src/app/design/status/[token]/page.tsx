@@ -33,9 +33,10 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
     : request.approvedDesignUrl
       ? [request.approvedDesignUrl]
       : [];
-  const isApproved = (request.status === "approved" || request.status === "ordered")
-    && approvedProofs.length > 0
-    && approvedProofs.every((url) => reviewProofs.includes(url));
+  // Customer approval is restricted to the current batch by its API. Staff may
+  // deliberately approve a known older proof, so persisted approval is the
+  // source of truth here rather than re-checking current-review membership.
+  const isApproved = (request.status === "approved" || request.status === "ordered") && approvedProofs.length > 0;
   // The order this design turned into (auto-provisioned on approval). Drives the
   // roster / deposit / tracking stages of the hub.
   const order = isApproved ? await getByDesignRequestId(request.id) : null;
