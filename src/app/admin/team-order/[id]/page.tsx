@@ -36,6 +36,7 @@ import { AdminRequote } from "@/components/admin-requote";
 import { AdminDeliveryTimeline } from "@/components/admin-delivery-timeline";
 import { findActiveDesignByEmail } from "@/lib/design-requests";
 import type { DeliveryTier } from "@/lib/delivery-timeline";
+import { claimDeadlineFromDelivery } from "@/lib/customer-policy";
 
 export const metadata: Metadata = { title: "Order Detail", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -490,6 +491,8 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
           </Field>
           <Field label="Est. weight">{weightOz > 0 ? `${(weightOz / 16).toFixed(1)} lb${twoBoxes ? " · 2 boxes (hats ship separately)" : ""}` : "-"}</Field>
           <Field label="Shipped">{o.shippedAt ? `${fmtDate(o.shippedAt)}` : "not yet"}</Field>
+          <Field label="Delivered">{o.deliveredAt ? fmtDate(o.deliveredAt) : "not yet"}</Field>
+          <Field label="Customer report-by">{o.deliveredAt ? fmtDate(claimDeadlineFromDelivery(o.deliveredAt)) : "starts after final package delivery"}</Field>
         </dl>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {!o.balanceInvoiceUrl && !paid && <AdminPickupToggle teamOrderId={o.id} pickup={o.localPickup} />}

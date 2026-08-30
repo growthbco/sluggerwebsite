@@ -40,6 +40,7 @@ const SECTIONS = [
       "Some approved rush orders may ship directly from one of our production partners. When that happens, Slugger Athletics sends the customer tracking alert and remains responsible for customer service. Carrier tracking may display the production facility, shipment origin, or country of origin.",
       "Tracking for a package traveling from a designer, factory, or supplier to Slugger Athletics remains internal production tracking. It is not customer delivery tracking, so it is not shared or displayed on the customer order page.",
       "Direct-shipped orders should not require the customer to pay unexpected customs charges or duties. If a carrier requests an unapproved payment, contact Slugger Athletics before paying it.",
+      "When every package in an order is marked delivered, we email a delivery confirmation and show the delivery date and report-by date in the customer portal. Inspect all items promptly and report a suspected defect, production error, wrong or missing item, or shipping damage within 7 calendar days of the carrier-recorded delivery time. For multi-package orders, the window starts when the final package is marked delivered.",
       "If you haven't seen a tracking email by your production target, reach out and we'll track it down for you. Remember that the clock starts only after proof approval, final roster submission, and deposit payment are all complete.",
     ],
   },

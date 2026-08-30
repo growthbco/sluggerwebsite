@@ -14,6 +14,7 @@ import { trackingUrlForCarrier } from "@/lib/tracking";
 import { buildDeliveryTimeline, type DeliveryTier } from "@/lib/delivery-timeline";
 import { CustomerDeliveryTimeline } from "@/components/customer-delivery-timeline";
 import { buildCustomerOrderSpec } from "@/lib/order-spec";
+import { claimDeadlineFromDelivery, formatCustomerDate } from "@/lib/customer-policy";
 
 type TeamOrderRow = typeof teamOrders.$inferSelect;
 
@@ -214,7 +215,9 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
     rush: order.rushShipping,
     localPickup: order.localPickup,
   });
-  const statusLabel = order.status === "shipped" || order.shippedAt
+  const statusLabel = order.deliveredAt
+    ? "Delivered"
+    : order.status === "shipped" || order.shippedAt
     ? "Shipped"
     : paid
       ? "Paid"
@@ -227,7 +230,9 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
           : order.status === "quoted"
             ? "Awaiting payment"
             : titleCaseStatus(order.status);
-  const nextStepHeading = outboundTrack
+  const nextStepHeading = order.deliveredAt
+    ? "Your order was delivered"
+    : outboundTrack
     ? "Your order is on the way"
     : started
       ? "Production is underway"
@@ -324,6 +329,9 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
           {outboundTrack && (
             <a href={outboundTrack.url} target="_blank" rel="noopener noreferrer" className="display text-sm border border-brand/50 text-brand px-5 min-h-[44px] inline-flex items-center rounded hover:bg-brand/10">Track shipment</a>
           )}
+          {(order.additionalShipments ?? []).map((shipment, index) => (
+            <a key={shipment.trackingNumber} href={trackingUrlForCarrier(shipment.trackingNumber, shipment.carrier)} target="_blank" rel="noopener noreferrer" className="display text-sm border border-brand/50 text-brand px-5 min-h-[44px] inline-flex items-center rounded hover:bg-brand/10">Track package {index + 2}</a>
+          ))}
         </div>
       </section>
 
@@ -332,6 +340,16 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
         localPickup={order.localPickup}
         shippedAt={order.shippedAt}
       />
+
+      {order.deliveredAt && (
+        <section className="rounded-xl border border-brand/50 bg-brand/[0.07] p-5">
+          <p className="display text-lg text-foreground">Delivered {formatCustomerDate(order.deliveredAt)}</p>
+          <p className="mt-2 max-w-2xl text-sm text-muted">
+            Please inspect every package and item before it is worn, washed, altered, or decorated. Report a suspected defect, production error, wrong or missing item, or shipping damage by <strong className="text-foreground">{formatCustomerDate(claimDeadlineFromDelivery(order.deliveredAt))}</strong>.
+          </p>
+          <a href={`/contact?topic=delivery&order=${encodeURIComponent(order.reference)}`} className="mt-4 inline-flex min-h-[44px] items-center rounded bg-brand px-5 display text-sm text-on-brand hover:bg-brand-dark">Report an order issue</a>
+        </section>
+      )}
 
       {/* Visual confirmation card so the coach (and screenshots they share with
           their players) make the team <-> uniform connection obvious. */}

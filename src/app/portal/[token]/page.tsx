@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { readPortalToken, getCustomerOrdersCached, type PortalData } from "@/lib/portal";
-import { trackingUrlFor } from "@/lib/tracking";
+import { trackingUrlFor, trackingUrlForCarrier } from "@/lib/tracking";
 import { PortalOrderList, type OrderRow } from "@/components/portal-order-list";
+import { claimDeadlineFromDelivery } from "@/lib/customer-policy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,7 @@ function balanceDueCents(o: TeamOrder): number {
 }
 
 function statusFor(o: TeamOrder): { label: string; tone: "green" | "amber" | "gold" } {
+  if (o.deliveredAt) return { label: "Delivered", tone: "green" };
   if (o.status === "shipped") return { label: "Shipped", tone: "green" };
   if (o.invoicePaidAt) return { label: "Paid", tone: "green" };
   if (balanceDueCents(o) > 0) return { label: "Balance due", tone: "amber" };
@@ -64,9 +66,11 @@ export default async function PortalOrdersPage({ params }: { params: Promise<{ t
         statusTone: s.tone,
         totalCents: o.totalCents + o.shippingCents,
         dateLabel: o.createdAt ? shortDate(o.createdAt) : "",
-        timelineLabel: o.deliveryTargetAt
-          ? `${o.deliveryTargetKind === "pickup" ? "Pickup target" : "Ready to ship target"} ${shortDate(o.deliveryTargetAt)}`
-          : undefined,
+        timelineLabel: o.deliveredAt
+          ? `Delivered ${shortDate(o.deliveredAt)} · report issues by ${shortDate(claimDeadlineFromDelivery(o.deliveredAt))}`
+          : o.deliveryTargetAt
+            ? `${o.deliveryTargetKind === "pickup" ? "Pickup target" : "Ready to ship target"} ${shortDate(o.deliveryTargetAt)}`
+            : undefined,
         href: `/portal/${token}/o/${o.reference}`,
       };
     });
@@ -95,6 +99,18 @@ export default async function PortalOrdersPage({ params }: { params: Promise<{ t
                 </div>
                 {track && (
                   <a href={trackingUrlFor(track)} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-sm text-brand underline underline-offset-2">Tracking: {track}</a>
+                )}
+                {s.additionalShipments.map((shipment, index) => (
+                  <div key={shipment.trackingNumber}>
+                    <a href={trackingUrlForCarrier(shipment.trackingNumber, shipment.carrier)} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-sm text-brand underline underline-offset-2">Package {index + 2}: {shipment.trackingNumber}</a>
+                  </div>
+                ))}
+                {s.deliveredAt && (
+                  <div className="mt-3 border-l-2 border-brand bg-brand/[0.06] px-3 py-2 text-sm">
+                    <p className="text-foreground">Delivered {shortDate(s.deliveredAt)}</p>
+                    <p className="mt-0.5 text-muted">Inspect every item and report a problem by {shortDate(claimDeadlineFromDelivery(s.deliveredAt))}.</p>
+                    <Link href={`/contact?topic=delivery&order=${encodeURIComponent(s.reference)}`} className="mt-1 inline-block text-brand underline underline-offset-2">Report an order issue</Link>
+                  </div>
                 )}
               </div>
             );

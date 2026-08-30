@@ -130,12 +130,20 @@ export default function TermsPage() {
             For standard orders, customer tracking is issued after we receive the
             finished order and prepare it for final shipment.
           </p>
+          <p className="mt-2">
+            Carrier tracking determines the recorded delivery time. Please inspect every package and
+            item promptly and report a suspected defect, production error, wrong or missing item, or
+            shipping damage within 7 calendar days. If an order arrives in multiple packages, the
+            reporting window begins when the final package is marked delivered. We email a delivery
+            confirmation and display the report-by date in the customer portal when tracking is available.
+          </p>
         </div>
         <div>
           <h2 className="display text-xl text-foreground">Returns</h2>
           <p className="mt-2">
             Because items are custom-made, they generally cannot be returned or
-            exchanged unless defective.{" "}
+            exchanged unless defective. Claims must be reported within the delivery
+            reporting window described above.{" "}
             <Link href="/returns" className="text-brand hover:underline">See our Returns &amp; Exchanges page.</Link>
           </p>
         </div>

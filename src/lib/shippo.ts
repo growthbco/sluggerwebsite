@@ -279,12 +279,14 @@ export async function scheduleUspsPickup(
 /* Live tracking status                                                */
 /* ------------------------------------------------------------------ */
 
-const TRACK_CARRIERS: Record<string, string> = {
-  FedEx: "fedex",
-  UPS: "ups",
-  USPS: "usps",
-  DHL: "dhl_express",
-};
+function shippoTrackingCarrier(carrier: string | null | undefined): string | null {
+  const normalized = (carrier ?? "").trim().toLowerCase();
+  if (normalized.includes("fedex")) return "fedex";
+  if (normalized.includes("ups")) return "ups";
+  if (normalized.includes("usps") || normalized.includes("postal")) return "usps";
+  if (normalized.includes("dhl")) return "dhl_express";
+  return null;
+}
 
 export type LiveTracking = {
   status: string; // e.g. "In transit", "Delivered"
@@ -304,7 +306,7 @@ const TRACK_TTL_MS = 5 * 60 * 1000;
  *  the status line. */
 export async function getLiveTracking(carrier: string | null | undefined, trackingNumber: string): Promise<LiveTracking | null> {
   if (!shippoEnabled()) return null;
-  const slug = TRACK_CARRIERS[carrier ?? ""];
+  const slug = shippoTrackingCarrier(carrier);
   if (!slug || !trackingNumber) return null;
 
   const key = `${slug}:${trackingNumber}`;

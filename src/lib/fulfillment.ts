@@ -43,6 +43,8 @@ export async function saveLabelPurchase(
         labelUrl,
         shipTransactionId: transactionId ?? null,
         shipCarrier: carrier ?? null,
+        deliveredAt: null,
+        deliveryNoticeSentAt: null,
         shippingProtectionCoveredCents: Math.min(existing.value, existing.covered + Math.max(0, insuredValueCents)),
         updatedAt: now,
       })
@@ -63,6 +65,8 @@ export async function saveLabelPurchase(
       labelUrl,
       shipTransactionId: transactionId ?? null,
       shipCarrier: carrier ?? null,
+      deliveredAt: null,
+      deliveryNoticeSentAt: null,
       shippingProtectionCoveredCents: Math.min(existing.value, existing.covered + Math.max(0, insuredValueCents)),
     })
     .where(eq(orders.id, id))
@@ -82,9 +86,11 @@ export async function appendAdditionalShipment(
   note?: string,
   transactionId?: string,
   insuredValueCents = 0,
+  carrier?: string,
+  service?: string,
 ): Promise<boolean> {
   const db = getDb();
-  const entry = { trackingNumber, labelUrl, transactionId, insuredValueCents: Math.max(0, insuredValueCents) || undefined, at: new Date().toISOString() };
+  const entry = { trackingNumber, labelUrl, transactionId, carrier, service, insuredValueCents: Math.max(0, insuredValueCents) || undefined, at: new Date().toISOString() };
   let email: string | null = null;
   let name: string | null = null;
   let reference = "";
@@ -95,6 +101,8 @@ export async function appendAdditionalShipment(
       .update(teamOrders)
       .set({
         additionalShipments: [...(row.additionalShipments ?? []), entry],
+        deliveredAt: null,
+        deliveryNoticeSentAt: null,
         shippingProtectionCoveredCents: Math.min(row.shippingProtectionValueCents, row.shippingProtectionCoveredCents + Math.max(0, insuredValueCents)),
         updatedAt: new Date(),
       })
@@ -107,6 +115,8 @@ export async function appendAdditionalShipment(
       .update(orders)
       .set({
         additionalShipments: [...(row.additionalShipments ?? []), entry],
+        deliveredAt: null,
+        deliveryNoticeSentAt: null,
         shippingProtectionCoveredCents: Math.min(row.shippingProtectionValueCents, row.shippingProtectionCoveredCents + Math.max(0, insuredValueCents)),
       })
       .where(eq(orders.id, id));
@@ -136,7 +146,7 @@ export async function markShipped(
     if (!tracking) return null;
     const [row] = await db
       .update(teamOrders)
-      .set({ status: "shipped", trackingNumber: tracking, shipCarrier: options?.carrier ?? carrierFor(tracking), labelUrl: labelUrl ?? existing?.label ?? null, shippedAt: now, updatedAt: now })
+      .set({ status: "shipped", trackingNumber: tracking, shipCarrier: options?.carrier ?? carrierFor(tracking), labelUrl: labelUrl ?? existing?.label ?? null, shippedAt: now, deliveredAt: null, deliveryNoticeSentAt: null, updatedAt: now })
       .where(eq(teamOrders.id, id))
       .returning({
         id: teamOrders.id,
@@ -178,7 +188,7 @@ export async function markShipped(
   if (!tracking) return null;
   const [row] = await db
     .update(orders)
-    .set({ status: "fulfilled", trackingNumber: tracking, shipCarrier: carrierFor(tracking), labelUrl: labelUrl ?? existing?.label ?? null, shippedAt: now })
+    .set({ status: "fulfilled", trackingNumber: tracking, shipCarrier: carrierFor(tracking), labelUrl: labelUrl ?? existing?.label ?? null, shippedAt: now, deliveredAt: null, deliveryNoticeSentAt: null })
     .where(eq(orders.id, id))
     .returning({ reference: orders.reference, email: orders.customerEmail, name: orders.customerName, phone: orders.customerPhone });
   if (!row) return null;

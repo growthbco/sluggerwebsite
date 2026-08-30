@@ -129,7 +129,7 @@ export async function POST(req: Request) {
         // (second box, reship, hats going separately). Append it and email
         // the customer this tracking right away - this box is going out now.
         const { appendAdditionalShipment } = await import("@/lib/fulfillment");
-        const sent = await appendAdditionalShipment(kind, body.id, label.trackingNumber, label.labelUrl, (body.note ?? "").trim().slice(0, 80) || undefined, label.transactionId, insuredValueCents);
+        const sent = await appendAdditionalShipment(kind, body.id, label.trackingNumber, label.labelUrl, (body.note ?? "").trim().slice(0, 80) || undefined, label.transactionId, insuredValueCents, label.provider, label.service);
         return NextResponse.json({
           ok: true,
           additional: true,

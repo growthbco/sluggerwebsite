@@ -10,6 +10,7 @@ import { AdminShipButton } from "@/components/admin-ship-button";
 import { AdminLabelButton } from "@/components/admin-label-button";
 import { AdminPickupButton } from "@/components/admin-pickup-button";
 import { TrackingInfo } from "@/components/tracking-info";
+import { claimDeadlineFromDelivery } from "@/lib/customer-policy";
 
 export const metadata: Metadata = { title: "Order Detail", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -159,6 +160,8 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
             )}
           </Field>
           <Field label="Shipped">{o.shippedAt ? `${fmtDate(o.shippedAt)}` : "not yet"}</Field>
+          <Field label="Delivered">{o.deliveredAt ? fmtDate(o.deliveredAt) : "not yet"}</Field>
+          <Field label="Customer report-by">{o.deliveredAt ? fmtDate(claimDeadlineFromDelivery(o.deliveredAt)) : "starts after final package delivery"}</Field>
           <Field label="Tracking">{o.trackingNumber ?? "-"}</Field>
           <Field label="Package protection">
             {o.shippingProtectionCents > 0

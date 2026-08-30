@@ -358,7 +358,6 @@ export async function findAiLeadFollowUpCandidates(now = new Date()): Promise<Ai
 // at the fallback age so a missed scan doesn't cost us the review.
 const REVIEW_AFTER_DAYS = 2;
 const REVIEW_MAX_DAYS = 30;
-export const REVIEW_FALLBACK_DAYS = 12;
 
 export type ReviewCandidate = {
   id: string;
@@ -369,6 +368,7 @@ export type ReviewCandidate = {
   carrier: string | null;
   trackingNumber: string | null;
   shippedAt: Date | null;
+  deliveredAt: Date | null;
 };
 
 export async function findReviewRequestCandidates(now = new Date()): Promise<ReviewCandidate[]> {
@@ -381,18 +381,17 @@ export async function findReviewRequestCandidates(now = new Date()): Promise<Rev
     .from(teamOrders)
     .where(
       and(
-        // Keyed off shippedAt, NOT status - an order can ship while still
-        // marked "paid" (paid in full) or "in_production", and those still
-        // deserve a review. Only a cancelled order is excluded.
+        // Delivery is the customer milestone. Never ask for a review while a
+        // package is still moving or while a second box is outstanding.
         ne(teamOrders.status, "cancelled"),
         isNull(teamOrders.reviewRequestedAt),
-        isNotNull(teamOrders.shippedAt),
-        lt(teamOrders.shippedAt, cutoff),
-        gt(teamOrders.shippedAt, floor),
+        isNotNull(teamOrders.deliveredAt),
+        lt(teamOrders.deliveredAt, cutoff),
+        gt(teamOrders.deliveredAt, floor),
       ),
     );
   return rows
-    .map((o) => ({ id: o.id, reference: o.reference, teamName: o.teamName, contactName: o.contactName, phone: o.contactPhone ?? "", carrier: o.shipCarrier, trackingNumber: o.trackingNumber, shippedAt: o.shippedAt }))
+    .map((o) => ({ id: o.id, reference: o.reference, teamName: o.teamName, contactName: o.contactName, phone: o.contactPhone ?? "", carrier: o.shipCarrier, trackingNumber: o.trackingNumber, shippedAt: o.shippedAt, deliveredAt: o.deliveredAt }))
     .filter((o) => o.phone.trim());
 }
 
@@ -417,13 +416,13 @@ export async function findOrderReviewCandidates(now = new Date()): Promise<Revie
         // "paid"); only cancelled/refunded are excluded.
         notInArray(orders.status, ["cancelled", "refunded"]),
         isNull(orders.reviewRequestedAt),
-        isNotNull(orders.shippedAt),
-        lt(orders.shippedAt, cutoff),
-        gt(orders.shippedAt, floor),
+        isNotNull(orders.deliveredAt),
+        lt(orders.deliveredAt, cutoff),
+        gt(orders.deliveredAt, floor),
       ),
     );
   return rows
-    .map((o) => ({ id: o.id, reference: o.reference, teamName: "", contactName: o.customerName ?? "", phone: o.customerPhone ?? "", carrier: o.shipCarrier, trackingNumber: o.trackingNumber, shippedAt: o.shippedAt }))
+    .map((o) => ({ id: o.id, reference: o.reference, teamName: "", contactName: o.customerName ?? "", phone: o.customerPhone ?? "", carrier: o.shipCarrier, trackingNumber: o.trackingNumber, shippedAt: o.shippedAt, deliveredAt: o.deliveredAt }))
     .filter((o) => o.phone.trim());
 }
 
@@ -451,9 +450,9 @@ export async function findReferralPromptCandidates(now = new Date()): Promise<Re
       and(
         eq(teamOrders.status, "shipped"),
         isNull(teamOrders.referralPromptedAt),
-        isNotNull(teamOrders.shippedAt),
-        lt(teamOrders.shippedAt, cutoff),
-        gt(teamOrders.shippedAt, floor),
+        isNotNull(teamOrders.deliveredAt),
+        lt(teamOrders.deliveredAt, cutoff),
+        gt(teamOrders.deliveredAt, floor),
       ),
     );
   return rows

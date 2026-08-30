@@ -225,7 +225,7 @@ export async function emailPaymentReceived(args: {
       bodyHtml: `
         <p style="margin:0 0 12px;">We received your ${dep ? "50% deposit" : "payment"} for <strong>${esc(args.teamName)}</strong>. ${dep ? "Your order is now in production." : "Your order is paid in full."}</p>
         ${args.timeline ? deliveryTimelineEmailHtml(args.timeline, args.localPickup) : ""}
-        <p style="margin:0;">From your order portal you can check status and tracking, pay a balance, update your shipping address, or add players anytime.</p>
+        <p style="margin:0;">From your order portal you can check status and tracking, pay a balance, and review your order. Payment locks the confirmed roster and order specifications; later additions must be accepted as separately priced add-ons and may have their own delivery date.</p>
       `,
       ctaText: args.timeline ? "View order timeline" : "View my orders",
       ctaUrl: args.manageUrl ?? `${SITE}/portal`,
@@ -493,13 +493,6 @@ export async function emailInvoiceReminder(args: {
 }
 
 /** Shipping notification with the tracking number. */
-// Direct "write a review" link for the Slugger Athletics Google Business
-// Profile (place ID from Google Maps). Review text mentioning specific
-// products (hats, jerseys) is a local-SEO ranking signal, so the ask below
-// nudges customers to say what they ordered.
-const GOOGLE_REVIEW_URL =
-  "https://search.google.com/local/writereview?placeid=ChIJh0imFOTa7EgRpcOO8DdGe9E";
-
 export async function emailOrderShipped(args: {
   to: string;
   name?: string | null;
@@ -523,10 +516,7 @@ export async function emailOrderShipped(args: {
             This order is shipping directly from one of our production partners. Carrier tracking may display the shipment&apos;s origin facility or country. Slugger Athletics remains your point of contact for the order and any delivery questions.
           </p>
         ` : ""}
-        <p style="margin:0 0 16px;">Once it lands, we'd love to see it on the field - tag us @sluggerathletics!</p>
-        <p style="margin:0 0 6px;"><strong>Happy with your gear?</strong> A quick Google review helps our small shop more than you'd think.</p>
-        <p style="margin:0 0 12px;font-size:13px;color:#555;">One sentence about what we made for you (jerseys, embroidered hats, the whole kit) helps other teams find us.</p>
-        <p style="margin:0;"><a href="${GOOGLE_REVIEW_URL}" style="color:#b8a36c;font-weight:bold;">Leave a Google review →</a></p>
+        <p style="margin:0;">We will send another message after every package is marked delivered with your inspection and problem-reporting deadline.</p>
         ${portalLinkHtml}
       `,
       ctaText: "Track your package",
@@ -562,6 +552,40 @@ export async function emailAdditionalShipment(args: {
       `,
       ctaText: "Track this package",
       ctaUrl: args.trackingUrl,
+    }),
+    replyTo: CONTACT_INBOX,
+  });
+}
+
+/** Sent only after every outbound parcel has a carrier-recorded Delivered
+ * scan. This makes the inspection deadline explicit instead of hiding it in
+ * policy copy. */
+export async function emailOrderDelivered(args: {
+  to: string;
+  name?: string | null;
+  reference: string;
+  deliveredDate: string;
+  reportByDate: string;
+  reportUrl: string;
+}): Promise<boolean> {
+  return sendEmail({
+    to: args.to,
+    subject: `📦 Your Slugger Athletics order was delivered (${args.reference})`,
+    html: brandedEmail({
+      preheader: `Please inspect your order and report any issue by ${args.reportByDate}`,
+      heading: `Delivered${args.name ? `, ${esc(args.name.split(" ")[0])}` : ""}!`,
+      intro: `Order reference: <strong>${esc(args.reference)}</strong>`,
+      bodyHtml: `
+        <p style="margin:0 0 12px;">The carrier marked your complete order delivered on <strong>${esc(args.deliveredDate)}</strong>.</p>
+        <p style="margin:0 0 12px;background:#fff8df;padding:12px 14px;border-left:3px solid #b8a36c;">
+          Please open every package and inspect all items before they are worn, washed, altered, or decorated further. Report a suspected defect, production error, wrong item, missing item, or shipping damage by <strong>${esc(args.reportByDate)}</strong>.
+        </p>
+        <p style="margin:0 0 12px;font-size:13px;color:#555;">Include your order reference, the affected player or item, and clear photos. Keep the item, tags, packaging, and shipping carton until the issue is resolved.</p>
+        <p style="margin:0;">Everything look right? No action is needed.</p>
+        ${portalLinkHtml}
+      `,
+      ctaText: "Report an order issue",
+      ctaUrl: args.reportUrl,
     }),
     replyTo: CONTACT_INBOX,
   });
@@ -678,8 +702,8 @@ export async function emailRushConfirmed(args: {
       intro: `Reference: <strong>${esc(args.reference)}</strong>`,
       bodyHtml: `
         <p style="margin:0 0 12px;">${args.approvedBy ? `${esc(args.approvedBy)} at Slugger` : "Our team"} reviewed your deadline and we can have your order in hand by <strong>${esc(date)}</strong>.</p>
-        <p style="margin:0 0 12px;">Rush orders get priority production and ship direct to you. Rush is a flat <strong>$100</strong> fee, includes direct shipping, and will appear on your invoice. No additional shipping charge will be added.</p>
-        <p style="margin:0;">To keep the timeline, please approve your design and pay the deposit as soon as they're ready - the clock starts there.</p>
+        <p style="margin:0 0 12px;">Rush orders receive priority production. Rush is a flat <strong>$100 production fee</strong> and will appear on your invoice. Shipping is additional, and a carrier delivery date is an estimate rather than a guarantee.</p>
+        <p style="margin:0;">The two-week production clock starts after your final proof is approved, your final roster is submitted, and your deposit is paid.</p>
       `,
       ctaText: "View your design",
       ctaUrl: args.statusUrl,

@@ -25,7 +25,13 @@ const jsonLd = {
   },
 };
 
-export default function ContactPage() {
+export default async function ContactPage({ searchParams }: { searchParams: Promise<{ topic?: string; order?: string }> }) {
+  const { topic, order } = await searchParams;
+  const reportingDelivery = topic === "delivery";
+  const cleanReference = (order ?? "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
+  const initialMessage = reportingDelivery
+    ? `Order reference: ${cleanReference || ""}\n\nThe package was delivered, and I need help with:\n\nAffected player/item(s):\n\nPlease attach or send photos of the full item and close-ups of the issue.`
+    : undefined;
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 py-14">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
@@ -41,7 +47,7 @@ export default function ContactPage() {
 
       <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_320px]">
         <div>
-          <ContactForm />
+          <ContactForm initialSubject={reportingDelivery ? "Delivery or order problem" : undefined} initialMessage={initialMessage} />
         </div>
 
         <aside className="space-y-6">

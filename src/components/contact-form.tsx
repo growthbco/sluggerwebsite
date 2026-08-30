@@ -4,25 +4,28 @@ import { useEffect, useState } from "react";
 import { SmsConsentNote } from "@/components/sms-consent";
 import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
 
-const SUBJECTS = ["Team order", "Custom design / quote", "Order status", "Returns & exchanges", "Something else"];
+const SUBJECTS = ["Team order", "Custom design / quote", "Order status", "Delivery or order problem", "Returns & exchanges", "Something else"];
 
-export function ContactForm() {
+export function ContactForm({ initialSubject, initialMessage }: { initialSubject?: string; initialMessage?: string } = {}) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [subject, setSubject] = useState(SUBJECTS[0]);
-  const [message, setMessage] = useState("");
+  const [subject, setSubject] = useState(SUBJECTS.includes(initialSubject ?? "") ? initialSubject! : SUBJECTS[0]);
+  const [message, setMessage] = useState(initialMessage ?? "");
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [error, setError] = useState("");
 
   // Prefill for returning visitors (stored in their own browser only).
   useEffect(() => {
-    const saved = loadRememberedContact();
-    if (saved) {
-      setName((v) => v || saved.name);
-      setEmail((v) => v || saved.email);
-      setPhone((v) => v || saved.phone);
-    }
+    const frame = window.requestAnimationFrame(() => {
+      const saved = loadRememberedContact();
+      if (saved) {
+        setName((v) => v || saved.name);
+        setEmail((v) => v || saved.email);
+        setPhone((v) => v || saved.phone);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   const inputCls =

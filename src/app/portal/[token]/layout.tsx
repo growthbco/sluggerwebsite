@@ -27,7 +27,8 @@ export default async function PortalLayout({
     labels.set(k, cur && cur === cur.toUpperCase() && o.teamName.trim() !== o.teamName.trim().toUpperCase() ? o.teamName.trim() : cur ?? o.teamName.trim());
   }
   const teamLabel = [...labels.values()][0] ?? "";
-  const orderCount = data.teamOrders.filter((o) => o.status !== "cancelled").length;
+  const orderCount = data.teamOrders.filter((o) => o.status !== "cancelled").length
+    + data.shop.filter((o) => !["cancelled", "refunded"].includes(o.status)).length;
 
   return (
     <PortalShell token={token} teamLabel={teamLabel} name={data.name?.trim() || email} orderCount={orderCount}>

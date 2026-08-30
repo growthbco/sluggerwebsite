@@ -48,13 +48,13 @@ export function readPortalToken(token: string): string | null {
 
 export type PortalData = {
   teamOrders: {
-    reference: string; teamName: string; status: string; manageToken: string | null; trackingNumber: string | null; createdAt: Date;
+    reference: string; teamName: string; status: string; manageToken: string | null; trackingNumber: string | null; deliveredAt: Date | null; createdAt: Date;
     totalCents: number; shippingCents: number; depositCents: number | null; invoiceUrl: string | null; fullInvoiceUrl: string | null; balanceInvoiceUrl: string | null; depositPaidAt: Date | null; invoicePaidAt: Date | null; pieceLabel: string;
     deliveryTargetAt: Date | null; deliveryTargetKind: "ship" | "pickup" | null;
   }[];
   designs: { reference: string; teamName: string; status: string; statusToken: string | null; createdAt: Date; mockups: string[] }[];
   invoices: { reference: string; status: string; totalCents: number; payUrl: string | null; createdAt: Date }[];
-  shop: { reference: string; type: string; status: string; totalCents: number; subtotalCents: number; shippingCents: number; items: { name: string; quantity: number; unitPriceCents: number }[]; trackingNumber: string | null; shippedAt: Date | null; addUrl: string | null; createdAt: Date }[];
+  shop: { reference: string; type: string; status: string; totalCents: number; subtotalCents: number; shippingCents: number; items: { name: string; quantity: number; unitPriceCents: number }[]; trackingNumber: string | null; additionalShipments: { trackingNumber: string; carrier?: string }[]; shippedAt: Date | null; deliveredAt: Date | null; addUrl: string | null; createdAt: Date }[];
   name: string | null;
   profile: { name: string | null; phone: string | null; referralCode: string; referralCreditCents: number; hasPassword: boolean };
   shippingAddress: { line1: string; line2: string; city: string; state: string; postalCode: string } | null;
@@ -134,6 +134,7 @@ export async function getCustomerOrders(email: string): Promise<PortalData> {
       status: o.status,
       manageToken: o.manageToken,
       trackingNumber: o.trackingNumber,
+      deliveredAt: o.deliveredAt,
       createdAt: o.createdAt,
       totalCents: o.quotedTotalCents ?? 0,
       shippingCents: o.shippingChargedCents ?? 0,
@@ -190,7 +191,7 @@ export async function getCustomerOrders(email: string): Promise<PortalData> {
   const shopV = shop.map((s) => {
     const store = s.teamId ? storeMap.get(s.teamId) : undefined;
     const addUrl = s.type === "team_store" && !s.shippedAt && store?.active && store.token ? `/store/${store.token}?addTo=${s.reference}` : null;
-    return { reference: s.reference, type: s.type, status: s.status, totalCents: s.totalCents, subtotalCents: s.subtotalCents, shippingCents: s.shippingCents, items: itemsByOrder.get(s.id) ?? [], trackingNumber: s.trackingNumber, shippedAt: s.shippedAt, addUrl, createdAt: s.createdAt };
+    return { reference: s.reference, type: s.type, status: s.status, totalCents: s.totalCents, subtotalCents: s.subtotalCents, shippingCents: s.shippingCents, items: itemsByOrder.get(s.id) ?? [], trackingNumber: s.trackingNumber, additionalShipments: (s.additionalShipments ?? []).map(({ trackingNumber, carrier }) => ({ trackingNumber, carrier })), shippedAt: s.shippedAt, deliveredAt: s.deliveredAt, addUrl, createdAt: s.createdAt };
   });
 
   // Display name: the most recent order that carries one.

@@ -357,6 +357,10 @@ export const orders = pgTable(
       { trackingNumber: string; labelUrl?: string; carrier?: string; service?: string; transactionId?: string; insuredValueCents?: number; at: string }[]
     >(),
     shippedAt: timestamp("shipped_at", { withTimezone: true }),
+    // Carrier-recorded delivery time. Multi-parcel orders use the latest
+    // delivery scan so the customer gets the full inspection window.
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    deliveryNoticeSentAt: timestamp("delivery_notice_sent_at", { withTimezone: true }),
     // Admin can hide a fulfilled/void shop or store order from the active list.
     archivedAt: timestamp("archived_at", { withTimezone: true }),
 
@@ -583,6 +587,10 @@ export const teamOrders = pgTable(
       { trackingNumber: string; labelUrl?: string; carrier?: string; service?: string; transactionId?: string; insuredValueCents?: number; at: string }[]
     >(),
     shippedAt: timestamp("shipped_at", { withTimezone: true }),
+    // Carrier-recorded delivery time. Multi-parcel orders use the latest
+    // delivery scan so the customer gets the full inspection window.
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    deliveryNoticeSentAt: timestamp("delivery_notice_sent_at", { withTimezone: true }),
     // When the post-delivery "how'd it turn out? leave a review" text went out
     // (once per order, a few days after shipping). Null = not yet asked.
     reviewRequestedAt: timestamp("review_requested_at", { withTimezone: true }),
