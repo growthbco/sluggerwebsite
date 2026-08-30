@@ -11,11 +11,13 @@ import { SPORT_PAGES } from "@/lib/sport-pages";
 // entry points (Free Design + Team Order) live as buttons on the right so
 // they're the most obvious actions, not lost in a list of links.
 const nav = [
+  { href: "/", label: "Home" },
   { href: "/team-uniforms", label: "Uniforms" },
   { href: "/#how-it-works", label: "How It Works" },
   { href: "/pricing", label: "Pricing" },
   { href: "/gallery", label: "Gallery" },
   { href: "/faq", label: "Support" },
+  { href: "/contact", label: "Contact" },
   { href: "/portal", label: "My Order" },
 ];
 
@@ -71,7 +73,7 @@ export function SiteHeader() {
             </Link>
 
             {/* Browse nav (desktop only) */}
-            <nav className="hidden lg:flex items-center gap-6">
+            <nav className="hidden lg:flex items-center gap-4 xl:gap-6">
               {nav.map((item) =>
                 item.label === "Uniforms" ? (
                   <div key={item.href} className="relative group">
