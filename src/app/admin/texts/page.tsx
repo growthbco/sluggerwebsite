@@ -23,6 +23,7 @@ export default async function AdminTextsPage({
   const session = await getAdminSession();
   if (!session) redirect("/admin/login");
   if (!canAccess(session.role, "/admin/texts")) redirect("/admin");
+  const restricted = session.role === "designer";
   const { to, name, tab, open } = await searchParams;
   // ?open=<designId> deep-links an email thread (from an email alert) and
   // implies the Email tab.
@@ -53,6 +54,8 @@ export default async function AdminTextsPage({
           initialPhone={to}
           initialName={name}
           initialOpen={open}
+          currentUserName={session.name}
+          restricted={restricted}
         />
       </div>
     </div>

@@ -12,7 +12,7 @@ const last10 = (p: string | null | undefined) => (p ?? "").replace(/\D/g, "").sl
 
 // GET -> conversation list; ?phone= -> full thread; ?phone=&context=1 -> CRM panel.
 export async function GET(req: Request) {
-  const gate = await requireApiRole("customer");
+  const gate = await requireApiRole("conversations");
   if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   const db = getDb();
@@ -20,6 +20,9 @@ export async function GET(req: Request) {
   const phone = url.searchParams.get("phone");
 
   if (phone && url.searchParams.get("context") === "1") {
+    if (gate.session.role === "designer") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     return NextResponse.json(await customerContext(phone));
   }
 
@@ -80,7 +83,7 @@ export async function GET(req: Request) {
 
 // PUT {phone, name?, star?, archive?, markRead?} -> contact + conversation state.
 export async function PUT(req: Request) {
-  const gate = await requireApiRole("customer");
+  const gate = await requireApiRole("conversations");
   if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   let body: { phone?: string; name?: string; star?: boolean; archive?: boolean; markRead?: boolean } = {};
@@ -110,7 +113,7 @@ export async function PUT(req: Request) {
 // POST {phone, body, channel?, name?, note?} -> send + log; note=true stores an
 // internal staff note in the thread WITHOUT texting the customer.
 export async function POST(req: Request) {
-  const gate = await requireApiRole("customer");
+  const gate = await requireApiRole("conversations");
   if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   let body: { phone?: string; body?: string; channel?: string; name?: string; note?: boolean; mediaUrls?: string[] } = {};
@@ -133,7 +136,7 @@ export async function POST(req: Request) {
   if (body.note === true) {
     const [row] = await getDb()
       .insert(smsMessages)
-      .values({ phone, direction: "note", channel: "sms", body: text, staff: "admin" })
+      .values({ phone, direction: "note", channel: "sms", body: text, staff: gate.session.name })
       .returning();
     return NextResponse.json({ ok: true, message: row });
   }
@@ -143,7 +146,7 @@ export async function POST(req: Request) {
 
   const [row] = await getDb()
     .insert(smsMessages)
-    .values({ phone, direction: "out", channel, body: text, mediaCount: mediaUrls.length, mediaUrls, staff: "admin", twilioSid: result.sid ?? null })
+    .values({ phone, direction: "out", channel, body: text, mediaCount: mediaUrls.length, mediaUrls, staff: gate.session.name, twilioSid: result.sid ?? null })
     .returning();
   return NextResponse.json({ ok: true, message: row });
 }

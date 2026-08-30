@@ -104,6 +104,7 @@ export async function isAdmin(): Promise<boolean> {
 // Everything a designer may open. Staff and owner see all pages; only the
 // owner manages users in Settings.
 const DESIGNER_ALLOWED_PREFIXES = [
+  "/admin/texts",
   "/admin/design-requests",
   "/admin/team-orders", // the list (read-only production view)
   "/admin/designer-tracking",
@@ -129,12 +130,13 @@ export function canAccess(role: AdminRole, pathname: string): boolean {
 /* ── API-layer role gate ────────────────────────────────────────── */
 // Page redirects (canAccess) are NOT enough: an authenticated designer can
 // call admin APIs directly with their cookie. These helpers enforce role at
-// the API layer. "production" = shared designer/staff workflow; "customer" =
-// customer contact details, inboxes, calls, addresses, and CRM records;
-// "money" = pricing/invoicing/payment/shipping/store mutations; "settings" =
-// user management. Designers are blocked from customer/money/settings; staff
-// and owner pass customer/money; only owner passes settings.
-export type AdminApiArea = "production" | "customer" | "money" | "settings";
+// the API layer. "production" = shared designer/staff workflow;
+// "conversations" = the shared customer message inbox; "customer" = broader
+// contact details, calls, addresses, and CRM records; "money" = pricing,
+// invoicing, payment, shipping, and store mutations; "settings" = user
+// management. Designers can work conversations without gaining the broader
+// customer/money/settings permissions.
+export type AdminApiArea = "production" | "conversations" | "customer" | "money" | "settings";
 
 export function canAccessApi(role: AdminRole, area: AdminApiArea): boolean {
   if (area === "settings") return role === "owner";

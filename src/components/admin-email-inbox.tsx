@@ -10,7 +10,7 @@ type Thread = {
   id: string;
   reference: string;
   teamName: string;
-  contactEmail: string;
+  contactEmail: string | null;
   status: string;
   archived: boolean;
   count: number;
@@ -30,11 +30,11 @@ type Active = {
   id: string;
   reference: string;
   teamName: string;
-  contactEmail: string;
+  contactEmail: string | null;
   contactPhone: string | null;
   status: string;
   manageToken: string;
-  statusToken: string;
+  statusToken: string | null;
   messages: DesignMessage[];
 };
 type Filter = "all" | "needs" | "archived";
@@ -81,7 +81,9 @@ const STATUS_LABEL: Record<string, string> = {
  *  replied. */
 export function AdminEmailInbox({
   initialOpen,
-}: { initialOpen?: string } = {}) {
+  currentUserName,
+  restricted = false,
+}: { initialOpen?: string; currentUserName: string; restricted?: boolean }) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [active, setActive] = useState<Active | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -91,7 +93,7 @@ export function AdminEmailInbox({
   const [draft, setDraft] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
-  const [sender, setSender] = useState(STAFF_NAMES[0]);
+  const [sender, setSender] = useState(restricted ? currentUserName : STAFF_NAMES[0]);
   const [busy, setBusy] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [pendingImages, setPendingImages] = useState<string[]>([]);
@@ -101,12 +103,13 @@ export function AdminEmailInbox({
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    const saved =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(NAME_KEY)
-        : null;
-    if (saved) setSender(saved);
-  }, []);
+    if (restricted) return;
+    const timeout = window.setTimeout(() => {
+      const saved = window.localStorage.getItem(NAME_KEY);
+      if (saved) setSender(saved);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [restricted]);
   useEffect(() => {
     const el = composerRef.current;
     if (!el) return;
@@ -131,7 +134,8 @@ export function AdminEmailInbox({
   }, []);
 
   useEffect(() => {
-    loadThreads();
+    const timeout = window.setTimeout(() => void loadThreads(), 0);
+    return () => window.clearTimeout(timeout);
   }, [loadThreads]);
 
   // Deep link from an email notification (?open=<designId>): open it straight away.
@@ -143,12 +147,15 @@ export function AdminEmailInbox({
   }, [initialOpen]);
 
   useEffect(() => {
-    if (!activeId) {
-      setActive(null);
-      return;
-    }
-    setMobileView("thread");
-    loadActive(activeId);
+    const timeout = window.setTimeout(() => {
+      if (!activeId) {
+        setActive(null);
+        return;
+      }
+      setMobileView("thread");
+      void loadActive(activeId);
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [activeId, loadActive]);
 
   // Poll: refresh the list and the open thread so a new reply shows without a
@@ -227,7 +234,7 @@ export function AdminEmailInbox({
     setBusy(true);
     setError("");
     try {
-      if (typeof window !== "undefined")
+      if (!restricted && typeof window !== "undefined")
         window.localStorage.setItem(NAME_KEY, sender);
       const res = await fetch(
         `/api/design-request/${active.manageToken}/message`,
@@ -264,7 +271,7 @@ export function AdminEmailInbox({
     if (filter === "needs" && !t.needsReply) return false;
     if (
       q &&
-      !`${t.teamName} ${t.reference} ${t.contactEmail} ${t.preview}`
+      !`${t.teamName} ${t.reference} ${t.contactEmail ?? ""} ${t.preview}`
         .toLowerCase()
         .includes(q)
     )
@@ -389,13 +396,18 @@ export function AdminEmailInbox({
                 <span className="min-w-0">
                   <span className="block truncate">{active.teamName}</span>
                   <span className="block text-[11px] text-muted font-normal truncate">
-                    {active.reference} ·{" "}
-                    <a
-                      href={`mailto:${active.contactEmail}`}
-                      className="hover:text-foreground"
-                    >
-                      {active.contactEmail}
-                    </a>
+                    {active.reference}
+                    {active.contactEmail && (
+                      <>
+                        {" · "}
+                        <a
+                          href={`mailto:${active.contactEmail}`}
+                          className="hover:text-foreground"
+                        >
+                          {active.contactEmail}
+                        </a>
+                      </>
+                    )}
                   </span>
                 </span>
               </span>
@@ -497,21 +509,27 @@ export function AdminEmailInbox({
                 <span className="display mr-1 text-[10px] uppercase tracking-wider text-muted">
                   From
                 </span>
-                {STAFF_NAMES.map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setSender(n)}
-                    className={`display inline-flex min-h-[34px] items-center rounded-full border px-3 py-1 text-[10px] lg:min-h-0 ${sender === n ? "border-brand/70 bg-brand/15 text-brand" : "border-line text-muted hover:text-foreground"}`}
-                  >
-                    {n}
-                  </button>
-                ))}
+                {restricted ? (
+                  <span className="display inline-flex min-h-[34px] items-center rounded-full border border-brand/70 bg-brand/15 px-3 py-1 text-[10px] text-brand lg:min-h-0">
+                    {currentUserName}
+                  </span>
+                ) : (
+                  STAFF_NAMES.map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setSender(n)}
+                      className={`display inline-flex min-h-[34px] items-center rounded-full border px-3 py-1 text-[10px] lg:min-h-0 ${sender === n ? "border-brand/70 bg-brand/15 text-brand" : "border-line text-muted hover:text-foreground"}`}
+                    >
+                      {n}
+                    </button>
+                  ))
+                )}
                 <button
                   type="button"
                   onClick={draftReply}
                   disabled={drafting}
-                  title="AI reads this thread and the customer's order, then drafts a reply for you to edit"
+                  title={restricted ? "AI reads this design conversation, then drafts a reply for you to edit" : "AI reads this thread and the customer's order, then drafts a reply for you to edit"}
                   className="display ml-auto inline-flex min-h-[34px] items-center rounded-md border border-brand/40 px-3 py-1 text-[10px] text-brand hover:bg-brand/10 disabled:opacity-50 lg:min-h-0"
                 >
                   {drafting ? "Drafting…" : "✦ Draft reply"}

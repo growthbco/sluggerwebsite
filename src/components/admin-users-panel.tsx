@@ -7,7 +7,7 @@ type User = { id: string; name: string; role: string; active: boolean; createdAt
 const ROLE_DESC: Record<string, string> = {
   owner: "Everything, including this settings page",
   staff: "Everything except user management",
-  designer: "Restricted design and production portal - no customer contacts, inboxes, addresses, payments, or store data",
+  designer: "Design, production, and Conversations - no customer financials, addresses, calls, or store data",
 };
 
 /** Owner-only user manager: each person gets their OWN password (that's how

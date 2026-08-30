@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 // raises the same beep + desktop alert as a text. Selects only the LAST message
 // per design (jsonb `-> -1`), never the whole thread.
 export async function GET() {
-  const gate = await requireApiRole("customer");
+  const gate = await requireApiRole("conversations");
   if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ latestClientEmail: null });
 

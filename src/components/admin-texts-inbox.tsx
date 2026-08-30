@@ -87,7 +87,8 @@ const isAutomatedMessage = (message: Message) =>
 export function AdminTextsInbox({
   initialPhone,
   initialName,
-}: { initialPhone?: string; initialName?: string } = {}) {
+  restricted = false,
+}: { initialPhone?: string; initialName?: string; restricted?: boolean } = {}) {
   const [convos, setConvos] = useState<Conversation[]>([]);
   const [active, setActive] = useState<string | null>(null);
   // Mobile is master-detail: the list OR the open thread, never both cramped
@@ -206,6 +207,7 @@ export function AdminTextsInbox({
   }, []);
 
   const loadContext = useCallback(async (phone: string) => {
+    if (restricted) return;
     setContext(null);
     try {
       const res = await fetch(
@@ -214,7 +216,7 @@ export function AdminTextsInbox({
       const data = await res.json();
       if (res.ok) setContext(data);
     } catch {}
-  }, []);
+  }, [restricted]);
 
   const setState = useCallback(
     async (
@@ -239,19 +241,22 @@ export function AdminTextsInbox({
   );
 
   useEffect(() => {
-    loadConvos();
+    const timeout = window.setTimeout(() => void loadConvos(), 0);
+    return () => window.clearTimeout(timeout);
   }, [loadConvos]);
 
   // New-conversation customer search: type a name, team, or email and pick
   // the person - no phone number hunting. Debounced type-ahead against the
   // same search the invoice form uses (now team-aware).
   useEffect(() => {
+    if (restricted) return;
     const q = pickerQ.trim();
-    if (q.length < 2 || /^[\d\s()+-]+$/.test(q)) {
-      setPickerHits([]);
-      return;
-    }
-    const t = setTimeout(async () => {
+    const shouldSearch = q.length >= 2 && !/^[\d\s()+-]+$/.test(q);
+    const t = window.setTimeout(async () => {
+      if (!shouldSearch) {
+        setPickerHits([]);
+        return;
+      }
       try {
         const res = await fetch(
           `/api/admin/customers/search?q=${encodeURIComponent(q)}`,
@@ -264,9 +269,9 @@ export function AdminTextsInbox({
             ),
           );
       } catch {}
-    }, 250);
-    return () => clearTimeout(t);
-  }, [pickerQ]);
+    }, shouldSearch ? 250 : 0);
+    return () => window.clearTimeout(t);
+  }, [pickerQ, restricted]);
 
   function pickCustomer(hit: { name: string; phone: string | null }) {
     if (!hit.phone) return;
@@ -315,11 +320,14 @@ export function AdminTextsInbox({
 
   useEffect(() => {
     if (!active) return;
-    loadThread(active);
-    loadContext(active);
-    setEditingName(false);
-    setMobileView("thread");
-    setState(active, { markRead: true });
+    const timeout = window.setTimeout(() => {
+      void loadThread(active);
+      void loadContext(active);
+      setEditingName(false);
+      setMobileView("thread");
+      void setState(active, { markRead: true });
+    }, 0);
+    return () => window.clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
@@ -424,7 +432,7 @@ export function AdminTextsInbox({
     0;
 
   return (
-    <div className="flex min-h-[32rem] flex-col overflow-hidden border border-line bg-steel shadow-[0_18px_60px_rgba(0,0,0,0.18)] lg:grid lg:h-[calc(100dvh-10.5rem)] lg:max-h-[52rem] lg:min-h-0 lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[19rem_minmax(28rem,1fr)_18rem]">
+    <div className={`flex min-h-[32rem] flex-col overflow-hidden border border-line bg-steel shadow-[0_18px_60px_rgba(0,0,0,0.18)] lg:grid lg:h-[calc(100dvh-10.5rem)] lg:max-h-[52rem] lg:min-h-0 lg:grid-cols-[20rem_minmax(0,1fr)] ${restricted ? "" : "xl:grid-cols-[19rem_minmax(28rem,1fr)_18rem]"}`}>
       {/* ── Conversations ─────────────────────────────────────────── */}
       <aside
         className={`min-w-0 flex-col overflow-hidden bg-steel lg:h-full lg:min-h-0 lg:border-r lg:border-line ${mobileView === "thread" ? "hidden lg:flex" : "flex h-[calc(100dvh-9rem)]"}`}
@@ -599,44 +607,47 @@ export function AdminTextsInbox({
             )
           ) : (
             <span className="flex-1 min-w-[16rem]">
-              <span className="relative block">
-                <input
-                  value={pickerQ}
-                  onChange={(e) => setPickerQ(e.target.value)}
-                  placeholder="Search a customer by name, team, or email…"
-                  autoFocus
-                  className="w-full bg-background border border-brand/40 px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-                />
-                {pickerHits.length > 0 && (
-                  <span className="absolute left-0 right-0 top-full z-20 mt-1 block border border-line bg-steel shadow-xl max-h-64 overflow-y-auto">
-                    {pickerHits.map((h) => (
-                      <button
-                        key={h.email}
-                        type="button"
-                        onClick={() => pickCustomer(h)}
-                        className="block w-full text-left px-3 py-2 hover:bg-brand/10 border-b border-line/60 last:border-b-0"
-                      >
-                        <span className="text-sm text-foreground">
-                          {h.name || h.email}
-                        </span>
-                        {h.team && (
-                          <span className="ml-2 text-xs text-brand">
-                            {h.team}
+              {!restricted && (
+                <span className="relative block">
+                  <input
+                    value={pickerQ}
+                    onChange={(e) => setPickerQ(e.target.value)}
+                    placeholder="Search a customer by name, team, or email…"
+                    autoFocus
+                    className="w-full bg-background border border-brand/40 px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                  />
+                  {pickerHits.length > 0 && (
+                    <span className="absolute left-0 right-0 top-full z-20 mt-1 block border border-line bg-steel shadow-xl max-h-64 overflow-y-auto">
+                      {pickerHits.map((h) => (
+                        <button
+                          key={h.email}
+                          type="button"
+                          onClick={() => pickCustomer(h)}
+                          className="block w-full text-left px-3 py-2 hover:bg-brand/10 border-b border-line/60 last:border-b-0"
+                        >
+                          <span className="text-sm text-foreground">
+                            {h.name || h.email}
                           </span>
-                        )}
-                        <span className="block text-xs text-muted">
-                          {h.phone ? prettyPhone(h.phone) : ""} · {h.email}
-                        </span>
-                      </button>
-                    ))}
-                  </span>
-                )}
-              </span>
-              <span className="mt-2 flex gap-2">
+                          {h.team && (
+                            <span className="ml-2 text-xs text-brand">
+                              {h.team}
+                            </span>
+                          )}
+                          <span className="block text-xs text-muted">
+                            {h.phone ? prettyPhone(h.phone) : ""} · {h.email}
+                          </span>
+                        </button>
+                      ))}
+                    </span>
+                  )}
+                </span>
+              )}
+              <span className={`${restricted ? "" : "mt-2"} flex gap-2`}>
                 <input
                   value={newPhone}
                   onChange={(e) => setNewPhone(e.target.value)}
-                  placeholder="…or a raw phone number"
+                  placeholder={restricted ? "Phone number" : "…or a raw phone number"}
+                  autoFocus={restricted}
                   className="flex-1 bg-background border border-line px-3 py-1.5 text-xs text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
                   inputMode="tel"
                 />
@@ -651,20 +662,22 @@ export function AdminTextsInbox({
           )}
           {active && activeConvo && (
             <span className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() =>
-                  window.dispatchEvent(
-                    new CustomEvent("slugger-dial", {
-                      detail: { phone: active },
-                    }),
-                  )
-                }
-                className="display inline-flex min-h-[36px] items-center rounded-md border border-brand/40 px-3 text-[11px] text-brand hover:bg-brand/10"
-                aria-label="Call this contact"
-              >
-                Call
-              </button>
+              {!restricted && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.dispatchEvent(
+                      new CustomEvent("slugger-dial", {
+                        detail: { phone: active },
+                      }),
+                    )
+                  }
+                  className="display inline-flex min-h-[36px] items-center rounded-md border border-brand/40 px-3 text-[11px] text-brand hover:bg-brand/10"
+                  aria-label="Call this contact"
+                >
+                  Call
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setState(active, { star: !activeConvo.starred })}
@@ -826,7 +839,7 @@ export function AdminTextsInbox({
                 Internal only — the customer will not see this
               </span>
             )}
-            {active && mode !== "note" && (
+            {active && mode !== "note" && !restricted && (
               <button
                 type="button"
                 onClick={draftReply}
@@ -937,7 +950,7 @@ export function AdminTextsInbox({
       </section>
 
       {/* ── Customer panel ────────────────────────────────────────── */}
-      <aside className="hidden flex-col overflow-y-auto bg-background/20 xl:flex">
+      {!restricted && <aside className="hidden flex-col overflow-y-auto bg-background/20 xl:flex">
         {!active ? (
           <div className="grid h-full place-items-center p-6 text-center">
             <div>
@@ -1083,7 +1096,7 @@ export function AdminTextsInbox({
             )}
           </div>
         )}
-      </aside>
+      </aside>}
     </div>
   );
 }

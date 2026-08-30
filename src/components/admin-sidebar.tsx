@@ -49,10 +49,12 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
   },
 ];
 
-// What a designer's sidebar shows: job artwork, production, tracking, and
-// their own invoices. Customer inboxes, leads, contacts, and money stay out.
+// What a designer's sidebar shows: conversations, job artwork, production,
+// tracking, and their own invoices. Broader CRM, calls, leads, and money stay
+// out.
 const DESIGNER_HREFS = new Set([
   "/admin",
+  "/admin/texts",
   "/admin/design-requests",
   "/admin/team-orders",
   "/admin/designer-tracking",
