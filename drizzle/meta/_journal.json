@@ -687,6 +687,13 @@
       "when": 1788100619623,
       "tag": "0097_silly_tomas",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1788106018026,
+      "tag": "0098_perfect_inhumans",
+      "breakpoints": true
     }
   ]
 }

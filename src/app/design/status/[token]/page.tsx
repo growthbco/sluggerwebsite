@@ -145,6 +145,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
           teamOrderUrl={order ? "#roster" : `/team-order?design=${token}`}
           revisionsUsed={request.revisionsUsed ?? 0}
           maxRevisions={MAX_REVISIONS}
+          whiteLabel={request.whiteLabel}
         />
       </section>
 

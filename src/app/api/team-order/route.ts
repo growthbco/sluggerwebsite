@@ -145,6 +145,7 @@ export async function POST(req: Request) {
           jerseyStyle: body.jerseyStyle ?? reuse.jerseyStyle,
           jerseyMaterial: selectedMaterial ?? reuse.jerseyMaterial,
           items,
+          whiteLabel: Boolean(design?.whiteLabel || reuse.whiteLabel),
           updatedAt: new Date(),
         })
         .where(eq(teamOrders.id, reuse.id));
@@ -161,6 +162,7 @@ export async function POST(req: Request) {
           jerseyMaterial: selectedMaterial,
           items,
           designRequestId: design?.id,
+          whiteLabel: Boolean(design?.whiteLabel),
           discordThreadId: design?.discordThreadId ?? undefined,
           rushShipping: design?.rush ?? false,
           smsOptIn: (body.smsConsent === true && Boolean(contactPhone)) || Boolean(design?.smsOptInAt),

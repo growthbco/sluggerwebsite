@@ -25,6 +25,8 @@ export type NewTeamOrder = {
   jerseyMaterial?: string;
   items?: string[];
   designRequestId?: string;
+  /** Staff-confirmed paid upgrade: omit all Slugger branding from production. */
+  whiteLabel?: boolean;
   /** Discord home for this order. Usually the linked design's forum thread. */
   discordThreadId?: string;
   // Inherited from a rush design request: flags the flat $100 rush fee.
@@ -101,6 +103,7 @@ export async function createTeamOrder(input: NewTeamOrder) {
       jerseyMaterial: input.jerseyMaterial ?? fabricForStyle(input.jerseyStyle),
       items: input.items?.length ? input.items : ["jersey"],
       designRequestId: input.designRequestId,
+      whiteLabel: input.whiteLabel ?? false,
       discordThreadId: input.discordThreadId,
       rushShipping: input.rushShipping ?? false,
       manualEntryAt: input.manualTimeline ? new Date() : undefined,

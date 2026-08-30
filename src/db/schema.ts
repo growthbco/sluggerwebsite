@@ -446,9 +446,9 @@ export const teamOrders = pgTable(
     embroideryFeeWaived: boolean("embroidery_fee_waived").notNull().default(false),
     // Tax-exempt org/company: no sales tax on this order's invoices.
     taxExempt: boolean("tax_exempt").notNull().default(false),
-    // Paid white-label upgrade: remove Slugger's SA back-logo + neck label from
-    // the finished garments. Adds a flat fee to the invoice; production must
-    // omit the branding.
+    // Paid white-label upgrade: remove every Slugger mark (SA back logo,
+    // branded neck label, and branded size/barcode tag). Adds a per-piece fee
+    // to the invoice; production must omit the branding.
     whiteLabel: boolean("white_label").notNull().default(false),
     jerseyMaterial: text("jersey_material"), // birdseye mesh / pro smooth
     // Which item types this order covers, e.g. ["jersey","pants","socks"].
@@ -738,6 +738,10 @@ export const designRequests = pgTable(
     // intake to qualify the request - full custom designs aren't worth doing
     // for a single piece, so staff sees this before design work starts.
     estimatedPieces: text("estimated_pieces"),
+    // Staff-confirmed white-label upgrade. This is captured while the artwork
+    // is still being reviewed, then inherited by the team order created on
+    // approval so pricing and production cannot lose the instruction.
+    whiteLabel: boolean("white_label").notNull().default(false),
     // Exact colors the customer picked from the hex wheel (e.g. ["#EC4899",
     // "#000000"]). The free-form `colors` text still holds names/notes.
     colorHexes: jsonb("color_hexes").$type<string[]>().default([]),

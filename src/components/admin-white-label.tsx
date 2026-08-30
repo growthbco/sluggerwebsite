@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-/** Toggle the paid white-label upgrade on a team order: removes Slugger's SA
- *  back-logo + neck label from the finished garments and adds a flat fee. */
+/** Toggle the paid per-piece white-label upgrade on a team order. */
 export function AdminWhiteLabel({ teamOrderId, whiteLabel }: { teamOrderId: string; whiteLabel: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -31,7 +30,7 @@ export function AdminWhiteLabel({ teamOrderId, whiteLabel }: { teamOrderId: stri
       type="button"
       onClick={toggle}
       disabled={busy}
-      title="Paid upgrade: remove the SA logo + neck label from the finished gear ($2.50/piece, $50 minimum)"
+      title="Paid upgrade: remove every Slugger mark from the finished gear ($2.50/piece, $50 minimum)"
       className={`text-xs display px-2 py-0.5 border disabled:opacity-50 whitespace-nowrap ${
         whiteLabel ? "border-brand/60 text-brand bg-brand/10" : "border-line text-muted hover:border-brand/40"
       }`}

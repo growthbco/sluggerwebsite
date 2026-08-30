@@ -20,6 +20,8 @@ import { TeamStoreTeaser } from "@/components/team-store-teaser";
 import { PrintChecklist } from "@/components/print-checklist";
 import { InboundTracking } from "@/components/inbound-tracking";
 import { FollowedUpButton } from "@/components/admin-followed-up-button";
+import { AdminDesignWhiteLabel } from "@/components/admin-design-white-label";
+import { whiteLabelFeeCents } from "@/lib/team-order-pricing";
 
 export const metadata: Metadata = { title: "Design Request", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -106,6 +108,13 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
   const needsAction = designNeedsAction(request);
   const printFileVerified = Boolean(linkedOrder?.printFileVerifiedAt) || (Boolean(linkedOrder) && printRoster.length > 0 && !personalized);
   const canOpenLinkedOrder = Boolean(linkedOrder && canAccess(session.role, `/admin/team-order/${linkedOrder.id}`));
+  const estimatedWhiteLabelPieces = /^\d+$/.test((request.estimatedPieces ?? "").trim())
+    ? Number(request.estimatedPieces)
+    : null;
+  const estimatedWhiteLabelFee = estimatedWhiteLabelPieces && estimatedWhiteLabelPieces > 0
+    ? whiteLabelFeeCents(estimatedWhiteLabelPieces)
+    : null;
+  const whiteLabelPricingLocked = Boolean(linkedOrder?.invoiceUrl || linkedOrder?.depositPaidAt || linkedOrder?.invoicePaidAt);
 
   let waitingOn = "Slugger";
   if (!needsAction && request.status === "in_design") waitingOn = "Design team";
@@ -430,6 +439,21 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
           {linkedOrder && <p className="mt-0.5 text-xs text-muted">{linkedOrder.status.replace(/_/g, " ")}</p>}
         </div>
       </section>
+
+      {!restricted ? (
+        <AdminDesignWhiteLabel
+          designRequestId={request.id}
+          whiteLabel={request.whiteLabel}
+          estimatedPieces={estimatedWhiteLabelPieces ? String(estimatedWhiteLabelPieces) : request.estimatedPieces ?? null}
+          estimatedFeeCents={estimatedWhiteLabelFee}
+          locked={whiteLabelPricingLocked}
+        />
+      ) : request.whiteLabel ? (
+        <section className="mt-4 border border-amber-400/50 bg-amber-400/10 p-4">
+          <p className="display text-sm uppercase tracking-[0.12em] text-amber-300">⚠ White-label production</p>
+          <p className="mt-1 text-sm text-foreground">Remove every Slugger mark: SA back logo, branded neck label, and branded lower-front size/barcode tag.</p>
+        </section>
+      ) : null}
 
       <div className="mt-6">
         <ManageTabs tabs={tabs} defaultTab={nextTab} />

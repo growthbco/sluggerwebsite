@@ -210,7 +210,7 @@ type TeamOrderPayload = {
    *  produce right on the roster post - not just when a customer approved via
    *  their own link. Up to a few are shown. */
   designImages?: string[];
-  /** Paid white-label order: production must OMIT the SA back-logo + neck label. */
+  /** Paid white-label order: production must OMIT every Slugger mark. */
   whiteLabel?: boolean;
 };
 
@@ -390,7 +390,7 @@ export async function postTeamOrderToDiscord(
     { name: "Players", value: String(order.roster.filter((r) => r.name || r.number || r.size || (r.sizes && Object.keys(r.sizes).length)).length), inline: true },
   ];
   if (order.whiteLabel) {
-    fields.push({ name: "⚠️ WHITE-LABEL", value: "Remove the SA back-logo and the Slugger Athletics neck label - this order ships unbranded.", inline: false });
+    fields.push({ name: "⚠️ WHITE-LABEL", value: "Remove every Slugger mark: SA back logo, branded neck label, and branded lower-front size/barcode tag. This order ships unbranded.", inline: false });
   }
   fields.push({ name: "Roster", value: rows.slice(0, 1024) || "-", inline: false });
   if (order.manageUrl) fields.push({ name: "🔗 Open order", value: order.manageUrl, inline: false });

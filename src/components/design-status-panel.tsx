@@ -19,6 +19,7 @@ type Props = {
   teamOrderUrl: string;
   revisionsUsed: number;
   maxRevisions: number;
+  whiteLabel?: boolean;
 };
 
 const STATUS_COPY: Record<string, { label: string; blurb: string }> = {
@@ -44,6 +45,7 @@ export function DesignStatusPanel({
   teamOrderUrl,
   revisionsUsed,
   maxRevisions,
+  whiteLabel = false,
 }: Props) {
   const [currentStatus, setCurrentStatus] = useState(status);
   // Multi-select: a project can have several finals (jersey, hat, pants, or a
@@ -172,10 +174,12 @@ export function DesignStatusPanel({
             </p>
           )}
           {isJerseyProject && (
-            <p className="text-xs text-muted mt-1">
-              Note: every finished jersey includes standard Slugger Athletics branding - a size barcode
-              tag on the lower-right front, the SA logo at the top of the back, and a neck label reading
-              &quot;Slugger Athletics&quot; - even if it isn&apos;t shown on the proof.
+            <p className={`text-xs mt-1 ${whiteLabel ? "text-amber-300" : "text-muted"}`}>
+              {whiteLabel ? (
+                <>White-label upgrade recorded: the finished gear will not include Slugger branding. The final charge is $2.50 per roster piece with a $50 order minimum.</>
+              ) : (
+                <>Note: every finished jersey includes standard Slugger Athletics branding - a size barcode tag on the lower-right front, the SA logo at the top of the back, and a neck label reading &quot;Slugger Athletics&quot; - even if it isn&apos;t shown on the proof.</>
+              )}
             </p>
           )}
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">

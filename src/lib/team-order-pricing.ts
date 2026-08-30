@@ -28,7 +28,7 @@ const ITEM_PRICES: Record<string, number> = {
   beanie: 4000, // custom knit beanie, special-ordered from Cap America (estimate; adjust to real cost)
 };
 
-// White-label upgrade (remove the SA back-logo + neck label): priced PER PIECE
+// White-label upgrade (remove every Slugger mark): priced PER PIECE
 // because the value is lost advertising, which scales with quantity - with a
 // per-order floor so small runs still pay meaningfully.
 export const WHITE_LABEL_PER_PIECE_CENTS = 250;
@@ -167,7 +167,7 @@ export function computeTeamOrderQuote(
     /** Set when this design's one-time embroidery fee was already paid on a
      *  previous order (auto-detected at invoicing, or staff toggle). */
     embroideryFeeWaived?: boolean | null;
-    /** Paid white-label upgrade: adds a flat fee and drops SA branding. */
+    /** Paid white-label upgrade: adds a per-piece fee and drops all Slugger branding. */
     whiteLabel?: boolean | null;
   },
   roster: RosterRow[],
@@ -234,8 +234,8 @@ export function computeTeamOrderQuote(
     const atFloor = fee === WHITE_LABEL_MIN_CENTS && pieces * WHITE_LABEL_PER_PIECE_CENTS < WHITE_LABEL_MIN_CENTS;
     lines.push(
       atFloor
-        ? { label: `White-label - remove Slugger branding (${pieces} pc, minimum)`, quantity: 1, unitPriceCents: fee, totalCents: fee }
-        : { label: "White-label - remove Slugger branding", quantity: pieces, unitPriceCents: WHITE_LABEL_PER_PIECE_CENTS, totalCents: fee },
+        ? { label: `White-label - remove all Slugger branding (${pieces} pc, minimum)`, quantity: 1, unitPriceCents: fee, totalCents: fee }
+        : { label: "White-label - remove all Slugger branding", quantity: pieces, unitPriceCents: WHITE_LABEL_PER_PIECE_CENTS, totalCents: fee },
     );
   }
 

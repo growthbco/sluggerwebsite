@@ -33,6 +33,7 @@ export async function POST(req: Request) {
   let designRequestId: string | undefined;
   let discordThreadId: string | undefined;
   let rushFromDesign = false;
+  let whiteLabelFromDesign = false;
   let trustedDesignToken = false;
   if (body.designToken) {
     const design = await getByStatusToken(body.designToken);
@@ -41,6 +42,7 @@ export async function POST(req: Request) {
       designRequestId = design.id;
       discordThreadId = design.discordThreadId ?? undefined;
       rushFromDesign = Boolean(design.rush);
+      whiteLabelFromDesign = Boolean(design.whiteLabel);
       sport = design.sport ?? sport;
       if (design.status === "approved" || design.status === "ordered") {
         teamName = design.teamName;
@@ -59,6 +61,7 @@ export async function POST(req: Request) {
       designRequestId = design.id;
       discordThreadId = design.discordThreadId ?? undefined;
       rushFromDesign = Boolean(design.rush);
+      whiteLabelFromDesign = Boolean(design.whiteLabel);
       sport = design.sport ?? sport;
     }
   }
@@ -86,6 +89,7 @@ export async function POST(req: Request) {
             jerseyStyle: body.jerseyStyle ?? existing.jerseyStyle,
             jerseyMaterial: selectedMaterial ?? existing.jerseyMaterial,
             items: body.items?.length ? body.items : existing.items,
+            whiteLabel: whiteLabelFromDesign || existing.whiteLabel,
             updatedAt: new Date(),
           })
           .where(eq(teamOrders.id, existing.id));
@@ -112,6 +116,7 @@ export async function POST(req: Request) {
         : undefined,
       items: body.items,
       designRequestId,
+      whiteLabel: whiteLabelFromDesign,
       discordThreadId,
       rushShipping: rushFromDesign,
       smsOptIn: body.smsConsent === true && Boolean(contactPhone),
