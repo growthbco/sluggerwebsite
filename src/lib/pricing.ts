@@ -14,6 +14,7 @@ export const PRICE_LIST: PriceGroup[] = [
       { item: "Round-Neck Jersey (any sport)", priceCents: 2800, note: "Baseball, softball, soccer, pickleball & more - your choice of mesh or dry-fit material" },
       { item: "V-Neck Jersey", priceCents: 3000, note: "Fully sublimated with names, numbers, and custom design included" },
       { item: "Dry-Fit Practice Jersey", priceCents: 2000, note: "Lightweight practice-weight shirt (not a game jersey) - practice sets, coaches, parents & fans" },
+      { item: "Custom Polo", priceCents: 3500, note: "Choose Dri-Fit or Pin-Dot material" },
       { item: "Long-Sleeve Shirt", priceCents: 3200 },
       { item: "Two-Button Jersey", priceCents: 3200 },
       { item: "Full-Button Jersey", priceCents: 3500 },
@@ -44,6 +45,7 @@ export const PRICE_LIST: PriceGroup[] = [
     group: "Hoodies & Extras",
     rows: [
       { item: "Hoodie", priceCents: 4000 },
+      { item: "Custom Jacket", priceCents: 5000, note: "Fully custom team warm-up jacket" },
       { item: "Custom Socks", priceCents: 1500 },
       { item: "Custom 3D Hype Chain", priceCents: 4000, note: "Starting price - final depends on design detail and colors. Free mockup; one-time $50 3D design file fee per design, then each chain from $40" },
     ],

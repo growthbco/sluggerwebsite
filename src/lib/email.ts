@@ -677,9 +677,9 @@ export async function emailRushConfirmed(args: {
       heading: `Your rush service is confirmed`,
       intro: `Reference: <strong>${esc(args.reference)}</strong>`,
       bodyHtml: `
-        <p style="margin:0 0 12px;">${args.approvedBy ? `${esc(args.approvedBy)} at Slugger` : "Our team"} approved two-week rush production for your order. Your requested in-hand date is <strong>${esc(date)}</strong>.</p>
-        <p style="margin:0 0 12px;">Rush is a flat <strong>$100</strong> fee and will appear on your invoice. The two-week production clock starts only after your final design, final roster, and deposit are complete.</p>
-        <p style="margin:0;">Direct shipping from production is included in the Rush fee, so there is no additional shipping charge. Carrier transit follows the production window, and delivery dates are estimates. We will send tracking when the final package is on its way.</p>
+        <p style="margin:0 0 12px;">${args.approvedBy ? `${esc(args.approvedBy)} at Slugger` : "Our team"} reviewed your deadline and we can have your order in hand by <strong>${esc(date)}</strong>.</p>
+        <p style="margin:0 0 12px;">Rush orders get priority production and ship direct to you. Rush is a flat <strong>$100</strong> fee, includes direct shipping, and will appear on your invoice. No additional shipping charge will be added.</p>
+        <p style="margin:0;">To keep the timeline, please approve your design and pay the deposit as soon as they're ready - the clock starts there.</p>
       `,
       ctaText: "View your design",
       ctaUrl: args.statusUrl,

@@ -5,10 +5,8 @@ import { useMemo, useState } from "react";
 import { AdminArchiveButton } from "@/components/admin-archive-button";
 import { AdminGalleryToggle } from "@/components/admin-gallery-toggle";
 import { FollowedUpButton } from "@/components/admin-followed-up-button";
-import { AdminProofFollowUpActions } from "@/components/admin-proof-follow-up-actions";
-import { proofFollowUpState, type ProofFollowUpState } from "@/lib/proof-follow-up-policy";
 
-type QueueKey = "action" | "followup" | "final" | "design" | "waiting" | "ready" | "completed" | "unresponsive" | "all";
+type QueueKey = "action" | "design" | "waiting" | "ready" | "completed" | "all";
 
 export type AdminDesignRequestListItem = {
   id: string;
@@ -26,10 +24,6 @@ export type AdminDesignRequestListItem = {
   hasApprovedDesign: boolean;
   galleryHidden: boolean;
   followedUpAt: string | null;
-  proofSentAt: string | null;
-  followUpsSent: number;
-  lastFollowUpAt: string | null;
-  followUpSnoozedUntil: string | null;
   updatedAt: string;
   needsAction: boolean;
   linkedOrder: { id: string; reference: string; status: string } | null;
@@ -37,13 +31,10 @@ export type AdminDesignRequestListItem = {
 
 const QUEUES: { key: QueueKey; label: string; shortLabel: string; description: string }[] = [
   { key: "action", label: "Needs our action", shortLabel: "Needs action", description: "New requests, change requests, and customer replies." },
-  { key: "followup", label: "Needs follow-up", shortLabel: "Follow-up", description: "A scheduled proof reminder is due now." },
-  { key: "final", label: "Final attempt due", shortLabel: "Final attempt", description: "Send the last reminder before the request moves to Unresponsive." },
   { key: "design", label: "In design", shortLabel: "In design", description: "Artwork is currently being prepared." },
   { key: "waiting", label: "Waiting on customer", shortLabel: "Waiting", description: "A proof was sent and the customer has the next move." },
   { key: "ready", label: "Approved", shortLabel: "Approved", description: "Artwork is approved and ready for a roster or order." },
   { key: "completed", label: "Order created", shortLabel: "Order created", description: "The design has moved into an order or was closed." },
-  { key: "unresponsive", label: "Unresponsive", shortLabel: "Unresponsive", description: "Saved requests that were closed after three unanswered reminders." },
   { key: "all", label: "All active", shortLabel: "All", description: "Every active design request." },
 ];
 
@@ -76,21 +67,6 @@ function queueFor(item: AdminDesignRequestListItem): Exclude<QueueKey, "all"> {
   if (item.status === "approved") return "ready";
   if (item.status === "ordered" || item.status === "cancelled") return "completed";
   return "action";
-}
-
-function followUpStateFor(item: AdminDesignRequestListItem, now: string): ProofFollowUpState {
-  if (item.linkedOrder && ["in_production", "paid", "shipped"].includes(item.linkedOrder.status)) return "none";
-  return proofFollowUpState({
-    status: item.status,
-    archivedAt: item.archivedAt,
-    archivedNote: item.archivedNote,
-    proofSentAt: item.proofSentAt,
-    followUpsSent: item.followUpsSent,
-    lastFollowUpAt: item.lastFollowUpAt,
-    followUpSnoozedUntil: item.followUpSnoozedUntil,
-    lastMessageAt: item.lastMessage?.at,
-    lastMessageFrom: item.lastMessage?.from,
-  }, now);
 }
 
 function fmtDate(value: string | null | undefined) {
@@ -140,14 +116,12 @@ function urgencyRank(item: AdminDesignRequestListItem, now: string) {
   return 3;
 }
 
-function DesignRow({ item, now }: { item: AdminDesignRequestListItem; now: string }) {
+function DesignRow({ item, now, restricted }: { item: AdminDesignRequestListItem; now: string; restricted: boolean }) {
   const deadline = deadlineState(item, now);
-  const followUpState = followUpStateFor(item, now);
   const lastActor = item.lastMessage?.from === "client" ? "Customer message" : item.lastMessage ? `${item.lastMessage.name || "Slugger"} replied` : "Updated";
   const requestHref = `/admin/design-requests/${item.id}`;
-  const primaryHref = item.linkedOrder && item.status === "ordered" ? `/admin/team-order/${item.linkedOrder.id}` : requestHref;
-  const primaryLabel = item.linkedOrder && item.status === "ordered" ? "Open order" : "Open request";
-  const fundedOrder = Boolean(item.linkedOrder && ["in_production", "paid", "shipped"].includes(item.linkedOrder.status));
+  const primaryHref = !restricted && item.linkedOrder && item.status === "ordered" ? `/admin/team-order/${item.linkedOrder.id}` : requestHref;
+  const primaryLabel = !restricted && item.linkedOrder && item.status === "ordered" ? "Open order" : "Open request";
 
   return (
     <article className="border-t border-line px-4 py-4 first:border-t-0 hover:bg-steel/45">
@@ -158,8 +132,7 @@ function DesignRow({ item, now }: { item: AdminDesignRequestListItem; now: strin
           </Link>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
             <span className="font-mono text-brand">{item.reference}</span>
-            <span aria-hidden="true">·</span>
-            <span className="truncate">{item.contactName}</span>
+            {!restricted && <><span aria-hidden="true">·</span><span className="truncate">{item.contactName}</span></>}
           </div>
         </div>
 
@@ -171,22 +144,7 @@ function DesignRow({ item, now }: { item: AdminDesignRequestListItem; now: strin
 
         <div>
           <p className="text-[10px] uppercase tracking-[0.14em] text-muted xl:hidden">Waiting on</p>
-          <p className={queueFor(item) === "action" ? "text-sm font-medium text-amber-300" : followUpState === "final_due" || followUpState === "closeout_due" ? "text-sm font-medium text-amber-300" : "text-sm text-foreground"}>
-            {followUpState === "unresponsive"
-              ? "Unresponsive"
-              : followUpState === "snoozed"
-                ? `Snoozed to ${fmtDate(item.followUpSnoozedUntil)}`
-                : followUpState === "final_due"
-                  ? "Customer · final due"
-                  : followUpState === "due"
-                    ? "Customer · follow-up due"
-                    : followUpState === "closeout_due"
-                      ? "Ready to close"
-                      : waitingOn(item)}
-          </p>
-          {item.status === "proof_sent" && followUpState !== "unresponsive" && (
-            <p className="mt-0.5 text-xs text-muted">{item.followUpsSent}/3 reminders sent</p>
-          )}
+          <p className={queueFor(item) === "action" ? "text-sm font-medium text-amber-300" : "text-sm text-foreground"}>{waitingOn(item)}</p>
         </div>
 
         <div>
@@ -207,10 +165,7 @@ function DesignRow({ item, now }: { item: AdminDesignRequestListItem; now: strin
           <Link href={primaryHref} className="whitespace-nowrap bg-brand px-3 py-2 text-xs text-on-brand hover:bg-brand-dark">
             {primaryLabel}
           </Link>
-          {!item.archivedAt && <AdminProofFollowUpActions id={item.id} teamName={item.teamName} state={followUpState} primaryOnly />}
-          {item.archivedAt ? (
-            <AdminArchiveButton kind="design_request" id={item.id} archived />
-          ) : <details className="group relative">
+          {!restricted && <details className="group relative">
             <summary className="flex h-8 w-9 cursor-pointer list-none items-center justify-center border border-line text-muted hover:border-brand/50 hover:text-foreground" aria-label={`More actions for ${item.teamName}`}>
               <span aria-hidden="true">•••</span>
             </summary>
@@ -228,17 +183,8 @@ function DesignRow({ item, now }: { item: AdminDesignRequestListItem; now: strin
               <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
                 {(item.needsAction || item.followedUpAt) && <FollowedUpButton id={item.id} followedUp={Boolean(item.followedUpAt)} />}
                 {item.status === "approved" && item.hasApprovedDesign && <AdminGalleryToggle designId={item.id} hidden={item.galleryHidden} />}
-                <AdminArchiveButton kind="design_request" id={item.id} archived={false} allowUnresponsive={!fundedOrder} />
+                <AdminArchiveButton kind="design_request" id={item.id} archived={false} />
               </div>
-              {item.status === "proof_sent" && !fundedOrder && (
-                <div className="mt-3 border-t border-line pt-3">
-                  <p className="mb-2 text-[10px] uppercase tracking-[0.14em] text-muted">Customer follow-up</p>
-                  <AdminProofFollowUpActions id={item.id} teamName={item.teamName} state={followUpState} />
-                </div>
-              )}
-              {item.status === "proof_sent" && fundedOrder && (
-                <p className="mt-3 border-t border-line pt-3 text-xs leading-5 text-emerald-300">Paid/production order — keep this visible for staff follow-up.</p>
-              )}
             </div>
           </details>}
         </div>
@@ -247,62 +193,45 @@ function DesignRow({ item, now }: { item: AdminDesignRequestListItem; now: strin
   );
 }
 
-export function AdminDesignRequestWorkspace({ items, now }: { items: AdminDesignRequestListItem[]; now: string }) {
+export function AdminDesignRequestWorkspace({ items, now, restricted = false }: { items: AdminDesignRequestListItem[]; now: string; restricted?: boolean }) {
   const active = useMemo(() => items.filter((item) => !item.archivedAt), [items]);
   const archived = useMemo(() => items.filter((item) => item.archivedAt), [items]);
-  const otherArchived = useMemo(() => archived.filter((item) => followUpStateFor(item, now) !== "unresponsive"), [archived, now]);
   const [queue, setQueue] = useState<QueueKey>("action");
   const [search, setSearch] = useState("");
 
   const counts = useMemo(() => {
-    const result: Record<QueueKey, number> = { action: 0, followup: 0, final: 0, design: 0, waiting: 0, ready: 0, completed: 0, unresponsive: 0, all: active.length };
-    for (const item of active) {
-      result[queueFor(item)] += 1;
-      const state = followUpStateFor(item, now);
-      if (state === "due") result.followup += 1;
-      if (state === "final_due" || state === "closeout_due") result.final += 1;
-    }
-    result.unresponsive = archived.filter((item) => followUpStateFor(item, now) === "unresponsive").length;
+    const result: Record<QueueKey, number> = { action: 0, design: 0, waiting: 0, ready: 0, completed: 0, all: active.length };
+    for (const item of active) result[queueFor(item)] += 1;
     return result;
-  }, [active, archived, now]);
+  }, [active]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const source = queue === "unresponsive" ? archived : active;
-    return source
-      .filter((item) => {
-        const followUpState = followUpStateFor(item, now);
-        if (queue === "all") return true;
-        if (queue === "followup") return followUpState === "due";
-        if (queue === "final") return followUpState === "final_due" || followUpState === "closeout_due";
-        if (queue === "unresponsive") return followUpState === "unresponsive";
-        return queueFor(item) === queue;
-      })
-      .filter((item) => !query || `${item.teamName} ${item.reference} ${item.contactName} ${item.contactEmail}`.toLowerCase().includes(query))
+    return active
+      .filter((item) => queue === "all" || queueFor(item) === queue)
+      .filter((item) => !query || `${item.teamName} ${item.reference}${restricted ? "" : ` ${item.contactName} ${item.contactEmail}`}`.toLowerCase().includes(query))
       .sort((a, b) => urgencyRank(a, now) - urgencyRank(b, now) || new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }, [active, archived, now, queue, search]);
+  }, [active, now, queue, restricted, search]);
 
+  const overdue = active.filter((item) => deadlineState(item, now) === "overdue").length;
+  const dueSoon = active.filter((item) => deadlineState(item, now) === "soon").length;
   const selectedQueue = QUEUES.find((item) => item.key === queue)!;
 
   return (
     <>
-      <section aria-label="Design request summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <button type="button" onClick={() => setQueue("action")} className="border border-amber-500/35 bg-amber-500/10 p-4 text-left hover:border-amber-400/60">
+      <section aria-label="Design request summary" className="grid gap-3 sm:grid-cols-3">
+        <div className="border border-amber-500/35 bg-amber-500/10 p-4">
           <span className="text-2xl font-semibold tabular-nums text-amber-300">{counts.action}</span>
           <span className="ml-2 text-sm text-foreground">need our action</span>
-        </button>
-        <button type="button" onClick={() => setQueue("followup")} className="border border-sky-500/30 bg-sky-500/10 p-4 text-left hover:border-sky-400/60">
-          <span className="text-2xl font-semibold tabular-nums text-sky-300">{counts.followup}</span>
-          <span className="ml-2 text-sm text-foreground">need follow-up</span>
-        </button>
-        <button type="button" onClick={() => setQueue("final")} className="border border-orange-500/30 bg-orange-500/10 p-4 text-left hover:border-orange-400/60">
-          <span className="text-2xl font-semibold tabular-nums text-orange-300">{counts.final}</span>
-          <span className="ml-2 text-sm text-foreground">final attempts</span>
-        </button>
-        <button type="button" onClick={() => setQueue("unresponsive")} className="border border-line bg-steel/60 p-4 text-left hover:border-brand/40">
-          <span className="text-2xl font-semibold tabular-nums text-foreground">{counts.unresponsive}</span>
-          <span className="ml-2 text-sm text-muted">unresponsive</span>
-        </button>
+        </div>
+        <div className="border border-red-500/30 bg-red-500/10 p-4">
+          <span className="text-2xl font-semibold tabular-nums text-red-300">{overdue}</span>
+          <span className="ml-2 text-sm text-foreground">past in-hand date</span>
+        </div>
+        <div className="border border-line bg-steel/60 p-4">
+          <span className="text-2xl font-semibold tabular-nums text-foreground">{dueSoon}</span>
+          <span className="ml-2 text-sm text-muted">due within 7 days</span>
+        </div>
       </section>
 
       <section className="mt-6" aria-label="Design request queues">
@@ -336,7 +265,7 @@ export function AdminDesignRequestWorkspace({ items, now }: { items: AdminDesign
                 setSearch(value);
                 if (value.trim()) setQueue("all");
               }}
-              placeholder="Search team, reference, or contact"
+              placeholder={restricted ? "Search team or reference" : "Search team, reference, or contact"}
               className="w-full border border-line bg-ink px-3 py-2.5 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
             />
           </label>
@@ -344,7 +273,7 @@ export function AdminDesignRequestWorkspace({ items, now }: { items: AdminDesign
 
         <div className="mt-4 border border-line bg-ink">
           <div className="hidden grid-cols-[minmax(210px,1.45fr)_145px_130px_125px_140px_minmax(112px,auto)] gap-4 bg-steel px-4 py-2 text-[10px] uppercase tracking-[0.14em] text-muted xl:grid">
-            <span>Team / contact</span>
+            <span>{restricted ? "Team / order" : "Team / contact"}</span>
             <span>Stage</span>
             <span>Waiting on</span>
             <span>In-hand date</span>
@@ -352,7 +281,7 @@ export function AdminDesignRequestWorkspace({ items, now }: { items: AdminDesign
             <span className="text-right">Actions</span>
           </div>
           {filtered.length > 0 ? (
-            filtered.map((item) => <DesignRow key={item.id} item={item} now={now} />)
+            filtered.map((item) => <DesignRow key={item.id} item={item} now={now} restricted={restricted} />)
           ) : (
             <div className="px-5 py-12 text-center">
               <p className="text-foreground">{search ? "No requests match that search." : `Nothing is in ${selectedQueue.label.toLowerCase()} right now.`}</p>
@@ -362,23 +291,23 @@ export function AdminDesignRequestWorkspace({ items, now }: { items: AdminDesign
         </div>
       </section>
 
-      {otherArchived.length > 0 && (
+      {archived.length > 0 && (
         <details className="group mt-6 border border-line bg-steel/40">
           <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3">
-            <span className="display text-sm text-muted">Other archived design requests ({otherArchived.length})</span>
+            <span className="display text-sm text-muted">Archived design requests ({archived.length})</span>
             <span className="text-brand transition-transform group-open:rotate-45">+</span>
           </summary>
           <div className="divide-y divide-[color:var(--line)] border-t border-line">
-            {otherArchived.map((item) => (
+            {archived.map((item) => (
               <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
                 <div className="min-w-0">
                   <Link href={`/admin/design-requests/${item.id}`} className="font-mono text-xs text-brand hover:underline">{item.reference}</Link>
                   <span className="ml-2 text-foreground">{item.teamName}</span>
-                  <span className="ml-2 text-muted">{item.contactName}</span>
-                  {item.archivedNote && <span className="ml-2 text-xs text-amber-300">&quot;{item.archivedNote}&quot;</span>}
+                  {!restricted && <span className="ml-2 text-muted">{item.contactName}</span>}
+                  {!restricted && item.archivedNote && <span className="ml-2 text-xs text-amber-300">&quot;{item.archivedNote}&quot;</span>}
                   <span className="ml-2 text-xs text-muted">archived {fmtDate(item.archivedAt)}</span>
                 </div>
-                <AdminArchiveButton kind="design_request" id={item.id} archived />
+                {!restricted && <AdminArchiveButton kind="design_request" id={item.id} archived />}
               </div>
             ))}
           </div>

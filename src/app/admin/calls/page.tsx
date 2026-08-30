@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { isAdmin, adminEnabled } from "@/lib/admin-auth";
+import { adminEnabled, canAccess, getAdminSession } from "@/lib/admin-auth";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { dbEnabled, getDb } from "@/db";
 import { customers, designRequests, teamOrders, orders, designLabVisitors, smsMessages } from "@/db/schema";
@@ -70,7 +70,9 @@ function statusLabel(c: CallRecord): string {
 
 export default async function AdminCallsPage() {
   if (!adminEnabled()) redirect("/admin");
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!canAccess(session.role, "/admin/calls")) redirect("/admin");
 
   const [calls, names, threads] = await Promise.all([listRecentCalls(40), namesByPhone(), phonesWithThreads()]);
 

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { designRequests, teamOrders, teamOrderAddons } from "@/db/schema";
-import { isAdmin, adminEnabled } from "@/lib/admin-auth";
+import { getAdminSession, adminEnabled } from "@/lib/admin-auth";
 import { getRoster } from "@/lib/team-orders";
 import { computeTeamOrderQuote, estimateOrderWeightOz, estimateOrderParcelsOz } from "@/lib/team-order-pricing";
 import { sizeBreakdown, ITEM_TYPES } from "@/lib/order-items";
@@ -30,11 +30,6 @@ import { AdminPickupToggle } from "@/components/admin-pickup-toggle";
 import { AdminRowMenu } from "@/components/admin-row-menu";
 import { AdminCustomPrice } from "@/components/admin-custom-price";
 import { AdminInboundTracking } from "@/components/admin-inbound-tracking";
-import {
-  buildDeliveryTimeline,
-  type DeliveryRisk,
-  type DeliveryTier,
-} from "@/lib/delivery-timeline";
 
 export const metadata: Metadata = { title: "Team Orders", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -96,7 +91,8 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
   if (!adminEnabled()) {
     return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Set ADMIN_PASSWORD to enable the dashboard.</div>;
   }
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
   if (!dbEnabled()) {
     return <div className="mx-auto max-w-lg px-4 py-24 text-center text-muted">Database not configured.</div>;
   }
@@ -110,17 +106,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
         id: designRequests.id,
         reference: designRequests.reference,
         teamName: designRequests.teamName,
-        status: designRequests.status,
-        contactName: designRequests.contactName,
-        contactEmail: designRequests.contactEmail,
-        revisionsUsed: designRequests.revisionsUsed,
-        neededBy: designRequests.neededBy,
-        messages: designRequests.messages,
-        source: designRequests.source,
-        manageToken: designRequests.manageToken,
-        approvedAt: designRequests.approvedAt,
         archivedAt: designRequests.archivedAt,
-        archivedNote: designRequests.archivedNote,
         updatedAt: designRequests.updatedAt,
       })
       .from(designRequests)
@@ -147,6 +133,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
         designRequestId: teamOrders.designRequestId,
         designerNote: teamOrders.designerNote,
         source: teamOrders.source,
+        printFileUrl: teamOrders.printFileUrl,
         printFileVerifiedAt: teamOrders.printFileVerifiedAt,
         quotedTotalCents: teamOrders.quotedTotalCents,
         invoiceUrl: teamOrders.invoiceUrl,
@@ -251,6 +238,73 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
   };
   const archivedOrders = torders.filter((o) => o.archivedAt);
 
+  if (session.role === "designer") {
+    const productionOrders = activeOrders.filter((order) => order.status === "in_production" || order.status === "paid" || order.status === "shipped");
+    const needsQa = productionOrders.filter((order) => Boolean(order.printFileUrl) && !order.printFileVerifiedAt).length;
+    const needsTracking = productionOrders.filter((order) => order.status !== "shipped" && !order.inboundTrackingNumber).length;
+    return (
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
+        <AdminPageHeader eyebrow="Designer portal" title={`Production Orders (${productionOrders.length})`}>
+          <Link href="/admin/designer-tracking" className="clip-slant bg-brand px-4 py-2 display text-sm text-on-brand hover:bg-brand-dark">
+            Tracking workspace
+          </Link>
+        </AdminPageHeader>
+        <p className="-mt-3 text-sm text-muted">Production readiness only — customer billing and Slugger financial controls stay in the staff workspace.</p>
+
+        <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="rounded-xl border border-line bg-steel p-4"><p className="text-xs text-muted">Active production</p><p className="display text-3xl text-brand mt-1">{productionOrders.filter((order) => order.status !== "shipped").length}</p></div>
+          <div className="rounded-xl border border-line bg-steel p-4"><p className="text-xs text-muted">Print QA needed</p><p className="display text-3xl text-sky-300 mt-1">{needsQa}</p></div>
+          <div className="rounded-xl border border-line bg-steel p-4 col-span-2 sm:col-span-1"><p className="text-xs text-muted">Tracking needed</p><p className="display text-3xl text-violet-300 mt-1">{needsTracking}</p></div>
+        </div>
+
+        <AdminSearch statuses={Array.from(new Set(productionOrders.map((order) => order.status)))} initialStatus={initialStatus} />
+        <section id="team-orders" className="mt-4 rounded-xl border border-line bg-steel overflow-hidden scroll-mt-16">
+          <div className="hidden md:grid grid-cols-[minmax(0,1.3fr)_8rem_minmax(0,1.2fr)_7rem] gap-4 px-4 py-2.5 border-b border-line text-[10px] uppercase tracking-wider text-muted">
+            <span>Team / order</span><span>Stage</span><span>Production handoff</span><span>Updated</span>
+          </div>
+          <div className="divide-y divide-line">
+            {productionOrders.map((order) => (
+              <article
+                key={order.id}
+                className="grid md:grid-cols-[minmax(0,1.3fr)_8rem_minmax(0,1.2fr)_7rem] gap-3 md:gap-4 px-4 py-4 items-center"
+                data-section="orders"
+                data-status={order.status}
+                data-search={`${order.teamName} ${order.reference}`.toLowerCase()}
+              >
+                <div className="min-w-0">
+                  <p className="text-sm text-foreground truncate">{order.teamName}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-mono text-muted">{order.reference}</span>
+                    {order.designRequestId ? (
+                      <Link href={`/admin/design-requests/${order.designRequestId}`} className="text-brand hover:underline">Open design</Link>
+                    ) : (
+                      <span className="text-amber-300">No linked design</span>
+                    )}
+                  </div>
+                </div>
+                <div><Badge label={order.status === "paid" ? "ready_to_ship" : order.status} /></div>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {order.printFileUrl ? (
+                    order.printFileVerifiedAt ? <span className="text-green-300">Print file verified</span> : <span className="text-amber-300">Print QA needed</span>
+                  ) : <span className="text-muted">Print file not uploaded</span>}
+                  {order.inboundTrackingNumber ? (
+                    <a href={inboundTrackingUrlFor(order.inboundTrackingNumber, order.inboundCarrier)} target="_blank" rel="noopener noreferrer" className="text-violet-300 underline decoration-dotted underline-offset-2">
+                      {order.inboundCarrier ?? "Inbound"} · {order.inboundTrackingNumber}
+                    </a>
+                  ) : order.status !== "shipped" ? (
+                    <span className="text-violet-300">Tracking not entered</span>
+                  ) : null}
+                </div>
+                <p className="text-xs text-muted">{fmtDate(order.updatedAt)}</p>
+              </article>
+            ))}
+            <p data-empty-for="orders" className="hidden px-5 py-10 text-center text-sm text-muted">No production orders match those filters.</p>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   // Price each unpaid team order from its roster so "Send invoice" can show
   // the number upfront, and count in-house pieces (hats we embroider in
   // Ocala) so they stay visible until shipped - the factory shipment won't
@@ -345,16 +399,15 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
       </div>
 
       <section className="mt-4 scroll-mt-16" id="team-orders">
-        <p className="mb-2 text-[11px] text-muted sm:hidden">Swipe sideways to see value, fulfillment, and the last update.</p>
         <div className="overflow-x-auto rounded-xl border border-line bg-steel/30">
-          <table className="w-full min-w-[900px] table-fixed text-sm">
+          <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="bg-steel text-left text-[10px] tracking-wider text-muted uppercase">
-                <th className="w-[25%] px-4 py-3">Team / order</th>
-                <th className="w-[21%] px-3 py-3">Stage / timeline</th>
-                <th className="w-[16%] px-3 py-3">Order value</th>
-                <th className="w-[31%] px-3 py-3">Next action / fulfillment</th>
-                <th className="w-[7%] px-3 py-3">Updated</th>
+                <th className="w-[27%] px-4 py-3">Team / order</th>
+                <th className="w-[13%] px-3 py-3">Stage</th>
+                <th className="w-[18%] px-3 py-3">Order value</th>
+                <th className="w-[34%] px-3 py-3">Next action / fulfillment</th>
+                <th className="w-[8%] px-3 py-3">Updated</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[color:var(--line)]">
@@ -385,26 +438,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                         <span title={o.source ?? "unknown (pre-tracking)"}>{srcShort(o.source)}</span>
                       </div>
                     </td>
-                    <td className="px-3 py-3">
-                      <Badge label={o.status} />
-                      <div className="mt-2 space-y-1 text-[11px] leading-snug">
-                        <p className="text-foreground">{timeline.tierLabel}</p>
-                        <p className={timeline.startAt ? "text-muted" : "text-amber-300"}>
-                          {o.shippedAt
-                            ? `Shipped ${fmtDate(o.shippedAt)}`
-                            : paid
-                              ? "Ready to ship"
-                              : timeline.startAt
-                                ? `Production target ${fmtDate(timeline.selectedTargetAt)}`
-                                : "Production clock not started"}
-                        </p>
-                        {customerDate ? (
-                          <p className={DATE_RISK_TONE[timeline.risk]} title={timeline.riskDetail}>
-                            {timeline.promisedInHandAt ? "Promised" : "Requested"} {fmtRequestedDate(customerDate)} · {timeline.riskLabel}
-                          </p>
-                        ) : null}
-                      </div>
-                    </td>
+                    <td className="px-3 py-3"><Badge label={o.status} /></td>
                     <td className="px-3 py-3 text-foreground">
                       <span className="flex flex-wrap items-center gap-1.5">
                         <span className="whitespace-nowrap">
@@ -458,7 +492,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                         )}
                       </span>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3 min-w-[18rem]">
                       <span className="flex flex-wrap items-center gap-1.5">
                         {/* Pieces we embroider in-house (hats): the factory
                             shipment won't contain these, so keep them in view
@@ -600,9 +634,10 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                             )}
                             {!o.shippedAt && o.manageToken && (
                               <AdminInboundTracking
-                                manageToken={o.manageToken}
+                                orderKey={o.id}
                                 initialCarrier={o.inboundCarrier}
                                 initialNumber={o.inboundTrackingNumber}
+                                canShipDirect={Boolean(o.invoicePaidAt)}
                               />
                             )}
                             {/* Buy an extra parcel's label once the primary one

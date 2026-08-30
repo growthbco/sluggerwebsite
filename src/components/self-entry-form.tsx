@@ -13,7 +13,7 @@ export function SelfEntryForm({ token, items, sport, designs = [], requiresNames
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
 
-  const sizeFields = sizeFieldsForItems(items, sport);
+  const sizeFields = sizeFieldsForItems(items);
   const inputCls =
     "w-full bg-steel border border-line px-3 py-2.5 text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none";
 
@@ -109,7 +109,7 @@ export function SelfEntryForm({ token, items, sport, designs = [], requiresNames
         ))}
       </div>
       {missingCheerSizes.length > 0 && hasSize && (
-        <p className="text-xs text-brand">Choose both a cheer top size and bottom size.</p>
+        <p className="text-xs text-brand">Choose both a cheer top size and skirt size.</p>
       )}
 
       <div>

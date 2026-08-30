@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SmsConsentNote } from "@/components/sms-consent";
-import { ITEM_TYPES, JERSEY_MATERIALS, fabricForStyle, missingCheerSizeLabels, sizeFieldsForItems } from "@/lib/order-items";
+import { ITEM_TYPES, JERSEY_MATERIALS, missingCheerSizeLabels, sizeFieldsForItems } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
 import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-acknowledgment";
@@ -117,7 +117,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const perPlayerSelected = selected.filter((t) => !t.inHouse && !t.outsourced);
   const bulkSelected = selected.filter((t) => t.inHouse || t.outsourced);
   const perPlayerKeys = perPlayerSelected.map((t) => t.key);
-  const perPlayerSizeFields = sizeFieldsForItems(perPlayerKeys, prefill?.sport);
+  const perPlayerSizeFields = sizeFieldsForItems(perPlayerKeys);
   const bulkRows = () =>
     bulkSelected.flatMap((t) =>
       t.sizes
@@ -166,7 +166,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       if (missing) { setStatus("error"); setMessage("This team has more than one design - pick which one each player gets."); return; }
     }
     if (rows.some((r) => (r.name || r.number || Object.values(r.sizes).some(Boolean)) && missingCheerSizeLabels(items, r.sizes).length)) {
-      setStatus("error"); setMessage("Choose both a cheer top size and bottom size for every cheerleader."); return;
+      setStatus("error"); setMessage("Choose both a cheer top size and skirt size for every cheerleader."); return;
     }
     setStatus("sending"); setMessage("");
     try {
@@ -447,7 +447,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
                   {perPlayerSizeFields.length > 0 && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {perPlayerSizeFields.map((field) => (
-                        <select key={field.key} name={`player-${i}-${field.key}-size`} aria-label={`Player ${i + 1} ${field.label} size`} className={inputCls} value={row.sizes[field.key] ?? ""} onChange={(e) => updateSize(i, field.key, e.target.value)}>
+                        <select key={field.key} className={inputCls} value={row.sizes[field.key] ?? ""} onChange={(e) => updateSize(i, field.key, e.target.value)}>
                           <option value="">{field.label} size</option>
                           {field.sizes.map((s) => <option key={s}>{s}</option>)}
                         </select>

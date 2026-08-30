@@ -41,6 +41,7 @@ export default async function AdminCustomersPage() {
       .from(teamOrders),
     db
       .select({
+        id: designRequests.id,
         contactEmail: designRequests.contactEmail,
         contactName: designRequests.contactName,
         contactPhone: designRequests.contactPhone,
@@ -75,14 +76,26 @@ export default async function AdminCustomersPage() {
     if (a.status === "paid") paidAddonsByOrder.set(a.teamOrderId, (paidAddonsByOrder.get(a.teamOrderId) ?? 0) + a.totalCents);
   }
 
-  type Agg = CustomerRow & { _last: number };
+  type Agg = CustomerRow & { _last: number; _latestDesign: number };
   const byEmail = new Map<string, Agg>();
   const get = (emailRaw: string | null, name: string, phone: string | null): Agg | null => {
     const email = (emailRaw ?? "").trim().toLowerCase();
     if (!email) return null;
     let a = byEmail.get(email);
     if (!a) {
-      a = { email, name, phone: null, orders: 0, designs: 0, spendCents: 0, lastActivity: "", latestOrderId: null, _last: 0 };
+      a = {
+        email,
+        name,
+        phone: null,
+        orders: 0,
+        designs: 0,
+        spendCents: 0,
+        lastActivity: "",
+        latestOrderId: null,
+        latestDesignId: null,
+        _last: 0,
+        _latestDesign: 0,
+      };
       byEmail.set(email, a);
     }
     if (name && (!a.name || a.name.length < name.length)) a.name = name;
@@ -109,6 +122,7 @@ export default async function AdminCustomersPage() {
     if (d.designFeePaymentId) a.spendCents += d.designFeeAmountCents;
     const t = (d.updatedAt ?? d.createdAt).getTime();
     if (t > a._last) a._last = t;
+    if (t > a._latestDesign) { a._latestDesign = t; a.latestDesignId = d.id; }
   }
   for (const c of custs) {
     const a = get(c.email, c.name ?? "", c.phone);
@@ -117,8 +131,17 @@ export default async function AdminCustomersPage() {
 
   const rows: CustomerRow[] = [...byEmail.values()]
     .sort((a, b) => b._last - a._last)
-    .slice(0, 500)
-    .map(({ _last, ...r }) => ({ ...r, lastActivity: new Date(_last).toISOString() }));
+    .map((row) => ({
+      email: row.email,
+      name: row.name,
+      phone: row.phone,
+      orders: row.orders,
+      designs: row.designs,
+      spendCents: row.spendCents,
+      lastActivity: new Date(row._last).toISOString(),
+      latestOrderId: row.latestOrderId,
+      latestDesignId: row.latestDesignId,
+    }));
 
   // Referral activity, straight from the customers table. Each customer has a
   // referralCode; anyone they referred carries that code in referredByCode.
@@ -135,28 +158,45 @@ export default async function AdminCustomersPage() {
   const totalCreditCents = custs.reduce((s, c) => s + (c.referralCreditCents ?? 0), 0);
   const rewardedCount = custs.filter((c) => c.referralRewardedAt).length;
   const money = (c: number) => `$${(c / 100).toFixed(0)}`;
+  const buyers = rows.filter((row) => row.orders > 0).length;
+  const repeatBuyers = rows.filter((row) => row.orders > 1).length;
+  const designLeads = rows.filter((row) => row.orders === 0 && row.designs > 0).length;
+  const recordedSpendCents = rows.reduce((sum, row) => sum + row.spendCents, 0);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-14">
-      <AdminPageHeader eyebrow="Menu" title="Customers" />
-      <p className="mt-2 text-muted">
-        Everyone who has ordered, started a design, or made a portal account - one row per person, with
-        their orders, approximate lifetime spend, and a one-tap text.
-      </p>
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
+      <AdminPageHeader eyebrow="Customer CRM" title={`Customers (${rows.length.toLocaleString()})`} />
+      <p className="-mt-3 text-sm text-muted">Find anyone, understand the relationship, and jump straight into the next conversation or job.</p>
+
+      <section className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { label: "Customers who ordered", value: buyers.toLocaleString(), detail: `${repeatBuyers} repeat buyers`, tone: "text-green-300" },
+          { label: "Design leads", value: designLeads.toLocaleString(), detail: "No order yet", tone: "text-sky-300" },
+          { label: "Recorded customer value", value: `$${(recordedSpendCents / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`, detail: "Payments captured here", tone: "text-brand" },
+          { label: "Referral credits", value: money(totalCreditCents), detail: `${referred.length} tracked referrals`, tone: "text-violet-300" },
+        ].map((item) => (
+          <div key={item.label} className="rounded-xl border border-line bg-steel p-4">
+            <p className="text-xs text-muted">{item.label}</p>
+            <p className={`mt-1 display text-2xl tabular-nums ${item.tone}`}>{item.value}</p>
+            <p className="mt-0.5 text-[11px] text-muted">{item.detail}</p>
+          </div>
+        ))}
+      </section>
       {/* Referral activity - proof the /r/<code> links are converting. */}
-      <section className="mt-8 rounded-xl border border-line bg-foreground/[0.02] p-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="display text-xl text-foreground">Referrals</h2>
+      <details open={referred.length > 0} className="mt-4 rounded-xl border border-line bg-foreground/[0.02] group">
+        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-4 py-3">
+          <span className="display text-sm text-foreground">Referral activity</span>
           <p className="text-sm text-muted">
             <strong className="text-foreground">{referred.length}</strong> referred ·{" "}
             <strong className="text-foreground">{rewardedCount}</strong> reward{rewardedCount === 1 ? "" : "s"} granted ·{" "}
             <strong className="text-foreground">{money(totalCreditCents)}</strong> credit earned
           </p>
-        </div>
-        {referred.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">No referrals yet. When someone orders after clicking a customer&apos;s /r/ link, they show up here.</p>
-        ) : (
-          <ul className="mt-3 divide-y divide-[color:var(--line)]">
+        </summary>
+        <div className="border-t border-line px-4 pb-3">
+          {referred.length === 0 ? (
+            <p className="py-3 text-sm text-muted">No tracked referrals yet. Existing account credits are still included in the snapshot above.</p>
+          ) : (
+          <ul className="divide-y divide-[color:var(--line)]">
             {referred.map((r, i) => (
               <li key={i} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 py-2 text-sm">
                 <span className="text-foreground"><strong>{r.name}</strong> <span className="text-muted">referred by</span> {r.by}</span>
@@ -168,10 +208,11 @@ export default async function AdminCustomersPage() {
               </li>
             ))}
           </ul>
-        )}
-      </section>
+          )}
+        </div>
+      </details>
 
-      <div className="mt-8">
+      <div className="mt-6">
         <AdminCustomersList rows={rows} />
       </div>
     </div>

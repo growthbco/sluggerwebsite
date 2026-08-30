@@ -8,7 +8,7 @@ import { AdminIcon } from "@/components/admin-icons";
 
 // The persistent admin nav: one place to reach everything, grouped the way
 // the work actually flows. Page items highlight when you're on them.
-const GROUPS: { title: string; items: { href: string; label: string; icon: string }[] }[] = [
+const GROUPS: { title: string; items: { href: string; label: string; icon: string; designerOnly?: boolean }[] }[] = [
   {
     title: "Menu",
     items: [
@@ -23,6 +23,7 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
     items: [
       { href: "/admin/design-requests", label: "Design Requests", icon: "pen" },
       { href: "/admin/team-orders", label: "Team Orders", icon: "box" },
+      { href: "/admin/designer-tracking", label: "Production Tracking", icon: "truck", designerOnly: true },
       { href: "/admin/design-lab", label: "Design Lab Leads", icon: "flask" },
       { href: "/admin/stores", label: "Team Stores", icon: "store" },
       { href: "/admin/shop-orders", label: "Shop Orders", icon: "cart" },
@@ -34,6 +35,7 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
     items: [
       { href: "/admin/invoice/new", label: "New Invoice", icon: "invoice" },
       { href: "/admin/invoices", label: "Designer Invoices", icon: "receipt" },
+      { href: "/admin/designer-invoices", label: "My Invoices", icon: "receipt", designerOnly: true },
       { href: "/admin/awaiting-payment", label: "Awaiting Payment", icon: "clock" },
       { href: "/admin/payments", label: "Transactions", icon: "swap" },
     ],
@@ -47,13 +49,14 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
   },
 ];
 
-// What a designer's sidebar shows: design work + conversations only.
+// What a designer's sidebar shows: job artwork, production, tracking, and
+// their own invoices. Customer inboxes, leads, contacts, and money stay out.
 const DESIGNER_HREFS = new Set([
   "/admin",
-  "/admin/texts",
   "/admin/design-requests",
   "/admin/team-orders",
-  "/admin/design-lab",
+  "/admin/designer-tracking",
+  "/admin/designer-invoices",
 ]);
 const OWNER_ONLY_HREFS = new Set(["/admin/settings"]);
 
@@ -68,7 +71,10 @@ export function AdminSidebar({ role = "staff", userName }: { role?: "owner" | "s
     if (role === "designer") return DESIGNER_HREFS.has(href);
     return true;
   };
-  const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((it) => visible(it.href)) })).filter((g) => g.items.length > 0);
+  const groups = GROUPS.map((g) => ({
+    ...g,
+    items: g.items.filter((it) => (role === "designer" ? visible(it.href) : !it.designerOnly && visible(it.href))),
+  })).filter((g) => g.items.length > 0);
 
   const isActive = (href: string) => !href.includes("#") && pathname === href;
   const initial = (userName?.trim()?.[0] ?? "S").toUpperCase();

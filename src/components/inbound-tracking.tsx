@@ -12,15 +12,17 @@ type Candidate = { id: string; reference: string; teamName: string; status: stri
 export function InboundTracking({
   token,
   initial,
+  canShipDirect,
 }: {
   token: string;
   initial: Saved | null;
+  canShipDirect: boolean;
 }) {
   const [saved, setSaved] = useState<Saved | null>(initial);
   const [editing, setEditing] = useState(!initial);
   const [carrier, setCarrier] = useState(initial?.carrier ?? "DHL");
   const [num, setNum] = useState(initial?.trackingNumber ?? "");
-  const [destination, setDestination] = useState<Destination>(initial?.destination ?? "slugger");
+  const [destination, setDestination] = useState<Destination | "">(initial ? "slugger" : "");
   const [directConfirmed, setDirectConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +46,10 @@ export function InboundTracking({
   }
 
   async function save() {
+    if (!destination) {
+      setError("Choose where this package is going.");
+      return;
+    }
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -78,11 +84,11 @@ export function InboundTracking({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="display text-lg text-foreground">📦 Production shipment tracking</h2>
         <span className="text-[10px] display text-muted border border-line px-1.5 py-0.5">
-          {saved?.destination === "customer" ? "DIRECT TO CUSTOMER" : saved ? "INTERNAL TO SLUGGER" : "CHOOSE THE DESTINATION CAREFULLY"}
+          {saved?.destination === "customer" ? "DIRECT TO CUSTOMER" : saved ? "INTERNAL TO SLUGGER" : "DESTINATION REQUIRED"}
         </span>
       </div>
       <p className="mt-2 text-sm text-muted">
-        Choose where this package is headed. Shipments to Slugger stay internal;
+        Choose where the package is headed. Shipments to Slugger stay internal;
         direct shipments update the order and alert the customer from Slugger Athletics.
       </p>
 
@@ -120,19 +126,19 @@ export function InboundTracking({
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
               <label className={`cursor-pointer border p-3 ${destination === "slugger" ? "border-brand bg-brand/10" : "border-line bg-background/40"}`}>
                 <span className="flex items-start gap-2">
-                  <input type="radio" name="tracking-destination" value="slugger" checked={destination === "slugger"} onChange={() => { setDestination("slugger"); setDirectConfirmed(false); }} className="mt-1 accent-[color:var(--brand-gold)]" />
+                  <input type="radio" name={`tracking-destination-${token}`} checked={destination === "slugger"} onChange={() => { setDestination("slugger"); setDirectConfirmed(false); setError(null); }} className="mt-1 accent-[color:var(--brand-gold)]" />
                   <span>
                     <span className="display block text-sm text-foreground">To Slugger</span>
                     <span className="block text-xs text-muted mt-0.5">Internal tracking only. The customer is not notified.</span>
                   </span>
                 </span>
               </label>
-              <label className={`cursor-pointer border p-3 ${destination === "customer" ? "border-brand bg-brand/10" : "border-line bg-background/40"}`}>
+              <label className={`border p-3 ${canShipDirect ? "cursor-pointer" : "cursor-not-allowed opacity-60"} ${destination === "customer" ? "border-brand bg-brand/10" : "border-line bg-background/40"}`}>
                 <span className="flex items-start gap-2">
-                  <input type="radio" name="tracking-destination" value="customer" checked={destination === "customer"} onChange={() => { setDestination("customer"); setAlso(new Set()); }} className="mt-1 accent-[color:var(--brand-gold)]" />
+                  <input type="radio" name={`tracking-destination-${token}`} checked={destination === "customer"} disabled={!canShipDirect} onChange={() => { setDestination("customer"); setAlso(new Set()); setError(null); }} className="mt-1 accent-[color:var(--brand-gold)]" />
                   <span>
                     <span className="display block text-sm text-foreground">Direct to customer</span>
-                    <span className="block text-xs text-muted mt-0.5">Marks the order shipped and sends Slugger&apos;s email/text alert.</span>
+                    <span className="block text-xs text-muted mt-0.5">{canShipDirect ? "Marks the order shipped and sends Slugger's email/text alert." : "Final payment is not recorded yet."}</span>
                   </span>
                 </span>
               </label>
@@ -140,36 +146,36 @@ export function InboundTracking({
           </fieldset>
 
           <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={carrier}
-            onChange={(e) => setCarrier(e.target.value)}
-            className="bg-background border border-line text-sm text-foreground px-2 py-2"
-            aria-label="Carrier"
-          >
-            {INBOUND_CARRIERS.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-          <input
-            value={num}
-            onChange={(e) => setNum(e.target.value)}
-            placeholder="Tracking number"
-            className="flex-1 min-w-[14rem] bg-background border border-line text-sm text-foreground px-3 py-2 font-mono"
-          />
-          <button
-            type="button"
-            onClick={save}
-            disabled={busy || !num.trim() || (destination === "customer" && !directConfirmed)}
-            className="display text-sm bg-brand text-on-brand px-4 py-2 disabled:opacity-50"
-          >
-            {busy
-              ? "Saving..."
-              : destination === "customer"
-                ? "Save + alert customer"
-                : also.size > 0
-                  ? `Save for ${also.size + 1} orders + notify`
-                  : "Save + notify shop"}
-          </button>
+            <select
+              value={carrier}
+              onChange={(e) => setCarrier(e.target.value)}
+              className="bg-background border border-line text-sm text-foreground px-2 py-2"
+              aria-label="Carrier"
+            >
+              {INBOUND_CARRIERS.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <input
+              value={num}
+              onChange={(e) => setNum(e.target.value)}
+              placeholder="Tracking number"
+              className="flex-1 min-w-[14rem] bg-background border border-line text-sm text-foreground px-3 py-2 font-mono"
+            />
+            <button
+              type="button"
+              onClick={save}
+              disabled={busy || !destination || !num.trim() || (destination === "customer" && !directConfirmed)}
+              className="display text-sm bg-brand text-on-brand px-4 py-2 disabled:opacity-50"
+            >
+              {busy
+                ? "Saving..."
+                : destination === "customer"
+                  ? "Save + alert customer"
+                  : also.size > 0
+                    ? `Save for ${also.size + 1} orders + notify`
+                    : "Save + notify shop"}
+            </button>
           </div>
 
           {destination === "customer" && (

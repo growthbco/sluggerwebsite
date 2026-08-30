@@ -52,7 +52,7 @@ export function DesignIntakeForm() {
 
   // What the customer wants us to mock up. "Jersey" reveals a cut dropdown;
   // "Other" reveals a free-text box.
-  const PRODUCT_OPTIONS = ["Jersey / Shirt", "Shorts", "Pants", "Hoodie", "Hat", "Socks", "Bag", "Other"];
+  const PRODUCT_OPTIONS = ["Jersey / Shirt", "Polo - Dri-Fit", "Polo - Pin-Dot", "Shorts", "Pants", "Hoodie", "Jacket", "Hat", "Socks", "Bag", "Other"];
   const PIECE_RANGES = ["1-5", "6-9", "10-14", "15-24", "25+"];
   const JERSEY_STYLES = ["Full-button", "Two-button", "Quarter-zip", "Crew neck", "V-neck", "Sleeveless / Tank"];
   const wantsJersey = productTypes.includes("Jersey / Shirt");

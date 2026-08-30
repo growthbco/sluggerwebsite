@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { and, isNull, ne, inArray } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
-import { getByManageToken, saveInboundTracking, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
+import { getById, getByManageToken, saveInboundTracking, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { INBOUND_CARRIERS, inboundTrackingUrlFor } from "@/lib/tracking";
 import { emailInboundShipment } from "@/lib/email";
 import { postDesignThreadUpdate } from "@/lib/discord";
@@ -32,27 +32,27 @@ async function boxmateCandidates(excludeId: string) {
 // The checklist of possible boxmates for the designer's tracking form.
 export async function GET(_req: Request, { params }: { params: Promise<{ token: string }> }) {
   const gate = await requireApiRole("production");
-  if (!gate.ok) return NextResponse.json({ error: "Unauthorized" }, { status: gate.status });
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   const { token } = await params;
-  const order = await getByManageToken(token);
+  const order = (await getById(token)) ?? (await getByManageToken(token));
   if (!order) return NextResponse.json({ error: "Link not found" }, { status: 404 });
   const candidates = await boxmateCandidates(order.id);
   return NextResponse.json({ candidates });
 }
 
-// Signed-in staff/designer records either an internal factory -> Slugger
-// shipment or a final direct-to-customer shipment. The private order token
-// identifies the record; the admin session authorizes the mutation.
+// A signed-in designer or staff member records either an internal
+// factory-to-Slugger shipment or a final direct-to-customer shipment. The
+// private order token identifies the record; the admin session authorizes it.
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
   const gate = await requireApiRole("production");
-  if (!gate.ok) return NextResponse.json({ error: "Unauthorized" }, { status: gate.status });
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) {
     return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   }
   const { token } = await params;
 
-  const order = await getByManageToken(token);
+  const order = (await getById(token)) ?? (await getByManageToken(token));
   if (!order) return NextResponse.json({ error: "Link not found" }, { status: 404 });
 
   let body: {
@@ -76,13 +76,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     return NextResponse.json({ error: "Enter a tracking number." }, { status: 400 });
   }
 
-  const destination = body.destination === "customer" ? "customer" : "slugger";
+  if (body.destination !== "slugger" && body.destination !== "customer") {
+    return NextResponse.json({ error: "Choose whether this package is going to Slugger or directly to the customer." }, { status: 400 });
+  }
+  const destination = body.destination;
+
   if (destination === "customer") {
     if (body.directConfirmed !== true) {
       return NextResponse.json({ error: "Confirm that this package is going directly to the customer." }, { status: 400 });
     }
-    if (order.status === "cancelled") {
-      return NextResponse.json({ error: "A cancelled order cannot be marked as shipped." }, { status: 409 });
+    if (order.status === "cancelled" || order.archivedAt) {
+      return NextResponse.json({ error: "A cancelled or archived order cannot be marked as shipped." }, { status: 409 });
     }
     if (!order.invoicePaidAt) {
       return NextResponse.json({ error: "The final balance must be recorded before a direct shipment can be released to the customer." }, { status: 409 });

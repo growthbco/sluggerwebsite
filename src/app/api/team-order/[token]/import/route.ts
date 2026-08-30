@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
-import { customerRosterLockMessage, getByManageToken, addRosterRow } from "@/lib/team-orders";
+import { getByManageToken, addRosterRow } from "@/lib/team-orders";
 import { missingCheerSizeLabels } from "@/lib/order-items";
 
 export const runtime = "nodejs";
@@ -40,7 +40,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     .slice(0, 200);
   if (rows.length === 0) return NextResponse.json({ error: "No players to add." }, { status: 400 });
   if (rows.some((r) => missingCheerSizeLabels(order.items ?? ["jersey"], r.sizes).length)) {
-    return NextResponse.json({ error: "Every cheer uniform needs both a top size and bottom size." }, { status: 400 });
+    return NextResponse.json({ error: "Every cheer uniform needs both a top size and skirt size." }, { status: 400 });
   }
 
   let added = 0;

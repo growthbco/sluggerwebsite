@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders, designRequests } from "@/db/schema";
-import { isAdmin } from "@/lib/admin-auth";
+import { getAdminSession } from "@/lib/admin-auth";
 import { getRoster } from "@/lib/team-orders";
 import { PrintButton } from "@/components/print-button";
 import { HatSheetTables, type HatRun } from "@/components/hat-sheet-tables";
@@ -27,7 +27,9 @@ const sizeRank = (s: string) => {
  *  into machine runs by hat type + size, with Stitched / Cleaned / Bagged
  *  checkoffs per hat. Linked from the order page whenever the roster has hats. */
 export default async function HatSheetPage({ params }: { params: Promise<{ id: string }> }) {
-  if (!(await isAdmin())) redirect("/admin");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin");
+  const restricted = session.role === "designer";
   if (!dbEnabled()) notFound();
   const { id } = await params;
 
@@ -64,7 +66,7 @@ export default async function HatSheetPage({ params }: { params: Promise<{ id: s
       <div className="mx-auto max-w-2xl px-4 py-20 text-center">
         <h1 className="display text-2xl text-foreground">No hats on this order</h1>
         <p className="mt-2 text-muted">
-          <Link href={`/admin/team-order/${order.id}`} className="text-brand underline">Back to the order</Link>
+          <Link href={restricted ? "/admin/team-orders" : `/admin/team-order/${order.id}`} className="text-brand underline">Back to the order</Link>
         </p>
       </div>
     );
@@ -95,6 +97,8 @@ export default async function HatSheetPage({ params }: { params: Promise<{ id: s
   });
 
   const neededBy = design?.neededBy ?? null;
+  // Server-rendered production sheets intentionally calculate urgency at request time.
+  // eslint-disable-next-line react-hooks/purity
   const daysOut = neededBy ? Math.ceil((neededBy.getTime() - Date.now()) / 86400000) : null;
   const urgent = Boolean(design?.rush) || (daysOut !== null && daysOut <= 7);
   const neededStr = neededBy
@@ -108,7 +112,7 @@ export default async function HatSheetPage({ params }: { params: Promise<{ id: s
       <style>{`@media print { header, footer, .no-print { display: none !important; } body { background: #fff !important; } @page { margin: 12mm; } }`}</style>
 
       <div className="no-print mb-4 flex items-center justify-between gap-3">
-        <Link href={`/admin/team-order/${order.id}`} className="text-sm text-muted hover:text-foreground">← Back to {order.reference}</Link>
+        <Link href={restricted ? "/admin/team-orders" : `/admin/team-order/${order.id}`} className="text-sm text-muted hover:text-foreground">← Back to {order.reference}</Link>
         <PrintButton />
       </div>
 
@@ -119,7 +123,7 @@ export default async function HatSheetPage({ params }: { params: Promise<{ id: s
           <p className="mt-1.5 text-sm text-neutral-600 flex flex-wrap gap-x-5 gap-y-1">
             <span>Order <strong className="text-black">{order.reference}</strong></span>
             {design && <span>Design <strong className="text-black">{design.reference}</strong></span>}
-            <span>Coach <strong className="text-black">{order.contactName}</strong></span>
+            {!restricted && <span>Coach <strong className="text-black">{order.contactName}</strong></span>}
             <span>Printed <strong className="text-black">{new Date().toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" })}</strong></span>
           </p>
           {neededStr && (

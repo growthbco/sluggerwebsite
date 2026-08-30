@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
 import { dbEnabled, getDb } from "@/db";
-import { isAdmin } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 import { designRequests } from "@/db/schema";
 
 export const runtime = "nodejs";
@@ -11,7 +11,8 @@ export const runtime = "nodejs";
 // raises the same beep + desktop alert as a text. Selects only the LAST message
 // per design (jsonb `-> -1`), never the whole thread.
 export async function GET() {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireApiRole("customer");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ latestClientEmail: null });
 
   const db = getDb();

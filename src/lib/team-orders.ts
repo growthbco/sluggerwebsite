@@ -150,6 +150,14 @@ export async function getByManageToken(token: string) {
   return row ?? null;
 }
 
+/** Staff/designer admin workflows identify an order by its ordinary id so the
+ * customer management token never has to cross the server/client boundary. */
+export async function getById(id: string) {
+  const db = getDb();
+  const [row] = await db.select().from(teamOrders).where(eq(teamOrders.id, id)).limit(1);
+  return row ?? null;
+}
+
 /** Resolve the single Discord home for a custom order.
  *
  * Linked orders reuse their design request's thread. Standalone/manual orders
@@ -365,7 +373,7 @@ export async function getSiblingPrintOrders(designRequestId: string, excludeId: 
 }
 
 /** Full per-order print checklists for every OTHER active order on a design
- *  (each with its own manage token + printable jerseys), so the designer's
+ *  (identified only by its internal id + printable jerseys), so the designer's
  *  checklist page can verify the whole shared print sheet - players and the
  *  coaches/extras that were ordered separately - all in one place. */
 export async function getSiblingChecklists(designRequestId: string, excludeId: string) {
@@ -375,12 +383,11 @@ export async function getSiblingChecklists(designRequestId: string, excludeId: s
     .from(teamOrders)
     .where(and(eq(teamOrders.designRequestId, designRequestId), ne(teamOrders.id, excludeId), isNull(teamOrders.archivedAt)))
     .orderBy(asc(teamOrders.createdAt));
-  const out: { id: string; reference: string; label: string; token: string; jerseys: Awaited<ReturnType<typeof getPrintableJerseys>> }[] = [];
+  const out: { id: string; reference: string; label: string; jerseys: Awaited<ReturnType<typeof getPrintableJerseys>> }[] = [];
   for (const s of sibs) {
-    if (!s.manageToken) continue;
     const jerseys = await getPrintableJerseys(s.id);
     if (!jerseys.length) continue;
-    out.push({ id: s.id, reference: s.reference, label: s.teamName.trim() || s.contactName, token: s.manageToken, jerseys });
+    out.push({ id: s.id, reference: s.reference, label: s.teamName.trim() || s.contactName, jerseys });
   }
   return out;
 }

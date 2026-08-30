@@ -42,9 +42,8 @@ function billableGarmentsFromRoster(
     const qty = Math.max(1, row.quantity ?? 1);
     const sized = Object.entries(row.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
     if (sized.length) {
-      for (const key of new Set(sized.map(([key]) => itemKeyForSizeField(key)))) {
-        counts.set(key, (counts.get(key) ?? 0) + qty);
-      }
+      const itemKeys = new Set(sized.map(([key]) => itemKeyForSizeField(key)));
+      for (const key of itemKeys) counts.set(key, (counts.get(key) ?? 0) + qty);
     } else if ((row.size ?? "").trim()) {
       counts.set("jersey", (counts.get("jersey") ?? 0) + qty);
     }
@@ -157,8 +156,8 @@ export type BillableOrder = {
   /** Section header for grouping the picker ("Team Orders", or a store's name
    *  like "Mamba Baseball · Team Store" so all its buyers nest under one header). */
   group: string;
-  /** Compact chip text within the group (team name, or the buyer's name for a
-   *  store order) - avoids repeating the store name on every chip. */
+  /** Compact chip text within the group. Store orders use their reference,
+   * never the buyer's name, so the production portal contains no CRM data. */
   chipLabel: string;
 };
 
@@ -399,17 +398,17 @@ export async function getBillableOrders(): Promise<BillableOrder[]> {
         const garments: BillableGarment[] = [...counts.entries()].map(([garment, qty]) => ({ garment, qty }));
         const pieces = garments.reduce((s, g) => s + g.qty, 0);
         const unitCostCents = garments.length === 1 ? (designerCostCents(garments[0].garment) ?? undefined) : undefined;
-        // Lead with WHO it's for: team/store name or drop title, then the type,
-        // then the buyer if we have one.
+        // Lead with the team/store or drop title and order type. Buyer identity
+        // is deliberately omitted from the designer's production data.
         const type = ORDER_TYPE_LABEL[o.type] ?? "Order";
         const who = o.type === "team_store" ? (o.teamId ? teamNameById.get(o.teamId) : null)
           : o.type === "buy_in" ? (o.dropId ? dropTitleById.get(o.dropId) : null)
           : null;
         // group = the store/drop header ("Mamba Baseball · Team Store"); chip =
-        // just the buyer, so the header isn't repeated on every row.
+        // the order reference, which is enough to reconcile the invoice.
         const group = [who, type].filter(Boolean).join(" · ") || type;
-        const chipLabel = o.customerName?.trim() || `Order ${o.reference}`;
-        const label = [who, type, o.customerName?.trim()].filter(Boolean).join(" · ") || `${type} ${o.reference}`;
+        const chipLabel = `Order ${o.reference}`;
+        const label = [who, type, o.reference].filter(Boolean).join(" · ") || `${type} ${o.reference}`;
         const b = billed.get(o.id);
         const billedPieces = b?.pieces ?? 0;
         return {

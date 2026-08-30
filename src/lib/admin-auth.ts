@@ -2,13 +2,16 @@
 // login; additional users (staff / designer) live in admin_users with their
 // own scrypt-hashed passwords. There are no usernames - each person's unique
 // password identifies them at login. A signed, expiring httpOnly cookie
-// carries {expiry, role, name}, HMAC'd with ADMIN_PASSWORD.
+// carries {version, expiry, role, name}, HMAC'd with ADMIN_PASSWORD.
 
 import { createHmac, timingSafeEqual, scryptSync, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 
 export const ADMIN_COOKIE = "sa_admin";
 const SESSION_DAYS = 30;
+// Bump this to revoke every existing admin session after a permission leak or
+// shared-device incident. Old formats are intentionally rejected below.
+const SESSION_VERSION = "v2";
 
 export type AdminRole = "owner" | "staff" | "designer";
 export type AdminSession = { role: AdminRole; name: string };
@@ -24,12 +27,13 @@ function hmac(payload: string): string {
 const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64url");
 const unb64 = (s: string) => Buffer.from(s, "base64url").toString("utf8");
 
-/** Cookie value: "<expiryMs>.<role>.<b64 name>.<hmac>" - stateless and
- *  tamper-proof. Legacy two-part cookies (pre-roles) still verify as owner. */
+/** Cookie value: "<version>.<expiryMs>.<role>.<b64 name>.<hmac>" - stateless
+ *  and tamper-proof. Older formats are rejected so sessions can be revoked. */
 export function makeSessionValue(role: AdminRole = "owner", name = "Owner"): string {
   const exp = Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000;
   const nameB = b64(name.slice(0, 40));
-  return `${exp}.${role}.${nameB}.${hmac(`${exp}.${role}.${nameB}`)}`;
+  const payload = `${SESSION_VERSION}.${exp}.${role}.${nameB}`;
+  return `${payload}.${hmac(payload)}`;
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -43,16 +47,11 @@ function safeEqual(a: string, b: string): boolean {
 export function parseSessionValue(value: string | undefined): AdminSession | null {
   if (!value || !adminEnabled()) return null;
   const parts = value.split(".");
-  if (parts.length === 2) {
-    // Legacy cookie from before roles existed: treat as owner.
-    const [exp, sig] = parts;
-    if (Number(exp) < Date.now() || !safeEqual(sig, hmac(exp))) return null;
-    return { role: "owner", name: "Owner" };
-  }
-  if (parts.length !== 4) return null;
-  const [exp, role, nameB, sig] = parts;
+  if (parts.length !== 5) return null;
+  const [version, exp, role, nameB, sig] = parts;
+  if (version !== SESSION_VERSION) return null;
   if (Number(exp) < Date.now()) return null;
-  if (!safeEqual(sig, hmac(`${exp}.${role}.${nameB}`))) return null;
+  if (!safeEqual(sig, hmac(`${version}.${exp}.${role}.${nameB}`))) return null;
   if (role !== "owner" && role !== "staff" && role !== "designer") return null;
   try {
     return { role, name: unb64(nameB) || "Staff" };
@@ -107,8 +106,8 @@ export async function isAdmin(): Promise<boolean> {
 const DESIGNER_ALLOWED_PREFIXES = [
   "/admin/design-requests",
   "/admin/team-orders", // the list (read-only production view)
-  "/admin/texts",
-  "/admin/design-lab",
+  "/admin/designer-tracking",
+  "/admin/designer-invoices",
 ];
 
 // Order-detail pages are money pages (pricing, invoices, payments), so the
@@ -130,13 +129,22 @@ export function canAccess(role: AdminRole, pathname: string): boolean {
 /* ── API-layer role gate ────────────────────────────────────────── */
 // Page redirects (canAccess) are NOT enough: an authenticated designer can
 // call admin APIs directly with their cookie. These helpers enforce role at
-// the API layer. "money" = pricing/invoicing/payment/shipping/store mutations
-// and customer PII; "settings" = user management. Designers are blocked from
-// both; staff and owner pass money; only owner passes settings.
-export async function requireApiRole(area: "production" | "money" | "settings"): Promise<{ ok: true; session: AdminSession } | { ok: false; status: 401 | 403 }> {
+// the API layer. "production" = shared designer/staff workflow; "customer" =
+// customer contact details, inboxes, calls, addresses, and CRM records;
+// "money" = pricing/invoicing/payment/shipping/store mutations; "settings" =
+// user management. Designers are blocked from customer/money/settings; staff
+// and owner pass customer/money; only owner passes settings.
+export type AdminApiArea = "production" | "customer" | "money" | "settings";
+
+export function canAccessApi(role: AdminRole, area: AdminApiArea): boolean {
+  if (area === "settings") return role === "owner";
+  if (area === "customer" || area === "money") return role !== "designer";
+  return true;
+}
+
+export async function requireApiRole(area: AdminApiArea): Promise<{ ok: true; session: AdminSession } | { ok: false; status: 401 | 403 }> {
   const session = await getAdminSession();
   if (!session) return { ok: false, status: 401 };
-  if (area === "settings" && session.role !== "owner") return { ok: false, status: 403 };
-  if (area === "money" && session.role === "designer") return { ok: false, status: 403 };
+  if (!canAccessApi(session.role, area)) return { ok: false, status: 403 };
   return { ok: true, session };
 }

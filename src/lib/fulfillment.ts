@@ -11,7 +11,7 @@ import { teamOrders, orders } from "@/db/schema";
 import { emailOrderShipped, emailAdditionalShipment } from "@/lib/email";
 import { sendFollowUpSms } from "@/lib/sms";
 import { archiveDiscordThread } from "@/lib/discord-bot";
-import { trackingUrlFor, trackingUrlForCarrier, carrierFor } from "@/lib/tracking";
+import { trackingUrlFor, inboundTrackingUrlFor, carrierFor } from "@/lib/tracking";
 import { ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 
 export { trackingUrlFor };
@@ -148,7 +148,9 @@ export async function markShipped(
         designRequestId: teamOrders.designRequestId,
       });
     if (!row) return null;
-    const trackingUrl = trackingUrlForCarrier(tracking, options?.carrier);
+    const trackingUrl = options?.carrier
+      ? inboundTrackingUrlFor(tracking, options.carrier)
+      : trackingUrlFor(tracking);
     await sendFollowUpSms({
       phone: row.phone,
       body: `Slugger Athletics: your ${row.reference} order shipped${options?.directFromProduction ? " directly from production" : ""}! 🚚 Track it: ${trackingUrl}\nReply STOP to opt out.`,

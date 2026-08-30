@@ -17,9 +17,8 @@ export const VOLLEYBALL_SIZES = [
 
 export const SOCK_SIZES = ["Youth S/M", "Youth L/XL", "Adult S/M", "Adult L/XL"];
 
-// Cheer sizing uses the supplier's numbered scale rather than the standard
-// youth/adult apparel scale. Keep these values aligned with CHEER_SET in
-// size-charts.tsx so every selectable size has an exact chart row.
+// Cheer uses the supplier's numbered scale. Tops and skirts are selected
+// separately because a cheerleader may need a different size in each piece.
 export const CHEER_SIZES = ["6", "8", "10", "12", "14", "16"];
 
 const CHEER_ITEM_KEYS = new Set(["cheer_uniform", "cheer_uniform_rhinestone"]);
@@ -27,9 +26,7 @@ const CHEER_TOP_SUFFIX = "__top";
 const CHEER_BOTTOM_SUFFIX = "__bottom";
 
 export type SizeField = {
-  /** Key persisted in the roster's `sizes` object. */
   key: string;
-  /** The priced/order item this measurement belongs to. */
   itemKey: string;
   label: string;
   sizes: string[];
@@ -39,39 +36,27 @@ export function isCheerItem(key: string): boolean {
   return CHEER_ITEM_KEYS.has(key);
 }
 
-/** Cheer uniforms are sold as one set but sized as two garments. Keeping the
- *  two roster keys tied to one `itemKey` lets production receive both sizes
- *  without billing the customer for two sets. */
-function isVolleyballSport(sport?: string | null): boolean {
-  return /volleyball/i.test(sport ?? "");
-}
-
-export function sizeFieldsForItem(key: string, sport?: string | null): SizeField[] {
+export function sizeFieldsForItem(key: string): SizeField[] {
   const item = ITEM_TYPES.find((t) => t.key === key);
-  const sizes = key === "jersey" && isVolleyballSport(sport)
-    ? VOLLEYBALL_SIZES
-    : item?.sizes ?? APPAREL_SIZES;
+  const sizes = item?.sizes ?? APPAREL_SIZES;
   const label = item?.label ?? key;
   if (!isCheerItem(key)) return [{ key, itemKey: key, label, sizes }];
   return [
     { key: `${key}${CHEER_TOP_SUFFIX}`, itemKey: key, label: `${label} Top`, sizes },
-    { key: `${key}${CHEER_BOTTOM_SUFFIX}`, itemKey: key, label: `${label} Bottom`, sizes },
+    { key: `${key}${CHEER_BOTTOM_SUFFIX}`, itemKey: key, label: `${label} Skirt`, sizes },
   ];
 }
 
-export function sizeFieldsForItems(keys: string[], sport?: string | null): SizeField[] {
-  return (keys.length ? keys : ["jersey"]).flatMap((key) => sizeFieldsForItem(key, sport));
+export function sizeFieldsForItems(keys: string[]): SizeField[] {
+  return (keys.length ? keys : ["jersey"]).flatMap(sizeFieldsForItem);
 }
 
-/** Maps a persisted size-field key back to the single product being priced. */
 export function itemKeyForSizeField(key: string): string {
   if (key.endsWith(CHEER_TOP_SUFFIX)) return key.slice(0, -CHEER_TOP_SUFFIX.length);
   if (key.endsWith(CHEER_BOTTOM_SUFFIX)) return key.slice(0, -CHEER_BOTTOM_SUFFIX.length);
   return key;
 }
 
-/** Old cheer rosters stored one set size. Use it as the fallback for both
- *  pieces until that row is edited, so existing orders remain readable. */
 export function sizeValueForField(
   field: SizeField,
   sizes?: Record<string, string> | null,
@@ -120,12 +105,15 @@ export const ITEM_TYPES: ItemType[] = [
   // Flag football game shirt: sleeveless compression, its own size scale.
   { key: "flag_football_jersey", label: "Flag Football Jersey", sizes: FLAG_FOOTBALL_SIZES },
   { key: "practice_jersey", label: "Practice Jersey", sizes: APPAREL_SIZES },
+  { key: "polo", label: "Custom Polo - Dri-Fit", sizes: APPAREL_SIZES },
+  { key: "polo_pin_dot", label: "Custom Polo - Pin-Dot", sizes: APPAREL_SIZES },
   { key: "knickers", label: "Knickers", sizes: APPAREL_SIZES },
   { key: "long_pants", label: "Long Pants", sizes: APPAREL_SIZES },
   { key: "shorts", label: "Shorts", sizes: APPAREL_SIZES },
   { key: "hoodie", label: "Heavyweight Hoodie", sizes: APPAREL_SIZES },
   { key: "lightweight_hoodie", label: "Lightweight Hoodie", sizes: APPAREL_SIZES },
   { key: "pullover", label: "1/4-Zip Pullover", sizes: APPAREL_SIZES },
+  { key: "jacket", label: "Custom Jacket", sizes: APPAREL_SIZES },
   { key: "cheer_uniform", label: "Cheer Uniform (Set)", sizes: CHEER_SIZES, minPieces: 12, noNames: true },
   { key: "cheer_uniform_rhinestone", label: "Cheer Uniform (Rhinestone)", sizes: CHEER_SIZES, minPieces: 12, noNames: true },
   { key: "socks", label: "Socks", sizes: SOCK_SIZES },
@@ -147,9 +135,12 @@ export const ITEM_TYPES: ItemType[] = [
 // the sport-locked jerseys (hockey/flag-football), cheer sets (min 12), and the
 // special-order beanie. Each MUST exist in ITEM_TYPES + the price map.
 export const EXTRA_ADDON_KEYS = [
+  "polo",
+  "polo_pin_dot",
   "hoodie",
   "lightweight_hoodie",
   "pullover",
+  "jacket",
   "fitted_hat",
   "snapback_hat",
   "performance_hat",
@@ -218,7 +209,10 @@ export function itemKeysFromDesignProducts(productTypes?: string[] | null): stri
     // Cheer FIRST - "cheerleading uniform shell and shirt" contains "shirt",
     // which would otherwise map to a jersey.
     if (/cheer/.test(p)) push(/rhinestone/.test(p) ? "cheer_uniform_rhinestone" : "cheer_uniform");
+    else if (/polo/.test(p) && /pin[\s-]?dot/.test(p)) push("polo_pin_dot");
+    else if (/polo/.test(p)) push("polo");
     else if (/jersey|shirt/.test(p)) push("jersey");
+    else if (/jacket|warm[\s-]?up/.test(p)) push("jacket");
     else if (/hoodie|sweat/.test(p)) push("hoodie");
     else if (/knicker/.test(p)) push("knickers");
     else if (/pant/.test(p)) push("long_pants");
@@ -288,12 +282,12 @@ export function itemLabel(key: string): string {
   const itemKey = itemKeyForSizeField(key);
   const base = ITEM_TYPES.find((t) => t.key === itemKey)?.label ?? itemKey;
   if (key.endsWith(CHEER_TOP_SUFFIX)) return `${base} Top`;
-  if (key.endsWith(CHEER_BOTTOM_SUFFIX)) return `${base} Bottom`;
+  if (key.endsWith(CHEER_BOTTOM_SUFFIX)) return `${base} Skirt`;
   return base;
 }
 
-export function sizesFor(key: string, sport?: string | null): string[] {
-  return sizeFieldsForItem(itemKeyForSizeField(key), sport)[0]?.sizes ?? APPAREL_SIZES;
+export function sizesFor(key: string): string[] {
+  return ITEM_TYPES.find((t) => t.key === itemKeyForSizeField(key))?.sizes ?? APPAREL_SIZES;
 }
 
 /** Tally an ordered roster into a per-item size breakdown (e.g. Fitted Hat:
@@ -314,7 +308,7 @@ export function sizeBreakdown(
   items: string[],
   sport?: string | null,
 ): { key: string; label: string; parts: { size: string; n: number }[]; total: number }[] {
-  return sizeFieldsForItems(items, sport)
+  return sizeFieldsForItems(items)
     .map((field) => {
       const counts: Record<string, number> = {};
       for (const r of roster) {

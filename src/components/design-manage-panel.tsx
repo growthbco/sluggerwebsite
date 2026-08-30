@@ -40,6 +40,9 @@ type Props = {
   rushApprovedBy: string | null;
   /** The admin detail page already owns the project title and status summary. */
   showRequestHeader?: boolean;
+  /** Designer-role view: keep job details and proof tools, but omit contact
+   * information, client links, lead source, and staff-only rush approval. */
+  restricted?: boolean;
   // Which slice of this panel to render, so the admin page can put the brief in
   // an "Overview" tab and the proof workflow in a "Proofs" tab from the SAME
   // markup. Omit to render everything (legacy single-scroll).
@@ -73,6 +76,7 @@ export function DesignManagePanel({
   rushApprovedAt,
   rushApprovedBy,
   showRequestHeader = true,
+  restricted = false,
   view,
 }: Props) {
   const showOverview = view !== "proofs";
@@ -250,6 +254,8 @@ export function DesignManagePanel({
             <p className="mt-3 display text-amber-300">Manual premium price + owner approval required</p>
           ) : rushOk ? (
             <p className="mt-3 display text-green-400">Timeline approved by {rushOk.by}</p>
+          ) : restricted ? (
+            <p className="mt-3 text-sm text-amber-200">Slugger staff must approve the rush timeline. Continue the artwork, but do not promise a date.</p>
           ) : (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <select
@@ -296,7 +302,7 @@ export function DesignManagePanel({
       </header>}
 
       <section className="bg-steel border border-line p-5 grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-        <div>
+        {!restricted && <div>
           <div className="display text-foreground text-xs">Contact</div>
           <div className="text-muted">{contact.name}</div>
           <div className="text-muted">{contact.email}</div>
@@ -306,7 +312,7 @@ export function DesignManagePanel({
               <span className="text-foreground">Source:</span> {source}
             </div>
           )}
-        </div>
+        </div>}
         {products && (
           <div className="sm:col-span-2">
             <div className="display text-foreground text-xs">Mock up</div>
@@ -341,7 +347,7 @@ export function DesignManagePanel({
             <p className="text-muted whitespace-pre-line">{vision}</p>
           </div>
         )}
-        <div className="sm:col-span-2">
+        {!restricted && <div className="sm:col-span-2">
           <div className="display text-foreground text-xs mb-2">Client status link (share to track)</div>
           <div className="flex gap-2">
             <input readOnly value={statusUrl} className="flex-1 bg-ink border border-line px-3 py-2 text-xs text-foreground/80" />
@@ -349,7 +355,7 @@ export function DesignManagePanel({
               {copied ? "Copied " : "Copy"}
             </button>
           </div>
-        </div>
+        </div>}
       </section>
       </>
       )}

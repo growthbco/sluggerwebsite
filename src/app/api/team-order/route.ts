@@ -8,9 +8,7 @@ import { eq } from "drizzle-orm";
 import { getByStatusToken, findActiveDesignByEmail, markOrdered, approvedMockupImages } from "@/lib/design-requests";
 import { createTeamOrder, addRosterRow, submitTeamOrder, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { autoInvoiceOnSubmit } from "@/lib/team-order-invoicing";
-import { JERSEY_MATERIALS, missingCheerSizeLabels } from "@/lib/order-items";
-import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
-import { buildCustomerOrderSpec } from "@/lib/order-spec";
+import { missingCheerSizeLabels } from "@/lib/order-items";
 
 export const runtime = "nodejs";
 
@@ -108,14 +106,8 @@ export async function POST(req: Request) {
   }
 
   const items = body.items?.length ? body.items : ["jersey"];
-  const selectedMaterial = JERSEY_MATERIALS.some((material) => material.key === body.jerseyMaterial)
-    ? body.jerseyMaterial
-    : undefined;
-  if (items.includes("jersey") && !selectedMaterial) {
-    return NextResponse.json({ error: "Choose and confirm the jersey material before submitting." }, { status: 400 });
-  }
   if (roster.some((r) => missingCheerSizeLabels(items, r.sizes).length)) {
-    return NextResponse.json({ error: "Every cheer uniform needs both a top size and bottom size." }, { status: 400 });
+    return NextResponse.json({ error: "Every cheer uniform needs both a top size and skirt size." }, { status: 400 });
   }
 
   try {

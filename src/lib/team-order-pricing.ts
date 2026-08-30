@@ -10,12 +10,15 @@ const ITEM_PRICES: Record<string, number> = {
   hockey_jersey: 5500, // ice-hockey sweater; ~2.3x the $24 designer cost
   flag_football_jersey: 2800, // sleeveless compression game shirt
   practice_jersey: 2000,
+  polo: 3500,
+  polo_pin_dot: 3500,
   knickers: 4000,
   long_pants: 4000,
   shorts: 2500,
   hoodie: 4000, // heavyweight
   lightweight_hoodie: 3500,
   pullover: 4000, // 1/4-zip
+  jacket: 5000, // custom warm-up jacket
   socks: 1500,
   cheer_uniform: 12000, // simple sublimated cheer set
   cheer_uniform_rhinestone: 17500, // rhinestone / all-star cheer set
@@ -52,12 +55,15 @@ export const ITEM_WEIGHT_OZ: Record<string, number> = {
   hockey_jersey: 14,
   flag_football_jersey: 8,
   practice_jersey: 10,
+  polo: 10,
+  polo_pin_dot: 10,
   knickers: 14,
   long_pants: 16,
   shorts: 10,
   hoodie: 24,
   lightweight_hoodie: 16,
   pullover: 20,
+  jacket: 20,
   socks: 3,
   cheer_uniform: 14, // shell + skirt
   cheer_uniform_rhinestone: 14,

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { redirect } from "next/navigation";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { isAdmin, adminEnabled } from "@/lib/admin-auth";
+import { adminEnabled, canAccess, getAdminSession } from "@/lib/admin-auth";
 import { dbEnabled, getDb } from "@/db";
 import { aiDailyCounters, aiUsageEvents, designLabVisitors, designLabRenders, designRequests } from "@/db/schema";
 import { AdminBulkLeadDelete } from "@/components/admin-bulk-lead-delete";
@@ -23,7 +23,9 @@ const fmt = (d: Date) =>
 // design request. Sorted hottest-first (paid, then most recent).
 export default async function DesignLabLeadsPage() {
   if (!adminEnabled()) redirect("/admin");
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!canAccess(session.role, "/admin/design-lab")) redirect("/admin");
   if (!dbEnabled()) redirect("/admin");
 
   const db = getDb();

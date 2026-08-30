@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/size-guide" },
   title: "Size Guide - Jerseys, Cheer, Volleyball, Hoodies & Pants",
   description:
-    "Sizing charts for Slugger Athletics custom jerseys, cheer uniforms, girls volleyball jerseys, hoodies, and pants. Measurements in inches for youth and adult sizes.",
+    "Sizing charts for Slugger Athletics custom jerseys, cheer uniforms, girls volleyball jerseys, hoodies, and pants.",
 };
 
 function getUploadedCharts(): { file: string; title: string }[] {
@@ -106,7 +106,7 @@ export default function SizeGuidePage() {
           </div>
         </section>
 
-        <section id="hoodies" className="scroll-mt-32">
+        <section>
           <h2 className="display text-2xl text-foreground">Hoodies</h2>
           <div className="mt-4 max-w-md">
             <ChartTable headers={["Size", "Width", "Length"]} rows={HOODIES} />

@@ -21,7 +21,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           on top of a table's last row / row actions. */}
       <div className="flex-1 min-w-0 pb-24">{children}</div>
       {session && session.role !== "designer" && <AdminDialer />}
-      {session && <AdminNotifier />}
+      {session && session.role !== "designer" && <AdminNotifier />}
     </div>
   );
 }

@@ -363,7 +363,21 @@ export async function postTeamOrderToDiscord(
   // production-facing post entirely.
   const itemKeys = (order.items?.length ? order.items : ["jersey"]).filter((k) => !notDesignerMade(k));
   // Production only needs: name / number / sizes per item (+ optional note). No prices.
-  const rows = designerRosterText(order);
+  const rows = order.roster
+    .filter((r) => r.name || r.number || r.size || (r.sizes && Object.keys(r.sizes).length))
+    .map((r, i) => {
+      const sizeStr = sizeFieldsForItems(itemKeys)
+        .map((field) => {
+          const v = sizeValueForField(field, r.sizes, r.size);
+          return v ? `${field.label}: ${v}` : null;
+        })
+        .filter(Boolean)
+        .join(" · ");
+      const note = r.notes ? ` - ${r.notes}` : "";
+      const designTag = r.design ? `**${r.design}** · ` : "";
+      return `${i + 1}. ${designTag}${r.name || "-"} · #${r.number || "-"} · ${sizeStr || "-"}${note}`;
+    })
+    .join("\n");
 
   // NOTE: customer contact (email/phone) is intentionally NOT posted here - this
   // channel is designer/production-facing, and the business already has the

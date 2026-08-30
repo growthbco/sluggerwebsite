@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { isAdmin, adminEnabled } from "@/lib/admin-auth";
+import { adminEnabled, canAccess, getAdminSession } from "@/lib/admin-auth";
 import { AdminConversations } from "@/components/admin-conversations";
 
 export const metadata: Metadata = {
@@ -20,7 +20,9 @@ export default async function AdminTextsPage({
   }>;
 }) {
   if (!adminEnabled()) redirect("/admin");
-  if (!(await isAdmin())) redirect("/admin/login");
+  const session = await getAdminSession();
+  if (!session) redirect("/admin/login");
+  if (!canAccess(session.role, "/admin/texts")) redirect("/admin");
   const { to, name, tab, open } = await searchParams;
   // ?open=<designId> deep-links an email thread (from an email alert) and
   // implies the Email tab.

@@ -8,7 +8,6 @@ import { getDb } from "@/db";
 import { teamOrders, teamOrderRoster, designRequests, customInvoices, orders, orderItems, teams } from "@/db/schema";
 import { getOrCreateCustomer } from "@/lib/customers";
 import { itemKeyForSizeField, itemLabel } from "@/lib/order-items";
-import { buildDeliveryTimeline, type DeliveryTier } from "@/lib/delivery-timeline";
 
 const TTL_MS = 45 * 60 * 1000; // 45 minutes
 
@@ -89,9 +88,8 @@ export async function getCustomerOrders(email: string): Promise<PortalData> {
       const m = comp.get(r.to) ?? new Map<string, number>();
       const sized = Object.entries(r.sizes ?? {}).filter(([, v]) => (v ?? "").trim());
       if (sized.length) {
-        for (const k of new Set(sized.map(([key]) => itemKeyForSizeField(key)))) {
-          m.set(k, (m.get(k) ?? 0) + 1);
-        }
+        const itemKeys = new Set(sized.map(([key]) => itemKeyForSizeField(key)));
+        for (const k of itemKeys) m.set(k, (m.get(k) ?? 0) + 1);
       }
       else if ((r.size ?? "").trim()) m.set("jersey", (m.get("jersey") ?? 0) + 1);
       comp.set(r.to, m);

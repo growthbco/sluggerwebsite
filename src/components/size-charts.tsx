@@ -48,9 +48,9 @@ export const FLAG_FOOTBALL = [
   ["XL", "21", "29"], ["2XL", "22", "30"], ["3XL", "23", "31"],
 ];
 
-// Cheer sets use the supplier's numbered garment-size scale. These are finished
-// item measurements (inches), not body measurements. Row labels
-// mirror CHEER_SIZES in order-items.ts so a picked size lines up with the chart.
+// Supplier finished-item measurements in inches. The waist range
+// belongs to the skirt/bottom, while chest and sleeve measurements belong to
+// the top. Row labels mirror CHEER_SIZES in order-items.ts.
 export const CHEER_SET_HEADERS = [
   "Size",
   "Garment length",
@@ -102,12 +102,10 @@ export function CheerSizingNotes() {
       <p className="font-medium text-foreground">Before choosing cheer sizes</p>
       <ul className="mt-2 list-disc space-y-1.5 pl-5">
         <li>The chart lists finished-item measurements, not body measurements. Measure the athlete instead of relying on age or a usual clothing size.</li>
-        <li>Choose the top by chest and the skirt/bottom by the skirt waist measurement. Top and bottom sizes may be different.</li>
+        <li>Choose the top by chest and the skirt/bottom by the skirt waist measurement. Top and skirt sizes may be different.</li>
         <li>If a measurement falls between two sizes, choose the larger size.</li>
         <li>Sock thigh circumference is the stretch range. Garments are measured by hand, so minor measurement variation is normal.</li>
         <li>Review both sizes before the roster closes. Custom uniforms cannot be returned or exchanged for a sizing change; manufacturing defects are covered under our <a href="/returns" className="text-brand hover:underline">Returns &amp; Exchanges policy</a>.</li>
-        <li>Screen colors and rhinestone placement may vary slightly on the finished uniform.</li>
-        <li>For rhinestone uniforms, wash inside out in cold water on a gentle cycle and air-dry. Do not use bleach, an iron, or high heat.</li>
       </ul>
     </div>
   );
@@ -223,10 +221,10 @@ function chartGroup(itemKey: string, sport?: string | null): ChartGroup | null {
   const k = itemKey.toLowerCase();
   if (/cheer/.test(k)) return "cheer";
   if (/flag[_\s-]?football/.test(k)) return "flag_football"; // before /jersey/
-  if (/hoodie|pullover/.test(k)) return "hoodie";
+  if (/hoodie|pullover|jacket/.test(k)) return "hoodie";
   if (/hat|beanie|cap/.test(k)) return "hats";
   if (/knicker|pant|short/.test(k)) return "pants";
-  if (/jersey|shirt/.test(k)) return /volleyball/i.test(sport ?? "") ? "volleyball" : "jersey";
+  if (/jersey|shirt|polo/.test(k)) return "jersey";
   return null; // socks, unknown
 }
 

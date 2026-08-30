@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { dbEnabled } from "@/db";
-import { getByManageToken, getPrintableJerseys, markJerseysVerified, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
+import { getById, getByManageToken, getPrintableJerseys, markJerseysVerified, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { verifyPrintFiles, type RosterEntry } from "@/lib/print-file-verifier";
 import { getById as getDesignById } from "@/lib/design-requests";
 import { postDesignThreadUpdate } from "@/lib/discord";
+import { requireApiRole } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -12,9 +13,11 @@ export const maxDuration = 300;
 // jerseys, then mark those jerseys verified. Already-verified jerseys aren't
 // re-checked; newly-added ones are just the ones you select.
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
+  const gate = await requireApiRole("production");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
   const { token } = await params;
-  const order = await getByManageToken(token);
+  const order = (await getById(token)) ?? (await getByManageToken(token));
   if (!order) return NextResponse.json({ error: "Link not found" }, { status: 404 });
 
   const body = await req.json().catch(() => null);

@@ -3,7 +3,7 @@ import { waitUntil } from "@vercel/functions";
 import { autoInvoiceOnSubmit } from "@/lib/team-order-invoicing";
 import { dbEnabled } from "@/db";
 import { getByManageToken, getRoster, submitTeamOrder, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
-import { JERSEY_MATERIALS, minPiecesForItems } from "@/lib/order-items";
+import { minPiecesForItems, missingCheerSizeLabels } from "@/lib/order-items";
 import { postTeamOrderToDiscord } from "@/lib/discord";
 import { markOrdered, getById, approvedMockupImages } from "@/lib/design-requests";
 import { setThreadStageTag } from "@/lib/discord-bot";
@@ -46,8 +46,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (roster.length === 0) {
     return NextResponse.json({ error: "Add at least one player before submitting." }, { status: 400 });
   }
-  if ((order.items ?? ["jersey"]).some((item) => item.includes("jersey")) && !JERSEY_MATERIALS.some((material) => material.key === order.jerseyMaterial)) {
-    return NextResponse.json({ error: "Choose and confirm the jersey material before submitting." }, { status: 400 });
+  if (roster.some((r) => missingCheerSizeLabels(order.items ?? ["jersey"], r.sizes).length)) {
+    return NextResponse.json({ error: "Every cheer uniform needs both a top size and skirt size." }, { status: 400 });
   }
   // Elevated per-item minimums (e.g. cheer sets require 12). Default-6 items
   // aren't hard-blocked here, preserving existing jersey flows.

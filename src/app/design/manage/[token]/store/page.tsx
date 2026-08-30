@@ -4,6 +4,8 @@ import { dbEnabled } from "@/db";
 import { getByManageToken } from "@/lib/design-requests";
 import { getStoreByDesignRequestId, STORE_ITEM_PRESETS } from "@/lib/team-stores";
 import { TeamStorePanel } from "@/components/team-store-panel";
+import { getAdminSession } from "@/lib/admin-auth";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = { title: "Team Store Setup", robots: { index: false } };
 
@@ -18,6 +20,8 @@ function Centered({ title, children }: { title: string; children: React.ReactNod
 
 export default async function TeamStoreSetupPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
+  const session = await getAdminSession();
+  if (session?.role === "designer") redirect("/admin/design-requests");
   if (!dbEnabled()) return <Centered title="Not available yet">Team stores aren&apos;t turned on yet.</Centered>;
 
   const request = await getByManageToken(token);
