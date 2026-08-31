@@ -55,6 +55,13 @@ function fmtDate(iso: string | null): string {
   return `${m}/${d}/${y.slice(2)}`;
 }
 
+function invoiceTeamSummary(inv: EditableInvoice): string {
+  const names = Array.from(new Set(inv.lines.map((line) => line.team.trim()).filter(Boolean)));
+  if (!names.length) return "No team name";
+  const visible = names.slice(0, 2).join(" · ");
+  return names.length > 2 ? `${visible} +${names.length - 2} more` : visible;
+}
+
 /** Unbilled delta for a row: full pieces for a fresh job, just the add-on
  *  remainder for one that was already partly billed/settled. */
 function deltaFor(o: BillableOrder): number {
@@ -464,16 +471,19 @@ export function DesignerInvoiceForm({
                   <button
                     key={inv.id}
                     onClick={() => startEdit(inv)}
-                    className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-steel transition-colors text-left"
+                    className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-steel transition-colors text-left ${editingId === inv.id ? "bg-brand/10" : ""}`}
                   >
                     <span className="min-w-0">
-                      <span className="text-foreground font-semibold font-mono">{inv.reference}</span>
-                      <span className="text-muted"> · {inv.lines.length} line{inv.lines.length === 1 ? "" : "s"} · {fmtDate(inv.submittedAt)}</span>
+                      <span className="block">
+                        <span className="text-foreground font-semibold font-mono">{inv.reference}</span>
+                        <span className="text-muted"> · {inv.lines.length} line{inv.lines.length === 1 ? "" : "s"} · {fmtDate(inv.submittedAt)}</span>
+                      </span>
+                      <span className="block mt-0.5 text-xs text-muted truncate">{invoiceTeamSummary(inv)}</span>
                     </span>
                     <span className="flex items-center gap-2 shrink-0">
                       <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 clip-slant bg-amber-400/15 text-amber-300">Awaiting pay</span>
                       <span className="text-foreground tabular-nums">{money2(inv.totalCents)}</span>
-                      <span className="text-brand text-xs">Edit</span>
+                      <span className="text-brand text-xs">{editingId === inv.id ? "Editing" : "Edit"}</span>
                     </span>
                   </button>
                 ))}
