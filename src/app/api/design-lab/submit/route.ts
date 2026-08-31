@@ -21,6 +21,7 @@ function designProductLabel(product: ProductType, style?: string): string {
   switch (product) {
     case "cheer": return s.includes("rhinestone") ? "Cheer Uniform (Rhinestone)" : "Cheer Uniform (Set)";
     case "jersey": return "Jersey / Shirt";
+    case "polo": return s.includes("pin") ? "Custom Polo - Pin-Dot" : "Custom Polo - Dri-Fit";
     case "hat": return s.includes("fitted") ? "Fitted Hat" : "Snapback Hat";
     case "hoodie": return "Hoodie";
     case "pants": return s.includes("knicker") ? "Knickers" : "Pants";

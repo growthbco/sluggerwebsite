@@ -35,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     style?: string;
     colors?: string[];
     refImage?: string; // staff-uploaded reference, as a data URL
-    product?: string;  // jersey | cheer | hat | hype-chain | hoodie | pants | shorts | socks
+    product?: string;  // jersey | polo | cheer | hat | hype-chain | hoodie | pants | shorts | socks
     sport?: string;    // selected in the studio's Sport -> Item -> Style picker
   } = {};
   try { body = await req.json(); } catch {}
