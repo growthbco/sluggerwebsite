@@ -4,7 +4,7 @@
 // "floating ghost" means for that item) so the concept reads like a real
 // e-commerce product shot.
 
-export type ProductType = "jersey" | "hat" | "hype-chain" | "hoodie" | "pants" | "socks" | "cheer" | "shorts" | "jacket";
+export type ProductType = "jersey" | "polo" | "hat" | "hype-chain" | "hoodie" | "pants" | "socks" | "cheer" | "shorts" | "jacket";
 
 // Shared Sport -> Item -> Style taxonomy for BOTH the staff studio and the
 // customer-facing Jersey Maker, so they never drift. Each item maps to a mockup
@@ -133,6 +133,7 @@ export const SPORT_MENU: StudioSport[] = [
     key: "extras",
     label: "Extras (any sport)",
     items: [
+      { product: "polo", label: "Polo", styles: ["Dri-Fit", "Pin-Dot"] },
       { product: "hoodie", label: "Hoodie", styles: ["Pullover", "Quarter-Zip"] },
       { product: "jacket", label: "Warm-Up Jacket", styles: ["Full-Zip", "Quarter-Zip"] },
       { product: "hat", label: "Hat", styles: ["Fitted", "Snapback"] },
@@ -144,6 +145,7 @@ export const SPORT_MENU: StudioSport[] = [
 
 export const PRODUCTS: { id: ProductType; label: string; noun: string }[] = [
   { id: "jersey", label: "Jersey", noun: "jersey" },
+  { id: "polo", label: "Polo", noun: "polo shirt" },
   { id: "cheer", label: "Cheer uniform", noun: "cheer uniform" },
   { id: "hat", label: "Embroidered hat", noun: "cap" },
   { id: "hype-chain", label: "Hype chain", noun: "hype chain" },
@@ -272,6 +274,17 @@ export function buildProductPrompt(product: ProductType, i: PromptInput): string
         `Colors: ${i.colors}.`,
       );
       break;
+    case "polo": {
+      const pinDot = /pin[\s-]?dot/i.test(style);
+      lines.push(
+        "Professional e-commerce product mockup of a custom fully SUBLIMATED short-sleeve PERFORMANCE POLO SHIRT, floating ghost-mannequin style on a pure white background with studio lighting. Show the FRONT (left) and BACK (right) of the same polo side by side.",
+        `Construction must have a classic fold-over polo collar, a clean three-button chest placket, short set-in sleeves, an athletic fit, and a straight finished hem. Use ${pinDot ? "a lightweight pin-dot performance knit with a subtle fine perforated texture" : "a smooth moisture-wicking performance knit with no open mesh holes"}.`,
+        team ? `Place the team name or emblem "${team}" cleanly on the left chest and carry the same design language across the back.` : "Use a clean left-chest team emblem area and a coordinated back design.",
+        `Colors: ${i.colors}.`,
+        "This is a collared athletic polo, NOT a crew-neck jersey, baseball button-front jersey, dress shirt, or T-shirt.",
+      );
+      break;
+    }
     case "pants":
       lines.push(
         `Professional e-commerce product mockup of custom fully SUBLIMATED (all-over dye-sublimation print, not embroidery or screen print) team ${sport} pants (athletic game pants)${style ? `, ${style}` : ""}, floating ghost-mannequin style on a pure white background with studio lighting. Show a FRONT view and a SIDE/BACK view side by side.`,
