@@ -28,6 +28,7 @@ export function OrderSpecificationCard({ spec, compact = false }: { spec: Custom
         {spec.colors && <SpecItem term="Colors" value={spec.colors} />}
         {spec.designs.length > 0 && <SpecItem term="Approved artwork" value={spec.designs.map((design) => design.label).join(" · ")} />}
         <SpecItem term="Requested in-hand date" value={spec.requestedInHandDate ?? "None provided"} />
+        <SpecItem term="Delivery" value={spec.deliveryMethod ?? "Ship directly to me"} />
       </dl>
 
       {spec.sizes.length > 0 && (
@@ -58,7 +59,7 @@ export function OrderSpecificationCard({ spec, compact = false }: { spec: Custom
         <div className="mt-3 flex items-end justify-between gap-4 border-t border-line pt-3">
           <div>
             <p className="display text-foreground">Merchandise subtotal</p>
-            <p className="mt-0.5 text-xs text-muted">Tax and shipping are calculated separately on the invoice.</p>
+            <p className="mt-0.5 text-xs text-muted">{spec.taxAndShipping}</p>
           </div>
           <span className="display text-2xl text-foreground">{money(spec.merchandiseSubtotalCents)}</span>
         </div>

@@ -26,6 +26,27 @@ export type InvoiceResult =
   | { ok: true; stage: string; totalCents: number; dueCents: number; shipCents: number; creditAppliedCents: number; taxDueCents: number; invoiceUrl: string | null; fullInvoiceUrl?: string; emailed: boolean; teamName: string; reference: string }
   | { ok: false; error: string; status: number };
 
+/** A reissued invoice must retire every older link for that same stage. This
+ * also expires already-open Checkout Sessions so a customer cannot finish an
+ * outdated shipping choice in another tab. */
+async function deactivateSupersededPaymentLinks(
+  stripe: ReturnType<typeof getStripe>,
+  urls: Array<string | null | undefined>,
+): Promise<void> {
+  const wanted = new Set(urls.filter((url): url is string => Boolean(url)));
+  if (wanted.size === 0) return;
+  for await (const paymentLink of stripe.paymentLinks.list({ active: true, limit: 100 })) {
+    if (!wanted.has(paymentLink.url)) continue;
+    try {
+      const sessions = await stripe.checkout.sessions.list({ payment_link: paymentLink.id, status: "open", limit: 100 });
+      await Promise.allSettled(sessions.data.map((session) => stripe.checkout.sessions.expire(session.id)));
+      await stripe.paymentLinks.update(paymentLink.id, { active: false });
+    } catch (error) {
+      console.error("Could not deactivate superseded team-order payment link:", paymentLink.id, error);
+    }
+  }
+}
+
 export async function sendTeamOrderInvoice(opts: {
   teamOrderId: string;
   stage: "deposit" | "balance";
@@ -36,6 +57,9 @@ export async function sendTeamOrderInvoice(opts: {
   const db = getDb();
   const [order] = await db.select().from(teamOrders).where(eq(teamOrders.id, opts.teamOrderId)).limit(1);
   if (!order) return { ok: false as const, error: "Team order not found", status: 404 };
+  const supersededUrls = stage === "deposit"
+    ? [order.invoiceUrl, order.fullInvoiceUrl]
+    : [order.balanceInvoiceUrl];
   if (order.invoicePaidAt) return { ok: false as const, error: "This order is already paid in full.", status: 409 };
   if (stage === "deposit" && order.depositPaidAt) {
     return { ok: false as const, error: "Deposit already paid - send the final invoice instead.", status: 409 };
@@ -172,17 +196,23 @@ export async function sendTeamOrderInvoice(opts: {
   const balanceRemaining = totalCents - depositCents;
   const withSummary = (terms: string) => (goodsSummary ? `${goodsSummary}. ${terms}` : terms);
   const depositDesc = withSummary(
-    order.rushShipping
+    order.localPickup
+      ? `This is your 50% production deposit. The remaining ${money(balanceRemaining)} is billed once your order is ready for pickup. No shipping charge will be added. Production starts as soon as this deposit is paid.`
+      : order.rushShipping
       ? `This is your 50% production deposit. The remaining ${money(balanceRemaining)} is billed once your order is ready. Direct shipping is included with Rush, so no additional shipping charge will be added. Production starts as soon as this deposit is paid.`
       : `This is your 50% production deposit. The remaining ${money(balanceRemaining)} plus shipping is billed once your order is ready. Production starts as soon as this deposit is paid.`,
   );
   const fullDesc = withSummary(
-    order.rushShipping
+    order.localPickup
+      ? "Pays your order in full. No shipping charge will be added. We will contact you when the order is ready for pickup in Ocala. Production starts right away."
+      : order.rushShipping
       ? "Pays your order in full. Direct shipping is included with Rush, so there is nothing left to collect later. Production starts right away."
       : "Pays your order in full including shipping, so there is nothing left to collect later. Production starts right away.",
   );
   const balanceDesc = withSummary(
-    order.rushShipping
+    order.localPickup
+      ? "Final balance for your order. No shipping charge has been added. We will contact you when the order is ready for pickup in Ocala. This clears your account in full."
+      : order.rushShipping
       ? "Final balance for your order. Direct shipping is included with Rush, with no additional shipping charge. This clears your account in full."
       : "Final balance for your order, including shipping. This clears your account in full.",
   );
@@ -192,7 +222,7 @@ export async function sendTeamOrderInvoice(opts: {
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
     // Collect the delivery address on the payment page unless we already have
     // one - it's required for buying the shipping label later.
-    const needsAddress = !order.shippingAddress?.line1;
+    const needsAddress = !order.localPickup && !order.shippingAddress?.line1;
     const exempt = order.taxExempt;
     // Each link charges the goods + 7% FL sales tax (skipped when tax-exempt).
     // creditCents is subtracted from the goods (and the tax base) before the
@@ -285,6 +315,8 @@ export async function sendTeamOrderInvoice(opts: {
         updatedAt: new Date(),
       })
       .where(eq(teamOrders.id, order.id));
+
+    await deactivateSupersededPaymentLinks(stripe, supersededUrls);
 
     // Defense in depth: never let a team name inject URLs or newlines into the
     // outbound SMS body (the name is customer-supplied on public forms).

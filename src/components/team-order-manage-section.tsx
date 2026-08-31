@@ -147,6 +147,8 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
           lockMessage={rosterLockMessage}
           requiresNames={order.requiresNames}
           minPieces={orderMinimum}
+          localPickup={order.localPickup}
+          rushShipping={order.rushShipping}
           quote={{ lines: customerQuote.lines, rushFeeCents: customerQuote.rushFeeCents, priorityFeeCents: customerQuote.priorityFeeCents, totalCents: customerQuote.totalCents }}
           nextIsDeposit={designState === "approved"}
           designState={designState}
@@ -287,7 +289,15 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
           <div className="border border-line bg-ink/40 px-4 py-3">
             <p className="text-xs uppercase tracking-wider text-muted">Order total</p>
             <p className="display text-lg text-foreground mt-0.5">{totalCents > 0 ? money(grandTotal) : "Add sizes"}</p>
-            <p className="text-xs text-muted mt-0.5">{shippingCents > 0 ? `Includes ${money(shippingCents)} shipping` : "Tax and shipping added later"}</p>
+            <p className="text-xs text-muted mt-0.5">
+              {order.localPickup
+                ? "Free local pickup in Ocala"
+                : shippingCents > 0
+                  ? `Includes ${money(shippingCents)} shipping`
+                  : order.rushShipping
+                    ? "Direct shipping included with Rush"
+                    : "Tax and shipping added later"}
+            </p>
           </div>
         </div>
 
@@ -393,9 +403,17 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
         </section>
       )}
 
-      {/* Where this order ships, editable by the customer (locked once shipped). */}
-      {!order.localPickup && (
-        <TeamOrderShipping token={order.manageToken!} initial={shipAddr} locked={order.status === "shipped" || Boolean(order.shippedAt)} />
+      {/* Delivery method + address, editable until fulfillment is locked. Draft
+          orders choose this in the final roster review above. */}
+      {!collecting && (
+        <TeamOrderShipping
+          token={order.manageToken!}
+          initial={shipAddr}
+          localPickup={order.localPickup}
+          rushShipping={order.rushShipping}
+          locked={order.status === "shipped" || Boolean(order.shippedAt) || Boolean(order.deliveredAt)}
+          deliveryLocked={Boolean(order.depositPaidAt || order.invoicePaidAt)}
+        />
       )}
 
       <div id="roster-builder" className="scroll-mt-6">

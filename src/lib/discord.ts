@@ -203,6 +203,7 @@ type TeamOrderPayload = {
   jerseyStyle?: string;
   jerseyMaterial?: string;
   items?: string[];
+  localPickup?: boolean;
   roster: RosterRow[];
   /** Direct link to open this order (design-manage page). */
   manageUrl?: string;
@@ -387,6 +388,7 @@ export async function postTeamOrderToDiscord(
     { name: "Style", value: order.jerseyStyle || "-", inline: true },
     { name: "Material", value: order.jerseyMaterial || "-", inline: true },
     { name: "Items", value: itemKeys.map(itemLabel).join(", ") || "-", inline: true },
+    { name: "Delivery", value: order.localPickup ? "Free local pickup · Ocala" : "Direct shipping", inline: true },
     { name: "Players", value: String(order.roster.filter((r) => r.name || r.number || r.size || (r.sizes && Object.keys(r.sizes).length)).length), inline: true },
   ];
   if (order.whiteLabel) {

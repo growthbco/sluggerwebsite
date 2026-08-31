@@ -33,6 +33,7 @@ export async function POST(req: Request) {
     designToken?: string;
     deliveryTermsAccepted?: boolean;
     specConfirmed?: boolean;
+    localPickup?: boolean;
   };
   try {
     body = await req.json();
@@ -148,6 +149,7 @@ export async function POST(req: Request) {
           jerseyMaterial: selectedMaterial ?? reuse.jerseyMaterial,
           items,
           whiteLabel: Boolean(design?.whiteLabel || reuse.whiteLabel),
+          localPickup: body.localPickup === true,
           updatedAt: new Date(),
         })
         .where(eq(teamOrders.id, reuse.id));
@@ -167,6 +169,7 @@ export async function POST(req: Request) {
           whiteLabel: Boolean(design?.whiteLabel),
           discordThreadId: design?.discordThreadId ?? undefined,
           rushShipping: design?.rush ?? false,
+          localPickup: body.localPickup === true,
           smsOptIn: (body.smsConsent === true && Boolean(contactPhone)) || Boolean(design?.smsOptInAt),
         });
     for (const r of roster.slice(0, 200)) {
@@ -255,7 +258,8 @@ export async function POST(req: Request) {
       jerseyStyle: body.jerseyStyle,
       jerseyMaterial: selectedMaterial ?? reuse?.jerseyMaterial ?? undefined,
       items,
-        designImages: design ? approvedMockupImages(design) : undefined,
+      localPickup: persistedOrder.localPickup,
+      designImages: design ? approvedMockupImages(design) : undefined,
         roster: roster.map((r) => ({
           name: r.name,
           number: r.number,

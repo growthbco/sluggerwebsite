@@ -17,6 +17,7 @@ import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-ackno
 import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
 import { buildCustomerOrderSpec } from "@/lib/order-spec";
 import { OrderSpecificationCard } from "@/components/order-specification-card";
+import { CustomerDeliveryChoice } from "@/components/customer-delivery-choice";
 
 const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button", "Quarter-Zip"];
 
@@ -88,6 +89,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [confirmingSubmit, setConfirmingSubmit] = useState(false);
   const [rosterAck, setRosterAck] = useState(false);
   const [deliveryAck, setDeliveryAck] = useState(false);
+  const [localPickup, setLocalPickup] = useState(false);
 
   // Returning visitor prefill (browser-local). Skipped when the identity is
   // already locked from an approved design.
@@ -158,6 +160,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
     jerseyStyle: hasJersey ? jerseyStyle : null,
     jerseyMaterial: hasJersey ? effectiveMaterial : null,
     rushShipping: prefill?.rush ?? false,
+    localPickup,
     requestedInHandAt: prefill?.neededBy ? new Date(`${prefill.neededBy}T12:00:00`) : null,
   };
   const submissionQuote = computeTeamOrderQuote(submissionOrder, submissionRosterForPricing);
@@ -184,7 +187,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn, deliveryTermsAccepted: true, specConfirmed: true }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn, localPickup, deliveryTermsAccepted: true, specConfirmed: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
@@ -201,7 +204,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items, designToken: prefill?.designToken, smsConsent: smsOptIn }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items, designToken: prefill?.designToken, smsConsent: smsOptIn, localPickup }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create link");
@@ -407,6 +410,13 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
           })}
         </div>
       </div>
+
+      <CustomerDeliveryChoice
+        localPickup={localPickup}
+        onChange={setLocalPickup}
+        rushShipping={prefill?.rush ?? false}
+        name="team-order-delivery-method"
+      />
 
       {/* Manual roster mode */}
       {mode === "manual" && (
