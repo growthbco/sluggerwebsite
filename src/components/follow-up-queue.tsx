@@ -26,13 +26,32 @@ const OUTCOMES: Array<{ value: Outcome; label: string }> = [
   { value: "not_interested", label: "Not interested" },
   { value: "do_not_call", label: "Do not call" },
 ];
-const STAGE_FILTERS: Array<{ key: StageFilter; label: string }> = [
-  { key: "all", label: "All stages" },
-  { key: "roster_incomplete", label: "Roster not submitted" },
-  { key: "deposit", label: "Deposit pending" },
-  { key: "approved_no_order", label: "Approved, no order" },
-  { key: "proof_review", label: "Proof feedback" },
-  { key: "design_fee", label: "Design fee" },
+const STAGE_FILTERS: Array<{ key: StageFilter; label: string; description: string }> = [
+  {
+    key: "all",
+    label: "All customer steps",
+    description: "Everyone in the selected call-queue status.",
+  },
+  {
+    key: "roster_incomplete",
+    label: "Finish roster",
+    description: "Order started and design approved, but names, numbers, or sizes are still missing.",
+  },
+  {
+    key: "deposit",
+    label: "Pay deposit",
+    description: "Deposit link was sent, but payment has not been completed.",
+  },
+  {
+    key: "approved_no_order",
+    label: "Start team order",
+    description: "Design approved, but the customer has not started an order or roster.",
+  },
+  {
+    key: "proof_review",
+    label: "Review proof",
+    description: "Proof sent; waiting for approval or requested changes.",
+  },
 ];
 const NEEDS_NEXT = new Set<Outcome>(["no_answer", "voicemail", "spoke_follow_up", "sent_link"]);
 const prettyLabel = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -103,7 +122,7 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
         filter.key,
         contacts.filter((contact) => contact.category === tab && (filter.key === "all" || contact.reasons.some((reason) => reason.kind === filter.key))).length,
       ]),
-    ) as Record<StageFilter, number>,
+    ) as Partial<Record<StageFilter, number>>,
     [contacts, tab],
   );
 
@@ -230,16 +249,23 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
         />
       </div>
       <div className="mt-4">
-        <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Filter by customer’s next step</p>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Filter by what the customer needs to do next</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
           {STAGE_FILTERS.map((filter) => (
             <button
               key={filter.key}
               type="button"
               onClick={() => setStage(filter.key)}
-              className={`min-h-[36px] rounded-md border px-3 text-xs transition-colors ${stage === filter.key ? "border-brand/60 bg-brand/10 text-brand" : "border-line text-muted hover:border-brand/40 hover:text-foreground"}`}
+              aria-pressed={stage === filter.key}
+              className={`min-h-[82px] rounded-lg border px-3 py-2.5 text-left transition-colors ${stage === filter.key ? "border-brand/60 bg-brand/10 text-brand" : "border-line text-muted hover:border-brand/40 hover:text-foreground"}`}
             >
-              {filter.label} · {stageCounts[filter.key]}
+              <span className="flex items-start justify-between gap-3">
+                <span className="display text-xs">{filter.label}</span>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] ${stage === filter.key ? "bg-brand/15" : "bg-black/20"}`}>
+                  {stageCounts[filter.key] ?? 0}
+                </span>
+              </span>
+              <span className="mt-1.5 block text-[11px] leading-4 opacity-80">{filter.description}</span>
             </button>
           ))}
         </div>
