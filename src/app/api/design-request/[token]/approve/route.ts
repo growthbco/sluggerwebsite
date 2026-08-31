@@ -66,7 +66,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     await postDesignThreadUpdate({
       threadId: request.discordThreadId ?? undefined,
       title: `✅ Approved - ${request.teamName} (${request.reference})`,
-      description: `Client approved ${approvedUrls.length === 1 ? "the design" : `${approvedUrls.length} designs`}. Their order (${provisionedOrder?.reference ?? "team order"}) is set up and they're filling their roster on the same link.\n\n⚠️ DO NOT START PRODUCTION YET. Approval is not payment - production starts only after the customer pays their 50% deposit.`,
+      description: `Client approved ${approvedUrls.length === 1 ? "the design" : `${approvedUrls.length} designs`}. Their order (${provisionedOrder?.reference ?? "team order"}) is set up and they're filling their roster on the same link.\n\n⚠️ DO NOT START PRODUCTION YET. Approval is not payment - production starts only after the customer pays ${provisionedOrder?.rushShipping ? "the Rush order in full" : "their 50% deposit"}.`,
       imageUrl: approvedUrls[0],
       username: "Slugger Design Requests",
     });

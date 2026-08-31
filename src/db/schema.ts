@@ -537,8 +537,8 @@ export const teamOrders = pgTable(
     // Two-stage invoicing: a 50% deposit starts production; the balance is
     // collected when the order is ready. Each is a one-time Stripe Payment
     // Link; payment lands via webhook.
-    invoiceUrl: text("invoice_url"), // deposit link
-    fullInvoiceUrl: text("full_invoice_url"), // optional pay-in-full link (sibling of deposit)
+    invoiceUrl: text("invoice_url"), // starting link: Standard deposit or required Rush pay-in-full
+    fullInvoiceUrl: text("full_invoice_url"), // pay-in-full link (same as invoiceUrl for Rush; optional sibling for Standard)
     depositCents: integer("deposit_cents"),
     depositPaidAt: timestamp("deposit_paid_at", { withTimezone: true }),
     balanceInvoiceUrl: text("balance_invoice_url"),

@@ -67,7 +67,7 @@ const SYSTEM_FEATURES = [
   },
   {
     t: "Pay Online, Your Way",
-    d: "Secure online checkout with a 50% deposit to start production and the balance when your order is ready. No checks, no chasing.",
+    d: "Standard orders can start with a 50% deposit. Rush orders are paid in full before production so nothing delays shipment.",
   },
   {
     t: "Controlled Add-Ons",

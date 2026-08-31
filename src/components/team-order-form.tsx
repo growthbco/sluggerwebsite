@@ -558,7 +558,9 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
           </button>
           <p className="text-xs text-muted">
             {hasApprovedDesign
-              ? "No payment now - we'll email your total and 50% deposit invoice."
+              ? prefill?.rush
+                ? "No payment now - we'll email your total and required Rush pay-in-full invoice."
+                : "No payment now - we'll email your total and 50% deposit invoice."
               : "Need to collect sizes first? Choose “Let players enter their own” above to create a draft roster link."}
           </p>
           <p className="text-xs text-muted">⏱ Working toward a deadline? Order as early as you can and build in a buffer. We push hard to hit every date, but carrier and shipping delays can happen and are outside our control - if your date is firm, tell us before you order and we&apos;ll be straight with you about it.</p>

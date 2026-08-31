@@ -492,7 +492,11 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                         {/* Shipping rides on the FINAL invoice: show the
                             charged amount once known, else the weight-based
                             estimate so the full number is visible up front. */}
-                        {o.localPickup ? (
+                        {o.rushShipping ? (
+                          <span className="text-xs text-sky-300 whitespace-nowrap" title="Direct shipping is included with Rush">
+                            + shipping included
+                          </span>
+                        ) : o.localPickup ? (
                           <span className="text-xs text-muted whitespace-nowrap" title="Local order - customer picks up in Ocala, no shipping">
                             + pickup
                           </span>
@@ -625,16 +629,18 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                               stage="balance"
                               resend={Boolean(o.balanceInvoiceUrl)}
                               localPickup={o.localPickup}
+                              rushShipping={o.rushShipping}
                             />
                           </>
                         ) : estimate ? (
                           <AdminInvoiceButton
                             teamOrderId={o.id}
                             teamName={o.teamName}
-                            dueCents={deposit}
+                            dueCents={o.rushShipping ? estimate : deposit}
                             stage="deposit"
                             resend={Boolean(o.invoiceUrl)}
                             warnPrintFile={Boolean(o.designRequestId) && !o.printFileVerifiedAt && personalizedOrders.has(o.id)}
+                            rushShipping={o.rushShipping}
                           />
                         ) : (
                           <span className="text-xs text-muted">no roster</span>
@@ -651,6 +657,8 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                                 teamName={o.teamName}
                                 depositPaid={Boolean(o.depositPaidAt)}
                                 suggestedDepositCents={estimate ? deposit : null}
+                                suggestedFullCents={estimate}
+                                rushShipping={o.rushShipping}
                               />
                             )}
                             {(o.invoiceUrl || estimate) && (
@@ -658,7 +666,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                                 href={`/api/admin/team-order/invoice-view?id=${o.id}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                title={paid ? "View the paid receipt (itemized, incl. shipping) - no Stripe login needed" : o.invoiceUrl ? "See a copy of the invoice the customer received" : "Preview the deposit invoice before sending it"}
+                                title={paid ? "View the paid receipt (itemized, incl. shipping) - no Stripe login needed" : o.invoiceUrl ? "See a copy of the invoice the customer received" : o.rushShipping ? "Preview the Rush pay-in-full invoice before sending it" : "Preview the deposit invoice before sending it"}
                                 className="text-xs display text-muted whitespace-nowrap"
                               >
                                 {paid ? "View receipt" : "View invoice"}

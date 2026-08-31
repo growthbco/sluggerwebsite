@@ -119,6 +119,7 @@ export default async function AdminPage() {
         depositPaidAt: teamOrders.depositPaidAt,
         invoiceUrl: teamOrders.invoiceUrl,
         invoicePaidAt: teamOrders.invoicePaidAt,
+        rushShipping: teamOrders.rushShipping,
         paymentNote: teamOrders.paymentNote,
         taxExempt: teamOrders.taxExempt,
         archivedAt: teamOrders.archivedAt,
@@ -257,7 +258,7 @@ export default async function AdminPage() {
     .map((o) => {
       const total = o.quotedTotalCents ?? 0;
       const deposit = o.depositCents ?? Math.round(total / 2);
-      const goodsDue = o.depositPaidAt ? total - deposit : deposit;
+      const goodsDue = o.depositPaidAt ? total - deposit : o.rushShipping ? total : deposit;
       return o.taxExempt ? goodsDue : goodsDue + Math.round(goodsDue * 0.07);
     })
     .filter((due) => due > 0);

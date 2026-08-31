@@ -40,6 +40,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
   // The order this design turned into (auto-provisioned on approval). Drives the
   // roster / deposit / tracking stages of the hub.
   const order = isApproved ? await getByDesignRequestId(request.id) : null;
+  const rushOrder = Boolean(order?.rushShipping);
 
   // Lifecycle flags off the team order.
   const submitted = order ? !["draft", "collecting"].includes(order.status) : false;
@@ -57,7 +58,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
   const stages: Stage[] = [
     { label: "Approve design", state: st(isApproved, !isApproved) },
     { label: "Roster & sizes", state: st(submitted, Boolean(isApproved && !submitted)) },
-    { label: "Deposit", state: st(depositDone, Boolean(depositReady && !depositDone)) },
+    { label: rushOrder ? "Payment" : "Deposit", state: st(depositDone, Boolean(depositReady && !depositDone)) },
     { label: shipped ? "Shipped" : "Final shipment", state: st(shipped, Boolean(depositDone && !shipped)) },
   ];
 
@@ -76,8 +77,10 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
       ? { title: "Finish your roster and review the price", body: "Add every athlete’s size, confirm the total, then submit.", href: "#roster", action: "Continue to roster ↓" }
       : !depositDone
         ? order.invoiceUrl
-          ? { title: "Pay the deposit", body: "Your roster is confirmed. The deposit starts production.", href: order.invoiceUrl, action: "Pay deposit →" }
-          : { title: "Deposit invoice is next", body: "Your roster is confirmed. We’ll email the invoice and place it here.", href: "#deposit", action: "View payment status ↓" }
+          ? rushOrder
+            ? { title: "Pay your Rush order in full", body: "Your roster is confirmed. Full payment starts Rush production.", href: order.invoiceUrl, action: "Pay in full →" }
+            : { title: "Pay the deposit", body: "Your roster is confirmed. The deposit starts production.", href: order.invoiceUrl, action: "Pay deposit →" }
+          : { title: rushOrder ? "Pay-in-full invoice is next" : "Deposit invoice is next", body: "Your roster is confirmed. We’ll email the invoice and place it here.", href: "#deposit", action: "View payment status ↓" }
         : shipped
           ? { title: "Your order shipped", body: "Use your carrier link to follow the delivery.", href: order?.trackingNumber ? trackingUrlForCarrier(order.trackingNumber, order.shipCarrier) : "#shipment", action: "Track shipment →" }
           : {
@@ -147,6 +150,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
           revisionsUsed={request.revisionsUsed ?? 0}
           maxRevisions={MAX_REVISIONS}
           whiteLabel={request.whiteLabel}
+          rush={request.rush}
         />
       </section>
 
@@ -158,28 +162,28 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
         </section>
       )}
 
-      {/* STAGE 3 - Deposit. Visible the moment a deposit invoice exists (even
+      {/* STAGE 3 - Payment. Visible the moment a starting invoice exists (even
           before the coach formally submits the roster), so the pay link never
-          dies into email. */}
+          dies into email. Rush requires full payment; Standard allows deposit. */}
       {isApproved && order && depositReady && (
         <section id="deposit" className="pt-6 border-t border-line scroll-mt-6">
-          <h2 className="display text-2xl text-foreground">Deposit</h2>
+          <h2 className="display text-2xl text-foreground">{rushOrder ? "Payment" : "Deposit"}</h2>
           {depositDone ? (
             <p className="mt-2 text-sm text-foreground bg-brand/10 border border-brand/40 px-4 py-3">
               ✓ {order.invoicePaidAt ? "Paid in full" : "Deposit received"} - thank you! We&apos;re moving your order into production.
             </p>
           ) : order.invoiceUrl ? (
             <div className="mt-2 space-y-3">
-              <p className="text-sm text-muted">A 50% deposit gets your order into production. Balance is due before we ship.</p>
+              <p className="text-sm text-muted">{rushOrder ? "Rush orders are paid in full before production starts. Direct shipping is included, so there is no later balance to chase." : "A 50% deposit gets your order into production. Balance is due before we ship."}</p>
               <Link
                 href={order.invoiceUrl}
                 className="inline-block clip-slant bg-brand text-on-brand display text-lg px-8 py-4 hover:bg-brand-dark transition-colors"
               >
-                Pay your deposit →
+                {rushOrder ? "Pay in full →" : "Pay your deposit →"}
               </Link>
             </div>
           ) : (
-            <p className="mt-2 text-sm text-muted">Once your roster is finalized, we&apos;ll email your deposit invoice - it will show up here too.</p>
+            <p className="mt-2 text-sm text-muted">Once your roster is finalized, we&apos;ll email your {rushOrder ? "pay-in-full" : "deposit"} invoice - it will show up here too.</p>
           )}
         </section>
       )}

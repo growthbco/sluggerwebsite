@@ -83,7 +83,9 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
   const needsDesign = designs.length > 1;
   const soleDesign = designs.length === 1 ? designs[0].label : "";
   const nextStepCopy = nextIsDeposit
-    ? "We'll email your total and the 50% deposit invoice to start production."
+    ? rushShipping
+      ? "We'll email your total and the required pay-in-full invoice. Rush production starts after full payment."
+      : "We'll email your total and the 50% deposit invoice to start production."
     : "We'll email your total and a design proof to approve.";
   const hasJersey = items.some((key) => key.includes("jersey"));
   const fixedSpeedoMaterial = hasJersey && usesSpeedoBaseballMaterial(jerseyStyle, sport);
@@ -534,7 +536,9 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
                       {status === "sending"
                         ? "Submitting…"
                         : nextIsDeposit
-                          ? "Confirm roster & receive deposit invoice"
+                          ? rushShipping
+                            ? "Confirm roster & receive pay-in-full invoice"
+                            : "Confirm roster & receive deposit invoice"
                           : "Confirm & submit order"}
                     </button>
                     <button

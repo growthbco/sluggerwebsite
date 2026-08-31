@@ -30,6 +30,9 @@ export async function POST(req: Request) {
   const [order] = await db.select().from(teamOrders).where(eq(teamOrders.id, body.teamOrderId)).limit(1);
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (order.invoicePaidAt) return NextResponse.json({ error: "Already paid in full." }, { status: 409 });
+  if (stage === "deposit" && order.rushShipping && !order.depositPaidAt) {
+    return NextResponse.json({ error: "Rush orders require full payment before production. Record this as paid in full." }, { status: 409 });
+  }
   if (stage === "deposit" && order.depositPaidAt) {
     return NextResponse.json({ error: "Deposit already recorded - record the balance instead." }, { status: 409 });
   }

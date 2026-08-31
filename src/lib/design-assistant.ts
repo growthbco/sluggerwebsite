@@ -48,6 +48,7 @@ export type OrderContext = {
   depositPaidAt: Date | null;
   invoicePaidAt: Date | null;
   shippedAt: Date | null;
+  rushShipping: boolean;
 };
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
@@ -110,7 +111,9 @@ function buildGrounding(design: DesignContext, order: OrderContext | null, messa
           ? "Paid in full - in production / preparing to ship"
           : order.depositPaidAt
             ? "50% deposit paid - production has started; the balance is due before shipping"
-            : "Not paid yet - a 50% deposit starts production",
+            : order.rushShipping
+              ? "Not paid yet - Rush requires payment in full before production starts"
+              : "Not paid yet - a 50% deposit starts production",
     );
   } else {
     projectLines.push("No team order linked yet - after the design is approved, the roster/order comes next.");
@@ -135,7 +138,7 @@ function buildGrounding(design: DesignContext, order: OrderContext | null, messa
     "- SPORT-SPECIFIC PRODUCTS AND PRICING - always answer using THIS PROJECT'S sport (shown under THIS PROJECT RIGHT NOW). NEVER assume baseball/softball. FLAG FOOTBALL uniforms are their own lightweight stretch-spandex products, priced separately: flag football game shirt $28, matching flag football shorts $28, or the full flag football uniform (shirt + shorts) $56 per player, names and numbers included. Flag football does NOT use baseball/softball pants, and the baseball/softball bundles below (Game Day, Home & Away, etc.) do NOT apply to it - NEVER quote a $40 pant or a baseball/softball bundle on a flag-football order. If a flag-football client asks about matching shorts/bottoms, the answer is the matching spandex flag football shorts at $28 (or the $56 full uniform for shirt + shorts). For ANY sport that is not baseball or softball (flag football, basketball, soccer, volleyball, etc.), do not quote pants or bundles unless that exact product and price is in the facts for that sport - if you are not sure of the price for that sport, say the team will confirm the exact pricing and offer a quick call; do not guess.",
     "- ORDER STRUCTURE for leagues / multiple teams: EACH team (each roster) is set up as its OWN separate order, even when several teams share the same design. Every team gets its own order number, its own tracking, and its own contact name on the order - that is how Slugger keeps big league orders organized. A shared, approved design CAN be reused across multiple teams, but you must NEVER tell a client to combine several teams' rosters under one order. If a client asks how a multi-team or league order works, or whether to split it, the answer is: yes, each team is its own separate order (own order number + tracking), and we reuse the approved design across them. Do not give logistics/order-structure advice that contradicts this - if unsure, tell them the team will set it up the best way and offer a quick call.",
     "- Discounts: possible, and they depend on the TOTAL number of pieces in the order - more pieces means more room to work. NEVER name a specific discount, percentage, or lower price. The right response: say we can work with them since it depends on piece count, ask what total or per-player number they were hoping to be at, and offer a quick phone call to land on a number - text (352) 414-7270.",
-    "- Payment flow: Slugger emails an invoice; a 50% deposit starts production and the balance (plus shipping) is due before the order ships. 7% Florida sales tax applies to goods.",
+    "- Payment flow: Standard orders may start with a 50% deposit, with the balance and shipping due before shipment. Rush orders require payment in full before production starts, and direct shipping is included with Rush. 7% Florida sales tax applies to goods.",
     "- Production: standard production is 3 weeks after final design approval, final roster submission, and deposit payment; shipping time is additional. Confirmed $100 rush targets 2 weeks. Deadlines inside 2 weeks require a manual priority quote. Hats are embroidered in-house and small hat orders are often ready in days.",
     "- Rush orders: rush is a flat $100 fee (priority production, ships direct to the client). Staff must confirm the deadline - never guarantee a date yourself; say the team is reviewing the order and will follow up.",
     "- TRACKING: customers receive tracking only for the FINAL shipment headed to them. For standard orders, that tracking is created after Slugger has the finished order in hand and prepares the outbound shipment. Tracking from a designer, factory, or supplier to Slugger is INTERNAL production tracking - never share it with the customer, never call it their tracking, and never imply that inbound production tracking means their order has shipped to them. Exception: when staff explicitly marks a production shipment DIRECT TO CUSTOMER, that number is final customer tracking; explain that the carrier may display the production origin and that Slugger remains the customer's point of contact.",
@@ -429,7 +432,7 @@ export type SmsThreadMsg = { direction: string; body: string; at: string };
 export type SmsCustomerContext = {
   emails: string[];
   spendCents: number;
-  orders: { reference: string; teamName: string; status: string; totalCents: number | null; paid: boolean; depositPaid: boolean }[];
+  orders: { reference: string; teamName: string; status: string; totalCents: number | null; paid: boolean; depositPaid: boolean; rushShipping: boolean }[];
   designs: { reference: string; teamName: string; status: string }[];
 };
 
@@ -458,7 +461,9 @@ export async function draftSmsReply(input: {
     .map((m) => `${m.direction === "in" ? "CUSTOMER" : m.direction === "note" ? "INTERNAL STAFF NOTE (customer never saw this)" : "SLUGGER"}: ${m.body}`)
     .join("\n");
   const orderLines = input.context.orders.map((o) => {
-    const meaning = ORDER_STATUS_MEANING[o.status] ?? o.status;
+    const meaning = o.rushShipping && o.status === "quoted"
+      ? "the Rush pay-in-full invoice went out and we are waiting on payment"
+      : ORDER_STATUS_MEANING[o.status] ?? o.status;
     return `- Order ${o.reference} (${o.teamName}): status "${o.status}" - ${meaning}.${o.totalCents ? ` Total ${money(o.totalCents)}.` : ""}${o.paid ? " Paid in full." : o.depositPaid ? " Deposit paid, balance still due." : ""}`;
   });
   const designLines = input.context.designs.map((d) => `- Design ${d.reference} (${d.teamName}): ${statusMeaning(d.status)}.`);

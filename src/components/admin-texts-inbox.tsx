@@ -38,6 +38,7 @@ type Context = {
     totalCents: number | null;
     paid: boolean;
     depositPaid: boolean;
+    rushShipping: boolean;
   }[];
   designs: {
     id: string;

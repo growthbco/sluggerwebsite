@@ -64,6 +64,7 @@ export default async function ManageDesignPage({ params }: { params: Promise<{ t
             : null
         }
         printFileVerified={Boolean(linkedOrder?.printFileVerifiedAt)}
+        rush={Boolean(linkedOrder?.rushShipping ?? request.rush)}
       />
 
       {(approved.length > 0 || otherProofs.length > 0) && (

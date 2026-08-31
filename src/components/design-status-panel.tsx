@@ -20,6 +20,7 @@ type Props = {
   revisionsUsed: number;
   maxRevisions: number;
   whiteLabel?: boolean;
+  rush?: boolean;
 };
 
 const STATUS_COPY: Record<string, { label: string; blurb: string }> = {
@@ -46,6 +47,7 @@ export function DesignStatusPanel({
   revisionsUsed,
   maxRevisions,
   whiteLabel = false,
+  rush = false,
 }: Props) {
   const [currentStatus, setCurrentStatus] = useState(status);
   // Multi-select: a project can have several finals (jersey, hat, pants, or a
@@ -70,7 +72,10 @@ export function DesignStatusPanel({
   const [used, setUsed] = useState(revisionsUsed);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const copy = STATUS_COPY[currentStatus] ?? { label: currentStatus, blurb: "" };
+  const baseCopy = STATUS_COPY[currentStatus] ?? { label: currentStatus, blurb: "" };
+  const copy = rush && currentStatus === "ordered"
+    ? { ...baseCopy, blurb: "Your roster is submitted. Full payment is the next step for Rush." }
+    : baseCopy;
   const isApproved = currentStatus === "approved" || currentStatus === "ordered";
   // When the roster lives on this same page (the unified hub passes a "#roster"
   // anchor), the post-approval CTA scrolls down instead of sending them to a
@@ -317,7 +322,7 @@ export function DesignStatusPanel({
                   Approving locks {selected.length > 1 ? "these designs" : "this design"} as your final artwork. Every logo, color, and design detail will be produced as shown.
                 </p>
                 <p className="mt-2 text-sm text-foreground/90">
-                  <strong>This does not start production or charge you.</strong> Next you&apos;ll confirm your roster, review the full price, and receive the deposit invoice.
+                  <strong>This does not start production or charge you.</strong> Next you&apos;ll confirm your roster, review the full price, and receive {rush ? "the required Rush pay-in-full invoice" : "the deposit invoice"}.
                 </p>
                 <label className="mt-4 flex items-start gap-2.5 text-sm text-foreground cursor-pointer select-none">
                   <input

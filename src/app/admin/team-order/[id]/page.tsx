@@ -130,6 +130,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
   const estimate = o.quotedTotalCents ?? (quote.totalCents > 0 ? quote.totalCents : null);
   const deposit = o.depositCents ?? (estimate ? Math.round(estimate / 2) : 0);
   const paid = Boolean(o.invoicePaidAt) || o.status === "paid" || o.status === "shipped";
+  const legacyRushDeposit = Boolean(o.rushShipping && o.depositPaidAt && !paid);
   const designBlocksOrder = !hasApprovedDesign && !o.timelineStartAt && !paid && !o.depositPaidAt;
   const parcels = estimateOrderParcelsOz(roster);
   const weightOz = parcels.apparelOz + parcels.hatOz;
@@ -174,7 +175,9 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
         : o.depositPaidAt
           ? { text: "Deposit paid, in production - send the final invoice when it's ready", tone: "text-sky-400" }
           : estimate
-            ? { text: o.invoiceUrl ? "Deposit invoice sent - waiting on payment" : "Roster in - send the 50% deposit invoice", tone: "text-amber-300" }
+            ? o.rushShipping
+              ? { text: o.invoiceUrl ? "Rush pay-in-full invoice sent - waiting on payment" : "Roster in - send the required Rush pay-in-full invoice", tone: "text-amber-300" }
+              : { text: o.invoiceUrl ? "Deposit invoice sent - waiting on payment" : "Roster in - send the 50% deposit invoice", tone: "text-amber-300" }
             : { text: "No roster yet - share the join link with the coach", tone: "text-muted" };
 
   // The ONE primary action for the current stage, surfaced in the Next step
@@ -194,11 +197,11 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
           ? <AdminShipButton kind="team_order" id={o.id} who={o.teamName} existingTracking={o.trackingNumber} label="Mark shipped + email customer" />
           : <AdminLabelButton kind="team_order" id={o.id} who={o.teamName} suggestedLb={Math.max(1, Math.round(((parcels.apparelOz || parcels.hatOz) / 16) * 10) / 10)} />
         : o.depositPaidAt
-          ? (estimate ? <AdminInvoiceButton teamOrderId={o.id} teamName={o.teamName} dueCents={estimate - deposit} stage="balance" resend={Boolean(o.balanceInvoiceUrl)} localPickup={o.localPickup} /> : null)
+          ? (estimate ? <AdminInvoiceButton teamOrderId={o.id} teamName={o.teamName} dueCents={estimate - deposit} stage="balance" resend={Boolean(o.balanceInvoiceUrl)} localPickup={o.localPickup} rushShipping={o.rushShipping} /> : null)
           : estimate
             ? o.invoiceUrl
-              ? <AdminRecordPayment teamOrderId={o.id} teamName={o.teamName} depositPaid={false} suggestedDepositCents={deposit} />
-              : <AdminInvoiceButton teamOrderId={o.id} teamName={o.teamName} dueCents={deposit} stage="deposit" resend={false} warnPrintFile={false} />
+              ? <AdminRecordPayment teamOrderId={o.id} teamName={o.teamName} depositPaid={false} suggestedDepositCents={deposit} suggestedFullCents={estimate} rushShipping={o.rushShipping} />
+              : <AdminInvoiceButton teamOrderId={o.id} teamName={o.teamName} dueCents={o.rushShipping ? estimate : deposit} stage="deposit" resend={false} warnPrintFile={false} rushShipping={o.rushShipping} />
             : <a href={`/team-order/manage/${o.manageToken}`} target="_blank" rel="noopener noreferrer" className="clip-slant bg-brand text-on-brand display text-sm px-5 py-2.5 hover:bg-brand-dark whitespace-nowrap">Open coach&apos;s page</a>;
 
   return (
@@ -344,7 +347,7 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
       </Section>
 
       {/* Payment */}
-      <Section title="Payment" hint="Two-stage invoicing: 50% deposit starts production, the balance is due before shipping.">
+      <Section title="Payment" hint={legacyRushDeposit ? "This Rush order predates the pay-in-full rule. Collect its final balance before it ships." : o.rushShipping ? "Rush orders must be paid in full before production starts. Direct shipping is included." : "Two-stage invoicing: 50% deposit starts production, the balance is due before shipping."}>
         {!paid && o.quotedTotalCents != null && quote.totalCents > 0 && quote.totalCents !== o.quotedTotalCents && (
           <div className="mb-4">
             <AdminRequote teamOrderId={o.id} lockedCents={o.quotedTotalCents} rosterCents={quote.totalCents} />
@@ -352,9 +355,9 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
         )}
         <dl className="grid sm:grid-cols-4 gap-4">
           <Field label="Order total">{estimate ? money(estimate) : "-"}{estimate && !o.quotedTotalCents ? <span className="text-xs text-muted"> est.</span> : null}</Field>
-          <Field label="Deposit (50%)">{deposit ? money(deposit) : "-"} {o.depositPaidAt ? <span className="text-green-400">paid {fmtDate(o.depositPaidAt)}</span> : <span className="text-muted">not paid</span>}</Field>
-          <Field label="Balance">{estimate ? money(Math.max(0, estimate - (o.depositPaidAt ? deposit : 0))) : "-"} {paid ? <span className="text-green-400">paid</span> : null}</Field>
-          <Field label="Shipping">{paid || o.depositPaidAt ? (o.shippingChargedCents != null ? money(o.shippingChargedCents) : o.localPickup ? "pickup" : "on final invoice") : o.localPickup ? "free pickup" : `~${money(shipEstimate)} est.`}</Field>
+          <Field label={legacyRushDeposit ? "Deposit received (legacy)" : o.rushShipping ? "Required before production" : "Deposit (50%)"}>{legacyRushDeposit ? money(deposit) : estimate && o.rushShipping ? money(estimate) : deposit ? money(deposit) : "-"} {o.depositPaidAt ? <span className="text-green-400">paid {fmtDate(o.depositPaidAt)}</span> : <span className="text-muted">not paid</span>}</Field>
+          <Field label="Balance">{estimate ? money(o.rushShipping && !legacyRushDeposit ? 0 : Math.max(0, estimate - (o.depositPaidAt ? deposit : 0))) : "-"} {paid ? <span className="text-green-400">paid</span> : null}</Field>
+          <Field label="Shipping">{o.rushShipping ? "included with Rush" : paid || o.depositPaidAt ? (o.shippingChargedCents != null ? money(o.shippingChargedCents) : o.localPickup ? "pickup" : "on final invoice") : o.localPickup ? "free pickup" : `~${money(shipEstimate)} est.`}</Field>
           <Field label="Package protection">
             {o.shippingProtectionCents > 0
               ? `${money(o.shippingProtectionCoveredCents)} of ${money(o.shippingProtectionValueCents)} assigned to labels`
@@ -379,10 +382,10 @@ export default async function AdminTeamOrderDetail({ params }: { params: Promise
               Next step banner above. Secondary here: record an offline balance
               payment, resend the deposit invoice, and view the invoice/receipt. */}
           {!paid && o.depositPaidAt && estimate && (
-            <AdminRecordPayment teamOrderId={o.id} teamName={o.teamName} depositPaid suggestedDepositCents={deposit} />
+            <AdminRecordPayment teamOrderId={o.id} teamName={o.teamName} depositPaid suggestedDepositCents={deposit} suggestedFullCents={estimate} rushShipping={o.rushShipping} />
           )}
           {!paid && !o.depositPaidAt && o.invoiceUrl && estimate && (
-            <AdminInvoiceButton teamOrderId={o.id} teamName={o.teamName} dueCents={deposit} stage="deposit" resend warnPrintFile={false} />
+            <AdminInvoiceButton teamOrderId={o.id} teamName={o.teamName} dueCents={o.rushShipping ? estimate : deposit} stage="deposit" resend warnPrintFile={false} rushShipping={o.rushShipping} />
           )}
           {(o.invoiceUrl || estimate) && (
             <a href={`/api/admin/team-order/invoice-view?id=${o.id}`} target="_blank" rel="noopener noreferrer" className="text-sm display text-muted border border-line px-3 py-1.5 hover:border-brand/50 hover:text-foreground">
