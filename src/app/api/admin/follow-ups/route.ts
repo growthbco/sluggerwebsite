@@ -16,6 +16,8 @@ const OUTCOMES = {
   completed: { label: "Done", status: "closed", needsNext: false },
   not_interested: { label: "Not interested", status: "closed", needsNext: false },
   do_not_call: { label: "Do not call", status: "do_not_call", needsNext: false },
+  archive: { label: "Archived", status: "archived", needsNext: false },
+  restore: { label: "Restored to call queue", status: "active", needsNext: false },
   reopen: { label: "Reopened", status: "active", needsNext: false },
 } as const;
 
@@ -64,12 +66,15 @@ export async function POST(req: Request) {
 
   const db = getDb();
   const [existing] = await db
-    .select({ doNotCallAt: smsContacts.doNotCallAt })
+    .select({ doNotCallAt: smsContacts.doNotCallAt, followUpStatus: smsContacts.followUpStatus })
     .from(smsContacts)
     .where(eq(smsContacts.phone, phone))
     .limit(1);
   if (existing?.doNotCallAt && outcome !== "reopen") {
     return NextResponse.json({ error: "This contact is on the do-not-call list." }, { status: 409 });
+  }
+  if (outcome === "restore" && existing?.followUpStatus !== "archived") {
+    return NextResponse.json({ error: "Only archived contacts can be restored." }, { status: 409 });
   }
 
   const now = new Date();

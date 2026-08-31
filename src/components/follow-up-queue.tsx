@@ -6,12 +6,14 @@ import { useRouter } from "next/navigation";
 import type { ContactFollowUp, FollowUpCategory } from "@/lib/contact-follow-ups";
 
 type Outcome = "no_answer" | "voicemail" | "spoke_follow_up" | "sent_link" | "needs_gary" | "completed" | "not_interested" | "do_not_call";
+type QueueAction = Outcome | "archive" | "restore";
 
 const TABS: Array<{ key: FollowUpCategory; label: string }> = [
   { key: "due", label: "Call now" },
   { key: "scheduled", label: "Scheduled" },
   { key: "needs_gary", label: "Needs Gary" },
   { key: "closed", label: "Closed" },
+  { key: "archived", label: "Archived" },
 ];
 const OUTCOMES: Array<{ value: Outcome; label: string }> = [
   { value: "no_answer", label: "No answer" },
@@ -24,6 +26,7 @@ const OUTCOMES: Array<{ value: Outcome; label: string }> = [
   { value: "do_not_call", label: "Do not call" },
 ];
 const NEEDS_NEXT = new Set<Outcome>(["no_answer", "voicemail", "spoke_follow_up", "sent_link"]);
+const prettyLabel = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 const prettyPhone = (phone: string) => {
   const digits = phone.replace(/\D/g, "").slice(-10);
@@ -37,6 +40,20 @@ const fmt = (value: string) =>
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
+  });
+const fmtDate = (value: string) =>
+  new Date(value).toLocaleDateString("en-US", {
+    timeZone: "America/New_York",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+const fmtRequestedDate = (value: string) =>
+  new Date(value).toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 const age = (value: string, asOf: string) => {
   const days = Math.max(0, Math.floor((new Date(asOf).getTime() - new Date(value).getTime()) / 86_400_000));
@@ -64,17 +81,17 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
   const [outcome, setOutcome] = useState<Outcome>("no_answer");
   const [note, setNote] = useState("");
   const [nextAt, setNextAt] = useState(defaultNextCall);
-  const [busy, setBusy] = useState(false);
+  const [busyPhone, setBusyPhone] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const visible = contacts.filter((contact) => {
     if (contact.category !== tab) return false;
     const needle = query.trim().toLowerCase();
     if (!needle) return true;
-    return `${contact.name} ${contact.phone} ${contact.teams.join(" ")} ${contact.reasons.map((reason) => `${reason.label} ${reason.reference}`).join(" ")}`.toLowerCase().includes(needle);
+    return `${contact.name} ${contact.phone} ${contact.teams.join(" ")} ${contact.reasons.map((reason) => `${reason.label} ${reason.reference}`).join(" ")} ${contact.orderHistory.map((order) => `${order.reference} ${order.teamName ?? ""} ${order.items.join(" ")}`).join(" ")} ${contact.designHistory.map((design) => `${design.reference} ${design.teamName} ${design.products.join(" ")}`).join(" ")}`.toLowerCase().includes(needle);
   });
 
-  function openNotes(phone: string) {
+  function openDetails(phone: string) {
     setOpenPhone((current) => current === phone ? null : phone);
     setOutcome("no_answer");
     setNote("");
@@ -82,8 +99,8 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
     setError("");
   }
 
-  async function save(contact: ContactFollowUp) {
-    setBusy(true);
+  async function save(contact: ContactFollowUp, selectedOutcome: QueueAction = outcome) {
+    setBusyPhone(contact.phone);
     setError("");
     try {
       const response = await fetch("/api/admin/follow-ups", {
@@ -92,9 +109,9 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
         body: JSON.stringify({
           phone: contact.phone,
           name: contact.name,
-          outcome,
-          note,
-          nextFollowUpAt: NEEDS_NEXT.has(outcome) ? new Date(nextAt).toISOString() : null,
+          outcome: selectedOutcome,
+          note: selectedOutcome === outcome ? note : "",
+          nextFollowUpAt: selectedOutcome === outcome && NEEDS_NEXT.has(outcome) ? new Date(nextAt).toISOString() : null,
           references: contact.reasons.map((reason) => reason.reference),
         }),
       });
@@ -106,8 +123,13 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save follow-up");
     } finally {
-      setBusy(false);
+      setBusyPhone(null);
     }
+  }
+
+  function archive(contact: ContactFollowUp) {
+    if (!window.confirm(`Archive ${contact.name} from the active call queue? Their history and notes will be kept.`)) return;
+    void save(contact, "archive");
   }
 
   return (
@@ -146,6 +168,7 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
           className="min-h-[42px] w-full rounded-md border border-line bg-steel px-3 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none sm:w-72"
         />
       </div>
+      {error && <p className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>}
 
       <section className="mt-5 space-y-3">
         {visible.length === 0 && (
@@ -183,7 +206,7 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2 lg:justify-end">
-                  {!contact.doNotCall && contact.category !== "closed" && (
+                  {!contact.doNotCall && contact.category !== "closed" && contact.category !== "archived" && (
                     <button
                       type="button"
                       onClick={() => window.dispatchEvent(new CustomEvent("slugger-dial", { detail: { phone: contact.phone } }))}
@@ -202,17 +225,104 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
                   )}
                   <button
                     type="button"
-                    onClick={() => openNotes(contact.phone)}
+                    onClick={() => openDetails(contact.phone)}
                     className="display min-h-[42px] rounded-md border border-line px-4 text-sm text-foreground hover:border-brand/50"
                   >
-                    {open ? "Close notes" : `Notes${contact.notes.length ? ` · ${contact.notes.length}` : ""}`}
+                    {open ? "Close details" : `Details & notes${contact.notes.length ? ` · ${contact.notes.length}` : ""}`}
                   </button>
+                  {contact.category === "archived" ? (
+                    <button
+                      type="button"
+                      disabled={busyPhone === contact.phone}
+                      onClick={() => void save(contact, "restore")}
+                      className="display min-h-[42px] rounded-md border border-brand/50 px-4 text-sm text-brand hover:bg-brand/10 disabled:opacity-50"
+                    >
+                      {busyPhone === contact.phone ? "Restoring…" : "Restore"}
+                    </button>
+                  ) : !contact.doNotCall ? (
+                    <button
+                      type="button"
+                      disabled={busyPhone === contact.phone}
+                      onClick={() => archive(contact)}
+                      className="display min-h-[42px] rounded-md border border-line px-4 text-sm text-muted hover:border-red-400/50 hover:text-red-200 disabled:opacity-50"
+                    >
+                      {busyPhone === contact.phone ? "Archiving…" : "Archive"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
               {open && (
-                <div className="grid gap-5 border-t border-line bg-background/25 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.8fr)]">
-                  <div>
+                <div className="border-t border-line bg-background/25 p-4 sm:p-5">
+                  <section>
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <h3 className="display text-sm text-foreground">Order history</h3>
+                      <p className="text-xs text-muted">{contact.orderHistory.length} {contact.orderHistory.length === 1 ? "order" : "orders"} on file</p>
+                    </div>
+                    {contact.orderHistory.length === 0 ? (
+                      <p className="mt-3 rounded-md border border-line bg-steel px-3 py-4 text-sm text-muted">No previous order is tied to this phone number or email.</p>
+                    ) : (
+                      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                        {contact.orderHistory.map((order) => (
+                          <article key={`${order.kind}:${order.id}`} className="rounded-lg border border-line bg-steel p-3.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="display text-sm text-foreground">{order.reference}</p>
+                              <div className="flex gap-1.5">
+                                {order.archived && <span className="rounded-full border border-line px-2 py-0.5 text-[10px] uppercase text-muted">Archived</span>}
+                                <span className="rounded-full border border-brand/30 bg-brand/10 px-2 py-0.5 text-[10px] uppercase text-brand">{prettyLabel(order.status)}</span>
+                              </div>
+                            </div>
+                            <p className="mt-1 text-xs text-muted">
+                              {order.kind === "team" ? "Team order" : "Online order"}
+                              {order.teamName ? ` · ${order.teamName}` : ""}
+                              {order.sport ? ` · ${prettyLabel(order.sport)}` : ""}
+                            </p>
+                            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                              <div><dt className="text-muted">Started</dt><dd className="mt-0.5 text-foreground">{fmtDate(order.createdAt)}</dd></div>
+                              <div><dt className="text-muted">Payment</dt><dd className="mt-0.5 text-foreground">{order.paymentState}</dd></div>
+                              <div className="col-span-2"><dt className="text-muted">Items</dt><dd className="mt-0.5 text-foreground">{order.items.length ? order.items.map(prettyLabel).join(" · ") : "Not selected yet"}{order.quantity ? ` · ${order.quantity} pcs` : ""}</dd></div>
+                              {order.requestedInHandAt && <div><dt className="text-muted">Requested in hand</dt><dd className="mt-0.5 text-foreground">{fmtRequestedDate(order.requestedInHandAt)}</dd></div>}
+                              {order.shippedAt && <div><dt className="text-muted">Shipped</dt><dd className="mt-0.5 text-foreground">{fmtDate(order.shippedAt)}</dd></div>}
+                            </dl>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="mt-6 border-t border-line pt-5">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <h3 className="display text-sm text-foreground">Design history</h3>
+                      <p className="text-xs text-muted">{contact.designHistory.length} {contact.designHistory.length === 1 ? "request" : "requests"} on file</p>
+                    </div>
+                    <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                      {contact.designHistory.map((design) => (
+                        <article key={design.id} className="rounded-lg border border-line bg-steel p-3.5">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="display text-sm text-foreground">{design.reference}</p>
+                            <div className="flex gap-1.5">
+                              {design.archived && <span className="rounded-full border border-line px-2 py-0.5 text-[10px] uppercase text-muted">Archived</span>}
+                              <span className="rounded-full border border-brand/30 bg-brand/10 px-2 py-0.5 text-[10px] uppercase text-brand">{prettyLabel(design.status)}</span>
+                            </div>
+                          </div>
+                          <p className="mt-1 text-xs text-muted">{design.teamName}{design.sport ? ` · ${prettyLabel(design.sport)}` : ""} · Started {fmtDate(design.createdAt)}</p>
+                          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                            <div><dt className="text-muted">Design fee</dt><dd className="mt-0.5 text-foreground">{design.feeState}</dd></div>
+                            {design.estimatedPieces && <div><dt className="text-muted">Estimated pieces</dt><dd className="mt-0.5 text-foreground">{design.estimatedPieces}</dd></div>}
+                            {design.products.length > 0 && <div className="col-span-2"><dt className="text-muted">Products</dt><dd className="mt-0.5 text-foreground">{design.products.join(" · ")}</dd></div>}
+                            {design.colors && <div className="col-span-2"><dt className="text-muted">Colors</dt><dd className="mt-0.5 text-foreground">{design.colors}</dd></div>}
+                            {design.neededBy && <div><dt className="text-muted">Needed by</dt><dd className="mt-0.5 text-foreground">{fmtRequestedDate(design.neededBy)}</dd></div>}
+                            {design.proofSentAt && <div><dt className="text-muted">Proof sent</dt><dd className="mt-0.5 text-foreground">{fmtDate(design.proofSentAt)}</dd></div>}
+                            {design.approvedAt && <div><dt className="text-muted">Approved</dt><dd className="mt-0.5 text-foreground">{fmtDate(design.approvedAt)}</dd></div>}
+                            {design.vision && <div className="col-span-2"><dt className="text-muted">Customer’s idea</dt><dd className="mt-0.5 whitespace-pre-wrap leading-5 text-foreground">{design.vision}</dd></div>}
+                          </dl>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+
+                  <div className="mt-6 grid gap-5 border-t border-line pt-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.8fr)]">
+                    <div>
                     <h3 className="display text-sm text-foreground">Contact notes</h3>
                     <div className="mt-3 space-y-2">
                       {contact.notes.length === 0 && <p className="text-sm text-muted">No notes yet.</p>}
@@ -223,8 +333,8 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
                         </div>
                       ))}
                     </div>
-                  </div>
-                  {contact.category !== "closed" && !contact.doNotCall && (
+                    </div>
+                  {contact.category !== "closed" && contact.category !== "archived" && !contact.doNotCall && (
                     <div>
                       <h3 className="display text-sm text-foreground">Log this call</h3>
                       <label className="mt-3 block text-xs text-muted">
@@ -244,12 +354,12 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
                         </label>
                       )}
                       {outcome === "do_not_call" && <p className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs leading-5 text-red-200">This permanently removes the number from the call queue until staff reopens it.</p>}
-                      {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
-                      <button type="button" disabled={busy || (NEEDS_NEXT.has(outcome) && !nextAt)} onClick={() => void save(contact)} className="display mt-4 min-h-[44px] w-full rounded-md bg-brand px-4 text-sm text-on-brand hover:bg-brand-dark disabled:opacity-50">
-                        {busy ? "Saving…" : "Save outcome"}
+                      <button type="button" disabled={busyPhone === contact.phone || (NEEDS_NEXT.has(outcome) && !nextAt)} onClick={() => void save(contact)} className="display mt-4 min-h-[44px] w-full rounded-md bg-brand px-4 text-sm text-on-brand hover:bg-brand-dark disabled:opacity-50">
+                        {busyPhone === contact.phone ? "Saving…" : "Save outcome"}
                       </button>
                     </div>
                   )}
+                  </div>
                 </div>
               )}
             </article>

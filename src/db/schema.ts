@@ -1127,7 +1127,7 @@ export const smsContacts = pgTable("sms_contacts", {
   lastReadAt: timestamp("last_read_at", { withTimezone: true }),
   // Human follow-up state for the call queue. The actual note history lives
   // in sms_messages as internal notes so it is also visible in Conversations.
-  followUpStatus: text("follow_up_status"), // active | scheduled | needs_gary | closed | do_not_call
+  followUpStatus: text("follow_up_status"), // active | scheduled | needs_gary | closed | archived | do_not_call
   nextFollowUpAt: timestamp("next_follow_up_at", { withTimezone: true }),
   followUpUpdatedAt: timestamp("follow_up_updated_at", { withTimezone: true }),
   followUpUpdatedBy: text("follow_up_updated_by"),
