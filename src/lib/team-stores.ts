@@ -49,7 +49,8 @@ export const STORE_ITEM_PRESETS: StoreItem[] = [
   { key: "socks", label: "Custom Socks", priceCents: 1500, sizes: SOCK_SIZES, weightOz: 3 },
   // Flexfit i8503 size range.
   { key: "fitted_hat", label: "Fitted Hat", priceCents: 3000, sizes: ["XS", "S/M", "L/XL", "XXL"], weightOz: 5, numberAddOnCents: 500 },
-  { key: "snapback_hat", label: "Snapback Hat", priceCents: 2500, sizes: ["One Size"], weightOz: 5, numberAddOnCents: 500 },
+  { key: "snapback_hat", label: "Base Snapback Hat", priceCents: 3000, sizes: ["One Size"], weightOz: 5, numberAddOnCents: 500 },
+  { key: "performance_hat", label: "Performance Cap", priceCents: 3800, sizes: ["One Size"], weightOz: 5, numberAddOnCents: 500 },
 ];
 
 // Shipping margin: customers are charged carrier cost + 25% (covers

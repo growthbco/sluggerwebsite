@@ -39,6 +39,7 @@ const ITEM_ICONS: Record<string, string> = {
   two_button_jersey: "👕",
   full_button_jersey: "👕",
   reversible_basketball: "🏀",
+  practice_jersey: "👕",
   polo: "👕",
   polo_pin_dot: "👕",
   hoodie: "🧥",
@@ -50,6 +51,7 @@ const ITEM_ICONS: Record<string, string> = {
   socks: "🧦",
   fitted_hat: "🧢",
   snapback_hat: "🧢",
+  performance_hat: "🧢",
 };
 
 /** Buyer-facing team store: pick items, personalize, pay via Stripe.
@@ -78,7 +80,7 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
     (acc, sel) => {
       const item = items.find((i) => i.key === sel.key);
       const w = (item?.weightOz ?? 12) * sel.quantity;
-      if (sel.key === "fitted_hat" || sel.key === "snapback_hat") acc.hatOz += w;
+      if (sel.key === "fitted_hat" || sel.key === "snapback_hat" || sel.key === "performance_hat") acc.hatOz += w;
       else acc.apparelOz += w;
       return acc;
     },
