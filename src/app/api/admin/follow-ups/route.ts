@@ -21,7 +21,7 @@ const OUTCOMES = {
   reopen: { label: "Reopened", status: "active", needsNext: false },
 } as const;
 
-type Outcome = keyof typeof OUTCOMES;
+type Outcome = keyof typeof OUTCOMES | "note";
 
 function fallbackName(phone: string) {
   const digits = phone.replace(/\D/g, "").slice(-10);
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   try { body = await req.json(); } catch {}
   const phone = toE164(body.phone);
   const outcome = body.outcome as Outcome;
-  const config = OUTCOMES[outcome];
+  const config = outcome === "note" ? null : OUTCOMES[outcome];
   const name = (body.name ?? "").trim().slice(0, 80);
   const note = (body.note ?? "").trim().slice(0, 1200);
   const references = (body.references ?? [])
@@ -47,6 +47,44 @@ export async function POST(req: Request) {
     .slice(0, 10);
 
   if (!phone) return NextResponse.json({ error: "Valid phone number required." }, { status: 400 });
+  if (outcome !== "note" && !config) return NextResponse.json({ error: "Choose a valid outcome." }, { status: 400 });
+  if (outcome === "note") {
+    if (note.length < 2) return NextResponse.json({ error: "Write a short note before saving." }, { status: 400 });
+    const now = new Date();
+    const savedName = name || fallbackName(phone);
+    const refLine = references.length ? ` · ${references.join(", ")}` : "";
+    const messageBody = `VA note${refLine}\n${note}`;
+    let savedNote: { id: string; body: string; staff: string | null; createdAt: string } | null = null;
+    try {
+      const db = getDb();
+      const [, insertedNotes] = await db.batch([
+        db
+          .insert(smsContacts)
+          .values({ phone, name: savedName })
+          .onConflictDoUpdate({ target: smsContacts.phone, set: { name: savedName } }),
+        db
+          .insert(smsMessages)
+          .values({
+            phone,
+            direction: "note",
+            channel: "sms",
+            body: messageBody,
+            staff: gate.session.name,
+            createdAt: now,
+          })
+          .returning({ id: smsMessages.id }),
+      ]);
+      savedNote = { id: insertedNotes[0].id, body: messageBody, staff: gate.session.name, createdAt: now.toISOString() };
+    } catch (error) {
+      console.error("[follow-ups] could not save note", { phoneLast4: phone.slice(-4), error });
+      return NextResponse.json({ error: "Could not save note. Please try again." }, { status: 500 });
+    }
+    console.info("[follow-ups] note saved", { phoneLast4: phone.slice(-4), staff: gate.session.name, references: references.length });
+    return NextResponse.json({
+      ok: true,
+      note: savedNote,
+    });
+  }
   if (!config) return NextResponse.json({ error: "Choose a valid outcome." }, { status: 400 });
   if (outcome === "reopen" && gate.session.role === "follow_up") {
     return NextResponse.json({ error: "Only staff can reopen a do-not-call contact." }, { status: 403 });
@@ -92,20 +130,36 @@ export async function POST(req: Request) {
   const refLine = references.length ? ` · ${references.join(", ")}` : "";
   const messageBody = `Follow-up · ${config.label}${refLine}${note ? `\n${note}` : ""}${nextLine}`;
 
-  await db.transaction(async (tx) => {
-    await tx
-      .insert(smsContacts)
-      .values({ phone, ...state })
-      .onConflictDoUpdate({ target: smsContacts.phone, set: state });
-    await tx.insert(smsMessages).values({
-      phone,
-      direction: "note",
-      channel: "sms",
-      body: messageBody,
-      staff: gate.session.name,
-      createdAt: now,
-    });
-  });
+  try {
+    await db.batch([
+      db
+        .insert(smsContacts)
+        .values({ phone, ...state })
+        .onConflictDoUpdate({ target: smsContacts.phone, set: state }),
+      db.insert(smsMessages).values({
+        phone,
+        direction: "note",
+        channel: "sms",
+        body: messageBody,
+        staff: gate.session.name,
+        createdAt: now,
+      }),
+    ]);
+  } catch (error) {
+    console.error("[follow-ups] could not save outcome", { outcome, phoneLast4: phone.slice(-4), error });
+    return NextResponse.json({ error: "Could not save follow-up. Please try again." }, { status: 500 });
+  }
 
-  return NextResponse.json({ ok: true });
+  const category = config.status === "archived"
+    ? "archived"
+    : config.status === "closed" || config.status === "do_not_call"
+      ? "closed"
+      : config.status === "needs_gary"
+        ? "needs_gary"
+        : config.status === "scheduled"
+          ? "scheduled"
+          : "due";
+  console.info("[follow-ups] outcome saved", { outcome, category, phoneLast4: phone.slice(-4), staff: gate.session.name });
+
+  return NextResponse.json({ ok: true, category });
 }

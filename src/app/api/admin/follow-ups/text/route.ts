@@ -47,21 +47,40 @@ export async function POST(req: Request) {
     followUpUpdatedAt: now,
     followUpUpdatedBy: gate.session.name,
   };
-  await getDb().transaction(async (tx) => {
-    await tx
-      .insert(smsContacts)
-      .values({ phone, ...state })
-      .onConflictDoUpdate({ target: smsContacts.phone, set: state });
-    await tx.insert(smsMessages).values({
-      phone,
-      direction: "out",
-      channel: "sms",
-      body: reason.textMessage!,
-      staff: gate.session.name,
+  const db = getDb();
+  try {
+    await db.batch([
+      db
+        .insert(smsContacts)
+        .values({ phone, ...state })
+        .onConflictDoUpdate({ target: smsContacts.phone, set: state }),
+      db.insert(smsMessages).values({
+        phone,
+        direction: "out",
+        channel: "sms",
+        body: reason.textMessage!,
+        staff: gate.session.name,
+        twilioSid: result.sid ?? null,
+        createdAt: now,
+      }),
+    ]);
+  } catch (error) {
+    // The SMS may already have been accepted by Twilio, so log the SID and
+    // return success with a warning rather than encouraging a duplicate send.
+    console.error("[follow-ups/text] sent but could not save follow-up state", {
+      phoneLast4: phone.slice(-4),
+      reference,
       twilioSid: result.sid ?? null,
-      createdAt: now,
+      error,
     });
-  });
+    return NextResponse.json({
+      ok: true,
+      nextFollowUpAt: nextFollowUpAt.toISOString(),
+      warning: "The text was sent, but the follow-up record could not be updated. Tell Gary before sending it again.",
+    });
+  }
+
+  console.info("[follow-ups/text] pickup link sent", { phoneLast4: phone.slice(-4), reference, staff: gate.session.name });
 
   return NextResponse.json({ ok: true, nextFollowUpAt: nextFollowUpAt.toISOString() });
 }

@@ -99,16 +99,21 @@ function defaultNextCall() {
 
 export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFollowUp[]; asOf: string; canText: boolean }) {
   const router = useRouter();
+  const [categoryOverrides, setCategoryOverrides] = useState<Partial<Record<string, FollowUpCategory>>>({});
   const counts = useMemo(
-    () => Object.fromEntries(TABS.map((tab) => [tab.key, contacts.filter((contact) => contact.category === tab.key).length])) as Record<FollowUpCategory, number>,
-    [contacts],
+    () => Object.fromEntries(TABS.map((tab) => [tab.key, contacts.filter((contact) => (categoryOverrides[contact.phone] ?? contact.category) === tab.key).length])) as Record<FollowUpCategory, number>,
+    [contacts, categoryOverrides],
   );
   const [tab, setTab] = useState<FollowUpCategory>(() => (counts.due ? "due" : counts.needs_gary ? "needs_gary" : counts.scheduled ? "scheduled" : "closed"));
   const [stage, setStage] = useState<StageFilter>("all");
   const [query, setQuery] = useState("");
   const [openPhone, setOpenPhone] = useState<string | null>(null);
+  const [pickupPhone, setPickupPhone] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<Outcome>("no_answer");
-  const [note, setNote] = useState("");
+  const [outcomeNote, setOutcomeNote] = useState("");
+  const [quickNote, setQuickNote] = useState("");
+  const [noteBusy, setNoteBusy] = useState(false);
+  const [addedNotes, setAddedNotes] = useState<Record<string, ContactFollowUp["notes"]>>({});
   const [nextAt, setNextAt] = useState(defaultNextCall);
   const [busyPhone, setBusyPhone] = useState<string | null>(null);
   const [textPhone, setTextPhone] = useState<string | null>(null);
@@ -116,18 +121,19 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
   const [textBusy, setTextBusy] = useState(false);
   const [textSuccessPhone, setTextSuccessPhone] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const stageCounts = useMemo(
     () => Object.fromEntries(
       STAGE_FILTERS.map((filter) => [
         filter.key,
-        contacts.filter((contact) => contact.category === tab && (filter.key === "all" || contact.reasons.some((reason) => reason.kind === filter.key))).length,
+        contacts.filter((contact) => (categoryOverrides[contact.phone] ?? contact.category) === tab && (filter.key === "all" || contact.reasons.some((reason) => reason.kind === filter.key))).length,
       ]),
     ) as Partial<Record<StageFilter, number>>,
-    [contacts, tab],
+    [contacts, tab, categoryOverrides],
   );
 
   const visible = contacts.filter((contact) => {
-    if (contact.category !== tab) return false;
+    if ((categoryOverrides[contact.phone] ?? contact.category) !== tab) return false;
     if (stage !== "all" && !contact.reasons.some((reason) => reason.kind === stage)) return false;
     const needle = query.trim().toLowerCase();
     if (!needle) return true;
@@ -136,12 +142,15 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
 
   function openDetails(contact: ContactFollowUp) {
     const firstReason = contact.reasons.find((reason) => reason.resumeUrl && reason.textMessage);
-    setOpenPhone((current) => current === contact.phone ? null : contact.phone);
+    const closing = openPhone === contact.phone;
+    setOpenPhone(closing ? null : contact.phone);
+    if (closing) setPickupPhone(null);
     setTextPhone(contact.phone);
     setTextReference(firstReason?.reference ?? "");
     setTextSuccessPhone(null);
     setOutcome("no_answer");
-    setNote("");
+    setOutcomeNote("");
+    setQuickNote("");
     setNextAt(defaultNextCall());
     setError("");
   }
@@ -149,10 +158,24 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
   function openPickupTool(contact: ContactFollowUp) {
     const firstReason = contact.reasons.find((reason) => reason.resumeUrl && reason.textMessage);
     if (!firstReason) return;
+    if (pickupPhone === contact.phone) {
+      setPickupPhone(null);
+      setOpenPhone(null);
+      return;
+    }
     setOpenPhone(contact.phone);
+    setPickupPhone(contact.phone);
     setTextPhone(contact.phone);
     setTextReference(firstReason.reference);
     setTextSuccessPhone(null);
+    setQuickNote("");
+    setError("");
+  }
+
+  function openNotes(contact: ContactFollowUp) {
+    setOpenPhone(contact.phone);
+    setPickupPhone(null);
+    setQuickNote("");
     setError("");
   }
 
@@ -160,6 +183,7 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
     setTextBusy(true);
     setTextSuccessPhone(null);
     setError("");
+    setSuccess("");
     try {
       const response = await fetch("/api/admin/follow-ups/text", {
         method: "POST",
@@ -169,6 +193,11 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Could not send pickup link");
       setTextSuccessPhone(contact.phone);
+      setPickupPhone(null);
+      setOpenPhone(null);
+      setSuccess(data.warning
+        ? `Pickup link sent to ${contact.name}. ${data.warning}`
+        : `Pickup link sent to ${contact.name}. Their next follow-up is scheduled in two days.`);
       setTab("scheduled");
       setStage("all");
       router.refresh();
@@ -182,6 +211,7 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
   async function save(contact: ContactFollowUp, selectedOutcome: QueueAction = outcome) {
     setBusyPhone(contact.phone);
     setError("");
+    setSuccess("");
     try {
       const response = await fetch("/api/admin/follow-ups", {
         method: "POST",
@@ -190,15 +220,24 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
           phone: contact.phone,
           name: contact.name,
           outcome: selectedOutcome,
-          note: selectedOutcome === outcome ? note : "",
+          note: selectedOutcome === outcome ? outcomeNote : "",
           nextFollowUpAt: selectedOutcome === outcome && NEEDS_NEXT.has(outcome) ? new Date(nextAt).toISOString() : null,
           references: contact.reasons.map((reason) => reason.reference),
         }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Could not save follow-up");
+      if (data.category) {
+        setCategoryOverrides((current) => ({ ...current, [contact.phone]: data.category as FollowUpCategory }));
+      }
       setOpenPhone(null);
-      setNote("");
+      setPickupPhone(null);
+      setOutcomeNote("");
+      setSuccess(selectedOutcome === "archive"
+        ? `${contact.name} moved to Archived.`
+        : selectedOutcome === "restore"
+          ? `${contact.name} restored to Call now.`
+          : `${OUTCOMES.find((item) => item.value === selectedOutcome)?.label ?? "Follow-up"} saved for ${contact.name}.`);
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save follow-up");
@@ -207,8 +246,46 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
     }
   }
 
+  async function saveNote(contact: ContactFollowUp) {
+    const body = quickNote.trim();
+    if (body.length < 2) {
+      setError("Write a short note before saving.");
+      return;
+    }
+    setNoteBusy(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch("/api/admin/follow-ups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: contact.phone,
+          name: contact.name,
+          outcome: "note",
+          note: body,
+          references: contact.reasons.map((reason) => reason.reference),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not save note");
+      if (data.note) {
+        setAddedNotes((current) => ({
+          ...current,
+          [contact.phone]: [data.note, ...(current[contact.phone] ?? [])],
+        }));
+      }
+      setQuickNote("");
+      setSuccess(`Note saved for ${contact.name}.`);
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not save note");
+    } finally {
+      setNoteBusy(false);
+    }
+  }
+
   function archive(contact: ContactFollowUp) {
-    if (!window.confirm(`Archive ${contact.name} from the active call queue? Their history and notes will be kept.`)) return;
     void save(contact, "archive");
   }
 
@@ -271,6 +348,12 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
         </div>
       </div>
       {error && <p className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>}
+      {success && (
+        <div role="status" className="mt-4 flex items-center justify-between gap-3 rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-200">
+          <span>{success}</span>
+          <button type="button" onClick={() => setSuccess("")} className="shrink-0 text-xs underline underline-offset-2">Dismiss</button>
+        </div>
+      )}
 
       <section className="mt-5 space-y-3">
         {visible.length === 0 && (
@@ -281,8 +364,11 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
         )}
         {visible.map((contact) => {
           const open = openPhone === contact.phone;
+          const category = categoryOverrides[contact.phone] ?? contact.category;
           const pickupReasons = contact.reasons.filter((reason) => reason.resumeUrl && reason.textMessage);
           const selectedPickupReason = pickupReasons.find((reason) => reason.reference === textReference) ?? pickupReasons[0];
+          const notes = [...(addedNotes[contact.phone] ?? []), ...contact.notes]
+            .filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index);
           return (
             <article key={contact.phone} className="overflow-hidden rounded-xl border border-line bg-steel">
               <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
@@ -290,7 +376,7 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="display truncate text-lg text-foreground">{contact.name}</h2>
                     {contact.doNotCall && <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-red-300">Do not call</span>}
-                    {contact.category === "needs_gary" && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-200">Needs Gary</span>}
+                    {category === "needs_gary" && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-200">Needs Gary</span>}
                   </div>
                   <p className="mt-0.5 text-sm text-muted">{prettyPhone(contact.phone)}{contact.teams.length ? ` · ${contact.teams.join(", ")}` : ""}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -300,17 +386,17 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
                       </span>
                     ))}
                   </div>
-                  {contact.nextFollowUpAt && contact.category === "scheduled" && (
+                  {contact.nextFollowUpAt && category === "scheduled" && (
                     <p className="mt-3 text-xs text-brand">Next call: {fmt(contact.nextFollowUpAt)} ET</p>
                   )}
-                  {contact.notes[0] && (
+                  {notes[0] && (
                     <p className="mt-3 line-clamp-2 text-xs leading-5 text-muted">
-                      Latest note: {contact.notes[0].body.replaceAll("\n", " ")} · {contact.notes[0].staff ?? "Staff"}
+                      Latest note: {notes[0].body.replaceAll("\n", " ")} · {notes[0].staff ?? "Staff"}
                     </p>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2 lg:justify-end">
-                  {!contact.doNotCall && contact.category !== "closed" && contact.category !== "archived" && (
+                  {!contact.doNotCall && category !== "closed" && category !== "archived" && (
                     <button
                       type="button"
                       onClick={() => window.dispatchEvent(new CustomEvent("slugger-dial", { detail: { phone: contact.phone } }))}
@@ -327,23 +413,30 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
                       Text
                     </Link>
                   )}
-                  {pickupReasons.length > 0 && !contact.doNotCall && contact.category !== "closed" && contact.category !== "archived" && (
+                  {pickupReasons.length > 0 && !contact.doNotCall && category !== "closed" && category !== "archived" && (
                     <button
                       type="button"
                       onClick={() => openPickupTool(contact)}
                       className="display min-h-[42px] rounded-md border border-brand/50 bg-brand/10 px-4 text-sm text-brand hover:bg-brand/20"
                     >
-                      Text pickup link
+                      {pickupPhone === contact.phone ? "Close pickup link" : "Text pickup link"}
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => openNotes(contact)}
+                    className="display min-h-[42px] rounded-md border border-brand/50 px-4 text-sm text-brand hover:bg-brand/10"
+                  >
+                    Add note
+                  </button>
                   <button
                     type="button"
                     onClick={() => openDetails(contact)}
                     className="display min-h-[42px] rounded-md border border-line px-4 text-sm text-foreground hover:border-brand/50"
                   >
-                    {open ? "Close details" : `Details & notes${contact.notes.length ? ` · ${contact.notes.length}` : ""}`}
+                    {open ? "Close details" : `Details & notes${notes.length ? ` · ${notes.length}` : ""}`}
                   </button>
-                  {contact.category === "archived" ? (
+                  {category === "archived" ? (
                     <button
                       type="button"
                       disabled={busyPhone === contact.phone}
@@ -367,7 +460,7 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
 
               {open && (
                 <div className="border-t border-line bg-background/25 p-4 sm:p-5">
-                  {pickupReasons.length > 0 && !contact.doNotCall && contact.category !== "closed" && contact.category !== "archived" && (
+                  {pickupPhone === contact.phone && pickupReasons.length > 0 && !contact.doNotCall && category !== "closed" && category !== "archived" && (
                     <section className="mb-6 rounded-lg border border-brand/50 bg-brand/[0.08] p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
@@ -375,7 +468,16 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
                           <h3 className="display mt-1 text-lg text-foreground">Text a secure pickup link</h3>
                           <p className="mt-1 text-xs leading-5 text-muted">The link is generated from this customer’s actual order or design. After sending, the next follow-up is scheduled for two days.</p>
                         </div>
-                        {textSuccessPhone === contact.phone && <span className="rounded-full border border-green-500/40 bg-green-500/10 px-3 py-1 text-xs text-green-300">Text sent</span>}
+                        <div className="flex items-center gap-2">
+                          {textSuccessPhone === contact.phone && <span className="rounded-full border border-green-500/40 bg-green-500/10 px-3 py-1 text-xs text-green-300">Text sent</span>}
+                          <button
+                            type="button"
+                            onClick={() => { setPickupPhone(null); setOpenPhone(null); }}
+                            className="min-h-[36px] rounded-md border border-line px-3 text-xs text-muted hover:border-brand/50 hover:text-foreground"
+                          >
+                            Close
+                          </button>
+                        </div>
                       </div>
                       {pickupReasons.length > 1 && (
                         <label className="mt-4 block text-xs text-muted">
@@ -405,6 +507,43 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
                       </button>
                     </section>
                   )}
+                  <section className="mb-6 rounded-lg border border-line bg-steel/55 p-4">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.18em] text-brand">VA workspace</p>
+                        <h3 className="display mt-1 text-base text-foreground">Contact notes</h3>
+                      </div>
+                      <p className="text-xs text-muted">{notes.length} {notes.length === 1 ? "note" : "notes"}</p>
+                    </div>
+                    <label className="mt-3 block text-xs text-muted">
+                      Add a note without changing the call status
+                      <textarea
+                        value={quickNote}
+                        onChange={(event) => setQuickNote(event.target.value)}
+                        rows={3}
+                        maxLength={1200}
+                        placeholder="What did the customer say? What should the next person know?"
+                        className="mt-1 w-full rounded-md border border-line bg-background/50 px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      disabled={noteBusy || quickNote.trim().length < 2}
+                      onClick={() => void saveNote(contact)}
+                      className="display mt-3 min-h-[42px] rounded-md bg-brand px-4 text-sm text-on-brand hover:bg-brand-dark disabled:opacity-50"
+                    >
+                      {noteBusy ? "Saving note…" : "Save note"}
+                    </button>
+                    <div className="mt-4 space-y-2">
+                      {notes.length === 0 && <p className="text-sm text-muted">No notes yet.</p>}
+                      {notes.map((item) => (
+                        <div key={item.id} className="rounded-md border border-line bg-background/35 px-3 py-2.5">
+                          <p className="whitespace-pre-wrap text-sm leading-5 text-foreground/90">{item.body}</p>
+                          <p className="mt-1 text-[10px] text-muted">{item.staff ?? "Staff"} · {fmt(item.createdAt)} ET</p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
                   <section>
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <h3 className="display text-sm text-foreground">Order history</h3>
@@ -472,21 +611,8 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
                     </div>
                   </section>
 
-                  <div className="mt-6 grid gap-5 border-t border-line pt-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.8fr)]">
-                    <div>
-                    <h3 className="display text-sm text-foreground">Contact notes</h3>
-                    <div className="mt-3 space-y-2">
-                      {contact.notes.length === 0 && <p className="text-sm text-muted">No notes yet.</p>}
-                      {contact.notes.map((item) => (
-                        <div key={item.id} className="rounded-md border border-line bg-steel px-3 py-2.5">
-                          <p className="whitespace-pre-wrap text-sm leading-5 text-foreground/90">{item.body}</p>
-                          <p className="mt-1 text-[10px] text-muted">{item.staff ?? "Staff"} · {fmt(item.createdAt)} ET</p>
-                        </div>
-                      ))}
-                    </div>
-                    </div>
-                  {contact.category !== "closed" && contact.category !== "archived" && !contact.doNotCall && (
-                    <div>
+                  {category !== "closed" && category !== "archived" && !contact.doNotCall && (
+                    <section className="mt-6 max-w-xl border-t border-line pt-5">
                       <h3 className="display text-sm text-foreground">Log this call</h3>
                       <label className="mt-3 block text-xs text-muted">
                         Outcome
@@ -495,8 +621,8 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
                         </select>
                       </label>
                       <label className="mt-3 block text-xs text-muted">
-                        Notes
-                        <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={4} maxLength={1200} placeholder="What did they say? What should the next person know?" className="mt-1 w-full rounded-md border border-line bg-steel px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none" />
+                        Notes from this call
+                        <textarea value={outcomeNote} onChange={(event) => setOutcomeNote(event.target.value)} rows={4} maxLength={1200} placeholder="What happened on this call?" className="mt-1 w-full rounded-md border border-line bg-steel px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none" />
                       </label>
                       {NEEDS_NEXT.has(outcome) && (
                         <label className="mt-3 block text-xs text-muted">
@@ -508,9 +634,8 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
                       <button type="button" disabled={busyPhone === contact.phone || (NEEDS_NEXT.has(outcome) && !nextAt)} onClick={() => void save(contact)} className="display mt-4 min-h-[44px] w-full rounded-md bg-brand px-4 text-sm text-on-brand hover:bg-brand-dark disabled:opacity-50">
                         {busyPhone === contact.phone ? "Saving…" : "Save outcome"}
                       </button>
-                    </div>
+                    </section>
                   )}
-                  </div>
                 </div>
               )}
             </article>
