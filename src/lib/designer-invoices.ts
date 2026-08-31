@@ -211,6 +211,7 @@ export async function getBilledOrderRefs(excludeInvoiceId?: string): Promise<Map
     if (r.status === "void") continue;
     if (excludeInvoiceId && r.id === excludeInvoiceId) continue;
     for (const l of r.lines ?? []) {
+      if (l.chargeType === "rush_shipping") continue;
       if (l.teamOrderId && !map.has(l.teamOrderId)) map.set(l.teamOrderId, r.reference);
     }
   }
@@ -231,6 +232,7 @@ export async function getBilledPieceCounts(excludeInvoiceId?: string): Promise<M
     if (excludeInvoiceId && r.id === excludeInvoiceId) continue;
     const date = (r.paidAt ?? r.submittedAt)?.toISOString() ?? null;
     for (const l of r.lines ?? []) {
+      if (l.chargeType === "rush_shipping") continue;
       if (!l.teamOrderId) continue;
       const qty = Math.max(0, l.qty ?? 0);
       const prev = map.get(l.teamOrderId);
@@ -488,6 +490,7 @@ export type DesignerInvoiceLineInput = {
   unitCents: number;
   teamOrderId?: string;
   orderRef?: string;
+  chargeType?: "garment" | "rush_shipping";
 };
 
 export type CreateDesignerInvoiceInput = {
@@ -516,13 +519,14 @@ async function buildInvoiceLines(inputLines: DesignerInvoiceLineInput[], exclude
 
   return inputLines
     .map((l) => {
-      const qty = Math.max(0, Math.round(Number(l.qty) || 0));
+      const chargeType = l.chargeType === "rush_shipping" ? "rush_shipping" as const : "garment" as const;
+      const qty = chargeType === "rush_shipping" ? 1 : Math.max(0, Math.round(Number(l.qty) || 0));
       const unitCents = Math.max(0, Math.round(Number(l.unitCents) || 0));
       const matched = l.teamOrderId ? ourByOrder.get(l.teamOrderId) : undefined;
       let alreadyBilledOn: string | undefined;
       // Default reconciliation target = our full current piece count.
-      let ourQty = matched?.pieces;
-      if (l.teamOrderId) {
+      let ourQty = chargeType === "garment" ? matched?.pieces : undefined;
+      if (l.teamOrderId && chargeType === "garment") {
         const prior = billedBefore.get(l.teamOrderId)?.pieces ?? 0;
         const soFar = runningThisInvoice.get(l.teamOrderId) ?? 0;
         if (matched?.pieces != null) {
@@ -544,13 +548,16 @@ async function buildInvoiceLines(inputLines: DesignerInvoiceLineInput[], exclude
         // A linked line uses our canonical order identity. This prevents a
         // tampered request from attaching an unrelated team name to a paid id.
         team: String(matched?.teamName ?? l.team ?? "").slice(0, 120),
-        garment: String(l.garment ?? "").slice(0, 120),
+        garment: chargeType === "rush_shipping"
+          ? `Rush shipping${matched?.reference ? ` · ${matched.reference}` : ""}`
+          : String(l.garment ?? "").slice(0, 120),
         qty,
         unitCents,
         teamOrderId: l.teamOrderId,
         orderRef: matched?.reference ?? l.orderRef,
         ourQty,
-        ourUnitCents: matched?.unitCostCents,
+        ourUnitCents: chargeType === "garment" ? matched?.unitCostCents : undefined,
+        chargeType,
         ...(alreadyBilledOn ? { alreadyBilledOn } : {}),
       };
     })
@@ -708,6 +715,7 @@ export type InvoiceReconciliation = {
     orderRef?: string;
     ourQty?: number;
     ourUnitCents?: number;
+    chargeType: "garment" | "rush_shipping";
     qtyMismatch: boolean;
     unitCostOverage: boolean;
     alreadyBilledOn?: string;
@@ -722,11 +730,14 @@ export function reconcileInvoice(
   expectedUnitByOrder: ReadonlyMap<string, number> = new Map(),
 ): InvoiceReconciliation {
   const lineChecks = (inv.lines ?? []).map((l) => {
-    const qtyMismatch = typeof l.ourQty === "number" && l.ourQty !== l.qty;
+    const chargeType = l.chargeType === "rush_shipping" ? "rush_shipping" as const : "garment" as const;
+    const qtyMismatch = chargeType === "garment" && typeof l.ourQty === "number" && l.ourQty !== l.qty;
     // New invoices snapshot the rate. The map lets old submitted invoices use
     // the current matched-order rate without rewriting their history.
-    const ourUnitCents = l.ourUnitCents ?? (l.teamOrderId ? expectedUnitByOrder.get(l.teamOrderId) : undefined);
-    const unitCostOverage = typeof ourUnitCents === "number" && l.unitCents > ourUnitCents;
+    const ourUnitCents = chargeType === "garment"
+      ? l.ourUnitCents ?? (l.teamOrderId ? expectedUnitByOrder.get(l.teamOrderId) : undefined)
+      : undefined;
+    const unitCostOverage = chargeType === "garment" && typeof ourUnitCents === "number" && l.unitCents > ourUnitCents;
     return {
       team: l.team,
       garment: l.garment,
@@ -736,14 +747,18 @@ export function reconcileInvoice(
       orderRef: l.orderRef,
       ourQty: l.ourQty,
       ourUnitCents,
+      chargeType,
       qtyMismatch,
       unitCostOverage,
       alreadyBilledOn: l.alreadyBilledOn,
     };
   });
+  const goodsSubtotalCents = lineChecks
+    .filter((line) => line.chargeType === "garment")
+    .reduce((sum, line) => sum + line.lineCents, 0);
   return {
-    dutyBps: dutyRateBps(inv.subtotalCents, inv.dutyCents),
-    dutyFlag: isDutyOutOfBand(inv.subtotalCents, inv.dutyCents),
+    dutyBps: dutyRateBps(goodsSubtotalCents, inv.dutyCents),
+    dutyFlag: isDutyOutOfBand(goodsSubtotalCents, inv.dutyCents),
     lineChecks,
     anyQtyMismatch: lineChecks.some((l) => l.qtyMismatch),
     anyUnitCostOverage: lineChecks.some((l) => l.unitCostOverage),
