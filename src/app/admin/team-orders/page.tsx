@@ -31,6 +31,8 @@ import { AdminCustomerPickupButton } from "@/components/admin-customer-pickup-bu
 import { AdminRowMenu } from "@/components/admin-row-menu";
 import { AdminCustomPrice } from "@/components/admin-custom-price";
 import { AdminInboundTracking } from "@/components/admin-inbound-tracking";
+import { AdminFinalMockup } from "@/components/admin-final-mockup";
+import { AdminPickupReadyText } from "@/components/admin-pickup-ready-text";
 import {
   buildDeliveryTimeline,
   type DeliveryRisk,
@@ -115,6 +117,8 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
         teamName: designRequests.teamName,
         approvedAt: designRequests.approvedAt,
         neededBy: designRequests.neededBy,
+        approvedDesignUrl: designRequests.approvedDesignUrl,
+        approvedDesignUrls: designRequests.approvedDesignUrls,
         archivedAt: designRequests.archivedAt,
         updatedAt: designRequests.updatedAt,
       })
@@ -126,7 +130,10 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
         reference: teamOrders.reference,
         teamName: teamOrders.teamName,
         status: teamOrders.status,
+        contactName: teamOrders.contactName,
         contactEmail: teamOrders.contactEmail,
+        contactPhone: teamOrders.contactPhone,
+        smsOptInAt: teamOrders.smsOptInAt,
         manageToken: teamOrders.manageToken,
         jerseyStyle: teamOrders.jerseyStyle,
         rushShipping: teamOrders.rushShipping,
@@ -195,6 +202,15 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
   }
 
   const activeDesigns = designs.filter((d) => !d.archivedAt);
+  const finalMockupsByDesign = new Map(
+    designs.map((design) => [
+      design.id,
+      Array.from(new Set([
+        ...(design.approvedDesignUrls ?? []),
+        ...(design.approvedDesignUrl ? [design.approvedDesignUrl] : []),
+      ])),
+    ]),
+  );
   // Designs a standalone order can be manually linked to.
   const linkableDesigns = activeDesigns.map((d) => ({ id: d.id, teamName: d.teamName, reference: d.reference }));
   const activeOrders = torders.filter((o) => !o.archivedAt);
@@ -410,14 +426,15 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
 
       <section className="mt-4 scroll-mt-16" id="team-orders">
         <div className="overflow-x-auto rounded-xl border border-line bg-steel/30">
-          <table className="w-full min-w-[860px] text-sm">
+          <table className="w-full min-w-[940px] text-sm">
             <thead>
               <tr className="bg-steel text-left text-[10px] tracking-wider text-muted uppercase">
-                <th className="w-[27%] px-4 py-3">Team / order</th>
-                <th className="w-[13%] px-3 py-3">Stage</th>
-                <th className="w-[18%] px-3 py-3">Order value</th>
-                <th className="w-[34%] px-3 py-3">Next action / fulfillment</th>
-                <th className="w-[8%] px-3 py-3">Updated</th>
+                <th className="w-[24%] px-4 py-3">Team / order</th>
+                <th className="w-[8%] px-3 py-3">Final</th>
+                <th className="w-[12%] px-3 py-3">Stage</th>
+                <th className="w-[17%] px-3 py-3">Order value</th>
+                <th className="w-[32%] px-3 py-3">Next action / fulfillment</th>
+                <th className="w-[7%] px-3 py-3">Updated</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[color:var(--line)]">
@@ -427,6 +444,10 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                 const deposit = o.depositCents ?? (estimate ? Math.round(estimate / 2) : 0);
                 const timeline = orderTimelines.get(o.id)!;
                 const customerDate = timeline.promisedInHandAt ?? timeline.requestedInHandAt;
+                const finalMockups = Array.from(new Set([
+                  ...(o.designRequestId ? finalMockupsByDesign.get(o.designRequestId) ?? [] : []),
+                  ...(o.approvedDesignUrl ? [o.approvedDesignUrl] : []),
+                ]));
                 return (
                   <tr
                     key={o.reference}
@@ -447,6 +468,9 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                         <span className="truncate max-w-[15rem]">{o.contactEmail}</span>
                         <span title={o.source ?? "unknown (pre-tracking)"}>{srcShort(o.source)}</span>
                       </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <AdminFinalMockup teamName={o.teamName} images={finalMockups} />
                     </td>
                     <td className="px-3 py-3"><Badge label={o.localPickup && o.deliveredAt ? "picked_up" : o.status} /></td>
                     <td className="px-3 py-3 text-foreground">
@@ -550,6 +574,14 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                           o.localPickup && !o.deliveredAt ? (
                             <>
                               <span className="text-xs display text-amber-400 whitespace-nowrap">PICKUP NEEDS CONFIRMATION</span>
+                              <AdminPickupReadyText
+                                teamOrderId={o.id}
+                                teamName={o.teamName}
+                                reference={o.reference}
+                                contactName={o.contactName}
+                                phoneLast4={o.contactPhone?.replace(/\D/g, "").slice(-4) || null}
+                                disabledReason={!o.contactPhone ? "No customer phone number on this order." : !o.smsOptInAt ? "Customer did not opt in to SMS updates." : undefined}
+                              />
                               <AdminCustomerPickupButton teamOrderId={o.id} teamName={o.teamName} />
                             </>
                           ) : (
@@ -562,6 +594,14 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                           o.localPickup ? (
                             <>
                               <span className="text-xs display text-green-400 whitespace-nowrap">PAID · LOCAL PICKUP</span>
+                              <AdminPickupReadyText
+                                teamOrderId={o.id}
+                                teamName={o.teamName}
+                                reference={o.reference}
+                                contactName={o.contactName}
+                                phoneLast4={o.contactPhone?.replace(/\D/g, "").slice(-4) || null}
+                                disabledReason={!o.contactPhone ? "No customer phone number on this order." : !o.smsOptInAt ? "Customer did not opt in to SMS updates." : undefined}
+                              />
                               <AdminCustomerPickupButton teamOrderId={o.id} teamName={o.teamName} />
                             </>
                           ) : o.trackingNumber ? (
@@ -676,7 +716,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                 );
               })}
               <tr data-empty-for="orders" className="hidden">
-                <td colSpan={5} className="px-5 py-10 text-center text-sm text-muted">No team orders match those filters.</td>
+                <td colSpan={6} className="px-5 py-10 text-center text-sm text-muted">No team orders match those filters.</td>
               </tr>
             </tbody>
           </table>
