@@ -66,6 +66,7 @@ export default async function DesignerInvoicePage({
       teamOrderId: l.teamOrderId,
       ourQty: l.ourQty,
       ourUnitCents: l.ourUnitCents ?? (l.teamOrderId ? expectedUnitByOrder.get(l.teamOrderId) : undefined),
+      chargeType: l.chargeType,
     })),
   }));
   const paid: PaidInvoice[] = paidRows.map((inv) => ({

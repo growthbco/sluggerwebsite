@@ -1265,6 +1265,10 @@ export const designerInvoices = pgTable(
           // Stored with the line so later price-list edits cannot hide an
           // overcharge on an older invoice.
           ourUnitCents?: number;
+          // Separates non-piece rush freight from produced garments. Shipping
+          // remains order-linked for payment verification but never changes
+          // billed garment counts or contract-rate reconciliation.
+          chargeType?: "garment" | "rush_shipping";
           // If this order was already billed on an earlier (non-void) invoice,
           // the ref it was billed on. Guards against paying for it twice.
           alreadyBilledOn?: string;
@@ -1273,7 +1277,8 @@ export const designerInvoices = pgTable(
       .notNull()
       .default([]),
 
-    subtotalCents: integer("subtotal_cents").notNull().default(0), // goods only
+    // Sum of itemized lines (garments plus any linked rush shipping).
+    subtotalCents: integer("subtotal_cents").notNull().default(0),
     dutyCents: integer("duty_cents").notNull().default(0), // the "Tex" line, as entered
     previousBalanceCents: integer("previous_balance_cents").notNull().default(0), // carryover
     totalCents: integer("total_cents").notNull().default(0), // what he's asking for

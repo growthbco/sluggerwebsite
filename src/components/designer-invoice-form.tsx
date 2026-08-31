@@ -12,6 +12,7 @@ type Line = {
   teamOrderId?: string;
   ourQty?: number;
   expectedUnitCents?: number;
+  chargeType?: "garment" | "rush_shipping";
 };
 
 // An already-submitted (still unpaid) invoice the designer can reopen and edit.
@@ -26,7 +27,7 @@ export type EditableInvoice = {
   submittedAt: string | null;
   vendorRef?: string | null;
   attachmentUrls?: string[];
-  lines: { team: string; garment: string; qty: number; unitCents: number; teamOrderId?: string; ourQty?: number; ourUnitCents?: number }[];
+  lines: { team: string; garment: string; qty: number; unitCents: number; teamOrderId?: string; ourQty?: number; ourUnitCents?: number; chargeType?: "garment" | "rush_shipping" }[];
 };
 
 // A paid invoice - read-only history, like a customer's past orders.
@@ -92,16 +93,22 @@ export function DesignerInvoiceForm({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("unbilled");
+  const [replacingIndex, setReplacingIndex] = useState<number | null>(null);
 
   const num = (s: string) => Math.max(0, Number(s) || 0);
 
-  const subtotal = useMemo(() => lines.reduce((s, l) => s + num(l.qty) * num(l.unit), 0), [lines]);
+  const goodsSubtotal = useMemo(() => lines.reduce((s, l) => l.chargeType === "rush_shipping" ? s : s + num(l.qty) * num(l.unit), 0), [lines]);
+  const rushShippingTotal = useMemo(() => lines.reduce((s, l) => l.chargeType === "rush_shipping" ? s + num(l.qty) * num(l.unit) : s, 0), [lines]);
+  const subtotal = goodsSubtotal + rushShippingTotal;
   const dutyN = num(duty);
   const total = subtotal + dutyN;
-  const dutyPct = subtotal > 0 ? (dutyN / subtotal) * 100 : 0;
-  const dutyOutOfBand = subtotal > 0 && dutyN > 0 && (dutyPct < 15 || dutyPct > 19);
+  const dutyPct = goodsSubtotal > 0 ? (dutyN / goodsSubtotal) * 100 : 0;
+  const dutyOutOfBand = goodsSubtotal > 0 && dutyN > 0 && (dutyPct < 15 || dutyPct > 19);
 
-  const addedIds = useMemo(() => new Set(lines.map((l) => l.teamOrderId).filter(Boolean)), [lines]);
+  const addedIds = useMemo(() => new Set(lines
+    .filter((l, index) => l.chargeType !== "rush_shipping" && index !== replacingIndex)
+    .map((l) => l.teamOrderId)
+    .filter(Boolean)), [lines, replacingIndex]);
 
   // Counts per filter, before search - drives the tab labels.
   const counts = useMemo(() => {
@@ -136,9 +143,7 @@ export function DesignerInvoiceForm({
       : o.garments.map((g) => `${g.qty} ${g.garment}`).join(", ") || "Order";
     // For a shop order the buyer is the identity; for a team order it's the team.
     const label = o.kind === "order" ? `${o.teamName}` : o.teamName;
-    setLines((prev) => [
-      ...prev,
-      {
+    const nextLine: Line = {
         team: label.trim(),
         garment: `${garment} · ${o.reference}`,
         qty: String(qty),
@@ -146,13 +151,51 @@ export function DesignerInvoiceForm({
         teamOrderId: o.teamOrderId,
         ourQty: qty,
         expectedUnitCents: o.unitCostCents,
-      },
-    ]);
+        chargeType: "garment",
+      };
+    if (replacingIndex != null) {
+      setLines((prev) => prev.map((line, index) => index === replacingIndex ? nextLine : line));
+      setReplacingIndex(null);
+      setQuery("");
+      return;
+    }
+    setLines((prev) => [...prev, nextLine]);
   }
 
   const update = (i: number, field: keyof Line, val: string) =>
     setLines((p) => p.map((l, idx) => (idx === i ? { ...l, [field]: val } : l)));
-  const remove = (i: number) => setLines((p) => p.filter((_, idx) => idx !== i));
+  const remove = (i: number) => {
+    setLines((p) => p.filter((_, idx) => idx !== i));
+    setReplacingIndex((current) => current == null ? null : current === i ? null : current > i ? current - 1 : current);
+  };
+
+  function replaceJob(i: number) {
+    setReplacingIndex(i);
+    setFilter("unbilled");
+    setQuery("");
+    setError(null);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function addRushShipping(i: number) {
+    const source = lines[i];
+    if (!source?.teamOrderId || source.chargeType === "rush_shipping") return;
+    const alreadyAdded = lines.some((line) => line.chargeType === "rush_shipping" && line.teamOrderId === source.teamOrderId);
+    if (alreadyAdded) return;
+    const reference = source.garment.match(/(?:^|·\s*)(TO-[A-Z0-9]+)\s*$/i)?.[1];
+    setLines((prev) => [
+      ...prev.slice(0, i + 1),
+      {
+        team: source.team,
+        garment: `Rush shipping${reference ? ` · ${reference}` : ""}`,
+        qty: "1",
+        unit: "",
+        teamOrderId: source.teamOrderId,
+        chargeType: "rush_shipping",
+      },
+      ...prev.slice(i + 1),
+    ]);
+  }
 
   // A blank line for something the system didn't surface - team + garment are
   // free text here (no order to tie to), qty/cost as usual.
@@ -173,6 +216,7 @@ export function DesignerInvoiceForm({
       teamOrderId: l.teamOrderId,
       ourQty: l.ourQty,
       expectedUnitCents: l.ourUnitCents,
+      chargeType: l.chargeType ?? "garment",
     })));
     setDuty(inv.dutyCents ? (inv.dutyCents / 100).toFixed(2) : "");
     setNotes(inv.notes ?? "");
@@ -188,6 +232,7 @@ export function DesignerInvoiceForm({
     setNotes("");
     setVendorRef("");
     setAttachments([]);
+    setReplacingIndex(null);
     setError(null);
   }
 
@@ -237,6 +282,7 @@ export function DesignerInvoiceForm({
             qty: num(l.qty),
             unitCents: Math.round(num(l.unit) * 100),
             teamOrderId: l.teamOrderId,
+            chargeType: l.chargeType,
           })),
           dutyCents: Math.round(dutyN * 100),
           // Carryover balances are not accepted from the vendor form. Put a
@@ -325,6 +371,17 @@ export function DesignerInvoiceForm({
             aria-label="Search jobs"
           />
 
+          {replacingIndex != null && lines[replacingIndex] && (
+            <div className="mb-3 flex items-center justify-between gap-3 bg-brand/10 border border-brand/50 clip-slant px-4 py-3">
+              <span className="text-sm text-foreground">
+                Choose the replacement for <strong>{lines[replacingIndex].team || "this line"}</strong> below.
+              </span>
+              <button onClick={() => setReplacingIndex(null)} className="text-xs text-brand border border-brand/50 clip-slant px-3 py-1.5 hover:bg-brand/10 shrink-0">
+                Cancel
+              </button>
+            </div>
+          )}
+
           {/* Filter tabs */}
           <div className="flex items-center gap-2 mb-3">
             {tabs.map((t) => (
@@ -388,7 +445,7 @@ export function DesignerInvoiceForm({
                           onClick={() => addFromOrder(o)}
                           className="flex-1 sm:flex-none bg-brand text-on-brand display text-sm px-4 py-1.5 clip-slant hover:bg-brand-dark transition-colors"
                         >
-                          Add
+                          {replacingIndex != null ? "Use" : "Add"}
                         </button>
                       )}
                     </div>
@@ -452,14 +509,18 @@ export function DesignerInvoiceForm({
                 {lines.map((l, i) => {
                   const lineTotal = num(l.qty) * num(l.unit);
                   const mismatch = typeof l.ourQty === "number" && l.ourQty !== num(l.qty);
-                  const qtyLocked = Boolean(l.teamOrderId && typeof l.ourQty === "number");
-                  const rateLocked = Boolean(l.teamOrderId && typeof l.expectedUnitCents === "number");
+                  const isRushShipping = l.chargeType === "rush_shipping";
+                  const qtyLocked = isRushShipping || Boolean(l.teamOrderId && typeof l.ourQty === "number");
+                  const rateLocked = !isRushShipping && Boolean(l.teamOrderId && typeof l.expectedUnitCents === "number");
                   return (
                     <div key={i} className={`bg-ink border clip-slant p-3 ${mismatch ? "border-[#e5533c]" : "border-line"}`}>
                       <div className="flex items-start justify-between gap-2 mb-2">
                         {l.teamOrderId ? (
                           <div className="min-w-0">
-                            <div className="text-foreground font-semibold text-sm truncate">{l.team || "-"}</div>
+                            <div className="text-foreground font-semibold text-sm truncate">
+                              {l.team || "-"}
+                              {isRushShipping && <span className="ml-2 text-[10px] uppercase tracking-wide px-1.5 py-0.5 clip-slant bg-brand/15 text-brand">Rush shipping</span>}
+                            </div>
                             {l.garment ? <div className="text-muted text-[11px] truncate">{l.garment}</div> : null}
                           </div>
                         ) : (
@@ -488,6 +549,18 @@ export function DesignerInvoiceForm({
                         <p className="text-[#e5533c] text-[11px] mt-2">
                           Slugger has {l.ourQty} pieces on record here, not {num(l.qty)}.
                         </p>
+                      )}
+                      {l.teamOrderId && !isRushShipping && (
+                        <div className="mt-2 pt-2 border-t border-line flex flex-wrap gap-2">
+                          <button onClick={() => replaceJob(i)} className="text-[11px] text-brand hover:underline">
+                            Change job
+                          </button>
+                          {!lines.some((line) => line.chargeType === "rush_shipping" && line.teamOrderId === l.teamOrderId) && (
+                            <button onClick={() => addRushShipping(i)} className="text-[11px] text-brand hover:underline">
+                              + Add rush shipping
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   );
@@ -548,7 +621,8 @@ export function DesignerInvoiceForm({
 
             {/* Totals */}
             <div className="mt-4 pt-3 border-t border-line space-y-0.5">
-              <Row label="Goods" value={dollars(subtotal)} />
+              <Row label="Goods" value={dollars(goodsSubtotal)} />
+              {rushShippingTotal > 0 && <Row label="Rush shipping" value={dollars(rushShippingTotal)} />}
               {dutyN > 0 && <Row label={`Duty (${dutyPct.toFixed(1)}%)`} value={dollars(dutyN)} />}
               <div className="flex items-baseline justify-between pt-1">
                 <span className="display">Total you&apos;re billing</span>
