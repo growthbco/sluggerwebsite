@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createHmac } from "node:crypto";
-import { getAdminSession } from "@/lib/admin-auth";
+import { requireApiRole } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 
@@ -11,10 +11,8 @@ const b64url = (input: Buffer | string) =>
 // softphone - grants outgoing calls through our TwiML app. 1-hour TTL; the
 // dialer refreshes it on expiry.
 export async function GET() {
-  const session = await getAdminSession();
-  if (!session || session.role === "designer") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await requireApiRole("voice");
+  if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   const acct = process.env.TWILIO_ACCOUNT_SID;
   const keySid = process.env.TWILIO_API_KEY_SID;
   const secret = process.env.TWILIO_API_KEY_SECRET;
@@ -34,7 +32,15 @@ export async function GET() {
     sub: acct,
     iat: now,
     exp: now + 3600,
-    grants: { identity, voice: { outgoing: { application_sid: appSid }, incoming: { allow: true } } },
+    grants: {
+      identity,
+      voice: {
+        outgoing: { application_sid: appSid },
+        // A follow-up caller works the outbound queue; the main shop line
+        // should continue ringing only owner/staff browsers and the phone.
+        incoming: { allow: gate.session.role !== "follow_up" },
+      },
+    },
   };
   const unsigned = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
   const sig = b64url(createHmac("sha256", secret).update(unsigned).digest());

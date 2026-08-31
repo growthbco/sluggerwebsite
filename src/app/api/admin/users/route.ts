@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   let body: { name?: string; role?: string; password?: string } = {};
   try { body = await req.json(); } catch {}
   const name = (body.name ?? "").trim().slice(0, 40);
-  const role = ["owner", "staff", "designer"].includes(body.role ?? "") ? body.role! : "staff";
+  const role = ["owner", "staff", "designer", "follow_up"].includes(body.role ?? "") ? body.role! : "staff";
   const password = body.password ?? "";
   if (!name) return NextResponse.json({ error: "Enter a name." }, { status: 400 });
   if (password.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
@@ -51,7 +51,7 @@ export async function PUT(req: Request) {
   if (!body.id) return NextResponse.json({ error: "Missing user id" }, { status: 400 });
 
   const set: Record<string, unknown> = {};
-  if (body.role && ["owner", "staff", "designer"].includes(body.role)) set.role = body.role;
+  if (body.role && ["owner", "staff", "designer", "follow_up"].includes(body.role)) set.role = body.role;
   if (typeof body.active === "boolean") set.active = body.active;
   if (body.password) {
     if (body.password.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });

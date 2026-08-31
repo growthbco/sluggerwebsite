@@ -13,6 +13,7 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
     title: "Menu",
     items: [
       { href: "/admin", label: "Dashboard", icon: "grid" },
+      { href: "/admin/follow-ups", label: "Call Queue", icon: "phone" },
       { href: "/admin/texts", label: "Conversations", icon: "chat" },
       { href: "/admin/calls", label: "Calls", icon: "phone" },
       { href: "/admin/customers", label: "Customers", icon: "users" },
@@ -60,9 +61,10 @@ const DESIGNER_HREFS = new Set([
   "/admin/designer-tracking",
   "/admin/designer-invoices",
 ]);
+const FOLLOW_UP_HREFS = new Set(["/admin/follow-ups"]);
 const OWNER_ONLY_HREFS = new Set(["/admin/settings"]);
 
-export function AdminSidebar({ role = "staff", userName }: { role?: "owner" | "staff" | "designer"; userName?: string }) {
+export function AdminSidebar({ role = "staff", userName }: { role?: "owner" | "staff" | "designer" | "follow_up"; userName?: string }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
   // The login page gets no chrome; everything else under /admin does.
@@ -71,6 +73,7 @@ export function AdminSidebar({ role = "staff", userName }: { role?: "owner" | "s
   const visible = (href: string) => {
     if (OWNER_ONLY_HREFS.has(href)) return role === "owner";
     if (role === "designer") return DESIGNER_HREFS.has(href);
+    if (role === "follow_up") return FOLLOW_UP_HREFS.has(href);
     return true;
   };
   const groups = GROUPS.map((g) => ({
@@ -97,7 +100,7 @@ export function AdminSidebar({ role = "staff", userName }: { role?: "owner" | "s
             <span className="w-8 h-8 rounded-lg bg-brand text-on-brand flex items-center justify-center text-sm display shrink-0">{initial}</span>
             <div className="min-w-0">
               <p className="text-sm text-foreground truncate">{userName ?? "Staff"}</p>
-              <p className="text-[10px] uppercase tracking-wide text-brand">{role}</p>
+              <p className="text-[10px] uppercase tracking-wide text-brand">{role === "follow_up" ? "Follow-up VA" : role}</p>
             </div>
           </div>
 

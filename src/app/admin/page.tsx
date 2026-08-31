@@ -60,6 +60,7 @@ export default async function AdminPage() {
   if ((session.role as string) === "designer") {
     return <DesignerDashboard userName={session.name} />;
   }
+  if (session.role === "follow_up") redirect("/admin/follow-ups");
 
   const db = getDb();
   const eventsPromise = session.role === "designer"

@@ -13,7 +13,7 @@ const SESSION_DAYS = 30;
 // shared-device incident. Old formats are intentionally rejected below.
 const SESSION_VERSION = "v2";
 
-export type AdminRole = "owner" | "staff" | "designer";
+export type AdminRole = "owner" | "staff" | "designer" | "follow_up";
 export type AdminSession = { role: AdminRole; name: string };
 
 export function adminEnabled(): boolean {
@@ -52,7 +52,7 @@ export function parseSessionValue(value: string | undefined): AdminSession | nul
   if (version !== SESSION_VERSION) return null;
   if (Number(exp) < Date.now()) return null;
   if (!safeEqual(sig, hmac(`${version}.${exp}.${role}.${nameB}`))) return null;
-  if (role !== "owner" && role !== "staff" && role !== "designer") return null;
+  if (role !== "owner" && role !== "staff" && role !== "designer" && role !== "follow_up") return null;
   try {
     return { role, name: unb64(nameB) || "Staff" };
   } catch {
@@ -110,6 +110,7 @@ const DESIGNER_ALLOWED_PREFIXES = [
   "/admin/designer-tracking",
   "/admin/designer-invoices",
 ];
+const FOLLOW_UP_ALLOWED_PREFIXES = ["/admin/follow-ups"];
 
 // Order-detail pages are money pages (pricing, invoices, payments), so the
 // bare /admin/team-order/ prefix is NOT allowed for designers - only the hat
@@ -123,6 +124,9 @@ export function canAccess(role: AdminRole, pathname: string): boolean {
   if (pathname.startsWith("/admin/settings")) return false;
   if (role === "staff") return true;
   if (pathname === "/admin" || pathname === "/admin/login") return true;
+  if (role === "follow_up") {
+    return FOLLOW_UP_ALLOWED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  }
   if (designerAllowsOrderPath(pathname)) return true;
   return DESIGNER_ALLOWED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p));
 }
@@ -135,13 +139,15 @@ export function canAccess(role: AdminRole, pathname: string): boolean {
 // contact details, calls, addresses, and CRM records; "money" = pricing,
 // invoicing, payment, shipping, and store mutations; "settings" = user
 // management. Designers can work conversations without gaining the broader
-// customer/money/settings permissions.
-export type AdminApiArea = "production" | "conversations" | "customer" | "money" | "settings";
+// customer/money/settings permissions. Follow-up users get only their queue
+// and the browser softphone.
+export type AdminApiArea = "production" | "conversations" | "follow_up" | "voice" | "customer" | "money" | "settings";
 
 export function canAccessApi(role: AdminRole, area: AdminApiArea): boolean {
-  if (area === "settings") return role === "owner";
-  if (area === "customer" || area === "money") return role !== "designer";
-  return true;
+  if (role === "owner") return true;
+  if (role === "staff") return area !== "settings";
+  if (role === "designer") return area === "production" || area === "conversations";
+  return area === "follow_up" || area === "voice";
 }
 
 export async function requireApiRole(area: AdminApiArea): Promise<{ ok: true; session: AdminSession } | { ok: false; status: 401 | 403 }> {
