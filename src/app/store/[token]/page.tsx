@@ -105,7 +105,7 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
             <span className="relative block h-28 w-44 sm:h-32 sm:w-52 mx-auto">
               <Image
                 src={store.logoUrl}
-                alt={`${store.name} logo`}
+                alt=""
                 fill
                 sizes="(max-width: 640px) 176px, 208px"
                 className="object-contain"
