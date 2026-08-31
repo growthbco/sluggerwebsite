@@ -58,8 +58,8 @@ function fmtDate(iso: string | null): string {
 function invoiceTeamSummary(inv: EditableInvoice): string {
   const names = Array.from(new Set(inv.lines.map((line) => line.team.trim()).filter(Boolean)));
   if (!names.length) return "No team name";
-  const visible = names.slice(0, 2).join(" · ");
-  return names.length > 2 ? `${visible} +${names.length - 2} more` : visible;
+  const visible = names.slice(0, 4).join(" · ");
+  return names.length > 4 ? `${visible} +${names.length - 4} more` : visible;
 }
 
 /** Unbilled delta for a row: full pieces for a fresh job, just the add-on
