@@ -12,7 +12,7 @@ import {
 import { toE164 } from "@/lib/sms";
 
 export type FollowUpCategory = "due" | "scheduled" | "needs_gary" | "closed" | "archived";
-export type FollowUpReasonKind = "deposit" | "design_fee" | "proof_review" | "approved_no_order";
+export type FollowUpReasonKind = "roster_incomplete" | "deposit" | "design_fee" | "proof_review" | "approved_no_order";
 
 export type FollowUpReason = {
   kind: FollowUpReasonKind;
@@ -20,6 +20,8 @@ export type FollowUpReason = {
   detail: string;
   reference: string;
   sourceAt: string;
+  resumeUrl: string | null;
+  textMessage: string | null;
 };
 
 export type FollowUpOrderHistory = {
@@ -81,6 +83,28 @@ type Candidate = {
 };
 
 const HOUR = 3_600_000;
+const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com").replace(/\/$/, "");
+
+function pickupText(input: {
+  kind: FollowUpReasonKind;
+  name: string;
+  team: string;
+  reference: string;
+  url: string | null;
+}) {
+  if (!input.url) return null;
+  const first = input.name.trim().split(/\s+/)[0] || "there";
+  const context = input.kind === "roster_incomplete"
+    ? `Your ${input.team} design is approved, but the roster for ${input.reference} still needs to be finished.`
+    : input.kind === "deposit"
+      ? `Your ${input.team} order (${input.reference}) is ready for the deposit.`
+      : input.kind === "proof_review"
+        ? `Your ${input.team} design proof (${input.reference}) is ready to review.`
+        : input.kind === "approved_no_order"
+          ? `Your ${input.team} design (${input.reference}) is approved and ready to turn into an order.`
+          : `Your ${input.team} design request (${input.reference}) is saved.`;
+  return `Hi ${first}, this is Slugger Athletics. ${context} Pick up where you left off here: ${input.url}\nReply STOP to opt out.`;
+}
 
 function sourceAt(value: Date | null | undefined, fallback: Date): Date {
   return value instanceof Date && !Number.isNaN(value.getTime()) ? value : fallback;
@@ -132,6 +156,8 @@ export async function getContactFollowUps(now = new Date()): Promise<ContactFoll
         contactPhone: teamOrders.contactPhone,
         sport: teamOrders.sport,
         items: teamOrders.items,
+        approvedDesignUrl: teamOrders.approvedDesignUrl,
+        manageToken: teamOrders.manageToken,
         invoiceUrl: teamOrders.invoiceUrl,
         depositPaidAt: teamOrders.depositPaidAt,
         invoicePaidAt: teamOrders.invoicePaidAt,
@@ -139,6 +165,7 @@ export async function getContactFollowUps(now = new Date()): Promise<ContactFoll
         shippedAt: teamOrders.shippedAt,
         archivedAt: teamOrders.archivedAt,
         designRequestId: teamOrders.designRequestId,
+        submittedAt: teamOrders.submittedAt,
         createdAt: teamOrders.createdAt,
         updatedAt: teamOrders.updatedAt,
       })
@@ -152,6 +179,7 @@ export async function getContactFollowUps(now = new Date()): Promise<ContactFoll
         contactName: designRequests.contactName,
         contactEmail: designRequests.contactEmail,
         contactPhone: designRequests.contactPhone,
+        statusToken: designRequests.statusToken,
         sport: designRequests.sport,
         productTypes: designRequests.productTypes,
         estimatedPieces: designRequests.estimatedPieces,
@@ -198,9 +226,49 @@ export async function getContactFollowUps(now = new Date()): Promise<ContactFoll
       .filter((order) => !order.archivedAt && order.status !== "cancelled" && order.designRequestId)
       .map((order) => order.designRequestId!),
   );
+  const designById = new Map(designs.map((design) => [design.id, design]));
   const candidates = new Map<string, Candidate>();
 
   for (const order of teamOrderRows) {
+    const linkedDesign = order.designRequestId ? designById.get(order.designRequestId) : null;
+    const hasApprovedDesign = Boolean(
+      order.approvedDesignUrl ||
+      linkedDesign?.approvedAt ||
+      linkedDesign?.status === "approved" ||
+      linkedDesign?.status === "ordered"
+    );
+    const rosterSourceAt = sourceAt(linkedDesign?.approvedAt, order.updatedAt).getTime() > order.updatedAt.getTime()
+      ? linkedDesign!.approvedAt!
+      : order.updatedAt;
+    if (
+      !order.archivedAt &&
+      order.status !== "cancelled" &&
+      (order.status === "draft" || order.status === "collecting") &&
+      !order.submittedAt &&
+      hasApprovedDesign &&
+      now.getTime() - rosterSourceAt.getTime() >= 24 * HOUR
+    ) {
+      const resumeUrl = linkedDesign?.statusToken
+        ? `${SITE}/design/status/${encodeURIComponent(linkedDesign.statusToken)}#roster`
+        : order.manageToken
+          ? `${SITE}/team-order/manage/${encodeURIComponent(order.manageToken)}`
+          : null;
+      addCandidate(candidates, {
+        phone: order.contactPhone,
+        email: order.contactEmail,
+        name: order.contactName,
+        team: order.teamName,
+        reason: {
+          kind: "roster_incomplete",
+          label: "Roster not submitted",
+          detail: "The design is approved and the order was started, but the final roster has not been submitted",
+          reference: order.reference,
+          sourceAt: rosterSourceAt.toISOString(),
+          resumeUrl,
+          textMessage: pickupText({ kind: "roster_incomplete", name: order.contactName, team: order.teamName, reference: order.reference, url: resumeUrl }),
+        },
+      });
+    }
     if (
       order.archivedAt ||
       order.status !== "quoted" ||
@@ -209,6 +277,7 @@ export async function getContactFollowUps(now = new Date()): Promise<ContactFoll
       order.invoicePaidAt ||
       now.getTime() - order.updatedAt.getTime() < 48 * HOUR
     ) continue;
+    const resumeUrl = order.invoiceUrl;
     addCandidate(candidates, {
       phone: order.contactPhone,
       email: order.contactEmail,
@@ -220,6 +289,8 @@ export async function getContactFollowUps(now = new Date()): Promise<ContactFoll
         detail: "Deposit link was sent at least 2 days ago",
         reference: order.reference,
         sourceAt: order.updatedAt.toISOString(),
+        resumeUrl,
+        textMessage: pickupText({ kind: "deposit", name: order.contactName, team: order.teamName, reference: order.reference, url: resumeUrl }),
       },
     });
   }
@@ -232,6 +303,9 @@ export async function getContactFollowUps(now = new Date()): Promise<ContactFoll
       !design.designFeeWaivedReason &&
       now.getTime() - design.updatedAt.getTime() >= 24 * HOUR
     ) {
+      const resumeUrl = design.statusToken
+        ? `${SITE}/design/status/${encodeURIComponent(design.statusToken)}`
+        : null;
       addCandidate(candidates, {
         phone: design.contactPhone,
         email: design.contactEmail,
@@ -243,11 +317,16 @@ export async function getContactFollowUps(now = new Date()): Promise<ContactFoll
           detail: "Design intake is waiting for payment",
           reference: design.reference,
           sourceAt: design.updatedAt.toISOString(),
+          resumeUrl,
+          textMessage: pickupText({ kind: "design_fee", name: design.contactName, team: design.teamName, reference: design.reference, url: resumeUrl }),
         },
       });
     } else if (design.status === "proof_sent") {
       const at = sourceAt(design.proofSentAt, design.updatedAt);
       if (now.getTime() - at.getTime() < 48 * HOUR) continue;
+      const resumeUrl = design.statusToken
+        ? `${SITE}/design/status/${encodeURIComponent(design.statusToken)}#design`
+        : null;
       addCandidate(candidates, {
         phone: design.contactPhone,
         email: design.contactEmail,
@@ -259,11 +338,16 @@ export async function getContactFollowUps(now = new Date()): Promise<ContactFoll
           detail: "Design proof has been waiting at least 2 days",
           reference: design.reference,
           sourceAt: at.toISOString(),
+          resumeUrl,
+          textMessage: pickupText({ kind: "proof_review", name: design.contactName, team: design.teamName, reference: design.reference, url: resumeUrl }),
         },
       });
     } else if (design.status === "approved" && !activeOrderDesignIds.has(design.id)) {
       const at = sourceAt(design.approvedAt, design.updatedAt || design.createdAt);
       if (now.getTime() - at.getTime() < 48 * HOUR) continue;
+      const resumeUrl = design.statusToken
+        ? `${SITE}/team-order?design=${encodeURIComponent(design.statusToken)}`
+        : null;
       addCandidate(candidates, {
         phone: design.contactPhone,
         email: design.contactEmail,
@@ -275,6 +359,8 @@ export async function getContactFollowUps(now = new Date()): Promise<ContactFoll
           detail: "Artwork is approved but the team order was not started",
           reference: design.reference,
           sourceAt: at.toISOString(),
+          resumeUrl,
+          textMessage: pickupText({ kind: "approved_no_order", name: design.contactName, team: design.teamName, reference: design.reference, url: resumeUrl }),
         },
       });
     }

@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ContactFollowUp, FollowUpCategory } from "@/lib/contact-follow-ups";
+import type { ContactFollowUp, FollowUpCategory, FollowUpReasonKind } from "@/lib/contact-follow-ups";
 
 type Outcome = "no_answer" | "voicemail" | "spoke_follow_up" | "sent_link" | "needs_gary" | "completed" | "not_interested" | "do_not_call";
 type QueueAction = Outcome | "archive" | "restore";
+type StageFilter = "all" | FollowUpReasonKind;
 
 const TABS: Array<{ key: FollowUpCategory; label: string }> = [
   { key: "due", label: "Call now" },
@@ -24,6 +25,14 @@ const OUTCOMES: Array<{ value: Outcome; label: string }> = [
   { value: "completed", label: "Done / converted" },
   { value: "not_interested", label: "Not interested" },
   { value: "do_not_call", label: "Do not call" },
+];
+const STAGE_FILTERS: Array<{ key: StageFilter; label: string }> = [
+  { key: "all", label: "All stages" },
+  { key: "roster_incomplete", label: "Roster not submitted" },
+  { key: "deposit", label: "Deposit pending" },
+  { key: "approved_no_order", label: "Approved, no order" },
+  { key: "proof_review", label: "Proof feedback" },
+  { key: "design_fee", label: "Design fee" },
 ];
 const NEEDS_NEXT = new Set<Outcome>(["no_answer", "voicemail", "spoke_follow_up", "sent_link"]);
 const prettyLabel = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -76,27 +85,79 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
     [contacts],
   );
   const [tab, setTab] = useState<FollowUpCategory>(() => (counts.due ? "due" : counts.needs_gary ? "needs_gary" : counts.scheduled ? "scheduled" : "closed"));
+  const [stage, setStage] = useState<StageFilter>("all");
   const [query, setQuery] = useState("");
   const [openPhone, setOpenPhone] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<Outcome>("no_answer");
   const [note, setNote] = useState("");
   const [nextAt, setNextAt] = useState(defaultNextCall);
   const [busyPhone, setBusyPhone] = useState<string | null>(null);
+  const [textPhone, setTextPhone] = useState<string | null>(null);
+  const [textReference, setTextReference] = useState("");
+  const [textBusy, setTextBusy] = useState(false);
+  const [textSuccessPhone, setTextSuccessPhone] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const stageCounts = useMemo(
+    () => Object.fromEntries(
+      STAGE_FILTERS.map((filter) => [
+        filter.key,
+        contacts.filter((contact) => contact.category === tab && (filter.key === "all" || contact.reasons.some((reason) => reason.kind === filter.key))).length,
+      ]),
+    ) as Record<StageFilter, number>,
+    [contacts, tab],
+  );
 
   const visible = contacts.filter((contact) => {
     if (contact.category !== tab) return false;
+    if (stage !== "all" && !contact.reasons.some((reason) => reason.kind === stage)) return false;
     const needle = query.trim().toLowerCase();
     if (!needle) return true;
     return `${contact.name} ${contact.phone} ${contact.teams.join(" ")} ${contact.reasons.map((reason) => `${reason.label} ${reason.reference}`).join(" ")} ${contact.orderHistory.map((order) => `${order.reference} ${order.teamName ?? ""} ${order.items.join(" ")}`).join(" ")} ${contact.designHistory.map((design) => `${design.reference} ${design.teamName} ${design.products.join(" ")}`).join(" ")}`.toLowerCase().includes(needle);
   });
 
-  function openDetails(phone: string) {
-    setOpenPhone((current) => current === phone ? null : phone);
+  function openDetails(contact: ContactFollowUp) {
+    const firstReason = contact.reasons.find((reason) => reason.resumeUrl && reason.textMessage);
+    setOpenPhone((current) => current === contact.phone ? null : contact.phone);
+    setTextPhone(contact.phone);
+    setTextReference(firstReason?.reference ?? "");
+    setTextSuccessPhone(null);
     setOutcome("no_answer");
     setNote("");
     setNextAt(defaultNextCall());
     setError("");
+  }
+
+  function openPickupTool(contact: ContactFollowUp) {
+    const firstReason = contact.reasons.find((reason) => reason.resumeUrl && reason.textMessage);
+    if (!firstReason) return;
+    setOpenPhone(contact.phone);
+    setTextPhone(contact.phone);
+    setTextReference(firstReason.reference);
+    setTextSuccessPhone(null);
+    setError("");
+  }
+
+  async function sendPickupLink(contact: ContactFollowUp, reference: string) {
+    setTextBusy(true);
+    setTextSuccessPhone(null);
+    setError("");
+    try {
+      const response = await fetch("/api/admin/follow-ups/text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: contact.phone, reference }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not send pickup link");
+      setTextSuccessPhone(contact.phone);
+      setTab("scheduled");
+      setStage("all");
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not send pickup link");
+    } finally {
+      setTextBusy(false);
+    }
   }
 
   async function save(contact: ContactFollowUp, selectedOutcome: QueueAction = outcome) {
@@ -139,7 +200,7 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
           <p className="text-[10px] uppercase tracking-[0.22em] text-muted">Customer follow-up</p>
           <h1 className="display mt-1 text-3xl text-foreground sm:text-4xl">Call Queue</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-            People waiting to finish a deposit, review a proof, or turn an approved design into an order. Log every outcome so the next call is clear.
+            People stalled between design, roster, and payment. Filter by the exact step they still need to finish, then log every outcome so the next call is clear.
           </p>
         </div>
         <div className="rounded-lg border border-brand/30 bg-brand/10 px-4 py-3 text-right">
@@ -154,7 +215,7 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
             <button
               key={item.key}
               type="button"
-              onClick={() => setTab(item.key)}
+              onClick={() => { setTab(item.key); setStage("all"); }}
               className={`display min-h-[40px] rounded-full border px-4 text-xs transition-colors ${tab === item.key ? "border-brand bg-brand text-on-brand" : "border-line text-muted hover:border-brand/50 hover:text-foreground"}`}
             >
               {item.label} · {counts[item.key]}
@@ -168,17 +229,34 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
           className="min-h-[42px] w-full rounded-md border border-line bg-steel px-3 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none sm:w-72"
         />
       </div>
+      <div className="mt-4">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Filter by customer’s next step</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {STAGE_FILTERS.map((filter) => (
+            <button
+              key={filter.key}
+              type="button"
+              onClick={() => setStage(filter.key)}
+              className={`min-h-[36px] rounded-md border px-3 text-xs transition-colors ${stage === filter.key ? "border-brand/60 bg-brand/10 text-brand" : "border-line text-muted hover:border-brand/40 hover:text-foreground"}`}
+            >
+              {filter.label} · {stageCounts[filter.key]}
+            </button>
+          ))}
+        </div>
+      </div>
       {error && <p className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>}
 
       <section className="mt-5 space-y-3">
         {visible.length === 0 && (
           <div className="rounded-xl border border-line bg-steel px-5 py-12 text-center">
             <p className="display text-lg text-foreground">Nothing in this list</p>
-            <p className="mt-1 text-sm text-muted">New stalled leads will appear automatically.</p>
+            <p className="mt-1 text-sm text-muted">No leads match this status and stage filter.</p>
           </div>
         )}
         {visible.map((contact) => {
           const open = openPhone === contact.phone;
+          const pickupReasons = contact.reasons.filter((reason) => reason.resumeUrl && reason.textMessage);
+          const selectedPickupReason = pickupReasons.find((reason) => reason.reference === textReference) ?? pickupReasons[0];
           return (
             <article key={contact.phone} className="overflow-hidden rounded-xl border border-line bg-steel">
               <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
@@ -223,9 +301,18 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
                       Text
                     </Link>
                   )}
+                  {pickupReasons.length > 0 && !contact.doNotCall && contact.category !== "closed" && contact.category !== "archived" && (
+                    <button
+                      type="button"
+                      onClick={() => openPickupTool(contact)}
+                      className="display min-h-[42px] rounded-md border border-brand/50 bg-brand/10 px-4 text-sm text-brand hover:bg-brand/20"
+                    >
+                      Text pickup link
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => openDetails(contact.phone)}
+                    onClick={() => openDetails(contact)}
                     className="display min-h-[42px] rounded-md border border-line px-4 text-sm text-foreground hover:border-brand/50"
                   >
                     {open ? "Close details" : `Details & notes${contact.notes.length ? ` · ${contact.notes.length}` : ""}`}
@@ -254,6 +341,44 @@ export function FollowUpQueue({ contacts, asOf, canText }: { contacts: ContactFo
 
               {open && (
                 <div className="border-t border-line bg-background/25 p-4 sm:p-5">
+                  {pickupReasons.length > 0 && !contact.doNotCall && contact.category !== "closed" && contact.category !== "archived" && (
+                    <section className="mb-6 rounded-lg border border-brand/50 bg-brand/[0.08] p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-[0.18em] text-brand">Customer action tool</p>
+                          <h3 className="display mt-1 text-lg text-foreground">Text a secure pickup link</h3>
+                          <p className="mt-1 text-xs leading-5 text-muted">The link is generated from this customer’s actual order or design. After sending, the next follow-up is scheduled for two days.</p>
+                        </div>
+                        {textSuccessPhone === contact.phone && <span className="rounded-full border border-green-500/40 bg-green-500/10 px-3 py-1 text-xs text-green-300">Text sent</span>}
+                      </div>
+                      {pickupReasons.length > 1 && (
+                        <label className="mt-4 block text-xs text-muted">
+                          Which step should they finish?
+                          <select
+                            value={selectedPickupReason?.reference ?? ""}
+                            onChange={(event) => { setTextPhone(contact.phone); setTextReference(event.target.value); setTextSuccessPhone(null); }}
+                            className="mt-1 min-h-[42px] w-full rounded-md border border-line bg-steel px-3 text-sm text-foreground focus:border-brand focus:outline-none"
+                          >
+                            {pickupReasons.map((reason) => <option key={`${reason.kind}:${reason.reference}`} value={reason.reference}>{reason.label} · {reason.reference}</option>)}
+                          </select>
+                        </label>
+                      )}
+                      {selectedPickupReason?.textMessage && (
+                        <div className="mt-4 rounded-md border border-line bg-steel p-3">
+                          <p className="text-[10px] uppercase tracking-[0.16em] text-muted">Message preview</p>
+                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/90">{selectedPickupReason.textMessage}</p>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        disabled={textBusy || !selectedPickupReason || textPhone !== contact.phone}
+                        onClick={() => selectedPickupReason && void sendPickupLink(contact, selectedPickupReason.reference)}
+                        className="display mt-4 min-h-[44px] rounded-md bg-brand px-5 text-sm text-on-brand hover:bg-brand-dark disabled:opacity-50"
+                      >
+                        {textBusy && textPhone === contact.phone ? "Sending…" : "Send pickup link"}
+                      </button>
+                    </section>
+                  )}
                   <section>
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <h3 className="display text-sm text-foreground">Order history</h3>
