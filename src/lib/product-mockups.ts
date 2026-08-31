@@ -122,6 +122,13 @@ export const SPORT_MENU: StudioSport[] = [
     ],
   },
   {
+    key: "polos",
+    label: "Polos",
+    items: [
+      { product: "polo", label: "Polo", styles: ["Dri-Fit", "Pin-Dot"] },
+    ],
+  },
+  {
     key: "hats",
     label: "Hats",
     items: [
