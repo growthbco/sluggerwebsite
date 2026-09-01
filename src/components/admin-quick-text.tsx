@@ -83,18 +83,24 @@ export function AdminQuickText({
 
   return (
     <>
-      <button type="button" onClick={() => showComposer("general")} title={`Text ${contactName}`}>
-        {sentKind === "general" ? "Quick text sent ✓" : "Quick text customer"}
-      </button>
       {finalPaymentUrl ? (
-        <button
-          type="button"
-          onClick={() => showComposer("arrived-payment")}
-          title={`Tell ${contactName} the order arrived and include the final-payment link`}
-        >
-          {sentKind === "arrived-payment" ? "Arrival text sent ✓" : "Text: arrived + final payment"}
+        <>
+          <button
+            type="button"
+            onClick={() => showComposer("arrived-payment")}
+            title={`Tell ${contactName} the order arrived and include the final-payment link`}
+          >
+            {sentKind === "arrived-payment" ? "Arrival text sent ✓" : "Text: arrived + final payment"}
+          </button>
+          <button type="button" onClick={() => showComposer("general")} title={`Write a general text to ${contactName}`}>
+            {sentKind === "general" ? "General text sent ✓" : "Write general text"}
+          </button>
+        </>
+      ) : (
+        <button type="button" onClick={() => showComposer("general")} title={`Text ${contactName}`}>
+          {sentKind === "general" ? "Quick text sent ✓" : "Quick text customer"}
         </button>
-      ) : null}
+      )}
 
       {open ? (
         <div
