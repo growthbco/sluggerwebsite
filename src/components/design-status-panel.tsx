@@ -235,17 +235,24 @@ export function DesignStatusPanel({
       )}
 
       {supersededProofImages.length > 0 && (
-        <details className="border border-line bg-foreground/[0.02]">
-          <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm text-muted">
-            View {supersededProofImages.length} superseded proof{supersededProofImages.length === 1 ? "" : "s"}
+        <details open className="border border-line bg-foreground/[0.02]">
+          <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-medium text-foreground">
+            Earlier and other product proofs ({supersededProofImages.length})
           </summary>
-          <div className="grid gap-3 border-t border-line p-4 sm:grid-cols-3">
-            {supersededProofImages.map((url) => (
-              <button key={url} type="button" onClick={() => setExpanded(url)} className="relative aspect-[4/3] overflow-hidden border border-line bg-white opacity-70 hover:opacity-100">
-                <Image src={url} alt={`${proofLabels[url] || "Previous proof"} — superseded`} fill sizes="(max-width: 640px) 100vw, 33vw" className="object-contain p-2" unoptimized />
-                <span className="absolute bottom-2 left-2 bg-black/80 px-2 py-1 text-[11px] text-white">Superseded · do not approve</span>
-              </button>
-            ))}
+          <div className="border-t border-line p-4">
+            <p className="mb-3 text-xs text-muted">
+              These stay visible so you can compare every piece in the project. They are reference-only; only the current proof{proofImages.length === 1 ? "" : "s"} above can be approved.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {supersededProofImages.map((url) => (
+                <button key={url} type="button" onClick={() => setExpanded(url)} className="relative aspect-[4/3] overflow-hidden border border-line bg-white opacity-80 hover:opacity-100">
+                  <Image src={url} alt={`${proofLabels[url] || "Earlier proof"} — reference only`} fill sizes="(max-width: 640px) 100vw, 33vw" className="object-contain p-2" unoptimized />
+                  <span className="absolute bottom-2 left-2 right-2 bg-black/80 px-2 py-1 text-left text-[11px] text-white">
+                    {proofLabels[url] || "Earlier proof"} · Reference only
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         </details>
       )}
