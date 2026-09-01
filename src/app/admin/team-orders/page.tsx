@@ -465,7 +465,17 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                       </div>
                       <p className="mt-1 text-xs text-foreground">
                         <span className="display text-[10px] text-muted">CONTACT</span>
-                        <span className="ml-1.5 font-medium">{o.contactName}</span>
+                        {o.contactPhone ? (
+                          <Link
+                            href={`/admin/texts?to=${encodeURIComponent(o.contactPhone)}&name=${encodeURIComponent(o.contactName)}`}
+                            className="ml-1.5 font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
+                            title={`Open text history with ${o.contactName}`}
+                          >
+                            {o.contactName}
+                          </Link>
+                        ) : (
+                          <span className="ml-1.5 font-medium" title="No phone number is attached to this order">{o.contactName}</span>
+                        )}
                       </p>
                       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted">
                         <Link href={`/admin/team-order/${o.id}`} className="font-mono text-brand hover:underline">{o.reference}</Link>
