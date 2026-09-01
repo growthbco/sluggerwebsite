@@ -33,6 +33,7 @@ import { AdminCustomPrice } from "@/components/admin-custom-price";
 import { AdminInboundTracking } from "@/components/admin-inbound-tracking";
 import { AdminFinalMockup } from "@/components/admin-final-mockup";
 import { AdminPickupReadyText } from "@/components/admin-pickup-ready-text";
+import { AdminQuickText } from "@/components/admin-quick-text";
 import {
   buildDeliveryTimeline,
   type DeliveryRisk,
@@ -647,6 +648,22 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                         )}
                         {/* Secondary actions in a floating dropdown. */}
                         <AdminRowMenu>
+                            <AdminQuickText
+                              teamOrderId={o.id}
+                              teamName={o.teamName}
+                              reference={o.reference}
+                              contactName={o.contactName}
+                              phoneLast4={o.contactPhone?.replace(/\D/g, "").slice(-4) || null}
+                              disabledReason={!o.contactPhone ? "No customer phone number on this order." : !o.smsOptInAt ? "Customer did not opt in to SMS updates." : undefined}
+                            />
+                            <a
+                              href={`/api/admin/team-order/packing-view?id=${o.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Open a printable item-by-item packing sheet"
+                            >
+                              Print order sheet
+                            </a>
                             <AdminDesignerNote teamOrderId={o.id} current={o.designerNote} />
                             {!o.designRequestId && (
                               <AdminLinkDesign teamOrderId={o.id} designs={linkableDesigns} />

@@ -4,7 +4,7 @@ import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
 import { requireApiRole } from "@/lib/admin-auth";
 import { getRoster } from "@/lib/team-orders";
-import { itemLabel, formatSize } from "@/lib/order-items";
+import { itemLabel, formatSize, JERSEY_MATERIALS } from "@/lib/order-items";
 
 export const runtime = "nodejs";
 
@@ -21,6 +21,13 @@ function sizeOf(r: RosterRow): string {
   const sizes = r.sizes ? Object.entries(r.sizes).filter(([, v]) => (v ?? "").toString().trim()) : [];
   if (sizes.length) return sizes.map(([k, v]) => `${itemLabel(k)}: ${formatSize(v)}`).join(", ");
   return formatSize(r.size) || "-";
+}
+
+function piecesInRow(r: RosterRow): number {
+  const itemCount = r.sizes
+    ? Object.values(r.sizes).filter((value) => (value ?? "").toString().trim()).length
+    : 0;
+  return Math.max(1, itemCount) * Math.max(1, r.quantity ?? 1);
 }
 
 // Admin-only printable PACKING sheet for a team order: every piece as a
@@ -64,14 +71,19 @@ export async function GET(req: Request) {
           </tr>`,
         )
         .join("");
+      const groupPieces = rows.reduce((sum, row) => sum + piecesInRow(row), 0);
       return `<section class="grp">
-        <h2>${esc(label)} <span class="count">${rows.length}</span></h2>
+        <h2>${esc(label)} <span class="count">${groupPieces} ${groupPieces === 1 ? "piece" : "pieces"}</span></h2>
         <table><tbody>${body}</tbody></table>
       </section>`;
     })
     .join("");
 
   const title = `${o.teamName || o.contactName} - ${o.reference}`;
+  const totalPieces = roster.reduce((sum, row) => sum + piecesInRow(row), 0);
+  const productSummary = (o.items ?? []).map(itemLabel).join(", ") || "Jersey";
+  const materialSummary = JERSEY_MATERIALS.find((material) => material.key === o.jerseyMaterial)?.label ?? o.jerseyMaterial;
+  const orderSetup = [o.sport, productSummary, o.jerseyStyle, materialSummary].filter(Boolean).map((value) => esc(String(value))).join(" · ");
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pack ${esc(o.reference)}</title>
   <style>
     * { box-sizing: border-box; }
@@ -103,9 +115,10 @@ export async function GET(req: Request) {
   <body>
     <button class="printbtn" onclick="window.print()">🖨️ Print</button>
     <header>
-      <div class="total">pieces<b>${roster.length}</b></div>
+      <div class="total">pieces<b>${totalPieces}</b></div>
       <h1>${esc(title)}</h1>
       <p class="sub">${esc(o.teamName || "")}${o.contactName ? ` · ${esc(o.contactName)}` : ""} · Status: ${esc(o.status)}</p>
+      ${orderSetup ? `<p class="sub"><b>Order:</b> ${orderSetup}</p>` : ""}
       ${shipTo ? `<p class="ship"><b>Ship to</b><br>${shipTo}</p>` : `<p class="ship"><b>Ship to</b><br>No address on file</p>`}
     </header>
     ${sections || "<p>No roster on this order.</p>"}
