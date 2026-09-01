@@ -95,7 +95,7 @@ export default async function AdminShopOrdersPage() {
           {o.shippingProtectionCents > 0 && <span className="text-[10px] display text-green-400 border border-green-400/40 px-1.5 py-0.5">PROTECTED</span>}
           {o.trackingNumber && <TrackingInfo trackingNumber={o.trackingNumber} labelUrl={o.labelUrl} />}
           {!o.shippedAt && o.status === "paid" && !o.trackingNumber && (
-            <AdminLabelButton kind="order" id={o.id} who={o.customerName ?? o.reference} />
+            <AdminLabelButton kind="order" id={o.id} who={o.customerName ?? o.reference} autoShipOnBuy={isStore(o)} />
           )}
           <AdminRowMenu>
             <a href={`/api/admin/order-view?id=${o.id}`} target="_blank" rel="noopener noreferrer">View order</a>
