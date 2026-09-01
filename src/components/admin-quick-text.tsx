@@ -8,6 +8,7 @@ type Props = {
   reference: string;
   contactName: string;
   phoneLast4: string | null;
+  finalPaymentUrl?: string | null;
   disabledReason?: string;
 };
 
@@ -16,24 +17,36 @@ function starterMessage(contactName: string, teamName: string, reference: string
   return `Hi ${firstName}, this is Slugger Athletics regarding ${teamName} (${reference}). `;
 }
 
+function arrivedPaymentMessage(contactName: string, teamName: string, finalPaymentUrl: string) {
+  const firstName = contactName.trim().split(/\s+/)[0] || "there";
+  return `Hi ${firstName}, great news—your ${teamName} order has arrived at Slugger Athletics! The remaining balance is now due. Once payment is completed, we’ll prepare the order for final shipment and send your tracking information. You can make the final payment here: ${finalPaymentUrl}\n\nThank you!`;
+}
+
 export function AdminQuickText({
   teamOrderId,
   teamName,
   reference,
   contactName,
   phoneLast4,
+  finalPaymentUrl,
   disabledReason,
 }: Props) {
   const initialMessage = starterMessage(contactName, teamName, reference);
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState(initialMessage);
   const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [composerKind, setComposerKind] = useState<"general" | "arrived-payment">("general");
+  const [sentKind, setSentKind] = useState<"general" | "arrived-payment" | null>(null);
   const [error, setError] = useState("");
 
-  function showComposer() {
+  function showComposer(kind: "general" | "arrived-payment") {
     if (disabledReason) return;
-    setMessage(initialMessage);
+    setComposerKind(kind);
+    setMessage(
+      kind === "arrived-payment" && finalPaymentUrl
+        ? arrivedPaymentMessage(contactName, teamName, finalPaymentUrl)
+        : initialMessage,
+    );
     setError("");
     setOpen(true);
   }
@@ -51,7 +64,7 @@ export function AdminQuickText({
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not send the text.");
-      setSent(true);
+      setSentKind(composerKind);
       setOpen(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not send the text.");
@@ -70,9 +83,18 @@ export function AdminQuickText({
 
   return (
     <>
-      <button type="button" onClick={showComposer} title={`Text ${contactName}`}>
-        {sent ? "Quick text sent ✓" : "Quick text customer"}
+      <button type="button" onClick={() => showComposer("general")} title={`Text ${contactName}`}>
+        {sentKind === "general" ? "Quick text sent ✓" : "Quick text customer"}
       </button>
+      {finalPaymentUrl ? (
+        <button
+          type="button"
+          onClick={() => showComposer("arrived-payment")}
+          title={`Tell ${contactName} the order arrived and include the final-payment link`}
+        >
+          {sentKind === "arrived-payment" ? "Arrival text sent ✓" : "Text: arrived + final payment"}
+        </button>
+      ) : null}
 
       {open ? (
         <div
@@ -88,7 +110,7 @@ export function AdminQuickText({
           >
             <div className="border-b border-line px-5 py-4">
               <h2 id={`quick-text-title-${teamOrderId}`} className="display text-xl text-foreground">
-                Quick text customer
+                {composerKind === "arrived-payment" ? "Order arrived + final payment" : "Quick text customer"}
               </h2>
               <p className="mt-1 text-sm text-muted">
                 {contactName} · {teamName} · {reference}{phoneLast4 ? ` · ending ${phoneLast4}` : ""}

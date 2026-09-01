@@ -654,6 +654,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                               reference={o.reference}
                               contactName={o.contactName}
                               phoneLast4={o.contactPhone?.replace(/\D/g, "").slice(-4) || null}
+                              finalPaymentUrl={!paid && o.depositPaidAt && !o.localPickup && !o.rushShipping ? o.balanceInvoiceUrl : null}
                               disabledReason={!o.contactPhone ? "No customer phone number on this order." : !o.smsOptInAt ? "Customer did not opt in to SMS updates." : undefined}
                             />
                             <a
