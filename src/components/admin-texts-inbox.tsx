@@ -896,6 +896,29 @@ export function AdminTextsInbox({
                 {label}
               </button>
             ))}
+            {mode !== "note" && (
+              <select
+                defaultValue=""
+                aria-label="Choose a quick reply"
+                onChange={(event) => {
+                  const reply = QUICK_REPLIES.find(
+                    (item) => item.key === event.currentTarget.value,
+                  );
+                  if (reply) useQuickReply(reply.message);
+                  event.currentTarget.value = "";
+                }}
+                className="ml-1 min-h-[34px] max-w-[11rem] rounded-md border border-line bg-background px-3 py-1 display text-[10px] text-foreground focus:border-brand focus:outline-none lg:min-h-0"
+              >
+                <option value="" disabled>
+                  Quick reply…
+                </option>
+                {QUICK_REPLIES.map((reply) => (
+                  <option key={reply.key} value={reply.key}>
+                    {reply.label}
+                  </option>
+                ))}
+              </select>
+            )}
             {mode === "note" && (
               <span className="text-amber-200/70">
                 Internal only — the customer will not see this
@@ -913,24 +936,6 @@ export function AdminTextsInbox({
               </button>
             )}
           </div>
-          {mode !== "note" && (
-            <div className="mb-2 flex items-center gap-1.5 overflow-x-auto pb-1">
-              <span className="display mr-1 shrink-0 text-[10px] uppercase tracking-wider text-muted">
-                Quick replies
-              </span>
-              {QUICK_REPLIES.map((reply) => (
-                <button
-                  key={reply.key}
-                  type="button"
-                  onClick={() => useQuickReply(reply.message)}
-                  title={`Replace the message draft with the ${reply.label} reply`}
-                  className="display inline-flex min-h-[34px] shrink-0 items-center rounded-full border border-line px-3 py-1 text-[10px] text-muted transition-colors hover:border-brand/50 hover:bg-brand/10 hover:text-brand lg:min-h-0"
-                >
-                  {reply.label}
-                </button>
-              ))}
-            </div>
-          )}
           {pendingImages.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-2">
               {pendingImages.map((u, i) => (
