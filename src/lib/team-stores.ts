@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { teams, orders } from "@/db/schema";
-import { APPAREL_SIZES, SOCK_SIZES } from "@/lib/order-items";
+import { APPAREL_SIZES, BASKETBALL_SIZES, SOCK_SIZES } from "@/lib/order-items";
 
 export type StoreItem = {
   key: string;
@@ -34,7 +34,7 @@ export const STORE_ITEM_PRESETS: StoreItem[] = [
   { key: "two_button_jersey", label: "Two-Button Jersey", priceCents: 3200, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 11 },
   { key: "full_button_jersey", label: "Full-Button Jersey", priceCents: 3500, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 12 },
   { key: "quarter_zip_jersey", label: "Quarter-Zip Jersey", priceCents: 4000, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 13 },
-  { key: "reversible_basketball", label: "Reversible Basketball Uniform", priceCents: 8500, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 16 },
+  { key: "reversible_basketball", label: "Reversible Basketball Uniform", priceCents: 8500, sizes: BASKETBALL_SIZES, nameNumber: true, weightOz: 16 },
   { key: "practice_jersey", label: "Performance Jersey", priceCents: 2000, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 10 },
   { key: "polo", label: "Custom Polo - Dri-Fit", priceCents: 3500, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 10 },
   { key: "polo_pin_dot", label: "Custom Polo - Pin-Dot", priceCents: 3500, sizes: APPAREL_SIZES, nameNumber: true, weightOz: 10 },

@@ -141,7 +141,11 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const materialOptions = jerseyMaterialsFor(jerseyStyle, prefill?.sport);
   const effectiveMaterial = fixedSpeedoMaterial ? SPEEDO_BASEBALL_MATERIAL_KEY : material;
   const orderSetupComplete = items.length > 0 && (!hasJersey || Boolean(jerseyStyle && effectiveMaterial));
-  const sizeGuideHref = /volleyball/i.test(prefill?.sport ?? "") ? "/size-guide#girls-volleyball" : "/size-guide#jerseys";
+  const sizeGuideHref = /basketball/i.test(prefill?.sport ?? "")
+    ? "/size-guide#basketball"
+    : /volleyball/i.test(prefill?.sport ?? "")
+      ? "/size-guide#girls-volleyball"
+      : "/size-guide#jerseys";
   const submissionRoster = [
     ...rows.map((row) => ({ ...row, quantity: 1 })),
     ...bulkRows(),

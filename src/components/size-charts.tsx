@@ -8,6 +8,15 @@ export const JERSEYS_ADULT = [
 export const JERSEYS_YOUTH = [
   ["YS", "18.5", "24"], ["YM", "19", "24.5"], ["YL", "19.5", "25"], ["YXL", "20", "25.5"],
 ];
+// Basketball uniform-top measurements. These use a different sleeveless cut
+// from the relaxed all-sport jersey above.
+export const BASKETBALL_ADULT = [
+  ["AXS", "21", "28"], ["AS", "22", "29"], ["AM", "23", "30"],
+  ["AL", "24", "31"], ["AXL", "25", "32"], ["2XL", "26", "33"],
+];
+export const BASKETBALL_YOUTH = [
+  ["YS", "17", "24"], ["YM", "18", "25"], ["YL", "19", "26"], ["YXL", "20", "27"],
+];
 // Girls' volleyball V-neck jerseys use their own fitted block. Keep this
 // separate from the relaxed-fit all-sport jersey chart above.
 export const VOLLEYBALL_GIRLS_ADULT = [
@@ -129,6 +138,24 @@ function JerseySection() {
     </section>
   );
 }
+export function BasketballSection() {
+  return (
+    <section>
+      <h3 className="display text-lg text-foreground">Basketball Jerseys &amp; Uniform Tops</h3>
+      <p className="mt-2 text-sm text-muted">Sleeveless basketball cut. Width is measured across the chest 1&quot; below the armhole; length is measured from the highest shoulder point to the bottom hem.</p>
+      <div className="mt-3 grid md:grid-cols-2 gap-6">
+        <div>
+          <h4 className="display text-sm text-brand mb-2">Adult</h4>
+          <ChartTable headers={["Size", "Width", "Length"]} rows={BASKETBALL_ADULT} />
+        </div>
+        <div>
+          <h4 className="display text-sm text-brand mb-2">Youth</h4>
+          <ChartTable headers={["Size", "Width", "Length"]} rows={BASKETBALL_YOUTH} />
+        </div>
+      </div>
+    </section>
+  );
+}
 function VolleyballSection() {
   return (
     <section>
@@ -216,11 +243,12 @@ function FlagFootballSection() {
 
 // Map an order-item key to the chart section it needs. Socks (self-explanatory
 // S/M, L/XL) have no chart. Keep in sync with ITEM_TYPES in order-items.ts.
-type ChartGroup = "jersey" | "volleyball" | "flag_football" | "hoodie" | "hats" | "cheer" | "pants";
+type ChartGroup = "jersey" | "basketball" | "volleyball" | "flag_football" | "hoodie" | "hats" | "cheer" | "pants";
 function chartGroup(itemKey: string, sport?: string | null): ChartGroup | null {
   const k = itemKey.toLowerCase();
   if (/cheer/.test(k)) return "cheer";
   if (/flag[_\s-]?football/.test(k)) return "flag_football"; // before /jersey/
+  if (/basketball/.test(k) || (/basketball/i.test(sport ?? "") && /jersey|shirt|short/.test(k))) return "basketball";
   if (/hoodie|pullover|jacket/.test(k)) return "hoodie";
   if (/hat|beanie|cap/.test(k)) return "hats";
   if (/knicker|pant|short/.test(k)) return "pants";
@@ -231,6 +259,7 @@ function chartGroup(itemKey: string, sport?: string | null): ChartGroup | null {
 
 const GROUP_SECTION: Record<ChartGroup, () => React.ReactElement> = {
   jersey: JerseySection,
+  basketball: BasketballSection,
   volleyball: VolleyballSection,
   flag_football: FlagFootballSection,
   hoodie: HoodieSection,
@@ -239,7 +268,7 @@ const GROUP_SECTION: Record<ChartGroup, () => React.ReactElement> = {
   pants: PantsSection,
 };
 // Show groups in a stable, sensible order regardless of item order.
-const GROUP_ORDER: ChartGroup[] = ["jersey", "volleyball", "flag_football", "cheer", "hoodie", "hats", "pants"];
+const GROUP_ORDER: ChartGroup[] = ["jersey", "basketball", "volleyball", "flag_football", "cheer", "hoodie", "hats", "pants"];
 
 /** Only the charts an order actually needs, based on its item keys. Falls back
  *  to the jersey chart if nothing maps (e.g. a socks-only or unknown order). */
@@ -266,6 +295,7 @@ export function AllSizeCharts() {
   return (
     <div className="space-y-8">
       <JerseySection />
+      <BasketballSection />
       <FlagFootballSection />
       <HoodieSection />
       <HatSection />

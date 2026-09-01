@@ -68,6 +68,7 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
   const pieceCount = roster.reduce((total, row) => total + Math.max(1, row.quantity ?? 1), 0);
   const rosterLockMessage = customerRosterLockMessage(order);
   const hasJersey = orderItems.some((item) => item.includes("jersey"));
+  const isBasketball = /basketball/i.test(order.sport ?? "");
   const collecting = ["draft", "collecting"].includes(order.status);
   const productPrices = orderItems
     .map((key) => ({
@@ -163,7 +164,9 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
       content: (
         <div>
           <p className="text-sm text-muted mb-4">
-            {hasJersey
+            {isBasketball
+              ? "All measurements are in inches. Use the basketball-specific chart for this uniform."
+              : hasJersey
               ? "All measurements in inches. Jerseys run slightly large - when in doubt, size down."
               : "All measurements are in inches. Use the chart for the items in this order."}
           </p>

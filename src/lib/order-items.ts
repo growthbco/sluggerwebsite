@@ -15,6 +15,13 @@ export const VOLLEYBALL_SIZES = [
   "Adult XS", "Small", "Medium", "Large", "X-Large", "2X-Large",
 ];
 
+// Basketball uses the sleeveless uniform block in size-charts.tsx. Its
+// published range includes Adult XS and ends at Adult 2XL.
+export const BASKETBALL_SIZES = [
+  "Youth Small", "Youth Medium", "Youth Large", "Youth X-Large",
+  "Adult XS", "Small", "Medium", "Large", "X-Large", "2X-Large",
+];
+
 export const SOCK_SIZES = ["Youth S/M", "Youth L/XL", "Adult S/M", "Adult L/XL"];
 
 // Cheer uses the supplier's numbered scale. Tops and skirts are selected
@@ -48,11 +55,17 @@ function isVolleyballSport(sport?: string | null): boolean {
   return /volleyball/i.test(sport ?? "");
 }
 
+function isBasketballSport(sport?: string | null): boolean {
+  return /basketball/i.test(sport ?? "");
+}
+
 export function sizeFieldsForItem(key: string, sport?: string | null): SizeField[] {
   const item = ITEM_TYPES.find((t) => t.key === key);
   const sizes = key === "jersey" && isVolleyballSport(sport)
     ? VOLLEYBALL_SIZES
-    : item?.sizes ?? APPAREL_SIZES;
+    : isBasketballSport(sport) && (key === "jersey" || key === "shorts")
+      ? BASKETBALL_SIZES
+      : item?.sizes ?? APPAREL_SIZES;
   const label = item?.label ?? key;
   if (!isCheerItem(key)) return [{ key, itemKey: key, label, sizes }];
   return [

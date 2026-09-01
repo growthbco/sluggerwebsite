@@ -167,10 +167,11 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
         </summary>
         <div className="px-5 pb-6">
           <p className="text-sm text-muted mb-5">
-            All measurements in inches. Jerseys have a relaxed fit and run slightly large -
-            when in doubt, size down or text us at (352) 414-7270.
+            {/basketball/i.test(store.sport ?? "")
+              ? "All measurements are in inches. Use the basketball-specific chart for this uniform."
+              : "All measurements are in inches. Jerseys have a relaxed fit and run slightly large. When in doubt, size down or text us at (352) 414-7270."}
           </p>
-          <SizeChartsFor items={(store.storeItems ?? []).map((it) => it.key)} />
+          <SizeChartsFor items={(store.storeItems ?? []).map((it) => it.key)} sport={store.sport} />
         </div>
       </details>
 
