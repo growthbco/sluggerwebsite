@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
-import { getBySelfEntryToken, getLinkedDesignPreview } from "@/lib/team-orders";
+import { getByDesignRequestId, getBySelfEntryToken, getLinkedDesignPreview } from "@/lib/team-orders";
 import { SelfEntryForm } from "@/components/self-entry-form";
 import { SizeChartsFor } from "@/components/size-charts";
 import { ZoomableImage } from "@/components/zoomable-image";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = { title: "Add Yourself to the Roster", robots: { index: false } };
 // Always render fresh so a newly-linked design/mockup shows immediately.
@@ -23,6 +24,15 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
   const order = await getBySelfEntryToken(token);
   if (!order) {
     return <Centered title="Link not found">This roster link is invalid or has expired.</Centered>;
+  }
+  // A cancelled duplicate may still have an old player link in circulation.
+  // Preserve that link by forwarding it to the current order for the same
+  // approved design instead of exposing stale product/size fields.
+  if (order.status === "cancelled" && order.designRequestId) {
+    const current = await getByDesignRequestId(order.designRequestId);
+    if (current && current.id !== order.id && current.status !== "cancelled" && current.selfEntryToken) {
+      redirect(`/team-order/join/${current.selfEntryToken}`);
+    }
   }
   if (!order.selfEntryOpen) {
     return (
