@@ -32,7 +32,6 @@ function getUploadedCharts(): { file: string; title: string }[] {
     const dir = path.join(process.cwd(), "public", "size-charts");
     return readdirSync(dir)
       .filter((f) => /\.(png|jpe?g|webp)$/i.test(f))
-      .filter((f) => f !== "basketball-size-chart.webp")
       .sort()
       .map((f) => ({ file: `/size-charts/${f}`, title: f.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ") }));
   } catch {
@@ -89,29 +88,14 @@ export default function SizeGuidePage() {
           <p className="mt-2 max-w-2xl text-sm text-muted">
             Use this chart for our sleeveless basketball jerseys and uniform tops. Width is measured across the chest 1&quot; below the armhole. Length is measured from the highest shoulder point to the bottom hem.
           </p>
-          <div className="mt-5 grid items-start gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(22rem,0.9fr)]">
-            <figure>
-              <a href="/size-charts/basketball-size-chart.webp" target="_blank" rel="noopener noreferrer" className="block border border-line bg-white p-2 hover:border-brand/60">
-                <Image
-                  src="/size-charts/basketball-size-chart.webp"
-                  alt="Youth and adult basketball uniform size chart with width and length measurements"
-                  width={1122}
-                  height={1402}
-                  sizes="(max-width: 1024px) 100vw, 55vw"
-                  className="h-auto w-full"
-                />
-              </a>
-              <figcaption className="mt-2 text-xs text-muted">Open the chart for a full-size view.</figcaption>
-            </figure>
-            <div className="space-y-7">
-              <div>
-                <h3 className="display text-sm text-brand mb-2">Youth</h3>
-                <ChartTable headers={["Size", "Width", "Length"]} rows={BASKETBALL_YOUTH} />
-              </div>
-              <div>
-                <h3 className="display text-sm text-brand mb-2">Adult</h3>
-                <ChartTable headers={["Size", "Width", "Length"]} rows={BASKETBALL_ADULT} />
-              </div>
+          <div className="mt-5 grid gap-6 md:grid-cols-2">
+            <div>
+              <h3 className="display text-sm text-brand mb-2">Youth</h3>
+              <ChartTable headers={["Size", "Width", "Length"]} rows={BASKETBALL_YOUTH} />
+            </div>
+            <div>
+              <h3 className="display text-sm text-brand mb-2">Adult</h3>
+              <ChartTable headers={["Size", "Width", "Length"]} rows={BASKETBALL_ADULT} />
             </div>
           </div>
         </section>
