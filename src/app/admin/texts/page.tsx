@@ -15,6 +15,7 @@ export default async function AdminTextsPage({
   searchParams: Promise<{
     to?: string;
     name?: string;
+    email?: string;
     tab?: string;
     open?: string;
   }>;
@@ -24,7 +25,7 @@ export default async function AdminTextsPage({
   if (!session) redirect("/admin/login");
   if (!canAccess(session.role, "/admin/texts")) redirect("/admin");
   const restricted = session.role === "designer";
-  const { to, name, tab, open } = await searchParams;
+  const { to, name, email, tab, open } = await searchParams;
   // ?open=<designId> deep-links an email thread (from an email alert) and
   // implies the Email tab.
   const initialTab = tab === "email" || open ? "email" : "texts";
@@ -53,6 +54,7 @@ export default async function AdminTextsPage({
           initialTab={initialTab}
           initialPhone={to}
           initialName={name}
+          initialEmail={email}
           initialOpen={open}
           currentUserName={session.name}
           restricted={restricted}

@@ -13,6 +13,7 @@ export function AdminConversations({
   initialTab = "texts",
   initialPhone,
   initialName,
+  initialEmail,
   initialOpen,
   currentUserName,
   restricted = false,
@@ -20,6 +21,7 @@ export function AdminConversations({
   initialTab?: Tab;
   initialPhone?: string;
   initialName?: string;
+  initialEmail?: string;
   initialOpen?: string;
   currentUserName: string;
   restricted?: boolean;
@@ -68,6 +70,7 @@ export function AdminConversations({
       <div className={tab === "email" ? "" : "hidden"}>
         <AdminEmailInbox
           initialOpen={initialOpen}
+          initialEmail={initialEmail}
           currentUserName={currentUserName}
           restricted={restricted}
         />

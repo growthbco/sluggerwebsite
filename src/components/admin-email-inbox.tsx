@@ -81,9 +81,10 @@ const STATUS_LABEL: Record<string, string> = {
  *  replied. */
 export function AdminEmailInbox({
   initialOpen,
+  initialEmail,
   currentUserName,
   restricted = false,
-}: { initialOpen?: string; currentUserName: string; restricted?: boolean }) {
+}: { initialOpen?: string; initialEmail?: string; currentUserName: string; restricted?: boolean }) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [active, setActive] = useState<Active | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -92,7 +93,7 @@ export function AdminEmailInbox({
   const [mobileView, setMobileView] = useState<"list" | "thread">("list");
   const [draft, setDraft] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialEmail ?? "");
   const [sender, setSender] = useState(restricted ? currentUserName : STAFF_NAMES[0]);
   const [busy, setBusy] = useState(false);
   const [drafting, setDrafting] = useState(false);

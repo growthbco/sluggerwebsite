@@ -444,7 +444,6 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                 const paid = Boolean(o.invoicePaidAt) || o.status === "paid" || o.status === "shipped";
                 const deposit = o.depositCents ?? (estimate ? Math.round(estimate / 2) : 0);
                 const timeline = orderTimelines.get(o.id)!;
-                const customerDate = timeline.promisedInHandAt ?? timeline.requestedInHandAt;
                 const finalMockups = Array.from(new Set([
                   ...(o.designRequestId ? finalMockupsByDesign.get(o.designRequestId) ?? [] : []),
                   ...(o.approvedDesignUrl ? [o.approvedDesignUrl] : []),
@@ -468,6 +467,19 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                         <Link href={`/admin/team-order/${o.id}`} className="font-mono text-brand hover:underline">{o.reference}</Link>
                         <span className="truncate max-w-[15rem]">{o.contactEmail}</span>
                         <span title={o.source ?? "unknown (pre-tracking)"}>{srcShort(o.source)}</span>
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px]">
+                        <span
+                          className={`display ${DATE_RISK_TONE[timeline.risk]}`}
+                          title={timeline.riskDetail}
+                        >
+                          NEEDED BY {timeline.requestedInHandAt ? fmtRequestedDate(timeline.requestedInHandAt) : "NOT PROVIDED"}
+                        </span>
+                        {timeline.promisedInHandAt ? (
+                          <span className="display text-sky-300" title="Date Slugger committed to in writing">
+                            PROMISED {fmtRequestedDate(timeline.promisedInHandAt)}
+                          </span>
+                        ) : null}
                       </div>
                     </td>
                     <td className="px-3 py-3">
@@ -648,6 +660,20 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                         )}
                         {/* Secondary actions in a floating dropdown. */}
                         <AdminRowMenu>
+                            {o.contactPhone ? (
+                              <Link href={`/admin/texts?to=${encodeURIComponent(o.contactPhone)}&name=${encodeURIComponent(o.contactName)}`}>
+                                View text history
+                              </Link>
+                            ) : (
+                              <span className="text-xs text-muted" title="No phone number is attached to this order">No text history · no phone</span>
+                            )}
+                            <Link
+                              href={o.designRequestId
+                                ? `/admin/texts?tab=email&open=${encodeURIComponent(o.designRequestId)}`
+                                : `/admin/texts?tab=email&email=${encodeURIComponent(o.contactEmail)}`}
+                            >
+                              View email history
+                            </Link>
                             <AdminQuickText
                               teamOrderId={o.id}
                               teamName={o.teamName}
