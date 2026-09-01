@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { SmsConsentNote } from "@/components/sms-consent";
 import {
+  approvedDesignsNeedPlayerChoice,
   ITEM_TYPES,
   SPEEDO_BASEBALL_MATERIAL_KEY,
   fabricForStyle,
@@ -54,12 +55,10 @@ function styleFromDesign(designStyle?: string | null): string | undefined {
 }
 
 export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
-  // Approved designs this team can pick from. More than one (e.g. Pin Daddy /
-  // Pin Mommy) turns on the per-row design picker so each size ties to the
-  // right artwork - the exact gap that used to force people into the notes box.
+  // Approved designs may be colorways players choose between or separate
+  // product mockups that all belong to the same order.
   const designs = prefill?.designs ?? [];
   const hasApprovedDesign = Boolean(prefill && designs.length > 0);
-  const needsDesign = designs.length > 1;
   const soleDesign = designs.length === 1 ? designs[0].label : "";
   const [mode, setMode] = useState<"manual" | "link">("manual");
   const [teamName, setTeamName] = useState(prefill?.teamName ?? "");
@@ -75,6 +74,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   // Orders from an approved design start with the items the design actually
   // covers (a hoodie design pre-selects hoodie, not the jersey default).
   const [items, setItems] = useState<string[]>(prefill?.items?.length ? prefill.items : ["jersey"]);
+  const needsDesign = approvedDesignsNeedPlayerChoice(designs, items);
   const [rows, setRows] = useState<Row[]>(() => [emptyRow(soleDesign), emptyRow(soleDesign), emptyRow(soleDesign)]);
   // Hats are ordered in bulk by size (not per player): { fitted_hat: { "S/M": 5 } }.
   const [hatQty, setHatQty] = useState<Record<string, Record<string, number>>>({});

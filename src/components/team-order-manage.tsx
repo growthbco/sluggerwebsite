@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-acknowledgment";
 import {
+  approvedDesignsNeedPlayerChoice,
   itemLabel,
   sizeBreakdown,
   formatSize,
@@ -79,8 +80,8 @@ function rowSizes(r: RosterRow, items: string[], sport?: string | null): string 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, items, sport, designs = [], shareUrl, roster, submitted, colors, locked, lockMessage, requiresNames = true, minPieces = 6, localPickup = false, rushShipping = false, quote, nextIsDeposit = false, designState = "approved", addonSlot, orderSpec }: Props) {
-  // >1 approved design -> show the "which design?" picker on every add/edit row.
-  const needsDesign = designs.length > 1;
+  // Multiple colorways need a picker. Separate product mockups do not.
+  const needsDesign = approvedDesignsNeedPlayerChoice(designs, items);
   const soleDesign = designs.length === 1 ? designs[0].label : "";
   const nextStepCopy = nextIsDeposit
     ? rushShipping

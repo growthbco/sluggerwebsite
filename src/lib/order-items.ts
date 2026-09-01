@@ -39,6 +39,53 @@ export type SizeField = {
   sizes: string[];
 };
 
+type ApprovedDesign = { label: string };
+
+const DESIGN_PRODUCT_LABELS: Record<string, RegExp> = {
+  jersey: /\b(jersey|shirt|uniform)\b/i,
+  hockey_jersey: /\b(hockey|sweater)\b/i,
+  flag_football_jersey: /\b(flag football|compression)\b/i,
+  practice_jersey: /\bpractice jersey\b/i,
+  polo: /\bpolo\b/i,
+  polo_pin_dot: /\b(pin[\s-]?dot polo|polo)\b/i,
+  knickers: /\bknickers?\b/i,
+  long_pants: /\b(pants?|trousers?)\b/i,
+  shorts: /\bshorts?\b/i,
+  hoodie: /\b(hoodie|sweatshirt)\b/i,
+  lightweight_hoodie: /\b(lightweight hoodie|hoodie)\b/i,
+  pullover: /\b(pullover|quarter[\s-]?zip|1\/4[\s-]?zip)\b/i,
+  jacket: /\b(jacket|warm[\s-]?up)\b/i,
+  cheer_uniform: /\bcheer\b/i,
+  cheer_uniform_rhinestone: /\b(cheer|rhinestone)\b/i,
+  socks: /\bsocks?\b/i,
+  fitted_hat: /\b(fitted hat|cap)\b/i,
+  snapback_hat: /\b(snapback|hat|cap)\b/i,
+  performance_hat: /\b(performance (hat|cap)|hat|cap)\b/i,
+  beanie: /\bbeanie\b/i,
+};
+
+/** Several approved images can mean either player-selectable colorways or
+ * separate product mockups that all belong to the same order. Product mockups
+ * should never force a player to choose between, for example, their uniform
+ * and their jacket. When every label clearly maps to the order's products and
+ * those mappings differ, the images are references rather than choices. */
+export function approvedDesignsNeedPlayerChoice(
+  designs: readonly ApprovedDesign[],
+  itemKeys: readonly string[],
+): boolean {
+  if (designs.length <= 1) return false;
+  const includedItems = new Set(itemKeys);
+  const signatures = designs.map(({ label }) =>
+    Object.entries(DESIGN_PRODUCT_LABELS)
+      .filter(([key, pattern]) => includedItems.has(key) && pattern.test(label))
+      .map(([key]) => key)
+      .sort()
+      .join("|"),
+  );
+  if (signatures.some((signature) => !signature)) return true;
+  return new Set(signatures).size === 1;
+}
+
 export function isOneSizeList(sizes: readonly string[]): boolean {
   return sizes.length === 1 && sizes[0] === "One Size";
 }
