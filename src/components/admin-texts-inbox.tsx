@@ -50,6 +50,60 @@ type Context = {
 };
 type Filter = "all" | "unread" | "starred" | "archived";
 
+const GOOGLE_REVIEW_URL =
+  "https://www.google.com/maps/search/?api=1&query=Slugger+Athletics+Ocala+FL";
+
+const QUICK_REPLIES = [
+  {
+    key: "pricing",
+    label: "Pricing",
+    message: (firstName: string) =>
+      `Hi ${firstName}, fully sublimated jerseys start at $28 for round neck and $30 for V-neck. Your custom design, team logos, sponsor logos, names, and numbers are included. Most orders have a 6-piece minimum per design. Current pricing: https://sluggerathletics.com/pricing`,
+  },
+  {
+    key: "sizing",
+    label: "Sizing",
+    message: (firstName: string) =>
+      `Hi ${firstName}, you can view our youth and adult size charts here: https://sluggerathletics.com/size-guide. Please compare the width and length to a jersey that already fits well. Basketball, volleyball, cheer, and other product-specific charts are listed separately.`,
+  },
+  {
+    key: "review",
+    label: "Review request",
+    message: (firstName: string) =>
+      `Hi ${firstName}, thank you for choosing Slugger Athletics! If you were happy with your order, would you mind leaving us a quick Google review? It really helps our small business: ${GOOGLE_REVIEW_URL}`,
+  },
+  {
+    key: "timeline",
+    label: "Timeline",
+    message: (firstName: string) =>
+      `Hi ${firstName}, standard production is 3 weeks after artwork approval and required payment. Two-week Rush is $100. Shipping time is additional. If you have a firm in-hand date, send it over before ordering so we can confirm availability.`,
+  },
+  {
+    key: "proof",
+    label: "Proof approval",
+    message: (firstName: string) =>
+      `Hi ${firstName}, your proof is ready for review. Please check spelling, numbers, colors, logos, and sponsor placement carefully. Reply with your approval or any changes. Production begins after final written approval and required payment.`,
+  },
+  {
+    key: "roster",
+    label: "Roster reminder",
+    message: (firstName: string) =>
+      `Hi ${firstName}, we are still waiting on your final roster and sizes. Please double-check every name, number, product, and size before submitting. Roster changes are locked once a deposit or full payment is recorded.`,
+  },
+  {
+    key: "payment",
+    label: "Payment reminder",
+    message: (firstName: string) =>
+      `Hi ${firstName}, your order is ready for the next payment step. Please use the invoice link we sent, or let us know if you need it resent. Production begins after the required payment is received.`,
+  },
+  {
+    key: "details",
+    label: "Need details",
+    message: (firstName: string) =>
+      `Hi ${firstName}, happy to help. Please send the sport, estimated quantity, preferred jersey style, and requested in-hand date. If you have logos or inspiration, send those too.`,
+  },
+] as const;
+
 const fmt = (d: string) =>
   new Date(d).toLocaleString("en-US", {
     timeZone: "America/New_York",
@@ -401,6 +455,13 @@ export function AdminTextsInbox({
   });
   const activeConvo = convos.find((c) => c.phone === active);
   const unreadCount = convos.filter((c) => c.unread && !c.archived).length;
+
+  function useQuickReply(message: (firstName: string) => string) {
+    const contactName = activeConvo?.name ?? newName;
+    const firstName = contactName?.trim().split(/\s+/)[0] || "there";
+    setDraft(message(firstName));
+    window.requestAnimationFrame(() => composerRef.current?.focus());
+  }
 
   const chip = (f: Filter, label: string) => (
     <button
@@ -852,6 +913,24 @@ export function AdminTextsInbox({
               </button>
             )}
           </div>
+          {mode !== "note" && (
+            <div className="mb-2 flex items-center gap-1.5 overflow-x-auto pb-1">
+              <span className="display mr-1 shrink-0 text-[10px] uppercase tracking-wider text-muted">
+                Quick replies
+              </span>
+              {QUICK_REPLIES.map((reply) => (
+                <button
+                  key={reply.key}
+                  type="button"
+                  onClick={() => useQuickReply(reply.message)}
+                  title={`Replace the message draft with the ${reply.label} reply`}
+                  className="display inline-flex min-h-[34px] shrink-0 items-center rounded-full border border-line px-3 py-1 text-[10px] text-muted transition-colors hover:border-brand/50 hover:bg-brand/10 hover:text-brand lg:min-h-0"
+                >
+                  {reply.label}
+                </button>
+              ))}
+            </div>
+          )}
           {pendingImages.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-2">
               {pendingImages.map((u, i) => (
