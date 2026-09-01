@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { dbEnabled } from "@/db";
-import { getByManageToken } from "@/lib/team-orders";
+import { getByDesignRequestId, getByManageToken } from "@/lib/team-orders";
 import { TeamOrderManageSection } from "@/components/team-order-manage-section";
 import { getAdminSession } from "@/lib/admin-auth";
 import { redirect } from "next/navigation";
@@ -19,6 +19,17 @@ export default async function ManagePage({ params }: { params: Promise<{ token: 
   const order = await getByManageToken(token);
   if (!order) {
     return <Centered title="Link not found">This management link is invalid or has expired.</Centered>;
+  }
+
+  // Older approval/order flows could leave a cancelled duplicate's customer
+  // link in an email or text. Never render that obsolete order: send the coach
+  // to the active order for the same design so its real products and size
+  // fields are shown (for example, cheer top + skirt instead of Jersey).
+  if (order.status === "cancelled" && order.designRequestId) {
+    const current = await getByDesignRequestId(order.designRequestId);
+    if (current && current.id !== order.id && current.status !== "cancelled" && current.manageToken) {
+      redirect(`/team-order/manage/${current.manageToken}`);
+    }
   }
 
   return (
