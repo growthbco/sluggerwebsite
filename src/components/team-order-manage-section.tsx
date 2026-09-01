@@ -70,7 +70,7 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
   const hasJersey = orderItems.some((item) => item.includes("jersey"));
   const isBasketball = /basketball/i.test(order.sport ?? "");
   const collecting = ["draft", "collecting"].includes(order.status);
-  const productPrices = orderItems
+  const separateProductPrices = orderItems
     .map((key) => ({
       key,
       label: itemLabel(key),
@@ -79,6 +79,22 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
         : itemPriceCents(key, order.jerseyStyle, order.localPricing, order.jerseyMaterial),
     }))
     .filter((p) => p.unitCents > 0);
+  const hasReversibleBasketballSet = isBasketball
+    && (order.jerseyMaterial ?? "").toLowerCase() === "reversible"
+    && orderItems.includes("jersey")
+    && orderItems.includes("shorts");
+  const productPrices = hasReversibleBasketballSet
+    ? [
+        {
+          key: "reversible_basketball",
+          label: "Reversible Basketball Uniform",
+          unitCents: separateProductPrices
+            .filter((product) => product.key === "jersey" || product.key === "shorts")
+            .reduce((total, product) => total + product.unitCents, 0),
+        },
+        ...separateProductPrices.filter((product) => product.key !== "jersey" && product.key !== "shorts"),
+      ]
+    : separateProductPrices;
   const canAddon = !["draft", "collecting", "cancelled"].includes(order.status);
   const addonPrices = Object.fromEntries(addonItems.map((k) => [
     k,
@@ -276,7 +292,10 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
           <div className="border border-line bg-ink/40 px-4 py-3">
             <p className="text-xs uppercase tracking-wider text-muted">Unit price</p>
             {productPrices.map((p) => (
-              <p key={p.key} className="display text-lg text-foreground mt-0.5">{money(p.unitCents)} each</p>
+              <div key={p.key} className="mt-2">
+                <p className="text-xs text-muted">{p.label}</p>
+                <p className="display text-lg text-foreground mt-0.5">{money(p.unitCents)} each</p>
+              </div>
             ))}
           </div>
           <div className="border border-line bg-ink/40 px-4 py-3">

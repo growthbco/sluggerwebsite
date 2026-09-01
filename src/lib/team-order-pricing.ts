@@ -114,6 +114,10 @@ export const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Tw
 
 export function jerseyPriceCents(jerseyStyle?: string | null, localPricing?: boolean | null, material?: string | null): number {
   const s = (jerseyStyle ?? "").toLowerCase();
+  // A reversible basketball uniform is advertised at $85 with shorts. Roster
+  // rows size each piece separately, so the jersey carries $60 and the shorts
+  // line supplies the remaining $25.
+  if ((material ?? "").toLowerCase() === "reversible") return 6000;
   // Bowling shirts are cut in a pricier microfiber, so a full-button bowling
   // shirt is $42 (not the $35 standard full-button). Only full-button carries
   // this premium; other bowling styles price by their normal style.
