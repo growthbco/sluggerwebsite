@@ -454,7 +454,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                     className="align-top hover:bg-steel/60"
                     data-section="orders"
                     data-status={o.status}
-                    data-search={`${o.teamName} ${o.reference} ${o.contactEmail} ${srcShort(o.source)} ${timeline.tierLabel} ${timeline.riskLabel}`.toLowerCase()}
+                    data-search={`${o.teamName} ${o.reference} ${o.contactName} ${o.contactEmail} ${srcShort(o.source)} ${timeline.tierLabel} ${timeline.riskLabel}`.toLowerCase()}
                   >
                     <td className="px-4 py-3 text-foreground">
                       <div className="flex flex-wrap items-center gap-2">
@@ -463,6 +463,10 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                           <AdminAddonDetails addons={addonsByOrder.get(o.id)!} teamName={o.teamName} />
                         )}
                       </div>
+                      <p className="mt-1 text-xs text-foreground">
+                        <span className="display text-[10px] text-muted">CONTACT</span>
+                        <span className="ml-1.5 font-medium">{o.contactName}</span>
+                      </p>
                       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted">
                         <Link href={`/admin/team-order/${o.id}`} className="font-mono text-brand hover:underline">{o.reference}</Link>
                         <span className="truncate max-w-[15rem]">{o.contactEmail}</span>
