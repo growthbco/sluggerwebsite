@@ -94,6 +94,21 @@ export function DesignStatusPanel({
     setSelected((s) => (s.includes(u) ? s.filter((x) => x !== u) : [...s, u]));
   }
 
+  function editProof(u: string) {
+    if (busy !== "") return;
+    if (activeProof !== u) {
+      setActiveProof(u);
+      setAnnotations([]);
+      setGeneralNote("");
+    }
+    setMessage("");
+    setExpanded(null);
+    setShowChanges(true);
+    window.setTimeout(() => {
+      document.getElementById("change-request-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
+
   async function approve() {
     if (selected.length === 0) return;
     setBusy("approving");
@@ -241,16 +256,27 @@ export function DesignStatusPanel({
           </summary>
           <div className="border-t border-line p-4">
             <p className="mb-3 text-xs text-muted">
-              These stay visible so you can compare every piece in the project. They are reference-only; only the current proof{proofImages.length === 1 ? "" : "s"} above can be approved.
+              These cannot be approved, but you can still request edits and place pins on any item that needs changes.
             </p>
             <div className="grid gap-3 sm:grid-cols-3">
               {supersededProofImages.map((url) => (
-                <button key={url} type="button" onClick={() => setExpanded(url)} className="relative aspect-[4/3] overflow-hidden border border-line bg-white opacity-80 hover:opacity-100">
-                  <Image src={url} alt={`${proofLabels[url] || "Earlier proof"} — reference only`} fill sizes="(max-width: 640px) 100vw, 33vw" className="object-contain p-2" unoptimized />
-                  <span className="absolute bottom-2 left-2 right-2 bg-black/80 px-2 py-1 text-left text-[11px] text-white">
-                    {proofLabels[url] || "Earlier proof"} · Reference only
-                  </span>
-                </button>
+                <div key={url} className="overflow-hidden border border-line bg-white">
+                  <button type="button" onClick={() => setExpanded(url)} className="relative block aspect-[4/3] w-full opacity-80 hover:opacity-100">
+                    <Image src={url} alt={`${proofLabels[url] || "Earlier proof"} — reference only`} fill sizes="(max-width: 640px) 100vw, 33vw" className="object-contain p-2" unoptimized />
+                    <span className="absolute bottom-2 left-2 right-2 bg-black/80 px-2 py-1 text-left text-[11px] text-white">
+                      {proofLabels[url] || "Earlier proof"} · Not available for approval
+                    </span>
+                  </button>
+                  {!isApproved && !maxedOut && (
+                    <button
+                      type="button"
+                      onClick={() => editProof(url)}
+                      className="w-full border-t border-line bg-ink px-3 py-2.5 text-left text-xs display text-brand hover:bg-brand/10"
+                    >
+                      Request edits and add pins
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>
@@ -379,16 +405,16 @@ export function DesignStatusPanel({
       )}
 
       {showChanges && !isApproved && !maxedOut && (
-        <section className="bg-steel border border-line p-5 space-y-4">
+        <section id="change-request-editor" className="scroll-mt-6 bg-steel border border-line p-5 space-y-4">
           <div>
             <h3 className="display text-foreground">Tell us what to change</h3>
             <p className="text-sm text-muted mt-1">
               Click pins on the proof to mark exactly what to change. You have{" "}
               <strong className="text-foreground">{revisionsLeft}</strong> revision{revisionsLeft === 1 ? "" : "s"} left.
             </p>
-            {proofImages.length > 1 && (
+            {proofImages.length + supersededProofImages.length > 1 && (
               <p className="text-xs text-muted mt-1">
-                Editing: <strong className="text-foreground">{proofLabels[activeProof] || "the selected proof"}</strong>. Tap a different proof above to switch.
+                Editing: <strong className="text-foreground">{proofLabels[activeProof] || "the selected proof"}</strong>. Choose another item&apos;s edit button to switch.
               </p>
             )}
           </div>
