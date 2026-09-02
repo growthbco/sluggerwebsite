@@ -189,7 +189,7 @@ export function DesignStatusPanel({
           {!isApproved && (
             <p className="text-sm text-muted mt-1">
               {proofImages.length > 1
-                ? "Tap each proof you want to approve (you can pick more than one). Use the magnifier to enlarge."
+                ? "Tap each proof to select it for approval. Use the edit button below the item you want to mark up."
                 : "Tap the proof to select it, then approve or request changes."}
             </p>
           )}
@@ -208,40 +208,50 @@ export function DesignStatusPanel({
               return (
                 <div
                   key={u}
-                  className={`group relative aspect-[4/3] bg-white border-2 overflow-hidden ${
+                  className={`group bg-white border-2 overflow-hidden ${
                     isSel ? "border-brand ring-2 ring-brand/40" : "border-line hover:border-brand/50"
                   }`}
                 >
-                  <Image src={u} alt={proofLabels[u] || "Proof"} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-contain p-2" unoptimized />
-                  {!isApproved && (
+                  <div className="relative aspect-[4/3]">
+                    <Image src={u} alt={proofLabels[u] || "Proof"} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-contain p-2" unoptimized />
+                    {!isApproved && (
+                      <button
+                        type="button"
+                        onClick={() => toggleSelect(u)}
+                        aria-pressed={isSel}
+                        aria-label={`${isSel ? "Deselect" : "Select"} ${proofLabels[u] || "proof"} for approval`}
+                        className="absolute inset-0 z-10 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand/70"
+                      >
+                        <span className="sr-only">{isSel ? "Selected" : "Not selected"}</span>
+                      </button>
+                    )}
+                    {!isApproved && (
+                      <span className={`absolute top-2 right-2 grid place-items-center h-7 w-7 display text-sm rounded-full border-2 ${isSel ? "bg-brand text-on-brand border-brand" : "bg-white/90 text-muted border-line"}`}>
+                        {isSel ? "✓" : ""}
+                      </span>
+                    )}
+                    {proofLabels[u] && (
+                      <span className="absolute top-2 left-2 bg-black/75 text-white text-[11px] display px-2 py-1 pointer-events-none">{proofLabels[u]}</span>
+                    )}
                     <button
                       type="button"
-                      onClick={() => toggleSelect(u)}
-                      aria-pressed={isSel}
-                      aria-label={`${isSel ? "Deselect" : "Select"} ${proofLabels[u] || "proof"} for approval`}
-                      className="absolute inset-0 z-10 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand/70"
+                      onClick={(e) => { e.stopPropagation(); setExpanded(u); }}
+                      className="absolute bottom-2 right-2 z-20 grid place-items-center h-11 w-11 bg-black/70 text-white rounded hover:bg-black/85"
+                      title="Enlarge"
+                      aria-label="Enlarge proof"
                     >
-                      <span className="sr-only">{isSel ? "Selected" : "Not selected"}</span>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" strokeLinecap="round" /></svg>
+                    </button>
+                  </div>
+                  {!isApproved && !maxedOut && (
+                    <button
+                      type="button"
+                      onClick={() => editProof(u)}
+                      className="w-full border-t border-line bg-ink px-3 py-2.5 text-left text-xs display text-brand hover:bg-brand/10"
+                    >
+                      Request edits and add pins
                     </button>
                   )}
-                  {!isApproved && (
-                    <span className={`absolute top-2 right-2 grid place-items-center h-7 w-7 display text-sm rounded-full border-2 ${isSel ? "bg-brand text-on-brand border-brand" : "bg-white/90 text-muted border-line"}`}>
-                      {isSel ? "✓" : ""}
-                    </span>
-                  )}
-                  {proofLabels[u] && (
-                    <span className="absolute top-2 left-2 bg-black/75 text-white text-[11px] display px-2 py-1 pointer-events-none">{proofLabels[u]}</span>
-                  )}
-                  {/* Enlarge is its own control so tapping the image selects it. */}
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setExpanded(u); }}
-                    className="absolute bottom-2 right-2 z-20 grid place-items-center h-11 w-11 bg-black/70 text-white rounded hover:bg-black/85"
-                    title="Enlarge"
-                    aria-label="Enlarge proof"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" strokeLinecap="round" /></svg>
-                  </button>
                 </div>
               );
             })}
