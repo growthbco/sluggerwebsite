@@ -21,6 +21,7 @@ import { OrderSpecificationCard } from "@/components/order-specification-card";
 const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button", "Quarter-Zip"];
 
 type Row = { name: string; number: string; sizes: Record<string, string>; notes: string; design: string };
+type FlowStep = "team" | "gear" | "roster" | "review";
 
 const emptyRow = (design = ""): Row => ({ name: "", number: "", sizes: {}, notes: "", design });
 
@@ -40,10 +41,15 @@ type DirectOrderDraft = {
   rows?: Row[];
   hatQty?: Record<string, Record<string, number>>;
   smsOptIn?: boolean;
+  flowStep?: FlowStep;
 };
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function isFlowStep(value: unknown): value is FlowStep {
+  return value === "team" || value === "gear" || value === "roster" || value === "review";
 }
 
 function stringRecord(value: unknown): Record<string, string> {
@@ -108,6 +114,7 @@ function readDraft(value: string | null): DirectOrderDraft | null {
       rows: restoreRows(draft.rows),
       hatQty: restoreHatQty(draft.hatQty),
       smsOptIn: draft.smsOptIn === true,
+      flowStep: isFlowStep(draft.flowStep) ? draft.flowStep : "team",
     };
   } catch {
     return null;
@@ -175,9 +182,9 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [copied, setCopied] = useState("");
   const [manageUrl, setManageUrl] = useState<string | null>(null);
   const [smsOptIn, setSmsOptIn] = useState(false);
-  const [confirmingSubmit, setConfirmingSubmit] = useState(false);
   const [rosterAck, setRosterAck] = useState(false);
   const [deliveryAck, setDeliveryAck] = useState(false);
+  const [flowStep, setFlowStep] = useState<FlowStep>("team");
   const [draftReady, setDraftReady] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
   const draftStorageKey = `${DIRECT_ORDER_DRAFT_PREFIX}:v${DIRECT_ORDER_DRAFT_VERSION}:${prefill?.designToken ?? "new"}`;
@@ -207,6 +214,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       if (draft.rows?.length) setRows(draft.rows);
       setHatQty(draft.hatQty ?? {});
       setSmsOptIn(Boolean(draft.smsOptIn));
+      setFlowStep(draft.flowStep ?? "team");
       setDraftRestored(true);
     }
     setDraftReady(true);
@@ -227,13 +235,14 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       rows,
       hatQty,
       smsOptIn,
+      flowStep,
     };
     try {
       window.sessionStorage.setItem(draftStorageKey, JSON.stringify(draft));
     } catch {
       // The final submission path remains unchanged when storage is blocked.
     }
-  }, [contactEmail, contactName, contactPhone, draftReady, draftStorageKey, hatQty, items, jerseyStyle, material, materialTouched, rows, smsOptIn, status, teamName]);
+  }, [contactEmail, contactName, contactPhone, draftReady, draftStorageKey, flowStep, hatQty, items, jerseyStyle, material, materialTouched, rows, smsOptIn, status, teamName]);
 
   // Returning visitor prefill (browser-local). Skipped when the identity is
   // already locked from an approved design.
@@ -285,6 +294,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const materialOptions = jerseyMaterialsFor(jerseyStyle, prefill?.sport);
   const effectiveMaterial = fixedSpeedoMaterial ? SPEEDO_BASEBALL_MATERIAL_KEY : material;
   const orderSetupComplete = items.length > 0 && (!hasJersey || Boolean(jerseyStyle && effectiveMaterial));
+  const teamDetailsComplete = Boolean(prefill || (teamName.trim() && contactName.trim() && contactEmail.trim()));
   const sizeGuideHref = /volleyball/i.test(prefill?.sport ?? "") ? "/size-guide#girls-volleyball" : "/size-guide#jerseys";
   const submissionRoster = [
     ...rows.map((row) => ({ ...row, quantity: 1 })),
@@ -406,6 +416,26 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
         </div>
       )}
 
+      <ol className="grid grid-cols-4 gap-2" aria-label="Team order progress">
+        {([
+          ["team", "Team"],
+          ["gear", "Gear"],
+          ["roster", "Roster"],
+          ["review", "Review"],
+        ] as const).map(([step, label], index) => {
+          const active = flowStep === step;
+          const complete = (["team", "gear", "roster", "review"] as FlowStep[]).indexOf(flowStep) > index;
+          return (
+            <li key={step} className={`border px-2.5 py-2 text-center ${active ? "border-brand bg-brand/[0.08]" : complete ? "border-brand/50" : "border-line"}`} aria-current={active ? "step" : undefined}>
+              <span className={`mr-1.5 inline-grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold ${active || complete ? "bg-brand text-on-brand" : "bg-foreground/10 text-muted"}`}>{complete ? "✓" : index + 1}</span>
+              <span className={`display text-xs ${active ? "text-foreground" : "text-muted"}`}>{label}</span>
+            </li>
+          );
+        })}
+      </ol>
+
+      {flowStep === "team" && (
+        <>
       {/* Mode selector */}
       <div className="grid sm:grid-cols-2 gap-3">
         <button onClick={() => { setMode("manual"); setLinks(null); }} className={`text-left p-4 border transition-colors ${mode === "manual" ? "border-brand bg-steel" : "border-line hover:border-brand/50"}`}>
@@ -463,8 +493,22 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
           </div>
         </div>
       )}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => { setStatus("idle"); setMessage(""); setFlowStep("gear"); }}
+          disabled={!teamDetailsComplete}
+          className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-6 py-3 disabled:opacity-50"
+        >
+          Continue to gear
+        </button>
+      </div>
+        </>
+      )}
 
       {/* Jersey style - editable in both flows; only relevant with a jersey */}
+      {flowStep === "gear" && (
+        <>
       {hasJersey && (
       <div>
         <label htmlFor="team-order-jersey-style" className="display text-sm text-foreground">Jersey Style *</label>
@@ -495,13 +539,13 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       )}
 
       {/* Jersey material */}
-      {hasJersey && (
+      {hasJersey && jerseyStyle && (
       <div>
-        <p className="display text-sm text-foreground">{fixedSpeedoMaterial ? "Included Jersey Material" : "Jersey Material *"}</p>
+        <p className="display text-sm text-foreground">{fixedSpeedoMaterial ? "Included Jersey Material" : "Recommended jersey material"}</p>
         <p className="mt-1 text-sm text-muted">
           {fixedSpeedoMaterial
             ? "Full Button and Two Button baseball jerseys are made in this fabric, so there is nothing extra to select."
-            : "Choose the fabric you expect to receive. You will confirm it again before submission."}
+            : "We selected the recommended fabric for this style. Choose another only if you have a preference."}
         </p>
         <div className={`mt-3 grid gap-3 ${fixedSpeedoMaterial ? "" : "sm:grid-cols-2"}`}>
           {materialOptions.map((m) => {
@@ -560,9 +604,26 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
           })}
         </div>
       </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button type="button" onClick={() => setFlowStep("team")} className="clip-slant border border-line text-foreground display px-5 py-3 hover:bg-foreground/5">
+          Back
+        </button>
+        {mode === "manual" ? (
+          <button
+            type="button"
+            onClick={() => { setStatus("idle"); setMessage(""); setFlowStep("roster"); }}
+            disabled={!orderSetupComplete}
+            className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-6 py-3 disabled:opacity-50"
+          >
+            {!items.length ? "Choose gear to continue" : hasJersey && !jerseyStyle ? "Choose a jersey style" : "Continue to roster"}
+          </button>
+        ) : null}
+      </div>
+        </>
+      )}
 
       {/* Manual roster mode */}
-      {mode === "manual" && (
+      {mode === "manual" && flowStep === "roster" && (
         <>
           <div>
             <div className="flex items-center justify-between">
@@ -686,19 +747,19 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
 
           {status === "error" && <p className="text-sm text-brand">{message}</p>}
 
-          <button
-            onClick={() => { setRosterAck(false); setDeliveryAck(false); setConfirmingSubmit(true); }}
-            disabled={status === "sending" || !hasApprovedDesign || !orderSetupComplete}
-            className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors disabled:opacity-60"
-          >
-            {status === "sending"
-              ? "Submitting…"
-              : !hasApprovedDesign
-                ? "Approved design required"
-                : !orderSetupComplete
-                  ? "Choose products, style, and material"
-                  : "Review & Submit Team Order"}
-          </button>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button type="button" onClick={() => setFlowStep("gear")} className="clip-slant border border-line text-foreground display px-5 py-3 hover:bg-foreground/5">
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={() => { setRosterAck(false); setDeliveryAck(false); setStatus("idle"); setMessage(""); setFlowStep("review"); }}
+              disabled={status === "sending" || !hasApprovedDesign || !orderSetupComplete}
+              className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors disabled:opacity-60"
+            >
+              {!hasApprovedDesign ? "Approved design required" : "Continue to review"}
+            </button>
+          </div>
           <p className="text-xs text-muted">
             {hasApprovedDesign
               ? "No payment now - we'll email your total and 50% deposit invoice."
@@ -706,76 +767,76 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
           </p>
           <p className="text-xs text-muted">⏱ Working toward a deadline? Order as early as you can and build in a buffer. We push hard to hit every date, but carrier and shipping delays can happen and are outside our control - if your date is firm, tell us before you order and we&apos;ll be straight with you about it.</p>
 
-          {confirmingSubmit && (
-            <div
-              className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="direct-order-confirm-title"
-              onClick={(event) => { if (event.target === event.currentTarget && status !== "sending") setConfirmingSubmit(false); }}
-            >
-              <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-steel border border-brand/60 p-6 text-left">
-                <p className="display text-xs uppercase tracking-[0.16em] text-brand">Final review</p>
-                <h2 id="direct-order-confirm-title" className="display text-2xl text-foreground mt-1">Confirm your team order</h2>
-                <p className="mt-2 text-sm text-muted">This exact summary is saved with your order when you submit.</p>
-
-                <div className="mt-4">
-                  <OrderSpecificationCard spec={submissionSpec} compact />
-                </div>
-
-                <label className="mt-4 flex cursor-pointer select-none items-start gap-2.5 border border-line p-3 text-sm text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={rosterAck}
-                    onChange={(event) => setRosterAck(event.target.checked)}
-                    className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
-                  />
-                  <span>I confirm the material, approved artwork, products, roster, sizes, service level, date, and subtotal above are correct.</span>
-                </label>
-
-                <div className="mt-4">
-                  <DeliveryTimingAcknowledgment
-                    id="direct-order-delivery-timing-ack"
-                    checked={deliveryAck}
-                    onChange={setDeliveryAck}
-                  />
-                </div>
-
-                {status === "error" && <p className="mt-3 text-sm text-brand">{message}</p>}
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={submit}
-                    disabled={!rosterAck || !deliveryAck || status === "sending"}
-                    className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-6 py-3 disabled:opacity-50"
-                  >
-                    {status === "sending" ? "Submitting…" : "Accept & submit order"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmingSubmit(false)}
-                    disabled={status === "sending"}
-                    className="clip-slant border border-line text-foreground display px-5 py-3 hover:bg-foreground/5 disabled:opacity-50"
-                  >
-                    Go back
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </>
       )}
 
+      {mode === "manual" && flowStep === "review" && (
+        <section className="border border-brand/50 bg-steel p-5 sm:p-6" aria-labelledby="direct-order-review-title">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="display text-xs uppercase tracking-[0.16em] text-brand">Final review</p>
+              <h2 id="direct-order-review-title" className="display text-2xl text-foreground mt-1">Confirm your team order</h2>
+              <p className="mt-2 text-sm text-muted">This exact summary is saved with your order when you submit.</p>
+            </div>
+            <button type="button" onClick={() => setFlowStep("roster")} disabled={status === "sending"} className="clip-slant border border-line text-foreground display px-4 py-2 hover:bg-foreground/5 disabled:opacity-50">
+              Edit roster
+            </button>
+          </div>
+
+          <div className="mt-5">
+            <OrderSpecificationCard spec={submissionSpec} compact />
+          </div>
+
+          <label className="mt-4 flex cursor-pointer select-none items-start gap-2.5 border border-line p-3 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={rosterAck}
+              onChange={(event) => setRosterAck(event.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+            />
+            <span>I confirm the material, approved artwork, products, roster, sizes, service level, date, and subtotal above are correct.</span>
+          </label>
+
+          <div className="mt-4">
+            <DeliveryTimingAcknowledgment
+              id="direct-order-delivery-timing-ack"
+              checked={deliveryAck}
+              onChange={setDeliveryAck}
+            />
+          </div>
+
+          {status === "error" && <p className="mt-3 text-sm text-brand">{message}</p>}
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={submit}
+              disabled={!rosterAck || !deliveryAck || status === "sending"}
+              className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-6 py-3 disabled:opacity-50"
+            >
+              {status === "sending" ? "Submitting…" : "Accept & submit order"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFlowStep("roster")}
+              disabled={status === "sending"}
+              className="clip-slant border border-line text-foreground display px-5 py-3 hover:bg-foreground/5 disabled:opacity-50"
+            >
+              Back
+            </button>
+          </div>
+        </section>
+      )}
+
       {/* Player self-entry link mode */}
-      {mode === "link" && (
+      {mode === "link" && flowStep === "gear" && (
         <div>
           {!links ? (
             <>
               {status === "error" && <p className="text-sm text-brand mb-3">{message}</p>}
-              <button onClick={createLink} disabled={status === "sending" || !teamName || !contactName || !contactEmail} className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors disabled:opacity-60">
+              <button onClick={createLink} disabled={status === "sending" || !teamDetailsComplete || !orderSetupComplete} className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors disabled:opacity-60">
                 {status === "sending" ? "Creating…" : "Create Roster Link"}
               </button>
-              <p className="text-xs text-muted mt-3">Fill in team name, your name, and email above, choose the items, then create a link to share with players.</p>
+              <p className="text-xs text-muted mt-3">Your team and gear choices are saved to this roster link for players to use.</p>
             </>
           ) : (
             <div className="space-y-5">
