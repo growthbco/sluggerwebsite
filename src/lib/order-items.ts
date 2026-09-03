@@ -297,6 +297,8 @@ export const JERSEY_MATERIALS: JerseyMaterial[] = [
   },
 ];
 
+const STANDARD_JERSEY_MATERIAL_KEYS = new Set(["mesh", "dry-fit"]);
+
 /** The fabric a jersey style is actually made in, so an order never defaults to
  *  Mesh when the style implies otherwise. Button-front and quarter-zip jerseys
  *  are smooth polyester, not birdseye mesh; crew / v-neck stay mesh (the
@@ -326,30 +328,44 @@ export function usesSpeedoBaseballMaterial(
   return isButtonBaseballCut && !isBowling(...sportHints);
 }
 
+/** A cut with a single production fabric. Standard crew and V-neck jerseys
+ * deliberately return undefined: coaches choose either Birdseye Mesh or
+ * Moisture-Wicking Performance Knit for those versatile cuts. */
+function fixedJerseyMaterialFor(
+  style?: string | null,
+  ...sportHints: (string | null | undefined)[]
+): string | undefined {
+  if (isBowling(...sportHints)) return "microfiber";
+  if (usesSpeedoBaseballMaterial(style, ...sportHints)) return SPEEDO_BASEBALL_MATERIAL_KEY;
+  return (style ?? "").toLowerCase().includes("zip") ? SPEEDO_BASEBALL_MATERIAL_KEY : undefined;
+}
+
 /** Options the customer can genuinely choose for this jersey cut. */
 export function jerseyMaterialsFor(
   style?: string | null,
   ...sportHints: (string | null | undefined)[]
 ): JerseyMaterial[] {
-  if (!usesSpeedoBaseballMaterial(style, ...sportHints)) return JERSEY_MATERIALS;
-  return JERSEY_MATERIALS.filter((material) => material.key === SPEEDO_BASEBALL_MATERIAL_KEY);
+  const fixedMaterial = fixedJerseyMaterialFor(style, ...sportHints);
+  if (fixedMaterial) return JERSEY_MATERIALS.filter((material) => material.key === fixedMaterial);
+  return JERSEY_MATERIALS.filter((material) => STANDARD_JERSEY_MATERIAL_KEYS.has(material.key));
 }
 
-/** Validate a customer material value and force fixed-fabric baseball cuts to
- * their actual production material. Returns undefined for an invalid choice. */
+/** Validate a customer material value and force fixed-fabric cuts to their
+ * actual production material. Returns undefined for an invalid choice. */
 export function resolveJerseyMaterial(
   material: string | null | undefined,
   style?: string | null,
   ...sportHints: (string | null | undefined)[]
 ): string | undefined {
-  if (usesSpeedoBaseballMaterial(style, ...sportHints)) return SPEEDO_BASEBALL_MATERIAL_KEY;
-  return JERSEY_MATERIALS.some((option) => option.key === material) ? material ?? undefined : undefined;
+  const fixedMaterial = fixedJerseyMaterialFor(style, ...sportHints);
+  if (fixedMaterial) return fixedMaterial;
+  return jerseyMaterialsFor(style, ...sportHints).some((option) => option.key === material) ? material ?? undefined : undefined;
 }
 
 /** Fabric for an order, aware that bowling shirts are microfiber regardless of
  *  style. Falls back to the style-based default for every other sport. */
 export function fabricFor(style?: string | null, ...sportHints: (string | null | undefined)[]): string {
-  return isBowling(...sportHints) ? "microfiber" : fabricForStyle(style);
+  return fixedJerseyMaterialFor(style, ...sportHints) ?? fabricForStyle(style);
 }
 
 export function itemLabel(key: string): string {

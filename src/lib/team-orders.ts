@@ -5,7 +5,6 @@ import { teamOrders, teamOrderRoster, designRequests } from "@/db/schema";
 import {
   notDesignerMade,
   defaultRequiresNames,
-  fabricForStyle,
   formatSize,
   itemLabel,
   itemKeysFromDesignProducts,
@@ -169,11 +168,11 @@ export async function createTeamOrder(input: NewTeamOrder) {
       contactPhone: input.contactPhone,
       sport: input.sport,
       jerseyStyle: input.jerseyStyle,
-      // Never blanket-default to Mesh: if no fabric was chosen, derive it from
-      // the style (button-front / zip = polyester, else mesh).
+      // Never blanket-default to Mesh: derive the actual production fabric
+      // from the style and sport when the customer has not chosen one.
       jerseyMaterial:
         resolveJerseyMaterial(input.jerseyMaterial, input.jerseyStyle, input.sport) ??
-        fabricForStyle(input.jerseyStyle),
+        fabricFor(input.jerseyStyle, input.sport),
       items: input.items?.length ? input.items : ["jersey"],
       designRequestId: input.designRequestId,
       whiteLabel: input.whiteLabel ?? false,
