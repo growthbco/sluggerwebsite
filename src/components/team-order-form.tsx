@@ -14,14 +14,24 @@ import {
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
 import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-acknowledgment";
-import { computeTeamOrderQuote } from "@/lib/team-order-pricing";
+import { computeTeamOrderQuote, itemPriceCents } from "@/lib/team-order-pricing";
 import { buildCustomerOrderSpec } from "@/lib/order-spec";
 import { OrderSpecificationCard } from "@/components/order-specification-card";
 
 const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button", "Quarter-Zip"];
+const DEFAULT_JERSEY_STYLE = "Standard Crew Neck";
+const COMMON_ADD_ON_KEYS = new Set(["shorts", "long_pants", "hoodie", "lightweight_hoodie", "fitted_hat", "socks"]);
+const BULK_SIZE_ITEM_KEYS = new Set(["socks"]);
+const JERSEY_STYLE_DESCRIPTIONS: Record<string, string> = {
+  "V-Neck": "A classic athletic V collar for teams that prefer a sharper neckline.",
+  "Full Button": "A traditional button-front baseball jersey.",
+  "Two Button": "A button-front baseball cut with a cleaner placket.",
+  "Quarter-Zip": "A premium quarter-zip jersey for a more elevated team look.",
+};
 
 type Row = { name: string; number: string; sizes: Record<string, string>; notes: string; design: string };
-type FlowStep = "team" | "gear" | "roster" | "review";
+type FlowStep = "team" | "gear" | "details" | "roster" | "review";
+type PoloMaterial = "dri-fit" | "pin-dot";
 
 const emptyRow = (design = ""): Row => ({ name: "", number: "", sizes: {}, notes: "", design });
 
@@ -40,6 +50,7 @@ type DirectOrderDraft = {
   items?: string[];
   rows?: Row[];
   hatQty?: Record<string, Record<string, number>>;
+  poloMaterial?: PoloMaterial;
   smsOptIn?: boolean;
   flowStep?: FlowStep;
 };
@@ -49,7 +60,15 @@ function stringValue(value: unknown): string {
 }
 
 function isFlowStep(value: unknown): value is FlowStep {
-  return value === "team" || value === "gear" || value === "roster" || value === "review";
+  return value === "team" || value === "gear" || value === "details" || value === "roster" || value === "review";
+}
+
+function isPoloMaterial(value: unknown): value is PoloMaterial {
+  return value === "dri-fit" || value === "pin-dot";
+}
+
+function normalizePoloItems(items: string[]): string[] {
+  return Array.from(new Set(items.map((item) => (item === "polo_pin_dot" ? "polo" : item))));
 }
 
 function stringRecord(value: unknown): Record<string, string> {
@@ -162,15 +181,18 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [contactName, setContactName] = useState(prefill?.contactName ?? "");
   const [contactEmail, setContactEmail] = useState(prefill?.contactEmail ?? "");
   const [contactPhone, setContactPhone] = useState(prefill?.contactPhone ?? "");
-  // No design style specified -> leave blank rather than silently stamping
-  // "Standard Crew Neck" on the order. Blank prices the same as crew neck.
-  const initialJerseyStyle = styleFromDesign(prefill?.designJerseyStyle) ?? "";
+  // The standard crew neck is Slugger's versatile $28 starting point. An
+  // approved design style still wins whenever one has already been chosen.
+  const initialItems = normalizePoloItems(prefill?.items?.length ? prefill.items : ["jersey"]);
+  const initialJerseyStyle = styleFromDesign(prefill?.designJerseyStyle) ?? (initialItems.includes("jersey") ? DEFAULT_JERSEY_STYLE : "");
+  const initialPoloMaterial: PoloMaterial = prefill?.items?.includes("polo_pin_dot") ? "pin-dot" : "dri-fit";
   const [jerseyStyle, setJerseyStyle] = useState(initialJerseyStyle);
   const [material, setMaterial] = useState(fabricForStyle(initialJerseyStyle));
   const [materialTouched, setMaterialTouched] = useState(false);
   // Orders from an approved design start with the items the design actually
   // covers (a hoodie design pre-selects hoodie, not the jersey default).
-  const [items, setItems] = useState<string[]>(prefill?.items?.length ? prefill.items : ["jersey"]);
+  const [items, setItems] = useState<string[]>(initialItems);
+  const [poloMaterial, setPoloMaterial] = useState<PoloMaterial>(initialPoloMaterial);
   const [rows, setRows] = useState<Row[]>(() => [emptyRow(soleDesign), emptyRow(soleDesign), emptyRow(soleDesign)]);
   // Hats are ordered in bulk by size (not per player): { fitted_hat: { "S/M": 5 } }.
   const [hatQty, setHatQty] = useState<Record<string, Record<string, number>>>({});
@@ -210,9 +232,11 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       if (draft.jerseyStyle) setJerseyStyle(draft.jerseyStyle);
       if (draft.material) setMaterial(draft.material);
       setMaterialTouched(Boolean(draft.materialTouched));
-      if (draft.items?.length) setItems(draft.items);
+      if (draft.items?.length) setItems(normalizePoloItems(draft.items));
       if (draft.rows?.length) setRows(draft.rows);
       setHatQty(draft.hatQty ?? {});
+      if (isPoloMaterial(draft.poloMaterial)) setPoloMaterial(draft.poloMaterial);
+      else if (draft.items?.includes("polo_pin_dot")) setPoloMaterial("pin-dot");
       setSmsOptIn(Boolean(draft.smsOptIn));
       setFlowStep(draft.flowStep ?? "team");
       setDraftRestored(true);
@@ -234,6 +258,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       items,
       rows,
       hatQty,
+      poloMaterial,
       smsOptIn,
       flowStep,
     };
@@ -242,7 +267,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
     } catch {
       // The final submission path remains unchanged when storage is blocked.
     }
-  }, [contactEmail, contactName, contactPhone, draftReady, draftStorageKey, flowStep, hatQty, items, jerseyStyle, material, materialTouched, rows, smsOptIn, status, teamName]);
+  }, [contactEmail, contactName, contactPhone, draftReady, draftStorageKey, flowStep, hatQty, items, jerseyStyle, material, materialTouched, poloMaterial, rows, smsOptIn, status, teamName]);
 
   // Returning visitor prefill (browser-local). Skipped when the identity is
   // already locked from an approved design.
@@ -260,7 +285,19 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const inputCls =
     "w-full bg-steel border border-line px-3 py-2.5 text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none";
 
+  function chooseJerseyStyle(nextStyle: string) {
+    setJerseyStyle(nextStyle);
+    if (usesSpeedoBaseballMaterial(nextStyle, prefill?.sport)) {
+      setMaterial(SPEEDO_BASEBALL_MATERIAL_KEY);
+    } else if (!materialTouched) {
+      setMaterial(fabricForStyle(nextStyle));
+    }
+  }
+
   function toggleItem(key: string) {
+    if (key === "jersey" && !items.includes("jersey") && !jerseyStyle) {
+      chooseJerseyStyle(DEFAULT_JERSEY_STYLE);
+    }
     setItems((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   }
   function update(i: number, key: keyof Row, value: string) {
@@ -273,12 +310,16 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const removeRow = (i: number) => setRows((r) => r.filter((_, idx) => idx !== i));
 
   const filledRows = rows.filter((r) => r.name || r.number || Object.keys(r.sizes).length);
+  // A polo is one customer-facing product. Its material determines the
+  // canonical item key only after the customer makes that choice in Details.
+  const resolvedItems = items.map((item) => (item === "polo" && poloMaterial === "pin-dot" ? "polo_pin_dot" : item));
   // Selected item types in canonical order, jersey first. Per-player items get
   // a size column on each roster row; in-house hats are ordered in bulk by size.
-  const selected = ITEM_TYPES.filter((t) => items.includes(t.key));
+  const selected = ITEM_TYPES.filter((t) => resolvedItems.includes(t.key));
   // One-size items ordered in bulk by size: in-house hats AND outsourced beanies.
-  const perPlayerSelected = selected.filter((t) => !t.inHouse && !t.outsourced);
-  const bulkSelected = selected.filter((t) => t.inHouse || t.outsourced);
+  const perPlayerSelected = selected.filter((t) => !t.inHouse && !t.outsourced && !BULK_SIZE_ITEM_KEYS.has(t.key));
+  const bulkSelected = selected.filter((t) => t.inHouse || t.outsourced || BULK_SIZE_ITEM_KEYS.has(t.key));
+  const needsPlayerRoster = perPlayerSelected.length > 0;
   const perPlayerKeys = perPlayerSelected.map((t) => t.key);
   const perPlayerSizeFields = sizeFieldsForItems(perPlayerKeys, prefill?.sport);
   const bulkRows = () =>
@@ -293,13 +334,17 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const fixedSpeedoMaterial = hasJersey && usesSpeedoBaseballMaterial(jerseyStyle, prefill?.sport);
   const materialOptions = jerseyMaterialsFor(jerseyStyle, prefill?.sport);
   const effectiveMaterial = fixedSpeedoMaterial ? SPEEDO_BASEBALL_MATERIAL_KEY : material;
-  const orderSetupComplete = items.length > 0 && (!hasJersey || Boolean(jerseyStyle && effectiveMaterial));
+  const orderSetupComplete = items.length > 0 && (!hasJersey || Boolean(jerseyStyle && effectiveMaterial)) && (!items.includes("polo") || Boolean(poloMaterial));
+  const commonAddOns = ITEM_TYPES.filter((item) => COMMON_ADD_ON_KEYS.has(item.key));
+  const specialtyAddOns = ITEM_TYPES.filter((item) => item.key !== "jersey" && item.key !== "polo_pin_dot" && !COMMON_ADD_ON_KEYS.has(item.key));
+  const specialtyGearSelected = specialtyAddOns.some((item) => items.includes(item.key));
   const teamDetailsComplete = Boolean(prefill || (teamName.trim() && contactName.trim() && contactEmail.trim()));
   const sizeGuideHref = /volleyball/i.test(prefill?.sport ?? "") ? "/size-guide#girls-volleyball" : "/size-guide#jerseys";
   const submissionRoster = [
     ...rows.map((row) => ({ ...row, quantity: 1 })),
     ...bulkRows(),
   ].filter((row) => row.name || row.number || Object.values(row.sizes).some(Boolean));
+  const hasEnteredSizes = submissionRoster.length > 0;
   const submissionRosterForPricing = submissionRoster.map((row, index) => ({
     id: `preview-${index}`,
     playerName: row.name,
@@ -309,7 +354,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   }));
   const submissionOrder = {
     teamName,
-    items,
+    items: resolvedItems,
     sport: prefill?.sport,
     jerseyStyle: hasJersey ? jerseyStyle : null,
     jerseyMaterial: hasJersey ? effectiveMaterial : null,
@@ -332,7 +377,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const missing = rows.some((r) => (r.name || r.number || Object.keys(r.sizes).length) && !r.design);
       if (missing) { setStatus("error"); setMessage("This team has more than one design - pick which one each player gets."); return; }
     }
-    if (rows.some((r) => (r.name || r.number || Object.values(r.sizes).some(Boolean)) && missingCheerSizeLabels(items, r.sizes).length)) {
+    if (rows.some((r) => (r.name || r.number || Object.values(r.sizes).some(Boolean)) && missingCheerSizeLabels(resolvedItems, r.sizes).length)) {
       setStatus("error"); setMessage("Choose both a cheer top size and skirt size for every cheerleader."); return;
     }
     setStatus("sending"); setMessage("");
@@ -340,7 +385,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn, deliveryTermsAccepted: true, specConfirmed: true }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items: resolvedItems, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn, deliveryTermsAccepted: true, specConfirmed: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
@@ -358,7 +403,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items, designToken: prefill?.designToken, smsConsent: smsOptIn }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items: resolvedItems, designToken: prefill?.designToken, smsConsent: smsOptIn }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create link");
@@ -416,15 +461,16 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
         </div>
       )}
 
-      <ol className="grid grid-cols-4 gap-2" aria-label="Team order progress">
+      <ol className="grid grid-cols-5 gap-2" aria-label="Team order progress">
         {([
           ["team", "Team"],
           ["gear", "Gear"],
-          ["roster", "Roster"],
+          ["details", "Details"],
+          ["roster", needsPlayerRoster ? "Roster" : "Sizes"],
           ["review", "Review"],
         ] as const).map(([step, label], index) => {
           const active = flowStep === step;
-          const complete = (["team", "gear", "roster", "review"] as FlowStep[]).indexOf(flowStep) > index;
+          const complete = (["team", "gear", "details", "roster", "review"] as FlowStep[]).indexOf(flowStep) > index;
           return (
             <li key={step} className={`border px-2.5 py-2 text-center ${active ? "border-brand bg-brand/[0.08]" : complete ? "border-brand/50" : "border-line"}`} aria-current={active ? "step" : undefined}>
               <span className={`mr-1.5 inline-grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold ${active || complete ? "bg-brand text-on-brand" : "bg-foreground/10 text-muted"}`}>{complete ? "✓" : index + 1}</span>
@@ -439,8 +485,8 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       {/* Mode selector */}
       <div className="grid sm:grid-cols-2 gap-3">
         <button onClick={() => { setMode("manual"); setLinks(null); }} className={`text-left p-4 border transition-colors ${mode === "manual" ? "border-brand bg-steel" : "border-line hover:border-brand/50"}`}>
-          <span className="display text-foreground">I&apos;ll enter the roster</span>
-          <p className="text-sm text-muted mt-1">Type in each player&apos;s name, number, and sizes now.</p>
+          <span className="display text-foreground">I&apos;ll enter the team sizes</span>
+          <p className="text-sm text-muted mt-1">Use player details for personalized gear, or simple size totals for items like socks and hats.</p>
         </button>
         <button onClick={() => setMode("link")} className={`text-left p-4 border transition-colors ${mode === "link" ? "border-brand bg-steel" : "border-line hover:border-brand/50"}`}>
           <span className="display text-foreground">Let players enter their own</span>
@@ -506,125 +552,234 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
         </>
       )}
 
-      {/* Jersey style - editable in both flows; only relevant with a jersey */}
+      {/* Pick products first. Their cuts and fabrics belong on the following
+          Details step, rather than interrupting the initial product choice. */}
       {flowStep === "gear" && (
         <>
       {hasJersey && (
-      <div>
-        <label htmlFor="team-order-jersey-style" className="display text-sm text-foreground">Jersey Style *</label>
-        <select
-          id="team-order-jersey-style"
-          name="jerseyStyle"
-          required
-          className={`mt-2 ${inputCls}`}
-          value={jerseyStyle}
-          onChange={(event) => {
-            const nextStyle = event.target.value;
-            setJerseyStyle(nextStyle);
-            if (usesSpeedoBaseballMaterial(nextStyle, prefill?.sport)) {
-              setMaterial(SPEEDO_BASEBALL_MATERIAL_KEY);
-            } else if (!materialTouched) {
-              setMaterial(fabricForStyle(nextStyle));
-            }
-          }}
-        >
-          <option value="">Select a style</option>
-          {JERSEY_STYLES.map((s) => (
-            <option key={s} value={s}>
-              {s} — ${s === "V-Neck" ? 30 : s === "Two Button" ? 32 : s === "Full Button" ? 35 : s === "Quarter-Zip" ? 40 : 28}
-            </option>
-          ))}
-        </select>
-      </div>
-      )}
-
-      {/* Jersey material */}
-      {hasJersey && jerseyStyle && (
-      <div>
-        <p className="display text-sm text-foreground">{fixedSpeedoMaterial ? "Included Jersey Material" : "Recommended jersey material"}</p>
-        <p className="mt-1 text-sm text-muted">
-          {fixedSpeedoMaterial
-            ? "Full Button and Two Button baseball jerseys are made in this fabric, so there is nothing extra to select."
-            : "We selected the recommended fabric for this style. Choose another only if you have a preference."}
-        </p>
-        <div className={`mt-3 grid gap-3 ${fixedSpeedoMaterial ? "" : "sm:grid-cols-2"}`}>
-          {materialOptions.map((m) => {
-            const on = material === m.key;
-            if (fixedSpeedoMaterial) {
-              return (
-                <div key={m.key} className="border border-brand bg-brand/[0.08] p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="display text-foreground">✓ {m.label}</span>
-                    <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-on-brand">Included</span>
-                  </div>
-                  <p className="mt-1 text-sm text-muted">{m.description} This is our standard fabric for both button-front baseball cuts.</p>
-                </div>
-              );
-            }
-            return (
-              <button
-                key={m.key}
-                type="button"
-                onClick={() => { setMaterial(m.key); setMaterialTouched(true); }}
-                aria-pressed={on}
-                className={`relative min-h-11 text-left p-4 border transition-colors ${on ? "border-brand bg-steel" : "border-line hover:border-brand/50"}`}
-              >
-                {m.recommended && (
-                  <span className="absolute top-3 right-3 display text-[10px] uppercase tracking-wider text-on-brand bg-brand px-1.5 py-0.5">
-                    Recommended
-                  </span>
-                )}
-                <span className="display text-foreground">{on ? "✓ " : ""}{m.label}</span>
-                <p className="text-sm text-muted mt-1">{m.description}</p>
-              </button>
-            );
-          })}
+      <section className="border border-brand bg-brand/[0.08] p-5 sm:p-6" aria-labelledby="default-jersey-title">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="display text-xs uppercase tracking-wider text-brand">Included by default</span>
+          <span className="display text-lg text-foreground">${(itemPriceCents("jersey", DEFAULT_JERSEY_STYLE) / 100).toFixed(0)} / player</span>
         </div>
-      </div>
+        <h2 id="default-jersey-title" className="display mt-2 text-2xl text-foreground">
+          {jerseyStyle === DEFAULT_JERSEY_STYLE ? "Standard Crew Neck Jersey" : `${jerseyStyle} Jersey`}
+        </h2>
+        <p className="mt-2 max-w-3xl text-muted">
+          Our versatile custom jersey for softball, soccer, basketball, practice squads, and more. The Standard Crew Neck is the Slugger starting point for most teams.
+        </p>
+        {jerseyStyle !== DEFAULT_JERSEY_STYLE && (
+          <p className="mt-2 text-sm text-muted">You&apos;ve chosen a different cut for this order. Switch back anytime if the standard crew neck is the better fit.</p>
+        )}
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => chooseJerseyStyle(DEFAULT_JERSEY_STYLE)}
+            aria-pressed={jerseyStyle === DEFAULT_JERSEY_STYLE}
+            className={`clip-slant display px-4 py-2.5 ${jerseyStyle === DEFAULT_JERSEY_STYLE ? "bg-brand text-on-brand" : "border border-brand text-foreground hover:bg-brand/[0.12]"}`}
+          >
+            {jerseyStyle === DEFAULT_JERSEY_STYLE ? "✓ Standard Crew Neck Selected" : "Use Standard Crew Neck"}
+          </button>
+          <button type="button" onClick={() => toggleItem("jersey")} className="min-h-11 text-sm text-muted underline underline-offset-4 hover:text-foreground">
+            This order doesn&apos;t need jerseys
+          </button>
+        </div>
+      </section>
       )}
 
-      {/* Item types */}
-      <div>
-        <p className="display text-sm text-foreground">What is the team ordering?</p>
-        <p className="text-sm text-muted mt-1">Jersey is included by default - add any extras. Each player chooses their own items below (leave a size blank if they&apos;re not getting that item).</p>
+      <section aria-labelledby="team-gear-title">
+        <p id="team-gear-title" className="display text-sm text-foreground">Add team gear <span className="text-muted">(optional)</span></p>
+        <p className="mt-1 text-sm text-muted">
+          {hasJersey
+            ? "Your jersey is already included. Add only the extras this team also needs; cuts and fabrics come next."
+            : "Start with the gear this team needs. You&apos;ll choose any applicable cuts and fabrics next."}
+        </p>
+        {!hasJersey && (
+          <button
+            type="button"
+            onClick={() => toggleItem("jersey")}
+            className="mt-3 min-h-11 clip-slant border border-brand px-4 py-2.5 text-left text-foreground hover:bg-brand/[0.12]"
+          >
+            <span className="display">+ Add Standard Crew Neck Jersey — $28</span>
+            <span className="mt-1 block text-sm text-muted">Our versatile default for softball, soccer, basketball, and more.</span>
+          </button>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
-          {ITEM_TYPES.map((t) => {
-            const on = items.includes(t.key);
+          {commonAddOns.map((item) => {
+            const on = items.includes(item.key);
             return (
               <button
-                key={t.key}
+                key={item.key}
                 type="button"
-                onClick={() => toggleItem(t.key)}
+                onClick={() => toggleItem(item.key)}
                 aria-pressed={on}
                 className={`min-h-11 clip-slant display text-sm px-4 py-2 transition-colors ${on ? "bg-brand text-on-brand" : "bg-steel border border-line text-foreground/80 hover:border-brand/50"}`}
               >
-                {on ? "✓ " : "+ "}{t.label}
+                {on ? "✓ " : "+ "}{item.label}
               </button>
             );
           })}
         </div>
-      </div>
+        <details className="mt-4 border border-line bg-steel p-4" open={specialtyGearSelected}>
+          <summary className="cursor-pointer display text-sm text-foreground">Show specialty apparel, alternate jerseys, and more</summary>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {specialtyAddOns.map((item) => {
+              const on = items.includes(item.key);
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => toggleItem(item.key)}
+                  aria-pressed={on}
+                  className={`min-h-11 clip-slant display text-sm px-4 py-2 transition-colors ${on ? "bg-brand text-on-brand" : "border border-line text-foreground/80 hover:border-brand/50"}`}
+                >
+                  {on ? "✓ " : "+ "}{item.key === "polo" ? "Custom Polo" : item.label}
+                </button>
+              );
+            })}
+          </div>
+        </details>
+      </section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button type="button" onClick={() => setFlowStep("team")} className="clip-slant border border-line text-foreground display px-5 py-3 hover:bg-foreground/5">
           Back
         </button>
-        {mode === "manual" ? (
-          <button
-            type="button"
-            onClick={() => { setStatus("idle"); setMessage(""); setFlowStep("roster"); }}
-            disabled={!orderSetupComplete}
-            className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-6 py-3 disabled:opacity-50"
-          >
-            {!items.length ? "Choose gear to continue" : hasJersey && !jerseyStyle ? "Choose a jersey style" : "Continue to roster"}
-          </button>
-        ) : null}
+        <button
+          type="button"
+          onClick={() => { setStatus("idle"); setMessage(""); setFlowStep("details"); }}
+          disabled={!items.length}
+          className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-6 py-3 disabled:opacity-50"
+        >
+          {!items.length ? "Choose gear to continue" : "Continue to details"}
+        </button>
       </div>
         </>
+      )}
+
+      {flowStep === "details" && (
+        <section className="space-y-7" aria-labelledby="team-order-details-title">
+          <div>
+            <p className="display text-xs uppercase tracking-[0.16em] text-brand">Selected gear</p>
+            <h2 id="team-order-details-title" className="display mt-1 text-2xl text-foreground">Choose the details that matter</h2>
+            <p className="mt-2 max-w-3xl text-sm text-muted">Only selected products appear here, so you can make the right cut and fabric choices without sorting through a catalogue.</p>
+          </div>
+
+          {hasJersey && (
+            <div className="border border-line bg-steel p-5">
+              <p className="display text-sm text-foreground">Jersey cut</p>
+              <p className="mt-1 text-sm text-muted">The Standard Crew Neck is the versatile $28 default. Choose a different cut only when it suits this team better.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {JERSEY_STYLES.map((style) => {
+                  const on = jerseyStyle === style;
+                  const description = style === DEFAULT_JERSEY_STYLE
+                    ? "A versatile custom jersey for softball, soccer, basketball, practice squads, and more."
+                    : JERSEY_STYLE_DESCRIPTIONS[style];
+                  return (
+                    <button
+                      key={style}
+                      type="button"
+                      onClick={() => chooseJerseyStyle(style)}
+                      aria-pressed={on}
+                      className={`min-h-11 border p-4 text-left transition-colors ${on ? "border-brand bg-brand/[0.08]" : "border-line hover:border-brand/50"}`}
+                    >
+                      <span className="display text-foreground">{on ? "✓ " : ""}{style} — ${(itemPriceCents("jersey", style) / 100).toFixed(0)}</span>
+                      <span className="mt-1 block text-sm text-muted">{description}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6 border-t border-line pt-5">
+                <p className="display text-sm text-foreground">{fixedSpeedoMaterial ? "Included jersey material" : "Jersey material"}</p>
+                <p className="mt-1 text-sm text-muted">
+                  {fixedSpeedoMaterial
+                    ? "Full Button and Two Button baseball jerseys use this fabric, so there is nothing extra to choose."
+                    : "We selected the recommended fabric for this cut. Choose another only if you have a preference."}
+                </p>
+                <div className={`mt-3 grid gap-3 ${fixedSpeedoMaterial ? "" : "sm:grid-cols-2"}`}>
+                  {materialOptions.map((option) => {
+                    const on = material === option.key;
+                    if (fixedSpeedoMaterial) {
+                      return (
+                        <div key={option.key} className="border border-brand bg-brand/[0.08] p-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="display text-foreground">✓ {option.label}</span>
+                            <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-on-brand">Included</span>
+                          </div>
+                          <p className="mt-1 text-sm text-muted">{option.description} This is our standard fabric for both button-front baseball cuts.</p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => { setMaterial(option.key); setMaterialTouched(true); }}
+                        aria-pressed={on}
+                        className={`relative min-h-11 border p-4 text-left transition-colors ${on ? "border-brand bg-brand/[0.08]" : "border-line hover:border-brand/50"}`}
+                      >
+                        {option.recommended && (
+                          <span className="absolute right-3 top-3 display bg-brand px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-on-brand">Recommended</span>
+                        )}
+                        <span className="display text-foreground">{on ? "✓ " : ""}{option.label}</span>
+                        <p className="mt-1 text-sm text-muted">{option.description}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {items.includes("polo") && (
+            <div className="border border-line bg-steel p-5">
+              <p className="display text-sm text-foreground">Custom Polo fabric</p>
+              <p className="mt-1 text-sm text-muted">Choose the fabric for the polo you selected on the previous step.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setPoloMaterial("dri-fit")}
+                  aria-pressed={poloMaterial === "dri-fit"}
+                  className={`min-h-11 border p-4 text-left transition-colors ${poloMaterial === "dri-fit" ? "border-brand bg-brand/[0.08]" : "border-line hover:border-brand/50"}`}
+                >
+                  <span className="display text-foreground">{poloMaterial === "dri-fit" ? "✓ " : ""}Dri-Fit</span>
+                  <span className="mt-1 block text-sm text-muted">Lightweight performance fabric for an active, athletic feel.</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPoloMaterial("pin-dot")}
+                  aria-pressed={poloMaterial === "pin-dot"}
+                  className={`min-h-11 border p-4 text-left transition-colors ${poloMaterial === "pin-dot" ? "border-brand bg-brand/[0.08]" : "border-line hover:border-brand/50"}`}
+                >
+                  <span className="display text-foreground">{poloMaterial === "pin-dot" ? "✓ " : ""}Pin-Dot</span>
+                  <span className="mt-1 block text-sm text-muted">Textured pin-dot fabric for a more elevated polo finish.</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button type="button" onClick={() => setFlowStep("gear")} className="clip-slant border border-line text-foreground display px-5 py-3 hover:bg-foreground/5">
+              Back
+            </button>
+            {mode === "manual" && (
+              <button
+                type="button"
+                onClick={() => { setStatus("idle"); setMessage(""); setFlowStep("roster"); }}
+                disabled={!orderSetupComplete}
+                className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display px-6 py-3 disabled:opacity-50"
+              >
+                Continue to roster
+              </button>
+            )}
+          </div>
+        </section>
       )}
 
       {/* Manual roster mode */}
       {mode === "manual" && flowStep === "roster" && (
         <>
+          {needsPlayerRoster ? (
           <div>
             <div className="flex items-center justify-between">
               <h2 className="display text-xl text-foreground">Roster</h2>
@@ -707,12 +862,18 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
               + Add Player
             </button>
           </div>
+          ) : (
+            <div className="border border-brand/50 bg-steel p-5">
+              <p className="display text-xl text-foreground">Team sizes</p>
+              <p className="mt-2 text-sm text-muted">This order only has bulk-size gear, so names and player rows are not needed. Enter the total you need in each size below.</p>
+            </div>
+          )}
 
-          {/* Hats: ordered in bulk by size, not per player. */}
+          {/* Hats, socks, and other bulk-size gear use team totals, not player names. */}
           {bulkSelected.length > 0 && (
             <div>
-              <h2 className="display text-xl text-foreground">Hats <span className="text-base text-muted">(order by size)</span></h2>
-              <p className="text-sm text-muted mt-1">Hats aren&apos;t name-specific - just enter how many you need of each size.</p>
+              <h2 className="display text-xl text-foreground">Team sizes <span className="text-base text-muted">(order by size)</span></h2>
+              <p className="mt-1 text-sm text-muted">Hats and socks aren&apos;t name-specific—just enter how many you need of each size.</p>
               <div className="mt-3 space-y-3">
                 {bulkSelected.map((t) => {
                   const total = t.sizes.reduce((a, s) => a + (hatQty[t.key]?.[s] ?? 0), 0);
@@ -748,16 +909,16 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
           {status === "error" && <p className="text-sm text-brand">{message}</p>}
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <button type="button" onClick={() => setFlowStep("gear")} className="clip-slant border border-line text-foreground display px-5 py-3 hover:bg-foreground/5">
+            <button type="button" onClick={() => setFlowStep("details")} className="clip-slant border border-line text-foreground display px-5 py-3 hover:bg-foreground/5">
               Back
             </button>
             <button
               type="button"
               onClick={() => { setRosterAck(false); setDeliveryAck(false); setStatus("idle"); setMessage(""); setFlowStep("review"); }}
-              disabled={status === "sending" || !hasApprovedDesign || !orderSetupComplete}
+              disabled={status === "sending" || !hasApprovedDesign || !orderSetupComplete || !hasEnteredSizes}
               className="clip-slant bg-brand hover:bg-brand-dark text-on-brand display text-lg px-8 py-4 transition-colors disabled:opacity-60"
             >
-              {!hasApprovedDesign ? "Approved design required" : "Continue to review"}
+              {!hasApprovedDesign ? "Approved design required" : !hasEnteredSizes ? needsPlayerRoster ? "Add a player size to continue" : "Add team sizes to continue" : "Continue to review"}
             </button>
           </div>
           <p className="text-xs text-muted">
@@ -828,7 +989,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       )}
 
       {/* Player self-entry link mode */}
-      {mode === "link" && flowStep === "gear" && (
+      {mode === "link" && flowStep === "details" && (
         <div>
           {!links ? (
             <>
