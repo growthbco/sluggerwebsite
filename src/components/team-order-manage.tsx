@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-acknowledgment";
 import {
+  countRosterPieces,
   itemLabel,
   sizeBreakdown,
   formatSize,
@@ -648,7 +649,7 @@ function RosterBlock({ token, roster, items, sport, designs = [], needsDesign = 
   onChange: () => void;
 }) {
   const breakdown = roster.length > 0 ? sizeBreakdown(roster, items, sport) : [];
-  const pieceCount = roster.reduce((total, row) => total + Math.max(1, row.quantity ?? 1), 0);
+  const pieceCount = countRosterPieces(roster, items);
   const groupedRoster = new Map<string, { name: string; number: string; rows: { row: RosterRow; index: number }[] }>();
   roster.forEach((row, index) => {
     const name = (row.playerName ?? "").trim();

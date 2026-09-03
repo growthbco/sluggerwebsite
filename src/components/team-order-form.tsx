@@ -24,6 +24,96 @@ type Row = { name: string; number: string; sizes: Record<string, string>; notes:
 
 const emptyRow = (design = ""): Row => ({ name: "", number: "", sizes: {}, notes: "", design });
 
+const DIRECT_ORDER_DRAFT_VERSION = 1;
+const DIRECT_ORDER_DRAFT_PREFIX = "slugger-team-order-draft";
+
+type DirectOrderDraft = {
+  version: number;
+  teamName?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  jerseyStyle?: string;
+  material?: string;
+  materialTouched?: boolean;
+  items?: string[];
+  rows?: Row[];
+  hatQty?: Record<string, Record<string, number>>;
+  smsOptIn?: boolean;
+};
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function stringRecord(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key, entry]) => key.length <= 80 && typeof entry === "string")
+      .map(([key, entry]) => [key, entry]),
+  );
+}
+
+function restoreRows(value: unknown): Row[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 200).map((row) => {
+    const source = row && typeof row === "object" && !Array.isArray(row)
+      ? row as Record<string, unknown>
+      : {};
+    return {
+      name: stringValue(source.name),
+      number: stringValue(source.number),
+      sizes: stringRecord(source.sizes),
+      notes: stringValue(source.notes),
+      design: stringValue(source.design),
+    };
+  });
+}
+
+function restoreHatQty(value: unknown): Record<string, Record<string, number>> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const restored: Record<string, Record<string, number>> = {};
+  for (const [item, sizes] of Object.entries(value)) {
+    if (item.length > 80 || !sizes || typeof sizes !== "object" || Array.isArray(sizes)) continue;
+    const quantities = Object.fromEntries(
+      Object.entries(sizes)
+        .filter(([size, quantity]) => size.length <= 80 && typeof quantity === "number" && Number.isFinite(quantity) && quantity >= 0)
+        .map(([size, quantity]) => [size, Math.floor(quantity as number)]),
+    );
+    if (Object.keys(quantities).length) restored[item] = quantities;
+  }
+  return restored;
+}
+
+function readDraft(value: string | null): DirectOrderDraft | null {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const draft = parsed as Record<string, unknown>;
+    if (draft.version !== DIRECT_ORDER_DRAFT_VERSION) return null;
+    return {
+      version: DIRECT_ORDER_DRAFT_VERSION,
+      teamName: stringValue(draft.teamName),
+      contactName: stringValue(draft.contactName),
+      contactEmail: stringValue(draft.contactEmail),
+      contactPhone: stringValue(draft.contactPhone),
+      jerseyStyle: stringValue(draft.jerseyStyle),
+      material: stringValue(draft.material),
+      materialTouched: draft.materialTouched === true,
+      items: Array.isArray(draft.items)
+        ? [...new Set(draft.items.filter((item): item is string => typeof item === "string" && ITEM_TYPES.some((type) => type.key === item)))].slice(0, ITEM_TYPES.length)
+        : [],
+      rows: restoreRows(draft.rows),
+      hatQty: restoreHatQty(draft.hatQty),
+      smsOptIn: draft.smsOptIn === true,
+    };
+  } catch {
+    return null;
+  }
+}
+
 type Prefill = {
   designToken: string;
   teamName: string;
@@ -88,6 +178,62 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [confirmingSubmit, setConfirmingSubmit] = useState(false);
   const [rosterAck, setRosterAck] = useState(false);
   const [deliveryAck, setDeliveryAck] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const draftStorageKey = `${DIRECT_ORDER_DRAFT_PREFIX}:v${DIRECT_ORDER_DRAFT_VERSION}:${prefill?.designToken ?? "new"}`;
+
+  // Retain a direct-entry roster for the life of this browser tab, so a reload
+  // cannot silently leave the coach reviewing only rows they re-entered.
+  useEffect(() => {
+    let draft: DirectOrderDraft | null = null;
+    try {
+      draft = readDraft(window.sessionStorage.getItem(draftStorageKey));
+    } catch {
+      // Browsers that block storage still retain the in-page form normally.
+    }
+    if (draft) {
+      // An approved design owns the team/contact identity; never replace it
+      // with a browser-stored value.
+      if (!prefill) {
+        setTeamName(draft.teamName ?? "");
+        setContactName(draft.contactName ?? "");
+        setContactEmail(draft.contactEmail ?? "");
+        setContactPhone(draft.contactPhone ?? "");
+      }
+      if (draft.jerseyStyle) setJerseyStyle(draft.jerseyStyle);
+      if (draft.material) setMaterial(draft.material);
+      setMaterialTouched(Boolean(draft.materialTouched));
+      if (draft.items?.length) setItems(draft.items);
+      if (draft.rows?.length) setRows(draft.rows);
+      setHatQty(draft.hatQty ?? {});
+      setSmsOptIn(Boolean(draft.smsOptIn));
+      setDraftRestored(true);
+    }
+    setDraftReady(true);
+  }, [draftStorageKey, prefill]);
+
+  useEffect(() => {
+    if (!draftReady || status === "done") return;
+    const draft: DirectOrderDraft = {
+      version: DIRECT_ORDER_DRAFT_VERSION,
+      teamName,
+      contactName,
+      contactEmail,
+      contactPhone,
+      jerseyStyle,
+      material,
+      materialTouched,
+      items,
+      rows,
+      hatQty,
+      smsOptIn,
+    };
+    try {
+      window.sessionStorage.setItem(draftStorageKey, JSON.stringify(draft));
+    } catch {
+      // The final submission path remains unchanged when storage is blocked.
+    }
+  }, [contactEmail, contactName, contactPhone, draftReady, draftStorageKey, hatQty, items, jerseyStyle, material, materialTouched, rows, smsOptIn, status, teamName]);
 
   // Returning visitor prefill (browser-local). Skipped when the identity is
   // already locked from an approved design.
@@ -189,6 +335,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
       setStatus("done");
+      try { window.sessionStorage.removeItem(draftStorageKey); } catch {}
       saveRememberedContact({ name: contactName, email: contactEmail, phone: contactPhone });
       setMessage(`Order ${data.reference} submitted! We'll be in touch with your total.`);
       if (data.manageUrl) setManageUrl(data.manageUrl);
@@ -270,6 +417,12 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
           <p className="text-sm text-muted mt-1">Share a link - each player fills in their own details.</p>
         </button>
       </div>
+
+      {draftRestored && (
+        <p className="-mt-4 text-xs text-muted" role="status">
+          Your saved roster draft was restored in this browser tab. It will clear automatically once the order is submitted.
+        </p>
+      )}
 
       {/* Team + contact - locked when arriving from an approved design so the
           team-order stays tied to the design (same name = same job). */}

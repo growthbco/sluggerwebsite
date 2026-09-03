@@ -1,5 +1,6 @@
 import {
   JERSEY_MATERIALS,
+  countRosterPieces,
   itemLabel,
   resolveJerseyMaterial,
   sizeBreakdown,
@@ -110,7 +111,7 @@ export function buildCustomerOrderSpec(
     ...service,
     requestedInHandDate: dateOnly(order.requestedInHandAt ?? design?.neededBy),
     athleteCount: athletes.size,
-    pieceCount: roster.reduce((total, row) => total + Math.max(1, row.quantity ?? 1), 0),
+    pieceCount: countRosterPieces(roster, items),
     sizes: sizeBreakdown(roster, items, order.sport).map((entry) => ({
       label: entry.label,
       parts: entry.parts.map((part) => ({ size: part.size, quantity: part.n })),

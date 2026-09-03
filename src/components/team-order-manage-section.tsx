@@ -4,7 +4,7 @@ import { customerRosterLockMessage, getRoster, getLinkedDesignPreview } from "@/
 import { getStoreByDesignRequestId, teamRaisedCents } from "@/lib/team-stores";
 import { TeamFundraiseCard } from "@/components/team-fundraise-card";
 import { itemPriceCents, computeTeamOrderQuote } from "@/lib/team-order-pricing";
-import { EXTRA_ADDON_KEYS, itemLabel, minPiecesForItems } from "@/lib/order-items";
+import { countRosterPieces, EXTRA_ADDON_KEYS, itemLabel, minPiecesForItems } from "@/lib/order-items";
 import { TeamOrderManage } from "@/components/team-order-manage";
 import { TeamOrderAddon } from "@/components/team-order-addon";
 import { TeamOrderShipping } from "@/components/team-order-shipping";
@@ -65,7 +65,7 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
     const number = (row.playerNumber ?? "").trim().toLowerCase();
     return name || number ? `${name}|${number}` : `row:${row.id}`;
   })).size;
-  const pieceCount = roster.reduce((total, row) => total + Math.max(1, row.quantity ?? 1), 0);
+  const pieceCount = countRosterPieces(roster, orderItems);
   const rosterLockMessage = customerRosterLockMessage(order);
   const hasJersey = orderItems.some((item) => item.includes("jersey"));
   const collecting = ["draft", "collecting"].includes(order.status);

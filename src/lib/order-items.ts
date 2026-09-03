@@ -71,6 +71,32 @@ export function itemKeyForSizeField(key: string): string {
   return key;
 }
 
+/** Count physical garments selected across a roster. A row can contain more
+ * than one garment, while a cheer top + skirt remains one uniform set. */
+export function countRosterPieces(
+  roster: { size?: string | null; sizes?: Record<string, string> | null; quantity?: number | null }[],
+  items?: readonly string[] | null,
+): number {
+  const orderItems = items?.length ? items : ["jersey"];
+  const allowedItems = new Set(orderItems);
+
+  return roster.reduce((total, row) => {
+    const quantity = Math.max(1, row.quantity ?? 1);
+    const sizedEntries = Object.entries(row.sizes ?? {}).filter(([, value]) => (value ?? "").trim());
+    const selectedItems = new Set(
+      sizedEntries
+        .map(([field]) => itemKeyForSizeField(field))
+        .filter((key) => allowedItems.has(key)),
+    );
+
+    if (selectedItems.size > 0) return total + selectedItems.size * quantity;
+    // Preserve legacy single-item rows whose product key was not standardized.
+    if (sizedEntries.length && orderItems.length === 1) return total + quantity;
+    if ((row.size ?? "").trim()) return total + quantity;
+    return total;
+  }, 0);
+}
+
 export function sizeValueForField(
   field: SizeField,
   sizes?: Record<string, string> | null,
