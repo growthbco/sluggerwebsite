@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { SmsConsentNote } from "@/components/sms-consent";
 import {
   ITEM_TYPES,
@@ -558,31 +559,50 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
         <>
       {hasJersey && (
       <section className="border border-brand bg-brand/[0.08] p-5 sm:p-6" aria-labelledby="default-jersey-title">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="display text-xs uppercase tracking-wider text-brand">Included by default</span>
-          <span className="display text-lg text-foreground">${(itemPriceCents("jersey", DEFAULT_JERSEY_STYLE) / 100).toFixed(0)} / player</span>
-        </div>
-        <h2 id="default-jersey-title" className="display mt-2 text-2xl text-foreground">
-          {jerseyStyle === DEFAULT_JERSEY_STYLE ? "Standard Crew Neck Jersey" : `${jerseyStyle} Jersey`}
-        </h2>
-        <p className="mt-2 max-w-3xl text-muted">
-          Our versatile custom jersey for softball, soccer, basketball, practice squads, and more. The Standard Crew Neck is the Slugger starting point for most teams.
-        </p>
-        {jerseyStyle !== DEFAULT_JERSEY_STYLE && (
-          <p className="mt-2 text-sm text-muted">You&apos;ve chosen a different cut for this order. Switch back anytime if the standard crew neck is the better fit.</p>
-        )}
-        <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={() => chooseJerseyStyle(DEFAULT_JERSEY_STYLE)}
-            aria-pressed={jerseyStyle === DEFAULT_JERSEY_STYLE}
-            className={`clip-slant display px-4 py-2.5 ${jerseyStyle === DEFAULT_JERSEY_STYLE ? "bg-brand text-on-brand" : "border border-brand text-foreground hover:bg-brand/[0.12]"}`}
-          >
-            {jerseyStyle === DEFAULT_JERSEY_STYLE ? "✓ Standard Crew Neck Selected" : "Use Standard Crew Neck"}
-          </button>
-          <button type="button" onClick={() => toggleItem("jersey")} className="min-h-11 text-sm text-muted underline underline-offset-4 hover:text-foreground">
-            This order doesn&apos;t need jerseys
-          </button>
+        <div className={`grid gap-6 ${jerseyStyle === DEFAULT_JERSEY_STYLE ? "lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] lg:items-center" : ""}`}>
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="display text-xs uppercase tracking-wider text-brand">Included by default</span>
+              <span className="display text-lg text-foreground">${(itemPriceCents("jersey", DEFAULT_JERSEY_STYLE) / 100).toFixed(0)} / player</span>
+            </div>
+            <h2 id="default-jersey-title" className="display mt-2 text-2xl text-foreground">
+              {jerseyStyle === DEFAULT_JERSEY_STYLE ? "Standard Crew Neck Jersey" : `${jerseyStyle} Jersey`}
+            </h2>
+            <p className="mt-2 max-w-3xl text-muted">
+              Our versatile custom jersey for softball, soccer, basketball, practice squads, and more. The Standard Crew Neck is the Slugger starting point for most teams.
+            </p>
+            {jerseyStyle !== DEFAULT_JERSEY_STYLE && (
+              <p className="mt-2 text-sm text-muted">You&apos;ve chosen a different cut for this order. Switch back anytime if the standard crew neck is the better fit.</p>
+            )}
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => chooseJerseyStyle(DEFAULT_JERSEY_STYLE)}
+                aria-pressed={jerseyStyle === DEFAULT_JERSEY_STYLE}
+                className={`clip-slant display px-4 py-2.5 ${jerseyStyle === DEFAULT_JERSEY_STYLE ? "bg-brand text-on-brand" : "border border-brand text-foreground hover:bg-brand/[0.12]"}`}
+              >
+                {jerseyStyle === DEFAULT_JERSEY_STYLE ? "✓ Standard Crew Neck Selected" : "Use Standard Crew Neck"}
+              </button>
+              <button type="button" onClick={() => toggleItem("jersey")} className="min-h-11 text-sm text-muted underline underline-offset-4 hover:text-foreground">
+                This order doesn&apos;t need jerseys
+              </button>
+            </div>
+          </div>
+          {jerseyStyle === DEFAULT_JERSEY_STYLE && (
+            <figure className="overflow-hidden border border-brand/40 bg-ink">
+              <Image
+                src="/styles/crew.jpg"
+                alt="Example Standard Crew Neck jersey, shown front and back"
+                width={1400}
+                height={1055}
+                sizes="(max-width: 1024px) 100vw, 384px"
+                className="h-auto w-full"
+              />
+              <figcaption className="border-t border-brand/30 px-3 py-2 text-xs text-muted">
+                Crew-neck example, front and back. Your colors, artwork, names, and numbers are customized for your team.
+              </figcaption>
+            </figure>
+          )}
         </div>
       </section>
       )}
