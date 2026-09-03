@@ -164,12 +164,22 @@ type Prefill = {
 function styleFromDesign(designStyle?: string | null): string | undefined {
   const s = (designStyle ?? "").toLowerCase();
   if (!s) return undefined;
-  if (s.includes("bowl")) return "Bowling Shirt (Camp Collar)";
+  if (s.includes("bowl") || s.includes("camp collar")) return "Bowling Shirt (Camp Collar)";
   if (s.includes("two")) return "Two Button";
   if (s.includes("full")) return "Full Button";
   if (s.includes("v-neck") || s.includes("v neck")) return "V-Neck";
   if (s.includes("crew") || s.includes("round")) return "Standard Crew Neck";
   return JERSEY_STYLES.find((j) => j.toLowerCase() === s);
+}
+
+function recommendedJerseyStyleForSport(sport?: string | null): string {
+  return /bowling/i.test(sport ?? "") ? "Bowling Shirt (Camp Collar)" : DEFAULT_JERSEY_STYLE;
+}
+
+function specialUniformKeyForSport(sport?: string | null): string | undefined {
+  if (/hockey/i.test(sport ?? "")) return "hockey_jersey";
+  if (/flag[\s-]*football/i.test(sport ?? "")) return "flag_football_jersey";
+  return undefined;
 }
 
 export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
@@ -188,7 +198,8 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   // The standard crew neck is Slugger's versatile $28 starting point. An
   // approved design style still wins whenever one has already been chosen.
   const initialItems = normalizePoloItems(prefill?.items?.length ? prefill.items : ["jersey"]);
-  const initialJerseyStyle = styleFromDesign(prefill?.designJerseyStyle) ?? (initialItems.includes("jersey") ? DEFAULT_JERSEY_STYLE : "");
+  const initialJerseyStyle = styleFromDesign(prefill?.designJerseyStyle)
+    ?? (initialItems.includes("jersey") ? recommendedJerseyStyleForSport(prefill?.sport) : "");
   const initialPoloMaterial: PoloMaterial = prefill?.items?.includes("polo_pin_dot") ? "pin-dot" : "dri-fit";
   const [jerseyStyle, setJerseyStyle] = useState(initialJerseyStyle);
   const [material, setMaterial] = useState(fabricFor(initialJerseyStyle, prefill?.sport));
@@ -343,6 +354,21 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const commonAddOns = ITEM_TYPES.filter((item) => COMMON_ADD_ON_KEYS.has(item.key));
   const otherJerseyItems = ITEM_TYPES.filter((item) => OTHER_JERSEY_ITEM_KEYS.has(item.key));
   const specialtyAddOns = ITEM_TYPES.filter((item) => item.key !== "jersey" && item.key !== "polo_pin_dot" && !COMMON_ADD_ON_KEYS.has(item.key) && !OTHER_JERSEY_ITEM_KEYS.has(item.key));
+  const approvedDesignSport = prefill?.sport?.trim() ?? "";
+  const hasSportLinkedDesign = Boolean(prefill?.designToken && approvedDesignSport);
+  const designRecommendedStyle = hasJersey
+    ? styleFromDesign(prefill?.designJerseyStyle) ?? recommendedJerseyStyleForSport(approvedDesignSport)
+    : undefined;
+  const displayedJerseyStyles = designRecommendedStyle
+    ? [designRecommendedStyle, ...JERSEY_STYLES.filter((style) => style !== designRecommendedStyle)]
+    : JERSEY_STYLES;
+  const designRecommendedUniformKey = hasSportLinkedDesign ? specialUniformKeyForSport(approvedDesignSport) : undefined;
+  const designRecommendedUniform = otherJerseyItems.find((item) => item.key === designRecommendedUniformKey);
+  const designRecommendedUniformSelected = Boolean(designRecommendedUniform && items.includes(designRecommendedUniform.key));
+  const designRecommendedUniformDescription = designRecommendedUniform?.key === "hockey_jersey"
+    ? "Sublimated hockey sweater."
+    : "Sleeveless compression game shirt.";
+  const additionalUniforms = otherJerseyItems.filter((item) => item.key !== designRecommendedUniformKey);
   const teamDetailsComplete = Boolean(prefill || (teamName.trim() && contactName.trim() && contactEmail.trim()));
   const sizeGuideHref = /volleyball/i.test(prefill?.sport ?? "") ? "/size-guide#girls-volleyball" : "/size-guide#jerseys";
   const submissionRoster = [
@@ -561,13 +587,37 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
           decision on the next step, after the team has picked its products. */}
       {flowStep === "gear" && (
         <>
+          {designRecommendedUniform && (
+            <section className="border border-brand bg-brand/[0.08] p-4 sm:p-5" aria-labelledby="design-uniform-title">
+              <p className="display text-xs uppercase tracking-[0.16em] text-brand">Your approved {approvedDesignSport} design</p>
+              <h2 id="design-uniform-title" className="display mt-1 text-2xl text-foreground">Recommended uniform</h2>
+              <p className="mt-2 text-sm text-muted">This is the uniform type tied to your design. You can still add any other jersey or team item below.</p>
+              <button
+                type="button"
+                onClick={() => toggleItem(designRecommendedUniform.key)}
+                aria-pressed={designRecommendedUniformSelected}
+                className={`!block mt-4 min-h-11 border p-4 text-left transition-colors ${designRecommendedUniformSelected ? "border-brand bg-brand text-on-brand" : "border-line bg-steel text-foreground hover:border-brand/50"}`}
+              >
+                <span className="display text-sm">{designRecommendedUniformSelected ? "✓ " : "+ "}{designRecommendedUniform.label} — ${(itemPriceCents(designRecommendedUniform.key) / 100).toFixed(0)}</span>
+                <span className={`mt-1 block text-xs ${designRecommendedUniformSelected ? "text-on-brand/80" : "text-muted"}`}>{designRecommendedUniformSelected ? "Selected from your approved design. " : "Recommended for your approved design. "}{designRecommendedUniformDescription}</span>
+              </button>
+            </section>
+          )}
+
           <section aria-labelledby="team-jersey-title">
             <p className="display text-xs uppercase tracking-[0.16em] text-brand">Step 1 · Team uniform</p>
-            <h2 id="team-jersey-title" className="display mt-1 text-2xl text-foreground">Choose a jersey style</h2>
-            <p className="mt-2 max-w-3xl text-sm text-muted">The Standard Crew Neck is the $28 default, not the only option. Every jersey cut is shown here so teams can choose what fits their sport. Fabric comes next.</p>
+            <h2 id="team-jersey-title" className="display mt-1 text-2xl text-foreground">{designRecommendedUniform ? "Other jersey styles" : "Choose a jersey style"}</h2>
+            <p className="mt-2 max-w-3xl text-sm text-muted">
+              {hasSportLinkedDesign && !designRecommendedUniform
+                ? `Based on your approved ${approvedDesignSport} design, we put the best match first. Every other cut remains available if your team needs a different option.`
+                : designRecommendedUniform
+                  ? "Your design-matched uniform is above. These all-sport cuts remain available for an additional jersey or a change in direction."
+                  : "The Standard Crew Neck is the $28 default, not the only option. Every jersey cut is shown here so teams can choose what fits their sport. Fabric comes next."}
+            </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {JERSEY_STYLES.map((style) => {
+              {displayedJerseyStyles.map((style) => {
                 const on = hasJersey && jerseyStyle === style;
+                const isDesignRecommendation = hasSportLinkedDesign && style === designRecommendedStyle;
                 return (
                   <button
                     key={style}
@@ -583,7 +633,8 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
                       <span className="display text-foreground">{on ? "✓ " : ""}{style}</span>
                       <span className="display text-sm text-foreground">${(itemPriceCents("jersey", style, undefined, fabricFor(style, prefill?.sport)) / 100).toFixed(0)}</span>
                     </span>
-                    {style === DEFAULT_JERSEY_STYLE && <span className="mt-2 block text-xs font-semibold uppercase tracking-wider text-brand">Included by default</span>}
+                    {style === DEFAULT_JERSEY_STYLE && <span className="mt-2 block text-xs font-semibold uppercase tracking-wider text-brand">{isDesignRecommendation ? (on ? "Selected from approved design" : `Recommended for ${approvedDesignSport}`) : "Included by default"}</span>}
+                    {isDesignRecommendation && style !== DEFAULT_JERSEY_STYLE && <span className="mt-2 block text-xs font-semibold uppercase tracking-wider text-brand">{on ? "Selected from approved design" : `Recommended for ${approvedDesignSport}`}</span>}
                     <span className="mt-1 block text-sm text-muted">{JERSEY_STYLE_DESCRIPTIONS[style]}</span>
                     {style === DEFAULT_JERSEY_STYLE && (
                       <span className="mt-3 flex items-center gap-3 border border-brand/30 bg-ink p-2">
@@ -609,11 +660,12 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
             )}
           </section>
 
+          {additionalUniforms.length > 0 && (
           <section className="border border-line bg-steel p-4" aria-labelledby="other-uniforms-title">
             <p id="other-uniforms-title" className="display text-sm text-foreground">Other team uniform types</p>
             <p className="mt-1 text-sm text-muted">Hockey, flag football, and practice jerseys are regular options—not hidden specialty gear. Add any of these alongside the jersey style above when the order needs multiple uniform types.</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              {otherJerseyItems.map((item) => {
+              {additionalUniforms.map((item) => {
                 const on = items.includes(item.key);
                 return (
                   <button
@@ -630,6 +682,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
               })}
             </div>
           </section>
+          )}
 
           <section aria-labelledby="team-gear-title">
             <p id="team-gear-title" className="display text-sm text-foreground">Add team gear <span className="text-muted">(optional)</span></p>
