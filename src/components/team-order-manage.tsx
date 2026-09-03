@@ -10,12 +10,11 @@ import {
   formatSize,
   isOneSizeField,
   JERSEY_MATERIALS,
-  SPEEDO_BASEBALL_MATERIAL_KEY,
+  fixedJerseyMaterialFor,
   jerseyMaterialsFor,
   missingCheerSizeLabels,
   sizeFieldsForItems,
   sizeValueForField,
-  usesSpeedoBaseballMaterial,
 } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 import { OrderSpecificationCard } from "@/components/order-specification-card";
@@ -84,13 +83,16 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
     ? "We'll email your total and the 50% deposit invoice to start production."
     : "We'll email your total and a design proof to approve.";
   const hasJersey = items.some((key) => key.includes("jersey"));
-  const fixedSpeedoMaterial = hasJersey && usesSpeedoBaseballMaterial(jerseyStyle, sport);
+  // Only the configurable all-sport jersey has a cut/fabric setting. Hockey,
+  // flag-football, and practice jerseys remain distinct selected products.
+  const hasConfigurableJersey = items.includes("jersey");
+  const fixedJerseyMaterial = hasConfigurableJersey ? fixedJerseyMaterialFor(jerseyStyle, sport) : undefined;
   const materialOptions = jerseyMaterialsFor(jerseyStyle, sport);
   const [materialChoice, setMaterialChoice] = useState(
-    fixedSpeedoMaterial ? SPEEDO_BASEBALL_MATERIAL_KEY : jerseyMaterial ?? "",
+    fixedJerseyMaterial ?? jerseyMaterial ?? "",
   );
   const [materialBusy, setMaterialBusy] = useState(false);
-  const materialLabel = hasJersey && materialChoice
+  const materialLabel = hasConfigurableJersey && materialChoice
     ? JERSEY_MATERIALS.find((m) => m.key === materialChoice)?.label ?? materialChoice
     : null;
   const router = useRouter();
@@ -247,22 +249,22 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
         <>
           {/* Step 1 - one-time setup: names on the back or not. */}
           <Step n={1} title="Confirm the uniform setup">
-            {hasJersey && (
+            {hasConfigurableJersey && (
               <div className="mb-5 border border-brand/40 bg-brand/[0.05] p-4">
-                <p className="display text-foreground">{fixedSpeedoMaterial ? "Included jersey material" : "Jersey material"}</p>
+                <p className="display text-foreground">{fixedJerseyMaterial ? "Included jersey material" : "Jersey material"}</p>
                 <p className="mt-1 text-sm text-muted">
-                  {fixedSpeedoMaterial
-                    ? "Full Button and Two Button baseball jerseys are made in this fabric, so there is nothing extra to select."
+                  {fixedJerseyMaterial
+                    ? "This jersey cut has one production fabric, so there is nothing extra to select."
                     : "Pick the fabric you expect to receive. This choice appears again in your final order confirmation."}
                 </p>
-                <div className={`mt-3 grid gap-2 ${fixedSpeedoMaterial ? "" : "sm:grid-cols-2"}`}>
-                  {materialOptions.map((material) => fixedSpeedoMaterial ? (
+                <div className={`mt-3 grid gap-2 ${fixedJerseyMaterial ? "" : "sm:grid-cols-2"}`}>
+                  {materialOptions.map((material) => fixedJerseyMaterial ? (
                     <div key={material.key} className="border border-brand bg-brand/10 p-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="display text-sm text-foreground">✓ {material.label}</span>
                         <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-on-brand">Included</span>
                       </div>
-                      <span className="mt-1 block text-xs text-muted">{material.description} This is our standard fabric for both button-front baseball cuts.</span>
+                      <span className="mt-1 block text-xs text-muted">{material.description}</span>
                     </div>
                   ) : (
                     <button
@@ -535,7 +537,7 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
         // current order status is shown once in the dashboard summary above.
         <>
           <OrderSpecificationCard spec={orderSpec} />
-          {hasJersey && !fixedSpeedoMaterial && !locked && (
+          {hasConfigurableJersey && !fixedJerseyMaterial && !locked && (
             <details className="border border-line bg-foreground/[0.02]">
               <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm text-brand">Change jersey material before paying the deposit</summary>
               <div className="grid gap-2 border-t border-line p-4 sm:grid-cols-2">

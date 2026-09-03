@@ -108,16 +108,16 @@ export function estimateOrderWeightOz(
 }
 
 // The jersey styles a team order can use, in the order shown in the form. The
-// price follows the style via jerseyPriceCents (zip $40, full $35, two $32,
-// V-neck $30, crew $28; crew/V-neck are $25 with local pricing).
-export const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button", "Quarter-Zip"] as const;
+// price follows the style via jerseyPriceCents (bowling $42, zip $40, full
+// $35, two $32, V-neck $30, crew $28; crew/V-neck are $25 with local pricing).
+export const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Bowling Shirt (Camp Collar)", "Full Button", "Two Button", "Quarter-Zip"] as const;
 
 export function jerseyPriceCents(jerseyStyle?: string | null, localPricing?: boolean | null, material?: string | null): number {
   const s = (jerseyStyle ?? "").toLowerCase();
-  // Bowling shirts are cut in a pricier microfiber, so a full-button bowling
-  // shirt is $42 (not the $35 standard full-button). Only full-button carries
-  // this premium; other bowling styles price by their normal style.
+  // Bowling shirts are cut in a pricier microfiber, so the camp-collar
+  // bowling shirt is $42 rather than the standard button-front price.
   const microfiber = (material ?? "").toLowerCase() === "microfiber";
+  if (s.includes("bowl")) return 4200;
   if (s.includes("full") && microfiber) return 4200;
   if (s.includes("zip")) return 4000;
   if (s.includes("full")) return 3500;

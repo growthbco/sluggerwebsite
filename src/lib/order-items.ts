@@ -325,17 +325,17 @@ export function usesSpeedoBaseballMaterial(
 ): boolean {
   const normalizedStyle = (style ?? "").toLowerCase();
   const isButtonBaseballCut = /full[\s-]*button|two[\s-]*button|2[\s-]*button/.test(normalizedStyle);
-  return isButtonBaseballCut && !isBowling(...sportHints);
+  return isButtonBaseballCut && !isBowling(style, ...sportHints);
 }
 
 /** A cut with a single production fabric. Standard crew and V-neck jerseys
  * deliberately return undefined: coaches choose either Birdseye Mesh or
  * Moisture-Wicking Performance Knit for those versatile cuts. */
-function fixedJerseyMaterialFor(
+export function fixedJerseyMaterialFor(
   style?: string | null,
   ...sportHints: (string | null | undefined)[]
 ): string | undefined {
-  if (isBowling(...sportHints)) return "microfiber";
+  if (isBowling(style, ...sportHints)) return "microfiber";
   if (usesSpeedoBaseballMaterial(style, ...sportHints)) return SPEEDO_BASEBALL_MATERIAL_KEY;
   return (style ?? "").toLowerCase().includes("zip") ? SPEEDO_BASEBALL_MATERIAL_KEY : undefined;
 }

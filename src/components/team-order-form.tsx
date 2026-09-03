@@ -5,12 +5,11 @@ import Image from "next/image";
 import { SmsConsentNote } from "@/components/sms-consent";
 import {
   ITEM_TYPES,
-  SPEEDO_BASEBALL_MATERIAL_KEY,
-  fabricForStyle,
+  fabricFor,
+  fixedJerseyMaterialFor,
   jerseyMaterialsFor,
   missingCheerSizeLabels,
   sizeFieldsForItems,
-  usesSpeedoBaseballMaterial,
 } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 import { loadRememberedContact, saveRememberedContact } from "@/lib/remembered-contact";
@@ -19,12 +18,15 @@ import { computeTeamOrderQuote, itemPriceCents } from "@/lib/team-order-pricing"
 import { buildCustomerOrderSpec } from "@/lib/order-spec";
 import { OrderSpecificationCard } from "@/components/order-specification-card";
 
-const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Full Button", "Two Button", "Quarter-Zip"];
+const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Bowling Shirt (Camp Collar)", "Full Button", "Two Button", "Quarter-Zip"];
 const DEFAULT_JERSEY_STYLE = "Standard Crew Neck";
 const COMMON_ADD_ON_KEYS = new Set(["shorts", "long_pants", "hoodie", "lightweight_hoodie", "fitted_hat", "socks"]);
 const BULK_SIZE_ITEM_KEYS = new Set(["socks"]);
+const OTHER_JERSEY_ITEM_KEYS = new Set(["hockey_jersey", "flag_football_jersey", "practice_jersey"]);
 const JERSEY_STYLE_DESCRIPTIONS: Record<string, string> = {
+  "Standard Crew Neck": "Our versatile $28 starting point for softball, soccer, basketball, practice squads, and more.",
   "V-Neck": "A classic athletic V collar for teams that prefer a sharper neckline.",
+  "Bowling Shirt (Camp Collar)": "A classic camp-collar bowling shirt in premium lightweight microfiber.",
   "Full Button": "A traditional button-front baseball jersey.",
   "Two Button": "A button-front baseball cut with a cleaner placket.",
   "Quarter-Zip": "A premium quarter-zip jersey for a more elevated team look.",
@@ -162,6 +164,7 @@ type Prefill = {
 function styleFromDesign(designStyle?: string | null): string | undefined {
   const s = (designStyle ?? "").toLowerCase();
   if (!s) return undefined;
+  if (s.includes("bowl")) return "Bowling Shirt (Camp Collar)";
   if (s.includes("two")) return "Two Button";
   if (s.includes("full")) return "Full Button";
   if (s.includes("v-neck") || s.includes("v neck")) return "V-Neck";
@@ -188,7 +191,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const initialJerseyStyle = styleFromDesign(prefill?.designJerseyStyle) ?? (initialItems.includes("jersey") ? DEFAULT_JERSEY_STYLE : "");
   const initialPoloMaterial: PoloMaterial = prefill?.items?.includes("polo_pin_dot") ? "pin-dot" : "dri-fit";
   const [jerseyStyle, setJerseyStyle] = useState(initialJerseyStyle);
-  const [material, setMaterial] = useState(fabricForStyle(initialJerseyStyle));
+  const [material, setMaterial] = useState(fabricFor(initialJerseyStyle, prefill?.sport));
   const [materialTouched, setMaterialTouched] = useState(false);
   // Orders from an approved design start with the items the design actually
   // covers (a hoodie design pre-selects hoodie, not the jersey default).
@@ -288,10 +291,11 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
 
   function chooseJerseyStyle(nextStyle: string) {
     setJerseyStyle(nextStyle);
-    if (usesSpeedoBaseballMaterial(nextStyle, prefill?.sport)) {
-      setMaterial(SPEEDO_BASEBALL_MATERIAL_KEY);
+    const fixedMaterial = fixedJerseyMaterialFor(nextStyle, prefill?.sport);
+    if (fixedMaterial) {
+      setMaterial(fixedMaterial);
     } else if (!materialTouched) {
-      setMaterial(fabricForStyle(nextStyle));
+      setMaterial(fabricFor(nextStyle, prefill?.sport));
     }
   }
 
@@ -332,13 +336,13 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   // Jersey style/material only apply when a jersey is actually being ordered
   // - a hoodie-only order must not carry a phantom jersey style.
   const hasJersey = items.includes("jersey");
-  const fixedSpeedoMaterial = hasJersey && usesSpeedoBaseballMaterial(jerseyStyle, prefill?.sport);
+  const fixedJerseyMaterial = hasJersey ? fixedJerseyMaterialFor(jerseyStyle, prefill?.sport) : undefined;
   const materialOptions = jerseyMaterialsFor(jerseyStyle, prefill?.sport);
-  const effectiveMaterial = fixedSpeedoMaterial ? SPEEDO_BASEBALL_MATERIAL_KEY : material;
+  const effectiveMaterial = fixedJerseyMaterial ?? material;
   const orderSetupComplete = items.length > 0 && (!hasJersey || Boolean(jerseyStyle && effectiveMaterial)) && (!items.includes("polo") || Boolean(poloMaterial));
   const commonAddOns = ITEM_TYPES.filter((item) => COMMON_ADD_ON_KEYS.has(item.key));
-  const specialtyAddOns = ITEM_TYPES.filter((item) => item.key !== "jersey" && item.key !== "polo_pin_dot" && !COMMON_ADD_ON_KEYS.has(item.key));
-  const specialtyGearSelected = specialtyAddOns.some((item) => items.includes(item.key));
+  const otherJerseyItems = ITEM_TYPES.filter((item) => OTHER_JERSEY_ITEM_KEYS.has(item.key));
+  const specialtyAddOns = ITEM_TYPES.filter((item) => item.key !== "jersey" && item.key !== "polo_pin_dot" && !COMMON_ADD_ON_KEYS.has(item.key) && !OTHER_JERSEY_ITEM_KEYS.has(item.key));
   const teamDetailsComplete = Boolean(prefill || (teamName.trim() && contactName.trim() && contactEmail.trim()));
   const sizeGuideHref = /volleyball/i.test(prefill?.sport ?? "") ? "/size-guide#girls-volleyball" : "/size-guide#jerseys";
   const submissionRoster = [
@@ -553,113 +557,119 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
         </>
       )}
 
-      {/* Pick products first. Their cuts and fabrics belong on the following
-          Details step, rather than interrupting the initial product choice. */}
+      {/* Keep the whole uniform line visible up front. Fabric is a separate
+          decision on the next step, after the team has picked its products. */}
       {flowStep === "gear" && (
         <>
-      {hasJersey && (
-      <section className="border border-brand bg-brand/[0.08] p-5 sm:p-6" aria-labelledby="default-jersey-title">
-        <div className={`grid gap-6 ${jerseyStyle === DEFAULT_JERSEY_STYLE ? "lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] lg:items-center" : ""}`}>
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="display text-xs uppercase tracking-wider text-brand">Included by default</span>
-              <span className="display text-lg text-foreground">${(itemPriceCents("jersey", DEFAULT_JERSEY_STYLE) / 100).toFixed(0)} / player</span>
+          <section aria-labelledby="team-jersey-title">
+            <p className="display text-xs uppercase tracking-[0.16em] text-brand">Step 1 · Team uniform</p>
+            <h2 id="team-jersey-title" className="display mt-1 text-2xl text-foreground">Choose a jersey style</h2>
+            <p className="mt-2 max-w-3xl text-sm text-muted">The Standard Crew Neck is the $28 default, not the only option. Every jersey cut is shown here so teams can choose what fits their sport. Fabric comes next.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {JERSEY_STYLES.map((style) => {
+                const on = hasJersey && jerseyStyle === style;
+                return (
+                  <button
+                    key={style}
+                    type="button"
+                    onClick={() => {
+                      chooseJerseyStyle(style);
+                      setItems((current) => current.includes("jersey") ? current : [...current, "jersey"]);
+                    }}
+                    aria-pressed={on}
+                    className={`!block min-h-11 border p-4 text-left transition-colors ${on ? "border-brand bg-brand/[0.08]" : "border-line bg-steel hover:border-brand/50"}`}
+                  >
+                    <span className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="display text-foreground">{on ? "✓ " : ""}{style}</span>
+                      <span className="display text-sm text-foreground">${(itemPriceCents("jersey", style, undefined, fabricFor(style, prefill?.sport)) / 100).toFixed(0)}</span>
+                    </span>
+                    {style === DEFAULT_JERSEY_STYLE && <span className="mt-2 block text-xs font-semibold uppercase tracking-wider text-brand">Included by default</span>}
+                    <span className="mt-1 block text-sm text-muted">{JERSEY_STYLE_DESCRIPTIONS[style]}</span>
+                    {style === DEFAULT_JERSEY_STYLE && (
+                      <span className="mt-3 flex items-center gap-3 border border-brand/30 bg-ink p-2">
+                        <Image
+                          src="/styles/crew.jpg"
+                          alt="Example Standard Crew Neck jersey, shown front and back"
+                          width={1400}
+                          height={1055}
+                          sizes="128px"
+                          className="h-24 w-32 shrink-0 object-cover"
+                        />
+                        <span className="text-xs text-muted">Crew-neck example, front and back. Artwork, colors, names, and numbers are customized for your team.</span>
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-            <h2 id="default-jersey-title" className="display mt-2 text-2xl text-foreground">
-              {jerseyStyle === DEFAULT_JERSEY_STYLE ? "Standard Crew Neck Jersey" : `${jerseyStyle} Jersey`}
-            </h2>
-            <p className="mt-2 max-w-3xl text-muted">
-              Our versatile custom jersey for softball, soccer, basketball, practice squads, and more. The Standard Crew Neck is the Slugger starting point for most teams.
-            </p>
-            {jerseyStyle !== DEFAULT_JERSEY_STYLE && (
-              <p className="mt-2 text-sm text-muted">You&apos;ve chosen a different cut for this order. Switch back anytime if the standard crew neck is the better fit.</p>
+            {hasJersey && (
+              <button type="button" onClick={() => toggleItem("jersey")} className="mt-3 min-h-11 text-sm text-muted underline underline-offset-4 hover:text-foreground">
+                This order doesn&apos;t need a standard jersey
+              </button>
             )}
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => chooseJerseyStyle(DEFAULT_JERSEY_STYLE)}
-                aria-pressed={jerseyStyle === DEFAULT_JERSEY_STYLE}
-                className={`clip-slant display px-4 py-2.5 ${jerseyStyle === DEFAULT_JERSEY_STYLE ? "bg-brand text-on-brand" : "border border-brand text-foreground hover:bg-brand/[0.12]"}`}
-              >
-                {jerseyStyle === DEFAULT_JERSEY_STYLE ? "✓ Standard Crew Neck Selected" : "Use Standard Crew Neck"}
-              </button>
-              <button type="button" onClick={() => toggleItem("jersey")} className="min-h-11 text-sm text-muted underline underline-offset-4 hover:text-foreground">
-                This order doesn&apos;t need jerseys
-              </button>
-            </div>
-          </div>
-          {jerseyStyle === DEFAULT_JERSEY_STYLE && (
-            <figure className="overflow-hidden border border-brand/40 bg-ink">
-              <Image
-                src="/styles/crew.jpg"
-                alt="Example Standard Crew Neck jersey, shown front and back"
-                width={1400}
-                height={1055}
-                sizes="(max-width: 1024px) 100vw, 384px"
-                className="h-auto w-full"
-              />
-              <figcaption className="border-t border-brand/30 px-3 py-2 text-xs text-muted">
-                Crew-neck example, front and back. Your colors, artwork, names, and numbers are customized for your team.
-              </figcaption>
-            </figure>
-          )}
-        </div>
-      </section>
-      )}
+          </section>
 
-      <section aria-labelledby="team-gear-title">
-        <p id="team-gear-title" className="display text-sm text-foreground">Add team gear <span className="text-muted">(optional)</span></p>
-        <p className="mt-1 text-sm text-muted">
-          {hasJersey
-            ? "Your jersey is already included. Add only the extras this team also needs; cuts and fabrics come next."
-            : "Start with the gear this team needs. You&apos;ll choose any applicable cuts and fabrics next."}
-        </p>
-        {!hasJersey && (
-          <button
-            type="button"
-            onClick={() => toggleItem("jersey")}
-            className="mt-3 min-h-11 clip-slant border border-brand px-4 py-2.5 text-left text-foreground hover:bg-brand/[0.12]"
-          >
-            <span className="display">+ Add Standard Crew Neck Jersey — $28</span>
-            <span className="mt-1 block text-sm text-muted">Our versatile default for softball, soccer, basketball, and more.</span>
-          </button>
-        )}
-        <div className="mt-3 flex flex-wrap gap-2">
-          {commonAddOns.map((item) => {
-            const on = items.includes(item.key);
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => toggleItem(item.key)}
-                aria-pressed={on}
-                className={`min-h-11 clip-slant display text-sm px-4 py-2 transition-colors ${on ? "bg-brand text-on-brand" : "bg-steel border border-line text-foreground/80 hover:border-brand/50"}`}
-              >
-                {on ? "✓ " : "+ "}{item.label}
-              </button>
-            );
-          })}
-        </div>
-        <details className="mt-4 border border-line bg-steel p-4" open={specialtyGearSelected}>
-          <summary className="cursor-pointer display text-sm text-foreground">Show specialty apparel, alternate jerseys, and more</summary>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {specialtyAddOns.map((item) => {
-              const on = items.includes(item.key);
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => toggleItem(item.key)}
-                  aria-pressed={on}
-                  className={`min-h-11 clip-slant display text-sm px-4 py-2 transition-colors ${on ? "bg-brand text-on-brand" : "border border-line text-foreground/80 hover:border-brand/50"}`}
-                >
-                  {on ? "✓ " : "+ "}{item.key === "polo" ? "Custom Polo" : item.label}
-                </button>
-              );
-            })}
-          </div>
-        </details>
-      </section>
+          <section className="border border-line bg-steel p-4" aria-labelledby="other-uniforms-title">
+            <p id="other-uniforms-title" className="display text-sm text-foreground">Other team uniform types</p>
+            <p className="mt-1 text-sm text-muted">Hockey, flag football, and practice jerseys are regular options—not hidden specialty gear. Add any of these alongside the jersey style above when the order needs multiple uniform types.</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              {otherJerseyItems.map((item) => {
+                const on = items.includes(item.key);
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => toggleItem(item.key)}
+                    aria-pressed={on}
+                    className={`!block min-h-11 border p-3 text-left transition-colors ${on ? "border-brand bg-brand text-on-brand" : "border-line text-foreground hover:border-brand/50"}`}
+                  >
+                    <span className="display text-sm">{on ? "✓ " : "+ "}{item.label} — ${(itemPriceCents(item.key) / 100).toFixed(0)}</span>
+                    <span className={`mt-1 block text-xs ${on ? "text-on-brand/80" : "text-muted"}`}>{item.key === "hockey_jersey" ? "Sublimated hockey sweater." : item.key === "flag_football_jersey" ? "Sleeveless compression game shirt." : "Lightweight extra jersey for training or warmups."}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section aria-labelledby="team-gear-title">
+            <p id="team-gear-title" className="display text-sm text-foreground">Add team gear <span className="text-muted">(optional)</span></p>
+            <p className="mt-1 text-sm text-muted">Pick every extra this team needs. Hats and socks will use simple team-size totals instead of player names.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {commonAddOns.map((item) => {
+                const on = items.includes(item.key);
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => toggleItem(item.key)}
+                    aria-pressed={on}
+                    className={`min-h-11 clip-slant display text-sm px-4 py-2 transition-colors ${on ? "bg-brand text-on-brand" : "bg-steel border border-line text-foreground/80 hover:border-brand/50"}`}
+                  >
+                    {on ? "✓ " : "+ "}{item.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4 border border-line bg-steel p-4">
+              <p className="display text-sm text-foreground">More apparel and accessories</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {specialtyAddOns.map((item) => {
+                  const on = items.includes(item.key);
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => toggleItem(item.key)}
+                      aria-pressed={on}
+                      className={`min-h-11 clip-slant display text-sm px-4 py-2 transition-colors ${on ? "bg-brand text-on-brand" : "border border-line text-foreground/80 hover:border-brand/50"}`}
+                    >
+                      {on ? "✓ " : "+ "}{item.key === "polo" ? "Custom Polo" : item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button type="button" onClick={() => setFlowStep("team")} className="clip-slant border border-line text-foreground display px-5 py-3 hover:bg-foreground/5">
           Back
@@ -686,67 +696,42 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
 
           {hasJersey && (
             <div className="border border-line bg-steel p-5">
-              <p className="display text-sm text-foreground">Jersey cut</p>
-              <p className="mt-1 text-sm text-muted">The Standard Crew Neck is the versatile $28 default. Choose a different cut only when it suits this team better.</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {JERSEY_STYLES.map((style) => {
-                  const on = jerseyStyle === style;
-                  const description = style === DEFAULT_JERSEY_STYLE
-                    ? "A versatile custom jersey for softball, soccer, basketball, practice squads, and more."
-                    : JERSEY_STYLE_DESCRIPTIONS[style];
+              <p className="display text-sm text-foreground">{fixedJerseyMaterial ? "Included jersey material" : "Jersey material"}</p>
+              <p className="mt-1 text-sm text-muted">
+                {fixedJerseyMaterial
+                  ? "This jersey cut has one production fabric, so there is nothing else to choose."
+                  : "We selected the recommended fabric for this cut. Choose another only if you have a preference."}
+              </p>
+              <div className={`mt-3 grid gap-3 ${fixedJerseyMaterial ? "" : "sm:grid-cols-2"}`}>
+                {materialOptions.map((option) => {
+                  const on = effectiveMaterial === option.key;
+                  if (fixedJerseyMaterial) {
+                    return (
+                      <div key={option.key} className="border border-brand bg-brand/[0.08] p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="display text-foreground">✓ {option.label}</span>
+                          <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-on-brand">Included</span>
+                        </div>
+                        <p className="mt-1 text-sm text-muted">{option.description}</p>
+                      </div>
+                    );
+                  }
                   return (
                     <button
-                      key={style}
+                      key={option.key}
                       type="button"
-                      onClick={() => chooseJerseyStyle(style)}
+                      onClick={() => { setMaterial(option.key); setMaterialTouched(true); }}
                       aria-pressed={on}
-                      className={`min-h-11 border p-4 text-left transition-colors ${on ? "border-brand bg-brand/[0.08]" : "border-line hover:border-brand/50"}`}
+                      className={`relative min-h-11 border p-4 text-left transition-colors ${on ? "border-brand bg-brand/[0.08]" : "border-line hover:border-brand/50"}`}
                     >
-                      <span className="display text-foreground">{on ? "✓ " : ""}{style} — ${(itemPriceCents("jersey", style) / 100).toFixed(0)}</span>
-                      <span className="mt-1 block text-sm text-muted">{description}</span>
+                      {option.recommended && (
+                        <span className="absolute right-3 top-3 display bg-brand px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-on-brand">Recommended</span>
+                      )}
+                      <span className="display text-foreground">{on ? "✓ " : ""}{option.label}</span>
+                      <p className="mt-1 text-sm text-muted">{option.description}</p>
                     </button>
                   );
                 })}
-              </div>
-
-              <div className="mt-6 border-t border-line pt-5">
-                <p className="display text-sm text-foreground">{fixedSpeedoMaterial ? "Included jersey material" : "Jersey material"}</p>
-                <p className="mt-1 text-sm text-muted">
-                  {fixedSpeedoMaterial
-                    ? "Full Button and Two Button baseball jerseys use this fabric, so there is nothing extra to choose."
-                    : "We selected the recommended fabric for this cut. Choose another only if you have a preference."}
-                </p>
-                <div className={`mt-3 grid gap-3 ${fixedSpeedoMaterial ? "" : "sm:grid-cols-2"}`}>
-                  {materialOptions.map((option) => {
-                    const on = material === option.key;
-                    if (fixedSpeedoMaterial) {
-                      return (
-                        <div key={option.key} className="border border-brand bg-brand/[0.08] p-4">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="display text-foreground">✓ {option.label}</span>
-                            <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-on-brand">Included</span>
-                          </div>
-                          <p className="mt-1 text-sm text-muted">{option.description} This is our standard fabric for both button-front baseball cuts.</p>
-                        </div>
-                      );
-                    }
-                    return (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => { setMaterial(option.key); setMaterialTouched(true); }}
-                        aria-pressed={on}
-                        className={`relative min-h-11 border p-4 text-left transition-colors ${on ? "border-brand bg-brand/[0.08]" : "border-line hover:border-brand/50"}`}
-                      >
-                        {option.recommended && (
-                          <span className="absolute right-3 top-3 display bg-brand px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-on-brand">Recommended</span>
-                        )}
-                        <span className="display text-foreground">{on ? "✓ " : ""}{option.label}</span>
-                        <p className="mt-1 text-sm text-muted">{option.description}</p>
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
             </div>
           )}
