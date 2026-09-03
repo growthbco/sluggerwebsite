@@ -257,11 +257,11 @@ export async function emailProofReady(args: {
   });
 }
 
-/** Team-order invoice (50% deposit or final balance) + a Stripe payment link. */
+/** Team-order invoice (deposit, Rush pay-in-full, or final balance) + a Stripe payment link. */
 export type TeamOrderInvoiceContent = {
   teamName: string;
   reference: string;
-  stage: "deposit" | "balance";
+  stage: "deposit" | "full" | "balance";
   lines: { label: string; quantity: number; unitPriceCents: number; totalCents: number }[];
   totalCents: number;
   dueCents: number;
@@ -304,15 +304,20 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
     )
     .join("");
   const isDeposit = args.stage === "deposit";
+  const isFull = args.stage === "full";
   return {
-    subject: isDeposit
+    subject: isFull
+      ? `Your ${args.teamName} Rush order: ${money(args.dueCents)} payment starts production (${args.reference})`
+      : isDeposit
       ? `Your ${args.teamName} order: ${money(args.dueCents)} deposit starts production (${args.reference})`
       : `Final balance for your ${args.teamName} order: ${money(args.dueCents)} (${args.reference})`,
     html: brandedEmail({
-      preheader: isDeposit
+      preheader: isFull
+        ? `Rush orders are paid in full before production begins.`
+        : isDeposit
         ? `Pay the 50% deposit and your order goes straight into production.`
         : `Your order is in production - the balance is due before it ships.`,
-      heading: isDeposit ? `Let's get your order started, ${esc(args.teamName)}!` : `Almost there, ${esc(args.teamName)}!`,
+      heading: isDeposit || isFull ? `Let's get your order started, ${esc(args.teamName)}!` : `Almost there, ${esc(args.teamName)}!`,
       intro: `Order reference: <strong>${esc(args.reference)}</strong>`,
       bodyHtml: `
         ${rows ? `<table style="width:100%;border-collapse:collapse;margin:0 0 14px;">${rows}
@@ -320,7 +325,7 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
         </table>` : ""}
         <table style="width:100%;border-collapse:collapse;margin:0 0 14px;">
           <tr>
-            <td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">${isDeposit ? "50% deposit" : "Final balance"}</td>
+            <td style="padding:6px 14px;background:#f6f4ee;border-left:3px solid #b8a36c;">${isFull ? "Rush order - paid in full" : isDeposit ? "50% deposit" : "Final balance"}</td>
             <td style="padding:6px 14px;background:#f6f4ee;text-align:right;">${money(args.dueCents)}</td>
           </tr>
           <tr>
@@ -349,7 +354,7 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
           </tr>
         </table>
         ${
-          isDeposit
+          isDeposit || isFull
             ? args.shippingIncludedWithRush
               ? `<p style="margin:0 0 14px;font-size:13px;color:#666;">This order includes direct shipping from production as part of the Rush fee. No additional shipping charge will be added.</p>`
               : args.localPickup
@@ -379,7 +384,9 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
             : ""
         }
         ${
-          isDeposit
+          isFull
+            ? `<p style="margin:0;">Rush production starts once full payment is received. There will be no remaining balance to collect before your order ships. You'll enter your <strong>shipping address</strong> on the payment page so we know exactly where your gear is headed. Questions or roster changes first? Just reply to this email.</p>`
+            : isDeposit
             ? `<p style="margin:0;">${args.shippingIncludedWithRush ? `Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} plus tax is due before your order ships. Direct shipping is included with Rush, with no added shipping charge.` : `Production starts the moment your deposit lands - the remaining ${money(args.totalCents - args.dueCents)} plus tax and shipping is due before your order ships.`} You'll enter your <strong>shipping address</strong> on the payment page so we know exactly where your gear is headed. Questions or roster changes first? Just reply to this email.</p>
         <table style="width:100%;border-collapse:collapse;margin:18px 0 0;"><tr><td style="padding:14px 16px;background:#f6f4ee;border:1px solid #e6e0cf;border-left:3px solid #b8a36c;">
           <p style="margin:0 0 6px;font-weight:bold;color:#13160b;">🏆 Make it official: add a Custom Team Hype Chain</p>
@@ -394,7 +401,7 @@ export function renderTeamOrderInvoice(args: TeamOrderInvoiceContent): { subject
             : ""
         }
       `,
-      ctaText: isDeposit ? "Pay your deposit" : "Pay the balance",
+      ctaText: isFull ? "Pay Rush order in full" : isDeposit ? "Pay your deposit" : "Pay the balance",
       ctaUrl: args.payUrl,
       footerNote: args.shippingIncludedWithRush
         ? "Rush production: 2 weeks · Direct shipping included · Carrier transit follows production"
@@ -461,31 +468,36 @@ export async function emailCustomInvoice(args: {
   });
 }
 
-/** Reminder for an unpaid deposit or balance invoice. */
+/** Reminder for an unpaid deposit, Rush full-payment, or balance invoice. */
 export async function emailInvoiceReminder(args: {
   to: string;
   teamName: string;
   reference: string;
-  stage: "deposit" | "balance";
+  stage: "deposit" | "full" | "balance";
   dueCents: number;
   payUrl: string;
   isFinal: boolean;
 }): Promise<boolean> {
   const money = `$${(args.dueCents / 100).toFixed(2)}`;
   const isDeposit = args.stage === "deposit";
+  const isFull = args.stage === "full";
   return sendEmail({
     to: args.to,
-    subject: isDeposit
+    subject: isFull
+      ? `Reminder: full payment starts your Rush order (${args.reference})`
+      : isDeposit
       ? `Reminder: your ${money} deposit starts production (${args.reference})`
       : `Reminder: ${money} balance due on your ${args.teamName} order (${args.reference})`,
     html: brandedEmail({
-      preheader: isDeposit ? `Your order is on hold until the deposit lands.` : `Pay the balance so we can ship the moment it's ready.`,
+      preheader: isFull ? `Your Rush order is on hold until full payment lands.` : isDeposit ? `Your order is on hold until the deposit lands.` : `Pay the balance so we can ship the moment it's ready.`,
       heading: `${args.isFinal ? "Last reminder" : "Friendly reminder"}, ${esc(args.teamName)}!`,
       intro: `Order reference: <strong>${esc(args.reference)}</strong>`,
-      bodyHtml: isDeposit
+      bodyHtml: isFull
+        ? `<p style="margin:0;">Your Rush order is priced and ready, but accelerated production does not start until the required <strong>${money} full payment</strong> comes in. Direct shipping is included, and there will be no later balance to collect. Questions? Just reply.</p>`
+        : isDeposit
         ? `<p style="margin:0;">Your team order is priced and ready, but production doesn't start until the <strong>${money} deposit</strong> comes in. Pay below and we get to work the same day. Roster changes or questions? Just reply.</p>`
         : `<p style="margin:0;">Your gear is in production and the remaining <strong>${money}</strong> is due before it ships. Settling it now means zero delay when your order is ready. Questions? Just reply.</p>`,
-      ctaText: isDeposit ? "Pay your deposit" : "Pay the balance",
+      ctaText: isFull ? "Pay Rush order in full" : isDeposit ? "Pay your deposit" : "Pay the balance",
       ctaUrl: args.payUrl,
     }),
     replyTo: CONTACT_INBOX,

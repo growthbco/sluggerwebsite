@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-acknowledgment";
 import {
   countRosterPieces,
+  approvedDesignsNeedPlayerChoice,
   itemLabel,
   sizeBreakdown,
   formatSize,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/order-items";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
 import { OrderSpecificationCard } from "@/components/order-specification-card";
+import { CustomerDeliveryChoice } from "@/components/customer-delivery-choice";
 import type { CustomerOrderSpec } from "@/lib/order-spec";
 
 type RosterRow = {
@@ -49,6 +51,8 @@ type Props = {
   lockMessage?: string | null;
   requiresNames?: boolean; // "names on the back?" survey answer
   minPieces?: number; // order minimum (6 default, cheer 12)
+  localPickup?: boolean;
+  rushShipping?: boolean;
   // True when this order came from an already-approved design (proof is done) -
   // so the post-submit next step is the 50% deposit invoice, not a proof.
   nextIsDeposit?: boolean;
@@ -75,12 +79,14 @@ function rowSizes(r: RosterRow, items: string[], sport?: string | null): string 
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, items, sport, designs = [], shareUrl, roster, submitted, colors, locked, lockMessage, requiresNames = true, minPieces = 6, quote, nextIsDeposit = false, designState = "approved", addonSlot, orderSpec }: Props) {
-  // >1 approved design -> show the "which design?" picker on every add/edit row.
-  const needsDesign = designs.length > 1;
+export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, items, sport, designs = [], shareUrl, roster, submitted, colors, locked, lockMessage, requiresNames = true, minPieces = 6, localPickup = false, rushShipping = false, quote, nextIsDeposit = false, designState = "approved", addonSlot, orderSpec }: Props) {
+  // Multiple colorways need a picker. Separate product mockups do not.
+  const needsDesign = approvedDesignsNeedPlayerChoice(designs, items);
   const soleDesign = designs.length === 1 ? designs[0].label : "";
   const nextStepCopy = nextIsDeposit
-    ? "We'll email your total and the 50% deposit invoice to start production."
+    ? rushShipping
+      ? "We'll email your total and the required pay-in-full invoice. Rush production starts after full payment."
+      : "We'll email your total and the 50% deposit invoice to start production."
     : "We'll email your total and a design proof to approve.";
   const hasJersey = items.some((key) => key.includes("jersey"));
   // Only the configurable all-sport jersey has a cut/fabric setting. Hockey,
@@ -102,6 +108,16 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
   const [confirmingSubmit, setConfirmingSubmit] = useState(false);
   const [submitAck, setSubmitAck] = useState(false);
   const [deliveryAck, setDeliveryAck] = useState(false);
+  const [pickupChoice, setPickupChoice] = useState(localPickup);
+  const confirmedOrderSpec: CustomerOrderSpec = {
+    ...orderSpec,
+    deliveryMethod: pickupChoice ? "Free local pickup in Ocala" : "Ship directly to me",
+    taxAndShipping: pickupChoice
+      ? "Tax is calculated on the invoice; local pickup has no shipping charge."
+      : rushShipping
+        ? "Tax is calculated on the invoice; direct shipping is included with Rush."
+        : "Tax and shipping are calculated separately on the invoice.",
+  };
 
   async function saveMaterial(value: string) {
     const previous = materialChoice;
@@ -209,7 +225,7 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
       const res = await fetch(`/api/team-order/${token}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deliveryTermsAccepted: true, specConfirmed: true }),
+        body: JSON.stringify({ localPickup: pickupChoice, deliveryTermsAccepted: true, specConfirmed: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not submit");
@@ -427,6 +443,15 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
               <RunningTotal quote={quote} />
             )}
 
+            <div className="mt-4">
+              <CustomerDeliveryChoice
+                localPickup={pickupChoice}
+                onChange={setPickupChoice}
+                rushShipping={rushShipping}
+                name="manage-order-delivery-method"
+              />
+            </div>
+
             {designState !== "approved" && (
               <div className="mt-4 border border-brand/60 bg-brand/[0.08] p-4" role="alert">
                 <p className="display text-foreground">
@@ -484,7 +509,7 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
                   <p className="mt-2 text-sm text-muted">This exact summary is saved with your order when you submit.</p>
 
                   <div className="mt-4">
-                    <OrderSpecificationCard spec={orderSpec} compact />
+                    <OrderSpecificationCard spec={confirmedOrderSpec} compact />
                   </div>
                   <label className="mt-4 flex items-start gap-2.5 text-sm text-foreground cursor-pointer select-none">
                     <input
@@ -515,7 +540,9 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
                       {status === "sending"
                         ? "Submitting…"
                         : nextIsDeposit
-                          ? "Confirm roster & receive deposit invoice"
+                          ? rushShipping
+                            ? "Confirm roster & receive pay-in-full invoice"
+                            : "Confirm roster & receive deposit invoice"
                           : "Confirm & submit order"}
                     </button>
                     <button

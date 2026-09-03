@@ -15,12 +15,13 @@ export const runtime = "nodejs";
 // Scopes columns and pulls only the LAST message per design for the list (jsonb
 // `-> -1`) so the listing never drags whole threads across the wire.
 export async function GET(req: Request) {
-  const gate = await requireApiRole("customer");
+  const gate = await requireApiRole("conversations");
   if (!gate.ok) return NextResponse.json({ error: gate.status === 403 ? "Forbidden" : "Unauthorized" }, { status: gate.status });
   if (!dbEnabled()) return NextResponse.json({ threads: [] });
 
   const db = getDb();
   const id = new URL(req.url).searchParams.get("id");
+  const restricted = gate.session.role === "designer";
 
   // ── One thread: full messages + reply credentials ──────────────────────
   if (id) {
@@ -30,12 +31,16 @@ export async function GET(req: Request) {
       id: d.id,
       reference: d.reference,
       teamName: d.teamName,
-      contactEmail: d.contactEmail,
-      contactPhone: d.contactPhone,
+      contactEmail: restricted ? null : d.contactEmail,
+      contactPhone: restricted ? null : d.contactPhone,
       status: d.status,
       manageToken: d.manageToken,
-      statusToken: d.statusToken,
-      messages: d.messages ?? [],
+      statusToken: restricted ? null : d.statusToken,
+      messages: (d.messages ?? []).map((message) =>
+        restricted && message.from === "client"
+          ? { ...message, name: "Customer" }
+          : message,
+      ),
     });
   }
 
@@ -62,7 +67,7 @@ export async function GET(req: Request) {
         id: r.id,
         reference: r.reference,
         teamName: r.teamName.trim(),
-        contactEmail: r.contactEmail,
+        contactEmail: restricted ? null : r.contactEmail,
         status: r.status,
         archived: Boolean(r.archivedAt),
         count: r.count,

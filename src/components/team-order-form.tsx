@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { SmsConsentNote } from "@/components/sms-consent";
 import {
+  approvedDesignsNeedPlayerChoice,
   ITEM_TYPES,
   fabricFor,
   fixedJerseyMaterialFor,
@@ -17,6 +18,7 @@ import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-ackno
 import { computeTeamOrderQuote, itemPriceCents } from "@/lib/team-order-pricing";
 import { buildCustomerOrderSpec } from "@/lib/order-spec";
 import { OrderSpecificationCard } from "@/components/order-specification-card";
+import { CustomerDeliveryChoice } from "@/components/customer-delivery-choice";
 
 const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Bowling Shirt (Camp Collar)", "Full Button", "Two Button", "Quarter-Zip"];
 const DEFAULT_JERSEY_STYLE = "Standard Crew Neck";
@@ -54,6 +56,7 @@ type DirectOrderDraft = {
   rows?: Row[];
   hatQty?: Record<string, Record<string, number>>;
   poloMaterial?: PoloMaterial;
+  localPickup?: boolean;
   smsOptIn?: boolean;
   flowStep?: FlowStep;
 };
@@ -136,6 +139,7 @@ function readDraft(value: string | null): DirectOrderDraft | null {
       rows: restoreRows(draft.rows),
       hatQty: restoreHatQty(draft.hatQty),
       smsOptIn: draft.smsOptIn === true,
+      localPickup: draft.localPickup === true,
       flowStep: isFlowStep(draft.flowStep) ? draft.flowStep : "team",
     };
   } catch {
@@ -183,12 +187,10 @@ function specialUniformKeyForSport(sport?: string | null): string | undefined {
 }
 
 export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
-  // Approved designs this team can pick from. More than one (e.g. Pin Daddy /
-  // Pin Mommy) turns on the per-row design picker so each size ties to the
-  // right artwork - the exact gap that used to force people into the notes box.
+  // Approved designs may be colorways players choose between or separate
+  // product mockups that all belong to the same order.
   const designs = prefill?.designs ?? [];
   const hasApprovedDesign = Boolean(prefill && designs.length > 0);
-  const needsDesign = designs.length > 1;
   const soleDesign = designs.length === 1 ? designs[0].label : "";
   const [mode, setMode] = useState<"manual" | "link">("manual");
   const [teamName, setTeamName] = useState(prefill?.teamName ?? "");
@@ -208,6 +210,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   // covers (a hoodie design pre-selects hoodie, not the jersey default).
   const [items, setItems] = useState<string[]>(initialItems);
   const [poloMaterial, setPoloMaterial] = useState<PoloMaterial>(initialPoloMaterial);
+  const needsDesign = approvedDesignsNeedPlayerChoice(designs, items);
   const [rows, setRows] = useState<Row[]>(() => [emptyRow(soleDesign), emptyRow(soleDesign), emptyRow(soleDesign)]);
   // Hats are ordered in bulk by size (not per player): { fitted_hat: { "S/M": 5 } }.
   const [hatQty, setHatQty] = useState<Record<string, Record<string, number>>>({});
@@ -221,6 +224,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [smsOptIn, setSmsOptIn] = useState(false);
   const [rosterAck, setRosterAck] = useState(false);
   const [deliveryAck, setDeliveryAck] = useState(false);
+  const [localPickup, setLocalPickup] = useState(false);
   const [flowStep, setFlowStep] = useState<FlowStep>("team");
   const [draftReady, setDraftReady] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
@@ -253,6 +257,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       if (isPoloMaterial(draft.poloMaterial)) setPoloMaterial(draft.poloMaterial);
       else if (draft.items?.includes("polo_pin_dot")) setPoloMaterial("pin-dot");
       setSmsOptIn(Boolean(draft.smsOptIn));
+      setLocalPickup(Boolean(draft.localPickup));
       setFlowStep(draft.flowStep ?? "team");
       setDraftRestored(true);
     }
@@ -275,6 +280,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       hatQty,
       poloMaterial,
       smsOptIn,
+      localPickup,
       flowStep,
     };
     try {
@@ -282,7 +288,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
     } catch {
       // The final submission path remains unchanged when storage is blocked.
     }
-  }, [contactEmail, contactName, contactPhone, draftReady, draftStorageKey, flowStep, hatQty, items, jerseyStyle, material, materialTouched, poloMaterial, rows, smsOptIn, status, teamName]);
+  }, [contactEmail, contactName, contactPhone, draftReady, draftStorageKey, flowStep, hatQty, items, jerseyStyle, localPickup, material, materialTouched, poloMaterial, rows, smsOptIn, status, teamName]);
 
   // Returning visitor prefill (browser-local). Skipped when the identity is
   // already locked from an approved design.
@@ -370,7 +376,11 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
     : "Sleeveless compression game shirt.";
   const additionalUniforms = otherJerseyItems.filter((item) => item.key !== designRecommendedUniformKey);
   const teamDetailsComplete = Boolean(prefill || (teamName.trim() && contactName.trim() && contactEmail.trim()));
-  const sizeGuideHref = /volleyball/i.test(prefill?.sport ?? "") ? "/size-guide#girls-volleyball" : "/size-guide#jerseys";
+  const sizeGuideHref = /basketball/i.test(prefill?.sport ?? "")
+    ? "/size-guide#basketball"
+    : /volleyball/i.test(prefill?.sport ?? "")
+      ? "/size-guide#girls-volleyball"
+      : "/size-guide#jerseys";
   const submissionRoster = [
     ...rows.map((row) => ({ ...row, quantity: 1 })),
     ...bulkRows(),
@@ -390,6 +400,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
     jerseyStyle: hasJersey ? jerseyStyle : null,
     jerseyMaterial: hasJersey ? effectiveMaterial : null,
     rushShipping: prefill?.rush ?? false,
+    localPickup,
     requestedInHandAt: prefill?.neededBy ? new Date(`${prefill.neededBy}T12:00:00`) : null,
   };
   const submissionQuote = computeTeamOrderQuote(submissionOrder, submissionRosterForPricing);
@@ -416,7 +427,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items: resolvedItems, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn, deliveryTermsAccepted: true, specConfirmed: true }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items: resolvedItems, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn, localPickup, deliveryTermsAccepted: true, specConfirmed: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
@@ -434,7 +445,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items: resolvedItems, designToken: prefill?.designToken, smsConsent: smsOptIn }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items: resolvedItems, designToken: prefill?.designToken, smsConsent: smsOptIn, localPickup }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create link");
@@ -834,6 +845,13 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
         </section>
       )}
 
+      <CustomerDeliveryChoice
+        localPickup={localPickup}
+        onChange={setLocalPickup}
+        rushShipping={prefill?.rush ?? false}
+        name="team-order-delivery-method"
+      />
+
       {/* Manual roster mode */}
       {mode === "manual" && flowStep === "roster" && (
         <>
@@ -981,7 +999,9 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
           </div>
           <p className="text-xs text-muted">
             {hasApprovedDesign
-              ? "No payment now - we'll email your total and 50% deposit invoice."
+              ? prefill?.rush
+                ? "No payment now - we'll email your total and required Rush pay-in-full invoice."
+                : "No payment now - we'll email your total and 50% deposit invoice."
               : "Need to collect sizes first? Choose “Let players enter their own” above to create a draft roster link."}
           </p>
           <p className="text-xs text-muted">⏱ Working toward a deadline? Order as early as you can and build in a buffer. We push hard to hit every date, but carrier and shipping delays can happen and are outside our control - if your date is firm, tell us before you order and we&apos;ll be straight with you about it.</p>

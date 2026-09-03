@@ -537,8 +537,8 @@ export const teamOrders = pgTable(
     // Two-stage invoicing: a 50% deposit starts production; the balance is
     // collected when the order is ready. Each is a one-time Stripe Payment
     // Link; payment lands via webhook.
-    invoiceUrl: text("invoice_url"), // deposit link
-    fullInvoiceUrl: text("full_invoice_url"), // optional pay-in-full link (sibling of deposit)
+    invoiceUrl: text("invoice_url"), // starting link: Standard deposit or required Rush pay-in-full
+    fullInvoiceUrl: text("full_invoice_url"), // pay-in-full link (same as invoiceUrl for Rush; optional sibling for Standard)
     depositCents: integer("deposit_cents"),
     depositPaidAt: timestamp("deposit_paid_at", { withTimezone: true }),
     balanceInvoiceUrl: text("balance_invoice_url"),
@@ -1077,11 +1077,12 @@ export const smsMessages = pgTable(
 //   owner    - everything, including user management
 //   staff    - everything except user management
 //   designer - design work only (no money, customers, or store pages)
+//   follow_up - call queue + Conversations only
 // The ADMIN_PASSWORD env var remains the built-in owner login.
 export const adminUsers = pgTable("admin_users", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
-  role: text("role").notNull().default("staff"), // owner | staff | designer
+  role: text("role").notNull().default("staff"), // owner | staff | designer | follow_up
   passwordHash: text("password_hash").notNull(), // scrypt "salt:hex"
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -1124,8 +1125,20 @@ export const smsContacts = pgTable("sms_contacts", {
   starredAt: timestamp("starred_at", { withTimezone: true }),
   archivedAt: timestamp("archived_at", { withTimezone: true }),
   lastReadAt: timestamp("last_read_at", { withTimezone: true }),
+  // Human follow-up state for the call queue. The actual note history lives
+  // in sms_messages as internal notes so it is also visible in Conversations.
+  followUpStatus: text("follow_up_status"), // active | scheduled | needs_gary | closed | archived | do_not_call
+  nextFollowUpAt: timestamp("next_follow_up_at", { withTimezone: true }),
+  followUpUpdatedAt: timestamp("follow_up_updated_at", { withTimezone: true }),
+  followUpUpdatedBy: text("follow_up_updated_by"),
+  // Durable manual opt-out. Unlike a snooze or closed lead, this number never
+  // returns to the generated call list until an owner/staff member reopens it.
+  doNotCallAt: timestamp("do_not_call_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [uniqueIndex("sms_contacts_phone_idx").on(t.phone)]);
+}, (t) => [
+  uniqueIndex("sms_contacts_phone_idx").on(t.phone),
+  index("sms_contacts_follow_up_idx").on(t.followUpStatus, t.nextFollowUpAt),
+]);
 
 // Every design-lab render, linked to the visitor who made it - powers the
 // /admin/design-lab leads page (see what each lead was designing).

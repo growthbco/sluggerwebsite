@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 
 export type Unpaid = {
   key: string;
-  kind: "Deposit" | "Final balance" | "Add-on" | "Custom invoice";
+  kind: "Deposit" | "Full payment" | "Final balance" | "Add-on" | "Custom invoice";
   customer: string;
   email: string | null;
   ref: string;
@@ -16,7 +16,7 @@ export type Unpaid = {
   payUrl: string | null;
   href: string | null; // where the row opens (order page, or pay page for custom)
   invoiceId?: string; // custom invoices only - enables Void
-  sendInvoice?: { orderId: string; stage: "deposit" | "balance"; ship: "auto" | "pickup" }; // final invoice not sent yet
+  sendInvoice?: { orderId: string; stage: "deposit" | "balance"; ship: "auto" | "pickup"; rushShipping?: boolean }; // final invoice not sent yet
   teamOrderId?: string;
   canMarkUnresponsive?: boolean;
 };
@@ -27,6 +27,7 @@ const daysSince = (iso: string, now: number) => Math.max(0, Math.floor((now - ne
 
 const KIND_TONE: Record<Unpaid["kind"], string> = {
   Deposit: "border-sky-500/30 text-sky-300 bg-sky-500/10",
+  "Full payment": "border-violet-500/30 text-violet-300 bg-violet-500/10",
   "Final balance": "border-amber-500/30 text-amber-300 bg-amber-500/10",
   "Add-on": "border-brand/30 text-brand bg-brand/10",
   "Custom invoice": "border-violet-500/30 text-violet-300 bg-violet-500/10",
@@ -38,6 +39,7 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: "all", label: "All invoice types" },
   { value: "follow-up", label: "Needs follow-up (7+ days)" },
   { value: "Deposit", label: "Deposits" },
+  { value: "Full payment", label: "Full payments" },
   { value: "Final balance", label: "Final balances" },
   { value: "Add-on", label: "Add-ons" },
   { value: "Custom invoice", label: "Custom invoices" },
@@ -85,7 +87,12 @@ export function AdminAwaitingList({ items, generatedAtISO }: { items: Unpaid[]; 
 
   async function sendFinalInvoice(it: Unpaid) {
     if (!it.sendInvoice) return;
-    if (!confirm(`Send the final balance invoice for ${it.customer} (${it.ref})? It emails the coach a pay link${it.sendInvoice.ship === "auto" ? " with live shipping added" : " (local pickup, no shipping)"}.`)) return;
+    const deliveryMessage = it.sendInvoice.rushShipping
+      ? " Rush shipping is already included, so no extra shipping charge will be added."
+      : it.sendInvoice.ship === "auto"
+        ? " It emails the coach a pay link with live shipping added."
+        : " This is local pickup, so no shipping will be added.";
+    if (!confirm(`Send the final balance invoice for ${it.customer} (${it.ref})?${deliveryMessage}`)) return;
     setSending(it.key);
     try {
       const res = await fetch("/api/admin/team-order/invoice", {

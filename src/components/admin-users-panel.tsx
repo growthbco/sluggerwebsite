@@ -7,7 +7,8 @@ type User = { id: string; name: string; role: string; active: boolean; createdAt
 const ROLE_DESC: Record<string, string> = {
   owner: "Everything, including this settings page",
   staff: "Everything except user management",
-  designer: "Restricted design and production portal - no customer contacts, inboxes, addresses, payments, or store data",
+  designer: "Design, production, and Conversations - no customer financials, addresses, calls, or store data",
+  follow_up: "Assigned call queue, contact notes, and the outbound shop softphone only",
 };
 
 /** Owner-only user manager: each person gets their OWN password (that's how
@@ -81,6 +82,7 @@ export function AdminUsersPanel() {
             className="bg-background border border-line px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
           />
           <select value={role} onChange={(e) => setRole(e.target.value)} className="bg-background border border-line px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none">
+            <option value="follow_up">Follow-up VA</option>
             <option value="designer">Designer</option>
             <option value="staff">Staff</option>
             <option value="owner">Owner</option>
@@ -129,6 +131,7 @@ export function AdminUsersPanel() {
                   onChange={(e) => call("PUT", { id: u.id, role: e.target.value }, `${u.name} is now ${e.target.value}.`)}
                   className="bg-background border border-line px-2 py-1 text-xs text-foreground"
                 >
+                  <option value="follow_up">Follow-up VA</option>
                   <option value="designer">Designer</option>
                   <option value="staff">Staff</option>
                   <option value="owner">Owner</option>

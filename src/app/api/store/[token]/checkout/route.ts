@@ -159,7 +159,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       const nm = (item.playerName ?? "").trim().slice(0, 30);
       if (nm) details.push(`(for ${nm} - not printed)`);
     }
-    if (def.key === "fitted_hat" || def.key === "snapback_hat") hatOz += def.weightOz * qty;
+    if (def.key === "fitted_hat" || def.key === "snapback_hat" || def.key === "performance_hat") hatOz += def.weightOz * qty;
     else apparelOz += def.weightOz * qty;
     lineItems.push({
       quantity: qty,

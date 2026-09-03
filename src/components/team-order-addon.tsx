@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { isOneSizeList, itemLabel, sizesFor, itemTakesName } from "@/lib/order-items";
+import { approvedDesignsNeedPlayerChoice, isOneSizeList, itemLabel, sizesFor, itemTakesName } from "@/lib/order-items";
 
 type Line = { key: string; size: string; name: string; number: string; design: string; quantity: number };
 
@@ -34,7 +34,7 @@ export function TeamOrderAddon({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [zoom, setZoom] = useState<string | null>(null);
-  const needsDesign = designs.length > 1;
+  const needsDesign = approvedDesignsNeedPlayerChoice(designs, items);
   // Hats/caps are sized, not personalized - hide the name/# fields for them.
   const needsName = itemTakesName(draft.key);
   const draftSizes = sizesFor(draft.key, sport);

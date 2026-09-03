@@ -39,6 +39,9 @@ export type NewTeamOrder = {
   discordThreadId?: string;
   // Inherited from a rush design request: flags the flat $100 rush fee.
   rushShipping?: boolean;
+  /** Customer-selected fulfillment method. Local pickup never carries a
+   * shipping charge or requires a delivery address. */
+  localPickup?: boolean;
   /** Explicit timeline facts for an order entered by staff rather than the
    * customer workflow. All fields are validated together upstream. */
   manualTimeline?: {
@@ -178,6 +181,7 @@ export async function createTeamOrder(input: NewTeamOrder) {
       whiteLabel: input.whiteLabel ?? false,
       discordThreadId: input.discordThreadId,
       rushShipping: input.rushShipping ?? false,
+      localPickup: input.localPickup ?? false,
       manualEntryAt: input.manualTimeline ? new Date() : undefined,
       timelineStartAt: input.manualTimeline?.startAt,
       turnaroundTier: input.manualTimeline?.tier,

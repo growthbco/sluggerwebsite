@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { autoInvoiceOnSubmit } from "@/lib/team-order-invoicing";
-import { dbEnabled } from "@/db";
+import { dbEnabled, getDb } from "@/db";
+import { teamOrders } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { getByManageToken, getRoster, submitTeamOrder, ensureTeamOrderDiscordThread } from "@/lib/team-orders";
 import { minPiecesForItems, missingCheerSizeLabels } from "@/lib/order-items";
 import { postTeamOrderToDiscord } from "@/lib/discord";
@@ -22,10 +24,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   let deliveryTermsAccepted = false;
   let specConfirmed = false;
+  let requestedLocalPickup: boolean | undefined;
   try {
     const body = await req.json();
     deliveryTermsAccepted = body.deliveryTermsAccepted === true;
     specConfirmed = body.specConfirmed === true;
+    requestedLocalPickup = typeof body.localPickup === "boolean" ? body.localPickup : undefined;
   } catch {
     // A missing/invalid body cannot count as an affirmative acceptance.
   }
@@ -77,6 +81,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   }
 
   try {
+    const localPickup = requestedLocalPickup ?? order.localPickup;
+    if (localPickup !== order.localPickup) {
+      await getDb()
+        .update(teamOrders)
+        .set({ localPickup, shippingChargedCents: null, updatedAt: new Date() })
+        .where(eq(teamOrders.id, order.id));
+    }
+    const orderForSubmission = { ...order, localPickup };
     const preview = design
       ? {
           neededBy: design.neededBy,
@@ -87,7 +99,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
           })),
         }
       : null;
-    const spec = buildCustomerOrderSpec(order, roster, preview, computeTeamOrderQuote(order, roster));
+    const spec = buildCustomerOrderSpec(orderForSubmission, roster, preview, computeTeamOrderQuote(orderForSubmission, roster));
     await submitTeamOrder(order.id, new Date(), spec);
     // Linked orders post into the design's existing thread (one project, one
     // thread); standalone orders get their own thread in the same forum.
@@ -103,6 +115,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         jerseyStyle: order.jerseyStyle ?? undefined,
         jerseyMaterial: order.jerseyMaterial ?? undefined,
         items: order.items ?? ["jersey"],
+        localPickup,
         designImages: design ? approvedMockupImages(design) : undefined,
         whiteLabel: order.whiteLabel,
         roster: roster.map((r) => ({

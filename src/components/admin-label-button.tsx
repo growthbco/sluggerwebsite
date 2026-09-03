@@ -37,6 +37,7 @@ export function AdminLabelButton({
   who,
   suggestedLb,
   additional = false,
+  autoShipOnBuy = false,
   label,
 }: {
   kind: "team_order" | "order";
@@ -47,6 +48,9 @@ export function AdminLabelButton({
    *  this tracking immediately (vs the primary label, which waits for
    *  "Mark shipped"). */
   additional?: boolean;
+  /** Team-store checkout orders ship as soon as their outbound label is
+   * bought, so the API marks fulfilled and sends tracking in the same step. */
+  autoShipOnBuy?: boolean;
   label?: string;
 }) {
   const router = useRouter();
@@ -141,6 +145,12 @@ export function AdminLabelButton({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Purchase failed");
       window.open(data.labelUrl, "_blank");
+      if (data.warning) {
+        setConfirming(null);
+        setError(data.warning);
+        router.refresh();
+        return;
+      }
       reset();
       router.refresh();
     } catch (e) {
@@ -275,7 +285,13 @@ export function AdminLabelButton({
                     {confirming.insuranceCostCents > 0 && (
                       <p className="text-xs text-green-400 mt-1">XCover attached for {money(Math.round((parseFloat(insuredValue) || 0) * 100))} of merchandise.</p>
                     )}
-                    <p className="text-xs text-muted mt-1">{additional ? "Charges your Shippo account and emails the customer this tracking right away as a second package." : "Charges your Shippo account and saves the label + tracking. The customer isn\u2019t emailed until you hit \u201cMark shipped.\u201d"}</p>
+                    <p className="text-xs text-muted mt-1">
+                      {additional
+                        ? "Charges your Shippo account and emails the customer this tracking right away as a second package."
+                        : autoShipOnBuy
+                          ? "Charges your Shippo account, marks this store order shipped, and immediately sends the customer their tracking."
+                          : "Charges your Shippo account and saves the label + tracking. The customer isn’t emailed until you hit “Mark shipped.”"}
+                    </p>
                   </div>
                   <button
                     type="button"

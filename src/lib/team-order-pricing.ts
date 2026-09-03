@@ -114,8 +114,12 @@ export const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Bowling Shirt (Ca
 
 export function jerseyPriceCents(jerseyStyle?: string | null, localPricing?: boolean | null, material?: string | null): number {
   const s = (jerseyStyle ?? "").toLowerCase();
-  // Bowling shirts are cut in a pricier microfiber, so the camp-collar
-  // bowling shirt is $42 rather than the standard button-front price.
+  // A reversible basketball uniform is advertised at $85 with shorts. Roster
+  // rows size each piece separately, so the jersey carries $60 and the shorts
+  // line supplies the remaining $25.
+  if ((material ?? "").toLowerCase() === "reversible") return 6000;
+  // Bowling shirts are cut in pricier microfiber: camp-collar bowling shirts
+  // and microfiber full-button bowling shirts are both $42.
   const microfiber = (material ?? "").toLowerCase() === "microfiber";
   if (s.includes("bowl")) return 4200;
   if (s.includes("full") && microfiber) return 4200;

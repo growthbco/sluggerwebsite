@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { teamName?: string; contactName?: string; contactEmail?: string; contactPhone?: string; smsConsent?: boolean; sport?: string; jerseyStyle?: string; jerseyMaterial?: string; items?: string[]; designToken?: string };
+  let body: { teamName?: string; contactName?: string; contactEmail?: string; contactPhone?: string; smsConsent?: boolean; sport?: string; jerseyStyle?: string; jerseyMaterial?: string; items?: string[]; designToken?: string; localPickup?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -88,6 +88,7 @@ export async function POST(req: Request) {
             jerseyMaterial: selectedMaterial ?? existing.jerseyMaterial,
             items: body.items?.length ? body.items : existing.items,
             whiteLabel: whiteLabelFromDesign || existing.whiteLabel,
+            localPickup: body.localPickup === true,
             updatedAt: new Date(),
           })
           .where(eq(teamOrders.id, existing.id));
@@ -115,6 +116,7 @@ export async function POST(req: Request) {
       whiteLabel: whiteLabelFromDesign,
       discordThreadId,
       rushShipping: rushFromDesign,
+      localPickup: body.localPickup === true,
       smsOptIn: body.smsConsent === true && Boolean(contactPhone),
     });
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";

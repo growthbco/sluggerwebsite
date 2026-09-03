@@ -5,6 +5,7 @@ import { SPORT_PAGES, type SportPage } from "@/lib/sport-pages";
 import { SERVICE_AREAS } from "@/lib/service-areas";
 import { galleryPhotos } from "@/lib/gallery";
 import { BUNDLES, formatDollars } from "@/lib/pricing";
+import { BASKETBALL_ADULT, BASKETBALL_YOUTH, ChartTable } from "@/components/size-charts";
 
 const SPORT_HERO_IMAGES: Record<string, string> = {
   "custom-cheer-uniforms": "/sports/generated/cheer-sa-catalog.png",
@@ -25,6 +26,7 @@ const SPORT_HERO_IMAGES: Record<string, string> = {
 // two funnel CTAs. Shared by all /custom-<sport>-* pages.
 export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; photoOffset?: number }) {
   const isCheer = page.slug === "custom-cheer-uniforms";
+  const hasBasketballChart = page.slug === "custom-basketball-uniforms";
   const heroImage = SPORT_HERO_IMAGES[page.slug];
   const startingPrice = page.pricing?.[0];
   const heroHighlights = isCheer
@@ -102,6 +104,11 @@ export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; 
             <Link href="/custom-jersey-maker" className="border border-brand/70 text-brand hover:bg-brand/10 display px-6 py-3 transition-colors">
               ⚡ Try the AI Design Lab
             </Link>
+            {hasBasketballChart && (
+              <Link href="#basketball-size-chart" className="border border-line text-foreground hover:border-brand/60 display px-6 py-3 transition-colors">
+                View Size Chart
+              </Link>
+            )}
           </div>
         </div>
         {heroImage && (
@@ -173,6 +180,28 @@ export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; 
           ))}
         </div>
       </section>
+
+      {hasBasketballChart && (
+        <section id="basketball-size-chart" className="mt-14 scroll-mt-32">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="display text-3xl text-foreground">Youth &amp; Adult Basketball Size Chart</h2>
+              <p className="mt-2 max-w-2xl text-muted">Measure a well-fitting jersey across the chest 1&quot; below the armhole, then from the highest shoulder point to the bottom hem.</p>
+            </div>
+            <Link href="/size-guide#basketball" className="text-sm text-brand hover:underline">View full size guide →</Link>
+          </div>
+          <div className="mt-5 grid gap-6 md:grid-cols-2">
+            <div>
+              <h3 className="display text-sm text-brand mb-2">Youth</h3>
+              <ChartTable headers={["Size", "Width", "Length"]} rows={BASKETBALL_YOUTH} />
+            </div>
+            <div>
+              <h3 className="display text-sm text-brand mb-2">Adult</h3>
+              <ChartTable headers={["Size", "Width", "Length"]} rows={BASKETBALL_ADULT} />
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Pricing strip */}
       <section className="mt-14 bg-steel border border-line p-6">

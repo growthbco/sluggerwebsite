@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatSize, isOneSizeField, missingCheerSizeLabels, sizeFieldsForItems } from "@/lib/order-items";
+import { approvedDesignsNeedPlayerChoice, formatSize, isOneSizeField, missingCheerSizeLabels, sizeFieldsForItems } from "@/lib/order-items";
 
 export function SelfEntryForm({ token, items, sport, designs = [], requiresNames = true }: { token: string; items: string[]; sport?: string | null; designs?: { label: string; image: string; sku?: string | null }[]; requiresNames?: boolean }) {
   const [name, setName] = useState("");
@@ -26,7 +26,7 @@ export function SelfEntryForm({ token, items, sport, designs = [], requiresNames
 
   const hasSize = Object.values(sizes).some(Boolean);
   const missingCheerSizes = missingCheerSizeLabels(items, sizes);
-  const needsDesign = designs.length > 1;
+  const needsDesign = approvedDesignsNeedPlayerChoice(designs, items);
   const canSubmit = hasSize && missingCheerSizes.length === 0 && (!needsDesign || picked.length > 0);
 
   async function submit() {
@@ -65,7 +65,7 @@ export function SelfEntryForm({ token, items, sport, designs = [], requiresNames
 
   return (
     <div className="space-y-4">
-      {designs.length > 1 && (
+      {needsDesign && (
         <div>
           <label className="display text-sm text-foreground">Pick your design <span className="text-brand">*</span> <span className="text-muted normal-case">(tap more than one to get a set of each)</span></label>
           <div className="mt-2 flex flex-wrap gap-2">

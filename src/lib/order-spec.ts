@@ -18,6 +18,7 @@ export type CustomerOrderSpec = {
   serviceLevel: "Standard" | "Rush" | "Priority";
   productionWindow: string;
   requestedInHandDate: string | null;
+  deliveryMethod: "Ship directly to me" | "Free local pickup in Ocala";
   athleteCount: number;
   pieceCount: number;
   sizes: { label: string; parts: { size: string; quantity: number }[] }[];
@@ -25,7 +26,7 @@ export type CustomerOrderSpec = {
   rushFeeCents: number;
   priorityFeeCents: number;
   merchandiseSubtotalCents: number;
-  taxAndShipping: "Calculated separately on the invoice";
+  taxAndShipping: string;
 };
 
 type SpecOrder = {
@@ -36,6 +37,7 @@ type SpecOrder = {
   jerseyMaterial?: string | null;
   turnaroundTier?: string | null;
   rushShipping?: boolean | null;
+  localPickup?: boolean | null;
   requestedInHandAt?: Date | null;
   approvedDesignUrl?: string | null;
 };
@@ -110,6 +112,7 @@ export function buildCustomerOrderSpec(
     ).map(({ label, image }) => ({ label, image })),
     ...service,
     requestedInHandDate: dateOnly(order.requestedInHandAt ?? design?.neededBy),
+    deliveryMethod: order.localPickup ? "Free local pickup in Ocala" : "Ship directly to me",
     athleteCount: athletes.size,
     pieceCount: countRosterPieces(roster, items),
     sizes: sizeBreakdown(roster, items, order.sport).map((entry) => ({
@@ -120,6 +123,10 @@ export function buildCustomerOrderSpec(
     rushFeeCents: quote.rushFeeCents,
     priorityFeeCents: quote.priorityFeeCents,
     merchandiseSubtotalCents: quote.totalCents,
-    taxAndShipping: "Calculated separately on the invoice",
+    taxAndShipping: order.localPickup
+      ? "Tax is calculated on the invoice; local pickup has no shipping charge."
+      : order.rushShipping
+        ? "Tax is calculated on the invoice; direct shipping is included with Rush."
+        : "Tax and shipping are calculated separately on the invoice.",
   };
 }

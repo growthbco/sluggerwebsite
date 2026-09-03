@@ -47,6 +47,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
   const design = await getLinkedDesignPreview(order.designRequestId);
   const orderItems = order.items ?? ["jersey"];
   const hasJersey = orderItems.some((item) => item.includes("jersey"));
+  const isBasketball = /basketball/i.test(order.sport ?? "");
 
   return (
     <div className="mx-auto max-w-lg px-4 sm:px-6 py-14">
@@ -89,7 +90,9 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
         </summary>
         <div className="px-4 pb-5">
           <p className="text-sm text-muted mb-4">
-            {hasJersey
+            {isBasketball
+              ? "All measurements are in inches. Use the basketball-specific chart for this uniform."
+              : hasJersey
               ? "All measurements in inches. Jerseys run slightly large - when in doubt, size down."
               : "All measurements are in inches. Use the chart for the items in this order."}
           </p>

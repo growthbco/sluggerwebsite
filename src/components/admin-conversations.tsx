@@ -13,12 +13,18 @@ export function AdminConversations({
   initialTab = "texts",
   initialPhone,
   initialName,
+  initialEmail,
   initialOpen,
+  currentUserName,
+  restricted = false,
 }: {
   initialTab?: Tab;
   initialPhone?: string;
   initialName?: string;
+  initialEmail?: string;
   initialOpen?: string;
+  currentUserName: string;
+  restricted?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
 
@@ -58,10 +64,16 @@ export function AdminConversations({
         <AdminTextsInbox
           initialPhone={initialPhone}
           initialName={initialName}
+          restricted={restricted}
         />
       </div>
       <div className={tab === "email" ? "" : "hidden"}>
-        <AdminEmailInbox initialOpen={initialOpen} />
+        <AdminEmailInbox
+          initialOpen={initialOpen}
+          initialEmail={initialEmail}
+          currentUserName={currentUserName}
+          restricted={restricted}
+        />
       </div>
     </div>
   );

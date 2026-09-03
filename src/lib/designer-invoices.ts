@@ -176,6 +176,7 @@ export function designerCostCents(label: string, material?: string | null, sport
   if (/full[\s-]?button/.test(s)) return bowling || microfiber ? 2100 : 1400;
   if (/two[\s-]?button/.test(s)) return 1300;
   if (/long[\s-]?sleeve/.test(s)) return 1200;
+  if (/polo/.test(s)) return 1400; // Dri-Fit and Pin-Dot polos
   if (/dri[\s-]?fit|dry[\s-]?fit|practice/.test(s)) return 1100;
   if (/light.*hoodie|lightweight/.test(s)) return 1800; // lightweight hoodie (historical)
   if (/hoodie/.test(s)) return 2400; // heavyweight hoodie

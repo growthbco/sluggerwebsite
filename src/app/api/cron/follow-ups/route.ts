@@ -118,7 +118,7 @@ export async function GET(req: Request) {
         await recordInvoiceReminder(c.id);
         await sendFollowUpSms({
           phone: c.contactPhone,
-          body: `Slugger Athletics reminder: the ${c.stage === "deposit" ? "50% deposit" : "final balance"} for ${c.teamName} (${c.reference}) is still unpaid. Pay here: ${c.payUrl}\nReply STOP to opt out.`,
+          body: `Slugger Athletics reminder: the ${c.stage === "full" ? "required full payment for your Rush order" : c.stage === "deposit" ? "50% deposit" : "final balance"} for ${c.teamName} (${c.reference}) is still unpaid. Pay here: ${c.payUrl}\nReply STOP to opt out.`,
         });
       }
       invoiceResults.push({ reference: c.reference, team: c.teamName, stage: c.stage, round, sent });
@@ -205,11 +205,12 @@ export async function GET(req: Request) {
         const res = await sendTeamOrderInvoice({ teamOrderId: o.id, stage: "deposit" });
         stuckInvoiceResults.push({ reference: o.reference, team: o.teamName, sent: res.ok, error: res.ok ? undefined : res.error });
         if (res.ok) {
+          const paymentLabel = res.stage === "full" ? "required full payment" : "deposit";
           const threadId = await ensureTeamOrderDiscordThread(o.id);
           await postDesignThreadUpdate({
             threadId: threadId ?? undefined,
-            title: `🧾 Safety net: sent the missing deposit invoice - ${o.teamName} (${o.reference})`,
-            description: `This order was submitted but never got its auto-invoice. It has now been sent (${money(res.dueCents)} deposit of ${money(res.totalCents)}).`,
+            title: `🧾 Safety net: sent the missing ${res.stage === "full" ? "Rush pay-in-full" : "deposit"} invoice - ${o.teamName} (${o.reference})`,
+            description: `This order was submitted but never got its auto-invoice. It has now been sent (${money(res.dueCents)} ${paymentLabel} on a ${money(res.totalCents)} order).`,
             username: "Slugger Design Requests",
           });
         }

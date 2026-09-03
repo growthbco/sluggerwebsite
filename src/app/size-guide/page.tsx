@@ -7,6 +7,8 @@ import {
   CheerSizingNotes,
   JERSEYS_ADULT,
   JERSEYS_YOUTH,
+  BASKETBALL_ADULT,
+  BASKETBALL_YOUTH,
   VOLLEYBALL_GIRLS_ADULT,
   VOLLEYBALL_GIRLS_YOUTH,
   CHEER_SET,
@@ -20,9 +22,9 @@ import {
 
 export const metadata: Metadata = {
   alternates: { canonical: "/size-guide" },
-  title: "Size Guide - Jerseys, Cheer, Volleyball, Hoodies & Pants",
+  title: "Size Guide - Basketball, Jerseys, Cheer, Volleyball & More",
   description:
-    "Sizing charts for Slugger Athletics custom jerseys, cheer uniforms, girls volleyball jerseys, hoodies, and pants.",
+    "Youth and adult sizing charts for Slugger Athletics basketball uniforms, custom jerseys, cheer uniforms, girls volleyball jerseys, hoodies, and pants.",
 };
 
 function getUploadedCharts(): { file: string; title: string }[] {
@@ -46,13 +48,14 @@ export default function SizeGuidePage() {
         <span className="display text-brand text-sm">Sizing</span>
         <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">Size Guide</h1>
         <p className="mt-3 text-muted">
-          All measurements are in inches. Our jerseys have a relaxed fit and run slightly large - when in doubt, size down or reach out and we&apos;ll help.
+          All measurements are in inches. Use the product-specific chart whenever one is listed, and reach out if you want help comparing measurements.
         </p>
       </header>
 
       <nav className="mt-6 flex flex-wrap gap-2" aria-label="Size chart sections">
         {[
           ["#jerseys", "Jerseys"],
+          ["#basketball", "Basketball"],
           ["#girls-volleyball", "Girls' Volleyball"],
           ["#cheer", "Cheer"],
           ["#hoodies", "Hoodies"],
@@ -76,6 +79,23 @@ export default function SizeGuidePage() {
             <div>
               <h3 className="display text-sm text-brand mb-2">Youth</h3>
               <ChartTable headers={["Size", "Width", "Length"]} rows={JERSEYS_YOUTH} />
+            </div>
+          </div>
+        </section>
+
+        <section id="basketball" className="scroll-mt-32">
+          <h2 className="display text-2xl text-foreground">Basketball Uniforms</h2>
+          <p className="mt-2 max-w-2xl text-sm text-muted">
+            Use this chart for our sleeveless basketball jerseys and uniform tops. Width is measured across the chest 1&quot; below the armhole. Length is measured from the highest shoulder point to the bottom hem.
+          </p>
+          <div className="mt-5 grid gap-6 md:grid-cols-2">
+            <div>
+              <h3 className="display text-sm text-brand mb-2">Youth</h3>
+              <ChartTable headers={["Size", "Width", "Length"]} rows={BASKETBALL_YOUTH} />
+            </div>
+            <div>
+              <h3 className="display text-sm text-brand mb-2">Adult</h3>
+              <ChartTable headers={["Size", "Width", "Length"]} rows={BASKETBALL_ADULT} />
             </div>
           </div>
         </section>
@@ -106,7 +126,7 @@ export default function SizeGuidePage() {
           </div>
         </section>
 
-        <section>
+        <section id="hoodies" className="scroll-mt-32">
           <h2 className="display text-2xl text-foreground">Hoodies</h2>
           <div className="mt-4 max-w-md">
             <ChartTable headers={["Size", "Width", "Length"]} rows={HOODIES} />
