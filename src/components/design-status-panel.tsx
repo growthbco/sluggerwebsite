@@ -50,9 +50,15 @@ export function DesignStatusPanel({
   const [currentStatus, setCurrentStatus] = useState(status);
   // Multi-select: a project can have several finals (jersey, hat, pants, or a
   // few practice jerseys), so the client can pick more than one to approve.
-  const [selected, setSelected] = useState<string[]>(
-    initialApprovedUrl ? [initialApprovedUrl] : proofImages.length === 1 ? [proofImages[0]] : [],
-  );
+  const [selected, setSelected] = useState<string[]>(() => {
+    const alreadyApproved = approvedUrls.filter((url) => proofImages.includes(url));
+    if (alreadyApproved.length) return alreadyApproved;
+    return initialApprovedUrl && proofImages.includes(initialApprovedUrl)
+      ? [initialApprovedUrl]
+      : proofImages.length === 1
+        ? [proofImages[0]]
+        : [];
+  });
   // The proof the change-request editor / lightbox act on (last one tapped).
   const [activeProof, setActiveProof] = useState<string>(
     initialApprovedUrl ?? proofImages[proofImages.length - 1] ?? "",
@@ -171,6 +177,11 @@ export function DesignStatusPanel({
               {proofImages.length > 1
                 ? "Tap each proof you want to approve (you can pick more than one). Use the magnifier to enlarge."
                 : "Tap the proof to select it, then approve or request changes."}
+            </p>
+          )}
+          {!isApproved && approvedUrls.some((url) => proofImages.includes(url)) && (
+            <p className="mt-2 text-xs text-muted">
+              Earlier approved pieces are already selected. Choose any new proof you want to add, then confirm the full set below.
             </p>
           )}
           {isJerseyProject && (

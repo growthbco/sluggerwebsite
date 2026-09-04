@@ -15,12 +15,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   const request = await getByStatusToken(token);
   if (!request) return NextResponse.json({ error: "Link not found" }, { status: 404 });
-  if (request.status === "approved" || request.status === "ordered") {
-    return NextResponse.json({ ok: true, alreadyApproved: true });
-  }
   const reviewProofs = request.proofReviewUrls?.length ? request.proofReviewUrls : request.proofImages ?? [];
   if (!reviewProofs.length) {
     return NextResponse.json({ error: "There's no proof to approve yet." }, { status: 400 });
+  }
+  const existingApproved = request.approvedDesignUrls ?? (request.approvedDesignUrl ? [request.approvedDesignUrl] : []);
+  if ((request.status === "approved" || request.status === "ordered") && reviewProofs.every((url) => existingApproved.includes(url))) {
+    return NextResponse.json({ ok: true, alreadyApproved: true });
   }
 
   let body: { approvedUrl?: string; approvedUrls?: string[] } = {};

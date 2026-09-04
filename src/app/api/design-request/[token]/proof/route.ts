@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     return NextResponse.json({ error: `A new proof cannot be sent after production is funded. ${productionLock}` }, { status: 409 });
   }
 
-  let body: { urls?: string[]; labels?: Record<string, string> };
+  let body: { urls?: string[]; labels?: Record<string, string>; replaceCurrentReview?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -35,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   }
 
   try {
-    await addProofImages(request.id, urls, body.labels);
+    await addProofImages(request.id, urls, body.labels, { replaceCurrentReview: body.replaceCurrentReview === true });
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const statusUrl = `${SITE}/design/status/${request.statusToken}`;
 

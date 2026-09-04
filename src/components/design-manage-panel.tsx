@@ -93,6 +93,7 @@ export function DesignManagePanel({
   const [posting, setPosting] = useState(false);
   const [pending, setPending] = useState<string[]>([]);
   const [pendingLabels, setPendingLabels] = useState<string[]>([]);
+  const [replaceCurrentReview, setReplaceCurrentReview] = useState(false);
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
   const [rushOk, setRushOk] = useState<{ by: string } | null>(rushApprovedAt ? { by: rushApprovedBy ?? "staff" } : null);
@@ -173,7 +174,7 @@ export function DesignManagePanel({
       const res = await fetch(`/api/design-request/${token}/proof`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls: pending, labels }),
+        body: JSON.stringify({ urls: pending, labels, replaceCurrentReview }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not send proof.");
@@ -551,22 +552,49 @@ export function DesignManagePanel({
         </label>
 
         {pending.length > 0 && (
-          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {pending.map((u, i) => (
-              <div key={i}>
-                <div className="relative aspect-square bg-white border border-line overflow-hidden">
-                  <Image src={u} alt={`Pending proof ${i + 1}`} fill sizes="20vw" className="object-contain p-1" unoptimized />
+          <>
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {pending.map((u, i) => (
+                <div key={i}>
+                  <div className="relative aspect-square bg-white border border-line overflow-hidden">
+                    <Image src={u} alt={`Pending proof ${i + 1}`} fill sizes="20vw" className="object-contain p-1" unoptimized />
+                  </div>
+                  <input
+                    value={pendingLabels[i] ?? ""}
+                    onChange={(e) => setPendingLabels((l) => l.map((v, j) => (j === i ? e.target.value : v)))}
+                    placeholder={`Label (e.g. Practice Jersey ${i + 1})`}
+                    maxLength={60}
+                    className="mt-1.5 w-full bg-steel border border-line px-2 py-1.5 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                  />
                 </div>
-                <input
-                  value={pendingLabels[i] ?? ""}
-                  onChange={(e) => setPendingLabels((l) => l.map((v, j) => (j === i ? e.target.value : v)))}
-                  placeholder={`Label (e.g. Practice Jersey ${i + 1})`}
-                  maxLength={60}
-                  className="mt-1.5 w-full bg-steel border border-line px-2 py-1.5 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-                />
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            {proofs.length > 0 && (
+              <fieldset className="mt-4 border border-line bg-foreground/[0.02] p-3">
+                <legend className="px-1 text-xs display text-foreground">Review behavior</legend>
+                <label className="flex cursor-pointer items-start gap-2 text-sm text-foreground">
+                  <input
+                    type="radio"
+                    name="proof-review-behavior"
+                    checked={!replaceCurrentReview}
+                    onChange={() => setReplaceCurrentReview(false)}
+                    className="mt-0.5 accent-brand"
+                  />
+                  <span><strong>Keep current proofs available</strong><br /><span className="text-xs text-muted">Use when adding another product, such as a practice shirt or hat.</span></span>
+                </label>
+                <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm text-foreground">
+                  <input
+                    type="radio"
+                    name="proof-review-behavior"
+                    checked={replaceCurrentReview}
+                    onChange={() => setReplaceCurrentReview(true)}
+                    className="mt-0.5 accent-brand"
+                  />
+                  <span><strong>Replace the current proof set</strong><br /><span className="text-xs text-muted">Use only when these files supersede every proof the client is still reviewing.</span></span>
+                </label>
+              </fieldset>
+            )}
+          </>
         )}
 
         {message && <p className="mt-3 text-sm text-brand">{message}</p>}

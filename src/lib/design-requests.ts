@@ -390,25 +390,46 @@ export async function reactivateUnresponsiveDesignRequest(id: string): Promise<b
   return true;
 }
 
-/** Designer uploads proof image(s); auto-bumps status to proof_sent. */
-export async function addProofImages(id: string, urls: string[], labels?: Record<string, string>) {
+/**
+ * Designer uploads proof image(s); auto-bumps status to proof_sent.
+ *
+ * Adding a different product (jersey, practice shirt, hat, etc.) must not
+ * quietly make the team's other current proofs unapprovable. That is the
+ * normal path, so new proofs append to the active review set by default. A
+ * designer explicitly opts into replacement when a new proof supersedes the
+ * entire current review batch.
+ */
+export async function addProofImages(
+  id: string,
+  urls: string[],
+  labels?: Record<string, string>,
+  options: { replaceCurrentReview?: boolean } = {},
+) {
   const db = getDb();
   const [existing] = await db.select().from(designRequests).where(eq(designRequests.id, id)).limit(1);
   if (!existing) return null;
   if (existing.archivedAt && isUnresponsiveArchiveNote(existing.archivedNote)) {
     await reactivateUnresponsiveDesignRequest(id);
   }
-  const merged = [...(existing.proofImages ?? []), ...urls];
+  const incoming = [...new Set(urls.filter(Boolean))];
+  const merged = [...new Set([...(existing.proofImages ?? []), ...incoming])];
   const previousReview = existing.proofReviewUrls?.length
     ? existing.proofReviewUrls
     : existing.status === "proof_sent" || existing.status === "changes_requested"
       ? existing.proofImages ?? []
       : [];
+  const existingApproved = existing.approvedDesignUrls ?? (existing.approvedDesignUrl ? [existing.approvedDesignUrl] : []);
+  // Older approved proof records predate proofReviewUrls. Keep them active
+  // whenever a new product proof is added, rather than treating them as an
+  // obsolete version solely because they were uploaded earlier.
+  const activeBeforeUpload = [...new Set([...previousReview, ...existingApproved])];
+  const reviewUrls = options.replaceCurrentReview
+    ? incoming
+    : [...new Set([...activeBeforeUpload, ...incoming])];
+  const reviewSet = new Set(reviewUrls);
   const supersededProofUrls = [...new Set([
-    ...(existing.supersededProofUrls ?? []),
-    ...previousReview.filter((url) => !urls.includes(url)),
-    ...(existing.approvedDesignUrls ?? (existing.approvedDesignUrl ? [existing.approvedDesignUrl] : []))
-      .filter((url) => !urls.includes(url)),
+    ...(existing.supersededProofUrls ?? []).filter((url) => !reviewSet.has(url)),
+    ...(options.replaceCurrentReview ? activeBeforeUpload : []).filter((url) => !reviewSet.has(url)),
   ])];
   const mergedLabels = { ...(existing.proofLabels ?? {}) };
   for (const [url, label] of Object.entries(labels ?? {})) {
@@ -419,12 +440,12 @@ export async function addProofImages(id: string, urls: string[], labels?: Record
     .update(designRequests)
     .set({
       proofImages: merged,
-      proofReviewUrls: urls,
+      proofReviewUrls: reviewUrls,
       supersededProofUrls,
       proofLabels: mergedLabels,
-      approvedDesignUrl: null,
-      approvedDesignUrls: [],
-      approvedAt: null,
+      ...(options.replaceCurrentReview
+        ? { approvedDesignUrl: null, approvedDesignUrls: [], approvedAt: null }
+        : {}),
       status: "proof_sent",
       proofSentAt: now,
       followUpsSent: 0,
@@ -435,7 +456,7 @@ export async function addProofImages(id: string, urls: string[], labels?: Record
     .where(eq(designRequests.id, id));
   await db
     .update(teamOrders)
-    .set({ approvedDesignUrl: null, updatedAt: now })
+    .set({ ...(options.replaceCurrentReview ? { approvedDesignUrl: null } : {}), updatedAt: now })
     .where(eq(teamOrders.designRequestId, id));
   return merged;
 }
@@ -466,7 +487,16 @@ export async function approveDesign(id: string, approvedUrls?: string | string[]
   const db = getDb();
   await reactivateUnresponsiveDesignRequest(id);
   const now = new Date();
-  const urls = (Array.isArray(approvedUrls) ? approvedUrls : approvedUrls ? [approvedUrls] : []).filter(Boolean);
+  const requested = (Array.isArray(approvedUrls) ? approvedUrls : approvedUrls ? [approvedUrls] : []).filter(Boolean);
+  const [existing] = await db.select().from(designRequests).where(eq(designRequests.id, id)).limit(1);
+  if (!existing) return null;
+  // A later product proof can reopen a review while other pieces remain
+  // approved. Customer approval of the new piece adds to that set; it never
+  // silently unapproves the already-final jersey or hat.
+  const current = existing.approvedDesignUrls ?? (existing.approvedDesignUrl ? [existing.approvedDesignUrl] : []);
+  const approvedSet = new Set([...current, ...requested]);
+  const proofOrder = existing.proofImages ?? [];
+  const urls = [...proofOrder.filter((url) => approvedSet.has(url)), ...[...approvedSet].filter((url) => !proofOrder.includes(url))];
   await db
     .update(designRequests)
     .set({
