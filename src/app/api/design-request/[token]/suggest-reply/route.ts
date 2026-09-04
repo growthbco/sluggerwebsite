@@ -55,6 +55,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
             depositPaidAt: order.depositPaidAt,
             invoicePaidAt: order.invoicePaidAt,
             shippedAt: order.shippedAt,
+            rushShipping: order.rushShipping,
           }
         : null,
       messages: request.messages ?? [],

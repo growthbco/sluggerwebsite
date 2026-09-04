@@ -98,13 +98,25 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 py-14" style={themeVars(store.primaryColor)}>
       <header className="text-center">
-        {store.logoUrl && (
-          <div className="relative h-24 w-24 mx-auto mb-4">
-            <Image src={store.logoUrl} alt={`${store.name} logo`} fill sizes="96px" className="object-contain" unoptimized />
-          </div>
-        )}
         <span className="display text-muted text-sm uppercase tracking-wide">Official team store</span>
-        <h1 className="display text-4xl sm:text-5xl text-brand mt-1">{store.name}</h1>
+        {store.logoUrl ? (
+          <h1 className="mt-3">
+            <span className="sr-only">{store.name}</span>
+            <span className="relative block h-28 w-44 sm:h-32 sm:w-52 mx-auto">
+              <Image
+                src={store.logoUrl}
+                alt=""
+                fill
+                sizes="(max-width: 640px) 176px, 208px"
+                className="object-contain"
+                loading="eager"
+                unoptimized
+              />
+            </span>
+          </h1>
+        ) : (
+          <h1 className="display text-4xl sm:text-5xl text-brand mt-1">{store.name}</h1>
+        )}
         <p className="mt-3 text-sm text-muted max-w-xl mx-auto">
           Your team&apos;s gear, in your team&apos;s design. Pay here, we make it.
         </p>
@@ -155,10 +167,11 @@ export default async function TeamStorePage({ params, searchParams }: { params: 
         </summary>
         <div className="px-5 pb-6">
           <p className="text-sm text-muted mb-5">
-            All measurements in inches. Jerseys have a relaxed fit and run slightly large -
-            when in doubt, size down or text us at (352) 414-7270.
+            {/basketball/i.test(store.sport ?? "")
+              ? "All measurements are in inches. Use the basketball-specific chart for this uniform."
+              : "All measurements are in inches. Jerseys have a relaxed fit and run slightly large. When in doubt, size down or text us at (352) 414-7270."}
           </p>
-          <SizeChartsFor items={(store.storeItems ?? []).map((it) => it.key)} />
+          <SizeChartsFor items={(store.storeItems ?? []).map((it) => it.key)} sport={store.sport} />
         </div>
       </details>
 

@@ -29,6 +29,7 @@ export function DesignProgress({
   orderSpec,
   printFileVerified,
   showNextAction = true,
+  rush = false,
 }: {
   status: string;
   orderStatus?: string | null;
@@ -37,6 +38,7 @@ export function DesignProgress({
   orderSpec?: string | null;
   printFileVerified?: boolean;
   showNextAction?: boolean;
+  rush?: boolean;
 }) {
   if (status === "cancelled") {
     return (
@@ -105,7 +107,9 @@ export function DesignProgress({
                   ? printFileVerified
                     ? "roster in, print file verified"
                     : "roster in"
-                  : ORDER_LABELS[orderStatus] ?? orderStatus}
+                  : rush && orderStatus === "quoted"
+                    ? "Rush pay-in-full invoice sent - awaiting payment"
+                    : ORDER_LABELS[orderStatus] ?? orderStatus}
               </span>
             </p>
           ) : (
@@ -134,7 +138,7 @@ export function DesignProgress({
       )}
       {showNextAction && printFileVerified && orderStatus === "submitted" && (
         <p className="mt-3 text-sm text-green-400">
-          ⏭ <strong>Next:</strong> print file passed - send the deposit invoice from the dashboard.
+          ⏭ <strong>Next:</strong> print file passed - send the {rush ? "Rush pay-in-full" : "deposit"} invoice from the dashboard.
         </p>
       )}
     </div>

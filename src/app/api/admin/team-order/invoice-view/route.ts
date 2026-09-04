@@ -11,7 +11,7 @@ import { requireApiRole } from "@/lib/admin-auth";
 export const runtime = "nodejs";
 
 // Admin-only: render a copy of the invoice email the customer received (or,
-// before anything is sent, a preview of what the deposit invoice will say).
+// before anything is sent, a preview of what the starting invoice will say).
 // Numbers are rebuilt with the same logic as the send route; the pay links
 // are the stored Stripe links, so this page mirrors the customer's email.
 export async function GET(req: Request) {
@@ -27,12 +27,13 @@ export async function GET(req: Request) {
   const [order] = await db.select().from(teamOrders).where(eq(teamOrders.id, id)).limit(1);
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Latest stage by default: balance once that invoice exists, else deposit.
+  // Latest stage by default: balance after a deposit, otherwise the starting
+  // invoice (50% for Standard, pay-in-full for Rush).
   const stageParam = url.searchParams.get("stage");
   const stage: "deposit" | "balance" =
     stageParam === "deposit" || stageParam === "balance"
       ? stageParam
-      : order.balanceInvoiceUrl
+      : order.balanceInvoiceUrl || order.depositPaidAt
         ? "balance"
         : "deposit";
 
@@ -50,7 +51,9 @@ export async function GET(req: Request) {
     });
   }
   const depositCents = order.depositCents ?? Math.round(totalCents / 2);
-  const dueCents = stage === "deposit" ? depositCents : totalCents - depositCents;
+  const rushRequiresFullPayment = stage === "deposit" && order.rushShipping;
+  const invoiceStage = rushRequiresFullPayment ? "full" : stage;
+  const dueCents = rushRequiresFullPayment ? totalCents : stage === "deposit" ? depositCents : totalCents - depositCents;
 
   // If the order is fully paid, show a RECEIPT (verify payment without Stripe)
   // instead of an invoice with pay buttons.
@@ -105,7 +108,7 @@ export async function GET(req: Request) {
   const { subject, html } = renderTeamOrderInvoice({
     teamName: order.teamName,
     reference: order.reference,
-    stage,
+    stage: invoiceStage,
     lines,
     totalCents,
     dueCents,
@@ -115,14 +118,14 @@ export async function GET(req: Request) {
     shipBoxes,
     roster: invoiceRosterEntries(roster),
     payUrl: sentUrl ?? "#",
-    payFullUrl: stage === "deposit" ? order.fullInvoiceUrl ?? undefined : undefined,
+    payFullUrl: stage === "deposit" && !rushRequiresFullPayment ? order.fullInvoiceUrl ?? undefined : undefined,
     localPickup: order.localPickup,
     shippingIncludedWithRush: order.rushShipping,
   });
 
   const banner = sentUrl
-    ? `ADMIN VIEW - copy of the ${stage} invoice emailed to ${order.contactEmail}. Subject: "${subject}"`
-    : `ADMIN PREVIEW - this ${stage} invoice has NOT been sent yet; this is what the customer will receive. Numbers reflect the current roster.`;
+    ? `ADMIN VIEW - copy of the ${invoiceStage} invoice emailed to ${order.contactEmail}. Subject: "${subject}"`
+    : `ADMIN PREVIEW - this ${invoiceStage} invoice has NOT been sent yet; this is what the customer will receive. Numbers reflect the current roster.`;
 
   return new Response(
     `<div style="background:#1a1a14;color:#e8e2d0;font-family:sans-serif;font-size:13px;padding:10px 16px;text-align:center;">${banner}</div>${html}`,

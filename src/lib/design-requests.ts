@@ -390,6 +390,52 @@ export async function reactivateUnresponsiveDesignRequest(id: string): Promise<b
   return true;
 }
 
+/** A stable product key for matching a revised proof to the proof it replaces.
+ * Designers commonly append "rev 2" to a label, which should not turn the
+ * prior version into a separate customer-approvable product. */
+function proofProductKey(label?: string): string | null {
+  const key = (label ?? "")
+    .toLowerCase()
+    .replace(/\brev(?:ision)?\s*\d+\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return key || null;
+}
+
+/**
+ * Add a labeled product proof without retiring the other products in the same
+ * uniform project. A new proof with the same product label replaces only that
+ * product's current version. Unlabeled uploads append by default, so a
+ * designer must explicitly choose to replace the entire current proof set.
+ */
+export function nextProofReviewUrls(input: {
+  previousReview: string[];
+  incoming: string[];
+  labels: Record<string, string>;
+}): { reviewUrls: string[]; supersededUrls: string[] } {
+  const incomingAreLabeled = input.incoming.length > 0
+    && input.incoming.every((url) => proofProductKey(input.labels[url]));
+  if (!incomingAreLabeled || input.previousReview.length === 0) {
+    return {
+      reviewUrls: [...new Set([...input.previousReview, ...input.incoming])],
+      supersededUrls: [],
+    };
+  }
+
+  const incomingKeys = new Set(input.incoming.map((url) => proofProductKey(input.labels[url])));
+  const supersededUrls = input.previousReview.filter((url) => {
+    const key = proofProductKey(input.labels[url]);
+    return key !== null && incomingKeys.has(key);
+  });
+  return {
+    reviewUrls: [
+      ...input.previousReview.filter((url) => !supersededUrls.includes(url)),
+      ...input.incoming,
+    ],
+    supersededUrls,
+  };
+}
+
 /**
  * Designer uploads proof image(s); auto-bumps status to proof_sent.
  *
@@ -397,7 +443,8 @@ export async function reactivateUnresponsiveDesignRequest(id: string): Promise<b
  * quietly make the team's other current proofs unapprovable. That is the
  * normal path, so new proofs append to the active review set by default. A
  * designer explicitly opts into replacement when a new proof supersedes the
- * entire current review batch.
+ * entire current review batch. A labeled revision still replaces its matching
+ * product only.
  */
 export async function addProofImages(
   id: string,
@@ -423,18 +470,29 @@ export async function addProofImages(
   // whenever a new product proof is added, rather than treating them as an
   // obsolete version solely because they were uploaded earlier.
   const activeBeforeUpload = [...new Set([...previousReview, ...existingApproved])];
-  const reviewUrls = options.replaceCurrentReview
-    ? incoming
-    : [...new Set([...activeBeforeUpload, ...incoming])];
-  const reviewSet = new Set(reviewUrls);
-  const supersededProofUrls = [...new Set([
-    ...(existing.supersededProofUrls ?? []).filter((url) => !reviewSet.has(url)),
-    ...(options.replaceCurrentReview ? activeBeforeUpload : []).filter((url) => !reviewSet.has(url)),
-  ])];
   const mergedLabels = { ...(existing.proofLabels ?? {}) };
   for (const [url, label] of Object.entries(labels ?? {})) {
     if (label?.trim()) mergedLabels[url] = label.trim().slice(0, 60);
   }
+  const { reviewUrls, supersededUrls } = options.replaceCurrentReview
+    ? {
+        reviewUrls: incoming,
+        supersededUrls: activeBeforeUpload.filter((url) => !incoming.includes(url)),
+      }
+    : nextProofReviewUrls({
+        previousReview: activeBeforeUpload,
+        incoming,
+        labels: mergedLabels,
+      });
+  const supersededProofUrls = [...new Set([
+    ...(existing.supersededProofUrls ?? []),
+    ...supersededUrls,
+    ...activeBeforeUpload.filter((url) => !reviewUrls.includes(url)),
+  ])].filter((url) => !reviewUrls.includes(url));
+  const approvedDesignUrls = options.replaceCurrentReview
+    ? []
+    : existingApproved.filter((url) => !supersededProofUrls.includes(url));
+  const approvedDesignUrl = approvedDesignUrls[0] ?? null;
   const now = new Date();
   await db
     .update(designRequests)
@@ -443,9 +501,9 @@ export async function addProofImages(
       proofReviewUrls: reviewUrls,
       supersededProofUrls,
       proofLabels: mergedLabels,
-      ...(options.replaceCurrentReview
-        ? { approvedDesignUrl: null, approvedDesignUrls: [], approvedAt: null }
-        : {}),
+      approvedDesignUrl,
+      approvedDesignUrls,
+      ...(options.replaceCurrentReview ? { approvedAt: null } : {}),
       status: "proof_sent",
       proofSentAt: now,
       followUpsSent: 0,
@@ -456,7 +514,7 @@ export async function addProofImages(
     .where(eq(designRequests.id, id));
   await db
     .update(teamOrders)
-    .set({ ...(options.replaceCurrentReview ? { approvedDesignUrl: null } : {}), updatedAt: now })
+    .set({ approvedDesignUrl, updatedAt: now })
     .where(eq(teamOrders.designRequestId, id));
   return merged;
 }

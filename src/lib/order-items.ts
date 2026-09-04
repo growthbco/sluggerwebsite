@@ -15,6 +15,13 @@ export const VOLLEYBALL_SIZES = [
   "Adult XS", "Small", "Medium", "Large", "X-Large", "2X-Large",
 ];
 
+// Basketball uses the sleeveless uniform block in size-charts.tsx. Its
+// published range includes Adult XS and ends at Adult 2XL.
+export const BASKETBALL_SIZES = [
+  "Youth Small", "Youth Medium", "Youth Large", "Youth X-Large",
+  "Adult XS", "Small", "Medium", "Large", "X-Large", "2X-Large",
+];
+
 export const SOCK_SIZES = ["Youth S/M", "Youth L/XL", "Adult S/M", "Adult L/XL"];
 
 // Cheer uses the supplier's numbered scale. Tops and skirts are selected
@@ -32,6 +39,53 @@ export type SizeField = {
   sizes: string[];
 };
 
+type ApprovedDesign = { label: string };
+
+const DESIGN_PRODUCT_LABELS: Record<string, RegExp> = {
+  jersey: /\b(jersey|shirt|uniform)\b/i,
+  hockey_jersey: /\b(hockey|sweater)\b/i,
+  flag_football_jersey: /\b(flag football|compression)\b/i,
+  practice_jersey: /\bpractice jersey\b/i,
+  polo: /\bpolo\b/i,
+  polo_pin_dot: /\b(pin[\s-]?dot polo|polo)\b/i,
+  knickers: /\bknickers?\b/i,
+  long_pants: /\b(pants?|trousers?)\b/i,
+  shorts: /\bshorts?\b/i,
+  hoodie: /\b(hoodie|sweatshirt)\b/i,
+  lightweight_hoodie: /\b(lightweight hoodie|hoodie)\b/i,
+  pullover: /\b(pullover|quarter[\s-]?zip|1\/4[\s-]?zip)\b/i,
+  jacket: /\b(jacket|warm[\s-]?up)\b/i,
+  cheer_uniform: /\bcheer\b/i,
+  cheer_uniform_rhinestone: /\b(cheer|rhinestone)\b/i,
+  socks: /\bsocks?\b/i,
+  fitted_hat: /\b(fitted hat|cap)\b/i,
+  snapback_hat: /\b(snapback|hat|cap)\b/i,
+  performance_hat: /\b(performance (hat|cap)|hat|cap)\b/i,
+  beanie: /\bbeanie\b/i,
+};
+
+/** Several approved images can mean either player-selectable colorways or
+ * separate product mockups that all belong to the same order. Product mockups
+ * should never force a player to choose between, for example, their uniform
+ * and their jacket. When every label clearly maps to the order's products and
+ * those mappings differ, the images are references rather than choices. */
+export function approvedDesignsNeedPlayerChoice(
+  designs: readonly ApprovedDesign[],
+  itemKeys: readonly string[],
+): boolean {
+  if (designs.length <= 1) return false;
+  const includedItems = new Set(itemKeys);
+  const signatures = designs.map(({ label }) =>
+    Object.entries(DESIGN_PRODUCT_LABELS)
+      .filter(([key, pattern]) => includedItems.has(key) && pattern.test(label))
+      .map(([key]) => key)
+      .sort()
+      .join("|"),
+  );
+  if (signatures.some((signature) => !signature)) return true;
+  return new Set(signatures).size === 1;
+}
+
 export function isOneSizeList(sizes: readonly string[]): boolean {
   return sizes.length === 1 && sizes[0] === "One Size";
 }
@@ -48,11 +102,17 @@ function isVolleyballSport(sport?: string | null): boolean {
   return /volleyball/i.test(sport ?? "");
 }
 
+function isBasketballSport(sport?: string | null): boolean {
+  return /basketball/i.test(sport ?? "");
+}
+
 export function sizeFieldsForItem(key: string, sport?: string | null): SizeField[] {
   const item = ITEM_TYPES.find((t) => t.key === key);
   const sizes = key === "jersey" && isVolleyballSport(sport)
     ? VOLLEYBALL_SIZES
-    : item?.sizes ?? APPAREL_SIZES;
+    : isBasketballSport(sport) && (key === "jersey" || key === "shorts")
+      ? BASKETBALL_SIZES
+      : item?.sizes ?? APPAREL_SIZES;
   const label = item?.label ?? key;
   if (!isCheerItem(key)) return [{ key, itemKey: key, label, sizes }];
   return [
@@ -69,6 +129,32 @@ export function itemKeyForSizeField(key: string): string {
   if (key.endsWith(CHEER_TOP_SUFFIX)) return key.slice(0, -CHEER_TOP_SUFFIX.length);
   if (key.endsWith(CHEER_BOTTOM_SUFFIX)) return key.slice(0, -CHEER_BOTTOM_SUFFIX.length);
   return key;
+}
+
+/** Count physical garments selected across a roster. A row can contain more
+ * than one garment, while a cheer top + skirt remains one uniform set. */
+export function countRosterPieces(
+  roster: { size?: string | null; sizes?: Record<string, string> | null; quantity?: number | null }[],
+  items?: readonly string[] | null,
+): number {
+  const orderItems = items?.length ? items : ["jersey"];
+  const allowedItems = new Set(orderItems);
+
+  return roster.reduce((total, row) => {
+    const quantity = Math.max(1, row.quantity ?? 1);
+    const sizedEntries = Object.entries(row.sizes ?? {}).filter(([, value]) => (value ?? "").trim());
+    const selectedItems = new Set(
+      sizedEntries
+        .map(([field]) => itemKeyForSizeField(field))
+        .filter((key) => allowedItems.has(key)),
+    );
+
+    if (selectedItems.size > 0) return total + selectedItems.size * quantity;
+    // Preserve legacy single-item rows whose product key was not standardized.
+    if (sizedEntries.length && orderItems.length === 1) return total + quantity;
+    if ((row.size ?? "").trim()) return total + quantity;
+    return total;
+  }, 0);
 }
 
 export function sizeValueForField(
@@ -271,6 +357,8 @@ export const JERSEY_MATERIALS: JerseyMaterial[] = [
   },
 ];
 
+const STANDARD_JERSEY_MATERIAL_KEYS = new Set(["mesh", "dry-fit"]);
+
 /** The fabric a jersey style is actually made in, so an order never defaults to
  *  Mesh when the style implies otherwise. Button-front and quarter-zip jerseys
  *  are smooth polyester, not birdseye mesh; crew / v-neck stay mesh (the
@@ -297,7 +385,19 @@ export function usesSpeedoBaseballMaterial(
 ): boolean {
   const normalizedStyle = (style ?? "").toLowerCase();
   const isButtonBaseballCut = /full[\s-]*button|two[\s-]*button|2[\s-]*button/.test(normalizedStyle);
-  return isButtonBaseballCut && !isBowling(...sportHints);
+  return isButtonBaseballCut && !isBowling(style, ...sportHints);
+}
+
+/** A cut with a single production fabric. Standard crew and V-neck jerseys
+ * deliberately return undefined: coaches choose either Birdseye Mesh or
+ * Moisture-Wicking Performance Knit for those versatile cuts. */
+export function fixedJerseyMaterialFor(
+  style?: string | null,
+  ...sportHints: (string | null | undefined)[]
+): string | undefined {
+  if (isBowling(style, ...sportHints)) return "microfiber";
+  if (usesSpeedoBaseballMaterial(style, ...sportHints)) return SPEEDO_BASEBALL_MATERIAL_KEY;
+  return (style ?? "").toLowerCase().includes("zip") ? SPEEDO_BASEBALL_MATERIAL_KEY : undefined;
 }
 
 /** Options the customer can genuinely choose for this jersey cut. */
@@ -305,25 +405,27 @@ export function jerseyMaterialsFor(
   style?: string | null,
   ...sportHints: (string | null | undefined)[]
 ): JerseyMaterial[] {
-  if (!usesSpeedoBaseballMaterial(style, ...sportHints)) return JERSEY_MATERIALS;
-  return JERSEY_MATERIALS.filter((material) => material.key === SPEEDO_BASEBALL_MATERIAL_KEY);
+  const fixedMaterial = fixedJerseyMaterialFor(style, ...sportHints);
+  if (fixedMaterial) return JERSEY_MATERIALS.filter((material) => material.key === fixedMaterial);
+  return JERSEY_MATERIALS.filter((material) => STANDARD_JERSEY_MATERIAL_KEYS.has(material.key));
 }
 
-/** Validate a customer material value and force fixed-fabric baseball cuts to
- * their actual production material. Returns undefined for an invalid choice. */
+/** Validate a customer material value and force fixed-fabric cuts to their
+ * actual production material. Returns undefined for an invalid choice. */
 export function resolveJerseyMaterial(
   material: string | null | undefined,
   style?: string | null,
   ...sportHints: (string | null | undefined)[]
 ): string | undefined {
-  if (usesSpeedoBaseballMaterial(style, ...sportHints)) return SPEEDO_BASEBALL_MATERIAL_KEY;
-  return JERSEY_MATERIALS.some((option) => option.key === material) ? material ?? undefined : undefined;
+  const fixedMaterial = fixedJerseyMaterialFor(style, ...sportHints);
+  if (fixedMaterial) return fixedMaterial;
+  return jerseyMaterialsFor(style, ...sportHints).some((option) => option.key === material) ? material ?? undefined : undefined;
 }
 
 /** Fabric for an order, aware that bowling shirts are microfiber regardless of
  *  style. Falls back to the style-based default for every other sport. */
 export function fabricFor(style?: string | null, ...sportHints: (string | null | undefined)[]): string {
-  return isBowling(...sportHints) ? "microfiber" : fabricForStyle(style);
+  return fixedJerseyMaterialFor(style, ...sportHints) ?? fabricForStyle(style);
 }
 
 export function itemLabel(key: string): string {

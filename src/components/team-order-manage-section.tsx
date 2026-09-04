@@ -4,7 +4,7 @@ import { customerRosterLockMessage, getRoster, getLinkedDesignPreview } from "@/
 import { getStoreByDesignRequestId, teamRaisedCents } from "@/lib/team-stores";
 import { TeamFundraiseCard } from "@/components/team-fundraise-card";
 import { itemPriceCents, computeTeamOrderQuote } from "@/lib/team-order-pricing";
-import { EXTRA_ADDON_KEYS, itemLabel, minPiecesForItems } from "@/lib/order-items";
+import { countRosterPieces, EXTRA_ADDON_KEYS, itemLabel, minPiecesForItems } from "@/lib/order-items";
 import { TeamOrderManage } from "@/components/team-order-manage";
 import { TeamOrderAddon } from "@/components/team-order-addon";
 import { TeamOrderShipping } from "@/components/team-order-shipping";
@@ -65,11 +65,12 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
     const number = (row.playerNumber ?? "").trim().toLowerCase();
     return name || number ? `${name}|${number}` : `row:${row.id}`;
   })).size;
-  const pieceCount = roster.reduce((total, row) => total + Math.max(1, row.quantity ?? 1), 0);
+  const pieceCount = countRosterPieces(roster, orderItems);
   const rosterLockMessage = customerRosterLockMessage(order);
   const hasJersey = orderItems.some((item) => item.includes("jersey"));
+  const isBasketball = /basketball/i.test(order.sport ?? "");
   const collecting = ["draft", "collecting"].includes(order.status);
-  const productPrices = orderItems
+  const separateProductPrices = orderItems
     .map((key) => ({
       key,
       label: itemLabel(key),
@@ -78,6 +79,22 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
         : itemPriceCents(key, order.jerseyStyle, order.localPricing, order.jerseyMaterial),
     }))
     .filter((p) => p.unitCents > 0);
+  const hasReversibleBasketballSet = isBasketball
+    && (order.jerseyMaterial ?? "").toLowerCase() === "reversible"
+    && orderItems.includes("jersey")
+    && orderItems.includes("shorts");
+  const productPrices = hasReversibleBasketballSet
+    ? [
+        {
+          key: "reversible_basketball",
+          label: "Reversible Basketball Uniform",
+          unitCents: separateProductPrices
+            .filter((product) => product.key === "jersey" || product.key === "shorts")
+            .reduce((total, product) => total + product.unitCents, 0),
+        },
+        ...separateProductPrices.filter((product) => product.key !== "jersey" && product.key !== "shorts"),
+      ]
+    : separateProductPrices;
   const canAddon = !["draft", "collecting", "cancelled"].includes(order.status);
   const addonPrices = Object.fromEntries(addonItems.map((k) => [
     k,
@@ -147,6 +164,8 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
           lockMessage={rosterLockMessage}
           requiresNames={order.requiresNames}
           minPieces={orderMinimum}
+          localPickup={order.localPickup}
+          rushShipping={order.rushShipping}
           quote={{ lines: customerQuote.lines, rushFeeCents: customerQuote.rushFeeCents, priorityFeeCents: customerQuote.priorityFeeCents, totalCents: customerQuote.totalCents }}
           nextIsDeposit={designState === "approved"}
           designState={designState}
@@ -161,7 +180,9 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
       content: (
         <div>
           <p className="text-sm text-muted mb-4">
-            {hasJersey
+            {isBasketball
+              ? "All measurements are in inches. Use the basketball-specific chart for this uniform."
+              : hasJersey
               ? "All measurements in inches. Jerseys run slightly large - when in doubt, size down."
               : "All measurements are in inches. Use the chart for the items in this order."}
           </p>
@@ -271,7 +292,10 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
           <div className="border border-line bg-ink/40 px-4 py-3">
             <p className="text-xs uppercase tracking-wider text-muted">Unit price</p>
             {productPrices.map((p) => (
-              <p key={p.key} className="display text-lg text-foreground mt-0.5">{money(p.unitCents)} each</p>
+              <div key={p.key} className="mt-2">
+                <p className="text-xs text-muted">{p.label}</p>
+                <p className="display text-lg text-foreground mt-0.5">{money(p.unitCents)} each</p>
+              </div>
             ))}
           </div>
           <div className="border border-line bg-ink/40 px-4 py-3">
@@ -287,7 +311,15 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
           <div className="border border-line bg-ink/40 px-4 py-3">
             <p className="text-xs uppercase tracking-wider text-muted">Order total</p>
             <p className="display text-lg text-foreground mt-0.5">{totalCents > 0 ? money(grandTotal) : "Add sizes"}</p>
-            <p className="text-xs text-muted mt-0.5">{shippingCents > 0 ? `Includes ${money(shippingCents)} shipping` : "Tax and shipping added later"}</p>
+            <p className="text-xs text-muted mt-0.5">
+              {order.localPickup
+                ? "Free local pickup in Ocala"
+                : shippingCents > 0
+                  ? `Includes ${money(shippingCents)} shipping`
+                  : order.rushShipping
+                    ? "Direct shipping included with Rush"
+                    : "Tax and shipping added later"}
+            </p>
           </div>
         </div>
 
@@ -393,9 +425,17 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
         </section>
       )}
 
-      {/* Where this order ships, editable by the customer (locked once shipped). */}
-      {!order.localPickup && (
-        <TeamOrderShipping token={order.manageToken!} initial={shipAddr} locked={order.status === "shipped" || Boolean(order.shippedAt)} />
+      {/* Delivery method + address, editable until fulfillment is locked. Draft
+          orders choose this in the final roster review above. */}
+      {!collecting && (
+        <TeamOrderShipping
+          token={order.manageToken!}
+          initial={shipAddr}
+          localPickup={order.localPickup}
+          rushShipping={order.rushShipping}
+          locked={order.status === "shipped" || Boolean(order.shippedAt) || Boolean(order.deliveredAt)}
+          deliveryLocked={Boolean(order.depositPaidAt || order.invoicePaidAt)}
+        />
       )}
 
       <div id="roster-builder" className="scroll-mt-6">

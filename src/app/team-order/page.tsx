@@ -84,8 +84,8 @@ export default async function TeamOrderPage({
         <span className="display text-brand text-sm">For Coaches &amp; Teams</span>
         <h1 className="display text-4xl sm:text-5xl text-foreground mt-1">Start a Team Order</h1>
         <p className="mt-3 text-muted">
-          Start with a free design, then build your roster once the artwork is approved.
-          We only need each player&apos;s name, number, and size - we handle the rest.
+          Start with a free design, then choose your team gear once the artwork is approved.
+          We&apos;ll ask for player details only when an item needs them, and use simple size totals for gear like socks and hats.
         </p>
         {prefill && (
           <div className="mt-5 bg-steel border border-brand/60 p-4 text-sm">

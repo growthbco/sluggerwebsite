@@ -15,6 +15,7 @@ const nav = [
   { href: "/team-uniforms", label: "Uniforms" },
   { href: "/#how-it-works", label: "How It Works" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/size-guide", label: "Size Guide" },
   { href: "/gallery", label: "Gallery" },
   { href: "/faq", label: "Support" },
   { href: "/contact", label: "Contact" },
@@ -105,9 +106,9 @@ export function SiteHeader() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className="display text-sm tracking-wide text-foreground/75 hover:text-foreground transition-colors"
+                    className={`display text-sm tracking-wide transition-colors ${item.href === "/size-guide" ? "text-brand hover:text-foreground" : "text-foreground/75 hover:text-foreground"}`}
                   >
-                    {item.label}
+                    {item.href === "/size-guide" ? <span aria-hidden="true">📏 </span> : null}{item.label}
                   </Link>
                 ),
               )}
@@ -152,10 +153,9 @@ export function SiteHeader() {
             </div>
           </div>
 
-          {/* Mobile-only inline funnel CTAs (under header bar, above the fold).
-              Still useful since the hamburger needs a tap; these put the two
-              primary actions one tap away. */}
-          <div className="sm:hidden flex gap-2 pb-3">
+          {/* Mobile-only quick actions under the header. The size guide stays
+              one tap away because sizing is one of the most common questions. */}
+          <div className="sm:hidden grid grid-cols-3 gap-2 pb-3">
             <Link
               href="/design"
               className="flex min-h-11 flex-1 items-center justify-center text-center clip-slant bg-brand text-on-brand display text-xs px-3 py-2.5"
@@ -164,9 +164,15 @@ export function SiteHeader() {
             </Link>
             <Link
               href="/team-order"
-              className="flex min-h-11 flex-1 items-center justify-center text-center border border-brand/70 text-foreground display text-xs px-3 py-2.5"
+              className="flex min-h-11 items-center justify-center text-center border border-brand/70 text-foreground display text-[11px] px-2 py-2.5"
             >
               Build Roster
+            </Link>
+            <Link
+              href="/size-guide"
+              className="flex min-h-11 items-center justify-center text-center border border-line bg-foreground/5 text-brand display text-[11px] px-2 py-2.5"
+            >
+              📏 Size Guide
             </Link>
           </div>
         </div>
@@ -204,9 +210,9 @@ export function SiteHeader() {
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="block px-5 py-3 display text-base text-foreground/85 hover:text-foreground hover:bg-foreground/5 border-b border-line/50"
+                    className={`block px-5 py-3 display text-base hover:text-foreground hover:bg-foreground/5 border-b border-line/50 ${item.href === "/size-guide" ? "text-brand" : "text-foreground/85"}`}
                   >
-                    {item.label}
+                    {item.href === "/size-guide" ? <span aria-hidden="true">📏 </span> : null}{item.label}
                   </Link>
                   {item.label === "Uniforms" && (
                     <ul className="bg-foreground/[0.03] border-b border-line/50">

@@ -1,6 +1,7 @@
-// Two-stage team-order invoicing, shared by the admin "Send invoice" button
+// Team-order invoicing, shared by the admin "Send invoice" button
 // and the auto-invoice that fires when a roster is submitted:
 //   stage "deposit" - 50% of the roster total; production starts on payment
+//                     (Rush orders instead receive one required full-payment link)
 //   stage "balance" - the remaining half, sent when the order is ready
 // Each is a one-time Stripe Payment Link (checkout sessions expire in 24h;
 // payment links don't).
@@ -26,6 +27,27 @@ export type InvoiceResult =
   | { ok: true; stage: string; totalCents: number; dueCents: number; shipCents: number; creditAppliedCents: number; taxDueCents: number; invoiceUrl: string | null; fullInvoiceUrl?: string; emailed: boolean; teamName: string; reference: string }
   | { ok: false; error: string; status: number };
 
+/** A reissued invoice must retire every older link for that same stage. This
+ * also expires already-open Checkout Sessions so a customer cannot finish an
+ * outdated shipping choice in another tab. */
+async function deactivateSupersededPaymentLinks(
+  stripe: ReturnType<typeof getStripe>,
+  urls: Array<string | null | undefined>,
+): Promise<void> {
+  const wanted = new Set(urls.filter((url): url is string => Boolean(url)));
+  if (wanted.size === 0) return;
+  for await (const paymentLink of stripe.paymentLinks.list({ active: true, limit: 100 })) {
+    if (!wanted.has(paymentLink.url)) continue;
+    try {
+      const sessions = await stripe.checkout.sessions.list({ payment_link: paymentLink.id, status: "open", limit: 100 });
+      await Promise.allSettled(sessions.data.map((session) => stripe.checkout.sessions.expire(session.id)));
+      await stripe.paymentLinks.update(paymentLink.id, { active: false });
+    } catch (error) {
+      console.error("Could not deactivate superseded team-order payment link:", paymentLink.id, error);
+    }
+  }
+}
+
 export async function sendTeamOrderInvoice(opts: {
   teamOrderId: string;
   stage: "deposit" | "balance";
@@ -36,12 +58,15 @@ export async function sendTeamOrderInvoice(opts: {
   const db = getDb();
   const [order] = await db.select().from(teamOrders).where(eq(teamOrders.id, opts.teamOrderId)).limit(1);
   if (!order) return { ok: false as const, error: "Team order not found", status: 404 };
+  const supersededUrls = stage === "deposit"
+    ? [order.invoiceUrl, order.fullInvoiceUrl]
+    : [order.balanceInvoiceUrl];
   if (order.invoicePaidAt) return { ok: false as const, error: "This order is already paid in full.", status: 409 };
   if (stage === "deposit" && order.depositPaidAt) {
     return { ok: false as const, error: "Deposit already paid - send the final invoice instead.", status: 409 };
   }
   if (stage === "balance" && !order.depositPaidAt) {
-    return { ok: false as const, error: "Send (and collect) the 50% deposit first.", status: 409 };
+    return { ok: false as const, error: order.rushShipping ? "Rush orders require full payment before production starts." : "Send (and collect) the 50% deposit first.", status: 409 };
   }
 
   // Price from the roster; the balance stage reuses the locked-in quote so a
@@ -91,8 +116,12 @@ export async function sendTeamOrderInvoice(opts: {
   }
   if (totalCents <= 0) return { ok: false as const, error: "No quoted total on file.", status: 400 };
 
+  // Rush moves too quickly to safely collect a second payment after production.
+  // Existing Rush orders that already paid a deposit still use the balance
+  // stage above; every new/unpaid Rush order gets only a pay-in-full link.
+  const rushRequiresFullPayment = stage === "deposit" && order.rushShipping;
   const depositCents = stage === "deposit" ? Math.round(totalCents / 2) : order.depositCents ?? Math.round(totalCents / 2);
-  const dueCents = stage === "deposit" ? depositCents : totalCents - depositCents;
+  const dueCents = rushRequiresFullPayment ? totalCents : stage === "deposit" ? depositCents : totalCents - depositCents;
 
   // Shipping charged to the customer (final invoice only). The package weight
   // is computed automatically from the roster (we know every item's weight),
@@ -159,6 +188,7 @@ export async function sendTeamOrderInvoice(opts: {
   const creditFor = (goods: number) => (bankedCredit > 0 ? Math.max(0, Math.min(bankedCredit, goods - 100)) : 0);
   const creditForFull = stage === "deposit" ? creditFor(totalCents) : 0;
   const creditForBalance = stage === "balance" ? creditFor(dueCents) : 0;
+  const creditAppliedNow = rushRequiresFullPayment ? creditForFull : creditForBalance;
 
   // Plain-English summary shown under the amount on the Stripe checkout page,
   // so the coach sees what the payment buys and how the two stages work - not
@@ -172,17 +202,23 @@ export async function sendTeamOrderInvoice(opts: {
   const balanceRemaining = totalCents - depositCents;
   const withSummary = (terms: string) => (goodsSummary ? `${goodsSummary}. ${terms}` : terms);
   const depositDesc = withSummary(
-    order.rushShipping
+    order.localPickup
+      ? `This is your 50% production deposit. The remaining ${money(balanceRemaining)} is billed once your order is ready for pickup. No shipping charge will be added. Production starts as soon as this deposit is paid.`
+      : order.rushShipping
       ? `This is your 50% production deposit. The remaining ${money(balanceRemaining)} is billed once your order is ready. Direct shipping is included with Rush, so no additional shipping charge will be added. Production starts as soon as this deposit is paid.`
       : `This is your 50% production deposit. The remaining ${money(balanceRemaining)} plus shipping is billed once your order is ready. Production starts as soon as this deposit is paid.`,
   );
   const fullDesc = withSummary(
-    order.rushShipping
+    order.localPickup
+      ? "Pays your order in full. No shipping charge will be added. We will contact you when the order is ready for pickup in Ocala. Production starts right away."
+      : order.rushShipping
       ? "Pays your order in full. Direct shipping is included with Rush, so there is nothing left to collect later. Production starts right away."
       : "Pays your order in full including shipping, so there is nothing left to collect later. Production starts right away.",
   );
   const balanceDesc = withSummary(
-    order.rushShipping
+    order.localPickup
+      ? "Final balance for your order. No shipping charge has been added. We will contact you when the order is ready for pickup in Ocala. This clears your account in full."
+      : order.rushShipping
       ? "Final balance for your order. Direct shipping is included with Rush, with no additional shipping charge. This clears your account in full."
       : "Final balance for your order, including shipping. This clears your account in full.",
   );
@@ -192,7 +228,7 @@ export async function sendTeamOrderInvoice(opts: {
     const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://sluggerathletics.com";
     // Collect the delivery address on the payment page unless we already have
     // one - it's required for buying the shipping label later.
-    const needsAddress = !order.shippingAddress?.line1;
+    const needsAddress = !order.localPickup && !order.shippingAddress?.line1;
     const exempt = order.taxExempt;
     // Each link charges the goods + 7% FL sales tax (skipped when tax-exempt).
     // creditCents is subtracted from the goods (and the tax base) before the
@@ -264,12 +300,17 @@ export async function sendTeamOrderInvoice(opts: {
     let link;
     let fullLink = null;
     if (stage === "deposit") {
-      // Deposit + a pay-in-full sibling. Whichever is paid first deactivates
-      // the other (via siblingLinkId in the webhook) so nobody double-pays.
-      // Credit rides on the pay-in-full link only (the deposit is partial).
-      link = await makeLink(`50% Production Deposit - ${order.teamName} (${order.reference})`, dueCents, "deposit", {}, 0, 0, depositDesc);
-      fullLink = await makeLink(`Pay in Full - ${order.teamName} (${order.reference})`, totalCents, "full", { siblingLinkId: link.id, shipCents: String(fullShipCents) }, fullShipCents, creditForFull, fullDesc);
-      await stripe.paymentLinks.update(link.id, { metadata: { ...link.metadata, siblingLinkId: fullLink.id } });
+      if (rushRequiresFullPayment) {
+        // Rush has one payment choice only. Stripe stage "full" makes the
+        // webhook mark both deposit and balance paid before production starts.
+        link = await makeLink(`Rush Order - Pay in Full - ${order.teamName} (${order.reference})`, totalCents, "full", { shipCents: "0" }, 0, creditForFull, fullDesc);
+      } else {
+        // Standard orders offer a deposit + pay-in-full sibling. Whichever is
+        // paid first deactivates the other so nobody can double-pay.
+        link = await makeLink(`50% Production Deposit - ${order.teamName} (${order.reference})`, dueCents, "deposit", {}, 0, 0, depositDesc);
+        fullLink = await makeLink(`Pay in Full - ${order.teamName} (${order.reference})`, totalCents, "full", { siblingLinkId: link.id, shipCents: String(fullShipCents) }, fullShipCents, creditForFull, fullDesc);
+        await stripe.paymentLinks.update(link.id, { metadata: { ...link.metadata, siblingLinkId: fullLink.id } });
+      }
     } else {
       link = await makeLink(`Final Balance - ${order.teamName} (${order.reference})`, dueCents, "balance", {}, shipCents, creditForBalance, balanceDesc);
     }
@@ -278,13 +319,15 @@ export async function sendTeamOrderInvoice(opts: {
       .update(teamOrders)
       .set({
         ...(stage === "deposit"
-          ? { status: "quoted", quotedTotalCents: totalCents, depositCents, invoiceUrl: link.url, fullInvoiceUrl: fullLink?.url ?? null }
+          ? { status: "quoted", quotedTotalCents: totalCents, depositCents, invoiceUrl: link.url, fullInvoiceUrl: rushRequiresFullPayment ? link.url : fullLink?.url ?? null }
           : { balanceInvoiceUrl: link.url, shippingChargedCents: shipCents }),
         invoiceRemindersSent: 0,
         lastInvoiceReminderAt: null,
         updatedAt: new Date(),
       })
       .where(eq(teamOrders.id, order.id));
+
+    await deactivateSupersededPaymentLinks(stripe, supersededUrls);
 
     // Defense in depth: never let a team name inject URLs or newlines into the
     // outbound SMS body (the name is customer-supplied on public forms).
@@ -293,7 +336,9 @@ export async function sendTeamOrderInvoice(opts: {
       phone: order.contactPhone,
       optInAt: order.smsOptInAt,
       body:
-        stage === "deposit"
+        rushRequiresFullPayment
+          ? `Slugger Athletics: your ${safeTeam} Rush invoice is ready. Full payment starts production: ${link.url}`
+          : stage === "deposit"
           ? `Slugger Athletics: your ${safeTeam} invoice is ready. Pay the 50% deposit to start production: ${link.url}`
           : `Slugger Athletics: final balance for ${safeTeam} (${order.reference}) is ready. Pay here: ${link.url}`,
     });
@@ -301,15 +346,15 @@ export async function sendTeamOrderInvoice(opts: {
       to: order.contactEmail,
       teamName: order.teamName,
       reference: order.reference,
-      stage,
+      stage: rushRequiresFullPayment ? "full" : stage,
       lines: quoteLines,
       totalCents,
       dueCents,
-      taxDueCents: order.taxExempt ? 0 : taxCents(dueCents - creditForBalance),
+      taxDueCents: order.taxExempt ? 0 : taxCents(dueCents - creditAppliedNow),
       taxExempt: order.taxExempt,
       shipCents,
       shipBoxes: parcelsFor().length,
-      creditAppliedCents: creditForBalance,
+      creditAppliedCents: creditAppliedNow,
       payFullCreditCents: creditForFull,
       localPickup: order.localPickup,
       shippingIncludedWithRush: order.rushShipping,
@@ -319,16 +364,16 @@ export async function sendTeamOrderInvoice(opts: {
       payFullCents: fullLink ? (totalCents - creditForFull) + (order.taxExempt ? 0 : taxCents(totalCents - creditForFull)) + fullShipCents : undefined,
     });
 
-    return { ok: true as const, stage, totalCents, dueCents, shipCents, creditAppliedCents: creditForBalance || creditForFull, taxDueCents: order.taxExempt ? 0 : taxCents((stage === "balance" ? dueCents - creditForBalance : dueCents)), invoiceUrl: link.url, fullInvoiceUrl: fullLink?.url ?? undefined, emailed, teamName: order.teamName, reference: order.reference };
+    return { ok: true as const, stage: rushRequiresFullPayment ? "full" : stage, totalCents, dueCents, shipCents, creditAppliedCents: creditAppliedNow || creditForFull, taxDueCents: order.taxExempt ? 0 : taxCents(dueCents - creditAppliedNow), invoiceUrl: link.url, fullInvoiceUrl: rushRequiresFullPayment ? link.url : fullLink?.url ?? undefined, emailed, teamName: order.teamName, reference: order.reference };
   } catch (e) {
     console.error("send invoice failed:", e);
     return { ok: false as const, error: "Could not create the invoice", status: 500 };
   }
 }
 
-/** Fire-and-forget: auto-send the 50% deposit invoice the moment a roster is
+/** Fire-and-forget: auto-send the starting invoice the moment a roster is
  *  submitted, so nobody waits on staff to click a button. Print-file QA
- *  happens AFTER - production doesn't start until the deposit is paid anyway.
+ *  happens AFTER - production doesn't start until the required payment lands.
  *  Skips quietly when the order already has an invoice, can't be priced, or
  *  Stripe is off; failures ping the project's Discord thread for a human. */
 export async function autoInvoiceOnSubmit(teamOrderId: string): Promise<void> {
@@ -337,7 +382,7 @@ export async function autoInvoiceOnSubmit(teamOrderId: string): Promise<void> {
     if (!stripeEnabled()) return;
     const db = getDb();
     const [o] = await db
-      .select({ id: teamOrders.id, reference: teamOrders.reference, teamName: teamOrders.teamName, status: teamOrders.status, invoiceUrl: teamOrders.invoiceUrl, depositPaidAt: teamOrders.depositPaidAt })
+      .select({ id: teamOrders.id, reference: teamOrders.reference, teamName: teamOrders.teamName, status: teamOrders.status, invoiceUrl: teamOrders.invoiceUrl, depositPaidAt: teamOrders.depositPaidAt, rushShipping: teamOrders.rushShipping })
       .from(teamOrders)
       .where(eq(teamOrders.id, teamOrderId))
       .limit(1);
@@ -350,19 +395,20 @@ export async function autoInvoiceOnSubmit(teamOrderId: string): Promise<void> {
     const { postDesignThreadUpdate } = await import("@/lib/discord");
     const money = (c: number) => `$${(c / 100).toFixed(2)}`;
     if (result.ok) {
+      const paymentLabel = result.stage === "full" ? "required full payment" : "deposit";
       if (threadId) {
         await postDesignThreadUpdate({
           threadId,
-          title: `🧾 Deposit invoice auto-sent - ${o.teamName} (${o.reference})`,
-          description: `Roster submitted → ${money(result.totalCents)} total quoted, ${money(result.dueCents)} deposit invoice emailed${result.emailed ? "" : " (email failed - resend from admin)"} automatically. Production starts when it's paid.`,
+          title: `🧾 ${result.stage === "full" ? "Rush pay-in-full" : "Deposit"} invoice auto-sent - ${o.teamName} (${o.reference})`,
+          description: `Roster submitted → ${money(result.totalCents)} total quoted, ${money(result.dueCents)} ${paymentLabel} invoice emailed${result.emailed ? "" : " (email failed - resend from admin)"} automatically. Production starts when it's paid.`,
         });
       }
-      console.log(`auto-invoice sent for ${o.reference}: ${money(result.dueCents)} deposit`);
+      console.log(`auto-invoice sent for ${o.reference}: ${money(result.dueCents)} ${paymentLabel}`);
     } else {
       await postDesignThreadUpdate({
         threadId: threadId ?? undefined,
         title: `⚠️ Auto-invoice needs a human - ${o.teamName} (${o.reference})`,
-        description: `Roster was submitted but the deposit invoice could not be sent automatically: ${result.error} Send it from the admin Team Orders page.`,
+          description: `Roster was submitted but the ${o.rushShipping ? "Rush pay-in-full" : "deposit"} invoice could not be sent automatically: ${result.error} Send it from the admin Team Orders page.`,
         mention: true,
       });
     }

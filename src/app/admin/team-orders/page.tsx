@@ -31,6 +31,9 @@ import { AdminCustomerPickupButton } from "@/components/admin-customer-pickup-bu
 import { AdminRowMenu } from "@/components/admin-row-menu";
 import { AdminCustomPrice } from "@/components/admin-custom-price";
 import { AdminInboundTracking } from "@/components/admin-inbound-tracking";
+import { AdminFinalMockup } from "@/components/admin-final-mockup";
+import { AdminPickupReadyText } from "@/components/admin-pickup-ready-text";
+import { AdminQuickText } from "@/components/admin-quick-text";
 import {
   buildDeliveryTimeline,
   type DeliveryRisk,
@@ -115,6 +118,8 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
         teamName: designRequests.teamName,
         approvedAt: designRequests.approvedAt,
         neededBy: designRequests.neededBy,
+        approvedDesignUrl: designRequests.approvedDesignUrl,
+        approvedDesignUrls: designRequests.approvedDesignUrls,
         archivedAt: designRequests.archivedAt,
         updatedAt: designRequests.updatedAt,
       })
@@ -126,7 +131,10 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
         reference: teamOrders.reference,
         teamName: teamOrders.teamName,
         status: teamOrders.status,
+        contactName: teamOrders.contactName,
         contactEmail: teamOrders.contactEmail,
+        contactPhone: teamOrders.contactPhone,
+        smsOptInAt: teamOrders.smsOptInAt,
         manageToken: teamOrders.manageToken,
         jerseyStyle: teamOrders.jerseyStyle,
         rushShipping: teamOrders.rushShipping,
@@ -195,6 +203,15 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
   }
 
   const activeDesigns = designs.filter((d) => !d.archivedAt);
+  const finalMockupsByDesign = new Map(
+    designs.map((design) => [
+      design.id,
+      Array.from(new Set([
+        ...(design.approvedDesignUrls ?? []),
+        ...(design.approvedDesignUrl ? [design.approvedDesignUrl] : []),
+      ])),
+    ]),
+  );
   // Designs a standalone order can be manually linked to.
   const linkableDesigns = activeDesigns.map((d) => ({ id: d.id, teamName: d.teamName, reference: d.reference }));
   const activeOrders = torders.filter((o) => !o.archivedAt);
@@ -410,14 +427,15 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
 
       <section className="mt-4 scroll-mt-16" id="team-orders">
         <div className="overflow-x-auto rounded-xl border border-line bg-steel/30">
-          <table className="w-full min-w-[860px] text-sm">
+          <table className="w-full min-w-[940px] text-sm">
             <thead>
               <tr className="bg-steel text-left text-[10px] tracking-wider text-muted uppercase">
-                <th className="w-[27%] px-4 py-3">Team / order</th>
-                <th className="w-[13%] px-3 py-3">Stage</th>
-                <th className="w-[18%] px-3 py-3">Order value</th>
-                <th className="w-[34%] px-3 py-3">Next action / fulfillment</th>
-                <th className="w-[8%] px-3 py-3">Updated</th>
+                <th className="w-[24%] px-4 py-3">Team / order</th>
+                <th className="w-[8%] px-3 py-3">Final</th>
+                <th className="w-[12%] px-3 py-3">Stage</th>
+                <th className="w-[17%] px-3 py-3">Order value</th>
+                <th className="w-[32%] px-3 py-3">Next action / fulfillment</th>
+                <th className="w-[7%] px-3 py-3">Updated</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[color:var(--line)]">
@@ -426,14 +444,17 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                 const paid = Boolean(o.invoicePaidAt) || o.status === "paid" || o.status === "shipped";
                 const deposit = o.depositCents ?? (estimate ? Math.round(estimate / 2) : 0);
                 const timeline = orderTimelines.get(o.id)!;
-                const customerDate = timeline.promisedInHandAt ?? timeline.requestedInHandAt;
+                const finalMockups = Array.from(new Set([
+                  ...(o.designRequestId ? finalMockupsByDesign.get(o.designRequestId) ?? [] : []),
+                  ...(o.approvedDesignUrl ? [o.approvedDesignUrl] : []),
+                ]));
                 return (
                   <tr
                     key={o.reference}
                     className="align-top hover:bg-steel/60"
                     data-section="orders"
                     data-status={o.status}
-                    data-search={`${o.teamName} ${o.reference} ${o.contactEmail} ${srcShort(o.source)} ${timeline.tierLabel} ${timeline.riskLabel}`.toLowerCase()}
+                    data-search={`${o.teamName} ${o.reference} ${o.contactName} ${o.contactEmail} ${srcShort(o.source)} ${timeline.tierLabel} ${timeline.riskLabel}`.toLowerCase()}
                   >
                     <td className="px-4 py-3 text-foreground">
                       <div className="flex flex-wrap items-center gap-2">
@@ -442,11 +463,41 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                           <AdminAddonDetails addons={addonsByOrder.get(o.id)!} teamName={o.teamName} />
                         )}
                       </div>
+                      <p className="mt-1 text-xs text-foreground">
+                        <span className="display text-[10px] text-muted">CONTACT</span>
+                        {o.contactPhone ? (
+                          <Link
+                            href={`/admin/texts?to=${encodeURIComponent(o.contactPhone)}&name=${encodeURIComponent(o.contactName)}`}
+                            className="ml-1.5 font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
+                            title={`Open text history with ${o.contactName}`}
+                          >
+                            {o.contactName}
+                          </Link>
+                        ) : (
+                          <span className="ml-1.5 font-medium" title="No phone number is attached to this order">{o.contactName}</span>
+                        )}
+                      </p>
                       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted">
                         <Link href={`/admin/team-order/${o.id}`} className="font-mono text-brand hover:underline">{o.reference}</Link>
                         <span className="truncate max-w-[15rem]">{o.contactEmail}</span>
                         <span title={o.source ?? "unknown (pre-tracking)"}>{srcShort(o.source)}</span>
                       </div>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px]">
+                        <span
+                          className={`display ${DATE_RISK_TONE[timeline.risk]}`}
+                          title={timeline.riskDetail}
+                        >
+                          NEEDED BY {timeline.requestedInHandAt ? fmtRequestedDate(timeline.requestedInHandAt) : "NOT PROVIDED"}
+                        </span>
+                        {timeline.promisedInHandAt ? (
+                          <span className="display text-sky-300" title="Date Slugger committed to in writing">
+                            PROMISED {fmtRequestedDate(timeline.promisedInHandAt)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <AdminFinalMockup teamName={o.teamName} images={finalMockups} />
                     </td>
                     <td className="px-3 py-3"><Badge label={o.localPickup && o.deliveredAt ? "picked_up" : o.status} /></td>
                     <td className="px-3 py-3 text-foreground">
@@ -468,7 +519,11 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                         {/* Shipping rides on the FINAL invoice: show the
                             charged amount once known, else the weight-based
                             estimate so the full number is visible up front. */}
-                        {o.localPickup ? (
+                        {o.rushShipping ? (
+                          <span className="text-xs text-sky-300 whitespace-nowrap" title="Direct shipping is included with Rush">
+                            + shipping included
+                          </span>
+                        ) : o.localPickup ? (
                           <span className="text-xs text-muted whitespace-nowrap" title="Local order - customer picks up in Ocala, no shipping">
                             + pickup
                           </span>
@@ -550,6 +605,14 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                           o.localPickup && !o.deliveredAt ? (
                             <>
                               <span className="text-xs display text-amber-400 whitespace-nowrap">PICKUP NEEDS CONFIRMATION</span>
+                              <AdminPickupReadyText
+                                teamOrderId={o.id}
+                                teamName={o.teamName}
+                                reference={o.reference}
+                                contactName={o.contactName}
+                                phoneLast4={o.contactPhone?.replace(/\D/g, "").slice(-4) || null}
+                                disabledReason={!o.contactPhone ? "No customer phone number on this order." : !o.smsOptInAt ? "Customer did not opt in to SMS updates." : undefined}
+                              />
                               <AdminCustomerPickupButton teamOrderId={o.id} teamName={o.teamName} />
                             </>
                           ) : (
@@ -562,6 +625,14 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                           o.localPickup ? (
                             <>
                               <span className="text-xs display text-green-400 whitespace-nowrap">PAID · LOCAL PICKUP</span>
+                              <AdminPickupReadyText
+                                teamOrderId={o.id}
+                                teamName={o.teamName}
+                                reference={o.reference}
+                                contactName={o.contactName}
+                                phoneLast4={o.contactPhone?.replace(/\D/g, "").slice(-4) || null}
+                                disabledReason={!o.contactPhone ? "No customer phone number on this order." : !o.smsOptInAt ? "Customer did not opt in to SMS updates." : undefined}
+                              />
                               <AdminCustomerPickupButton teamOrderId={o.id} teamName={o.teamName} />
                             </>
                           ) : o.trackingNumber ? (
@@ -585,22 +656,55 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                               stage="balance"
                               resend={Boolean(o.balanceInvoiceUrl)}
                               localPickup={o.localPickup}
+                              rushShipping={o.rushShipping}
                             />
                           </>
                         ) : estimate ? (
                           <AdminInvoiceButton
                             teamOrderId={o.id}
                             teamName={o.teamName}
-                            dueCents={deposit}
+                            dueCents={o.rushShipping ? estimate : deposit}
                             stage="deposit"
                             resend={Boolean(o.invoiceUrl)}
                             warnPrintFile={Boolean(o.designRequestId) && !o.printFileVerifiedAt && personalizedOrders.has(o.id)}
+                            rushShipping={o.rushShipping}
                           />
                         ) : (
                           <span className="text-xs text-muted">no roster</span>
                         )}
                         {/* Secondary actions in a floating dropdown. */}
                         <AdminRowMenu>
+                            {o.contactPhone ? (
+                              <Link href={`/admin/texts?to=${encodeURIComponent(o.contactPhone)}&name=${encodeURIComponent(o.contactName)}`}>
+                                View text history
+                              </Link>
+                            ) : (
+                              <span className="text-xs text-muted" title="No phone number is attached to this order">No text history · no phone</span>
+                            )}
+                            <Link
+                              href={o.designRequestId
+                                ? `/admin/texts?tab=email&open=${encodeURIComponent(o.designRequestId)}`
+                                : `/admin/texts?tab=email&email=${encodeURIComponent(o.contactEmail)}`}
+                            >
+                              View email history
+                            </Link>
+                            <AdminQuickText
+                              teamOrderId={o.id}
+                              teamName={o.teamName}
+                              reference={o.reference}
+                              contactName={o.contactName}
+                              phoneLast4={o.contactPhone?.replace(/\D/g, "").slice(-4) || null}
+                              finalPaymentUrl={!paid && o.depositPaidAt && !o.localPickup && !o.rushShipping ? o.balanceInvoiceUrl : null}
+                              disabledReason={!o.contactPhone ? "No customer phone number on this order." : !o.smsOptInAt ? "Customer did not opt in to SMS updates." : undefined}
+                            />
+                            <a
+                              href={`/api/admin/team-order/packing-view?id=${o.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Open a printable item-by-item packing sheet"
+                            >
+                              Print order sheet
+                            </a>
                             <AdminDesignerNote teamOrderId={o.id} current={o.designerNote} />
                             {!o.designRequestId && (
                               <AdminLinkDesign teamOrderId={o.id} designs={linkableDesigns} />
@@ -611,6 +715,8 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                                 teamName={o.teamName}
                                 depositPaid={Boolean(o.depositPaidAt)}
                                 suggestedDepositCents={estimate ? deposit : null}
+                                suggestedFullCents={estimate}
+                                rushShipping={o.rushShipping}
                               />
                             )}
                             {(o.invoiceUrl || estimate) && (
@@ -618,7 +724,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                                 href={`/api/admin/team-order/invoice-view?id=${o.id}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                title={paid ? "View the paid receipt (itemized, incl. shipping) - no Stripe login needed" : o.invoiceUrl ? "See a copy of the invoice the customer received" : "Preview the deposit invoice before sending it"}
+                                title={paid ? "View the paid receipt (itemized, incl. shipping) - no Stripe login needed" : o.invoiceUrl ? "See a copy of the invoice the customer received" : o.rushShipping ? "Preview the Rush pay-in-full invoice before sending it" : "Preview the deposit invoice before sending it"}
                                 className="text-xs display text-muted whitespace-nowrap"
                               >
                                 {paid ? "View receipt" : "View invoice"}
@@ -676,7 +782,7 @@ export default async function AdminTeamOrdersPage({ searchParams }: { searchPara
                 );
               })}
               <tr data-empty-for="orders" className="hidden">
-                <td colSpan={5} className="px-5 py-10 text-center text-sm text-muted">No team orders match those filters.</td>
+                <td colSpan={6} className="px-5 py-10 text-center text-sm text-muted">No team orders match those filters.</td>
               </tr>
             </tbody>
           </table>

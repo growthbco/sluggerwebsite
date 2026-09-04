@@ -29,6 +29,7 @@ export async function customerContext(phone: string) {
         invoicePaidAt: teamOrders.invoicePaidAt,
         depositPaidAt: teamOrders.depositPaidAt,
         depositCents: teamOrders.depositCents,
+        rushShipping: teamOrders.rushShipping,
         createdAt: teamOrders.createdAt,
       })
       .from(teamOrders)
@@ -84,6 +85,7 @@ export async function customerContext(phone: string) {
         totalCents: o.quotedTotalCents,
         paid: Boolean(o.invoicePaidAt),
         depositPaid: Boolean(o.depositPaidAt),
+        rushShipping: o.rushShipping,
       })),
     designs: myDesigns
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
@@ -128,5 +130,3 @@ export async function namesByPhone(): Promise<Map<string, string>> {
   }
   return map;
 }
-
-

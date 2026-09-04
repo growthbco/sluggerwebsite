@@ -39,7 +39,7 @@ const PORTFOLIO_PHOTOS = [
 const metroProcess = (city: string) => [
   { t: "1. Free design mockup", d: `Send your logo, colors, or an idea. Our designer sends back a ${city}-ready mockup, revisions included, before you pay anything.` },
   { t: "2. Share the roster link", d: `Approve the design, then share one link so every ${city} player picks their own size, name, and number. No spreadsheets, no chasing parents.` },
-  { t: "3. Deposit and production", d: "A 50% deposit starts full sublimation production. Standard production is 3 weeks after the final proof, final roster, and deposit. Confirmed 2-week Rush is $100; shipping time is additional." },
+  { t: "3. Payment and production", d: "Standard orders can start with a 50% deposit and target 3 weeks after the final proof, roster, and payment. Confirmed 2-week Rush is $100 and requires full payment before production; direct shipping is included." },
   { t: `4. Delivery to ${city}`, d: `We deliver the finished set to your ${city} team or ship it, and each family keeps ordering through your free team store.` },
 ];
 
@@ -48,7 +48,7 @@ const metroCommonFaqs = (city: string) => [
   { q: `How much do custom uniforms cost in ${city}?`, a: "Sublimated jerseys start at $28 with the design, names, and numbers included: $30 V-neck, $32 two-button, $35 full-button, $40 quarter-zip. Pants are $40 and embroidered hats $25 to $30. The same price applies to every size, and there are no per-color charges." },
   { q: "Is there a minimum order?", a: `We run a six-piece minimum per design, which most ${city} teams clear easily. Embroidered hats have a six-hat minimum per design and are often ready in days.` },
   { q: "Do I have to drive to Ocala to order?", a: `No. We deliver finished orders to ${city} or ship them, and the whole design and roster process happens online, so you never have to make the drive.` },
-  { q: `How long does a ${city} uniform order take?`, a: "Standard production is 3 weeks after the final proof, final roster, and deposit are complete. Confirmed 2-week Rush is $100. Shipping time is additional." },
+  { q: `How long does a ${city} uniform order take?`, a: "Standard production is 3 weeks after the final proof, final roster, and deposit are complete. Confirmed 2-week Rush is $100, requires full payment before production, and includes direct shipping." },
 ];
 
 export const SERVICE_AREAS: ServiceArea[] = [
@@ -72,7 +72,7 @@ export const SERVICE_AREAS: ServiceArea[] = [
     process: [
       { t: "1. Free design mockup", d: "Send your logo, colors, or an idea. Our designer sends back an Orlando-ready mockup, revisions included, before you pay anything." },
       { t: "2. Share the roster link", d: "Approve the design, then share one link so every Orlando player picks their own size, name, and number. No spreadsheets, no chasing parents." },
-      { t: "3. Deposit and production", d: "A 50% deposit starts full sublimation production. Standard production is 3 weeks after the final proof, final roster, and deposit. Confirmed 2-week Rush is $100; shipping time is additional." },
+      { t: "3. Payment and production", d: "Standard orders can start with a 50% deposit and target 3 weeks after the final proof, roster, and payment. Confirmed 2-week Rush is $100 and requires full payment before production; direct shipping is included." },
       { t: "4. Delivery to Orlando", d: "We deliver the finished set to your Orlando team or ship it, and each family keeps ordering through your free team store." },
     ],
     delivery:
@@ -88,7 +88,7 @@ export const SERVICE_AREAS: ServiceArea[] = [
       { q: "What sports do you make uniforms for in Orlando?", a: "Baseball, softball, basketball, soccer, flag football, and volleyball, plus custom hats and full uniform bundles. Every sport uses the same free-design, roster-based ordering." },
       { q: "Is there a minimum order for Orlando teams?", a: "We run a six-piece minimum per design, which most Orlando teams clear easily. Embroidered hats have a six-hat minimum per design and are often ready in days." },
       { q: "Do I have to drive to Ocala to order?", a: "No. We deliver finished orders to Orlando or ship them, and the whole design and roster process happens online, so you never have to make the drive." },
-      { q: "How long does an Orlando uniform order take?", a: "Standard production is 3 weeks after the final proof, final roster, and deposit are complete. Confirmed 2-week Rush is $100. Shipping time is additional." },
+      { q: "How long does an Orlando uniform order take?", a: "Standard production is 3 weeks after the final proof, final roster, and deposit are complete. Confirmed 2-week Rush is $100, requires full payment before production, and includes direct shipping." },
       { q: "Are the jerseys really fully sublimated?", a: "Yes. Colors, logos, numbers, and pinstripes are dyed into the fabric, not pressed on top, so they will not crack or peel through an Orlando season." },
     ],
   },

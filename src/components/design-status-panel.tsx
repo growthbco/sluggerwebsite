@@ -20,6 +20,7 @@ type Props = {
   revisionsUsed: number;
   maxRevisions: number;
   whiteLabel?: boolean;
+  rush?: boolean;
 };
 
 const STATUS_COPY: Record<string, { label: string; blurb: string }> = {
@@ -46,6 +47,7 @@ export function DesignStatusPanel({
   revisionsUsed,
   maxRevisions,
   whiteLabel = false,
+  rush = false,
 }: Props) {
   const [currentStatus, setCurrentStatus] = useState(status);
   // Multi-select: a project can have several finals (jersey, hat, pants, or a
@@ -76,7 +78,10 @@ export function DesignStatusPanel({
   const [used, setUsed] = useState(revisionsUsed);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const copy = STATUS_COPY[currentStatus] ?? { label: currentStatus, blurb: "" };
+  const baseCopy = STATUS_COPY[currentStatus] ?? { label: currentStatus, blurb: "" };
+  const copy = rush && currentStatus === "ordered"
+    ? { ...baseCopy, blurb: "Your roster is submitted. Full payment is the next step for Rush." }
+    : baseCopy;
   const isApproved = currentStatus === "approved" || currentStatus === "ordered";
   // When the roster lives on this same page (the unified hub passes a "#roster"
   // anchor), the post-approval CTA scrolls down instead of sending them to a
@@ -93,6 +98,21 @@ export function DesignStatusPanel({
     if (isApproved) return;
     setActiveProof(u);
     setSelected((s) => (s.includes(u) ? s.filter((x) => x !== u) : [...s, u]));
+  }
+
+  function editProof(u: string) {
+    if (busy !== "") return;
+    if (activeProof !== u) {
+      setActiveProof(u);
+      setAnnotations([]);
+      setGeneralNote("");
+    }
+    setMessage("");
+    setExpanded(null);
+    setShowChanges(true);
+    window.setTimeout(() => {
+      document.getElementById("change-request-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
   }
 
   async function approve() {
@@ -175,7 +195,7 @@ export function DesignStatusPanel({
           {!isApproved && (
             <p className="text-sm text-muted mt-1">
               {proofImages.length > 1
-                ? "Tap each proof you want to approve (you can pick more than one). Use the magnifier to enlarge."
+                ? "Tap each proof to select it for approval. Use the edit button below the item you want to mark up."
                 : "Tap the proof to select it, then approve or request changes."}
             </p>
           )}
@@ -199,40 +219,50 @@ export function DesignStatusPanel({
               return (
                 <div
                   key={u}
-                  className={`group relative aspect-[4/3] bg-white border-2 overflow-hidden ${
+                  className={`group bg-white border-2 overflow-hidden ${
                     isSel ? "border-brand ring-2 ring-brand/40" : "border-line hover:border-brand/50"
                   }`}
                 >
-                  <Image src={u} alt={proofLabels[u] || "Proof"} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-contain p-2" unoptimized />
-                  {!isApproved && (
+                  <div className="relative aspect-[4/3]">
+                    <Image src={u} alt={proofLabels[u] || "Proof"} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-contain p-2" unoptimized />
+                    {!isApproved && (
+                      <button
+                        type="button"
+                        onClick={() => toggleSelect(u)}
+                        aria-pressed={isSel}
+                        aria-label={`${isSel ? "Deselect" : "Select"} ${proofLabels[u] || "proof"} for approval`}
+                        className="absolute inset-0 z-10 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand/70"
+                      >
+                        <span className="sr-only">{isSel ? "Selected" : "Not selected"}</span>
+                      </button>
+                    )}
+                    {!isApproved && (
+                      <span className={`absolute top-2 right-2 grid place-items-center h-7 w-7 display text-sm rounded-full border-2 ${isSel ? "bg-brand text-on-brand border-brand" : "bg-white/90 text-muted border-line"}`}>
+                        {isSel ? "✓" : ""}
+                      </span>
+                    )}
+                    {proofLabels[u] && (
+                      <span className="absolute top-2 left-2 bg-black/75 text-white text-[11px] display px-2 py-1 pointer-events-none">{proofLabels[u]}</span>
+                    )}
                     <button
                       type="button"
-                      onClick={() => toggleSelect(u)}
-                      aria-pressed={isSel}
-                      aria-label={`${isSel ? "Deselect" : "Select"} ${proofLabels[u] || "proof"} for approval`}
-                      className="absolute inset-0 z-10 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand/70"
+                      onClick={(e) => { e.stopPropagation(); setExpanded(u); }}
+                      className="absolute bottom-2 right-2 z-20 grid place-items-center h-11 w-11 bg-black/70 text-white rounded hover:bg-black/85"
+                      title="Enlarge"
+                      aria-label="Enlarge proof"
                     >
-                      <span className="sr-only">{isSel ? "Selected" : "Not selected"}</span>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" strokeLinecap="round" /></svg>
+                    </button>
+                  </div>
+                  {!isApproved && !maxedOut && (
+                    <button
+                      type="button"
+                      onClick={() => editProof(u)}
+                      className="w-full border-t border-line bg-ink px-3 py-2.5 text-left text-xs display text-brand hover:bg-brand/10"
+                    >
+                      Request edits and add pins
                     </button>
                   )}
-                  {!isApproved && (
-                    <span className={`absolute top-2 right-2 grid place-items-center h-7 w-7 display text-sm rounded-full border-2 ${isSel ? "bg-brand text-on-brand border-brand" : "bg-white/90 text-muted border-line"}`}>
-                      {isSel ? "✓" : ""}
-                    </span>
-                  )}
-                  {proofLabels[u] && (
-                    <span className="absolute top-2 left-2 bg-black/75 text-white text-[11px] display px-2 py-1 pointer-events-none">{proofLabels[u]}</span>
-                  )}
-                  {/* Enlarge is its own control so tapping the image selects it. */}
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setExpanded(u); }}
-                    className="absolute bottom-2 right-2 z-20 grid place-items-center h-11 w-11 bg-black/70 text-white rounded hover:bg-black/85"
-                    title="Enlarge"
-                    aria-label="Enlarge proof"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" strokeLinecap="round" /></svg>
-                  </button>
                 </div>
               );
             })}
@@ -241,17 +271,35 @@ export function DesignStatusPanel({
       )}
 
       {supersededProofImages.length > 0 && (
-        <details className="border border-line bg-foreground/[0.02]">
-          <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm text-muted">
-            View {supersededProofImages.length} superseded proof{supersededProofImages.length === 1 ? "" : "s"}
+        <details open className="border border-line bg-foreground/[0.02]">
+          <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-medium text-foreground">
+            Earlier and other product proofs ({supersededProofImages.length})
           </summary>
-          <div className="grid gap-3 border-t border-line p-4 sm:grid-cols-3">
-            {supersededProofImages.map((url) => (
-              <button key={url} type="button" onClick={() => setExpanded(url)} className="relative aspect-[4/3] overflow-hidden border border-line bg-white opacity-70 hover:opacity-100">
-                <Image src={url} alt={`${proofLabels[url] || "Previous proof"} — superseded`} fill sizes="(max-width: 640px) 100vw, 33vw" className="object-contain p-2" unoptimized />
-                <span className="absolute bottom-2 left-2 bg-black/80 px-2 py-1 text-[11px] text-white">Superseded · do not approve</span>
-              </button>
-            ))}
+          <div className="border-t border-line p-4">
+            <p className="mb-3 text-xs text-muted">
+              These cannot be approved, but you can still request edits and place pins on any item that needs changes.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {supersededProofImages.map((url) => (
+                <div key={url} className="overflow-hidden border border-line bg-white">
+                  <button type="button" onClick={() => setExpanded(url)} className="relative block aspect-[4/3] w-full opacity-80 hover:opacity-100">
+                    <Image src={url} alt={`${proofLabels[url] || "Earlier proof"} — reference only`} fill sizes="(max-width: 640px) 100vw, 33vw" className="object-contain p-2" unoptimized />
+                    <span className="absolute bottom-2 left-2 right-2 bg-black/80 px-2 py-1 text-left text-[11px] text-white">
+                      {proofLabels[url] || "Earlier proof"} · Not available for approval
+                    </span>
+                  </button>
+                  {!isApproved && !maxedOut && (
+                    <button
+                      type="button"
+                      onClick={() => editProof(url)}
+                      className="w-full border-t border-line bg-ink px-3 py-2.5 text-left text-xs display text-brand hover:bg-brand/10"
+                    >
+                      Request edits and add pins
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </details>
       )}
@@ -328,7 +376,7 @@ export function DesignStatusPanel({
                   Approving locks {selected.length > 1 ? "these designs" : "this design"} as your final artwork. Every logo, color, and design detail will be produced as shown.
                 </p>
                 <p className="mt-2 text-sm text-foreground/90">
-                  <strong>This does not start production or charge you.</strong> Next you&apos;ll confirm your roster, review the full price, and receive the deposit invoice.
+                  <strong>This does not start production or charge you.</strong> Next you&apos;ll confirm your roster, review the full price, and receive {rush ? "the required Rush pay-in-full invoice" : "the deposit invoice"}.
                 </p>
                 <label className="mt-4 flex items-start gap-2.5 text-sm text-foreground cursor-pointer select-none">
                   <input
@@ -378,16 +426,16 @@ export function DesignStatusPanel({
       )}
 
       {showChanges && !isApproved && !maxedOut && (
-        <section className="bg-steel border border-line p-5 space-y-4">
+        <section id="change-request-editor" className="scroll-mt-6 bg-steel border border-line p-5 space-y-4">
           <div>
             <h3 className="display text-foreground">Tell us what to change</h3>
             <p className="text-sm text-muted mt-1">
               Click pins on the proof to mark exactly what to change. You have{" "}
               <strong className="text-foreground">{revisionsLeft}</strong> revision{revisionsLeft === 1 ? "" : "s"} left.
             </p>
-            {proofImages.length > 1 && (
+            {proofImages.length + supersededProofImages.length > 1 && (
               <p className="text-xs text-muted mt-1">
-                Editing: <strong className="text-foreground">{proofLabels[activeProof] || "the selected proof"}</strong>. Tap a different proof above to switch.
+                Editing: <strong className="text-foreground">{proofLabels[activeProof] || "the selected proof"}</strong>. Choose another item&apos;s edit button to switch.
               </p>
             )}
           </div>

@@ -38,6 +38,7 @@ type Context = {
     totalCents: number | null;
     paid: boolean;
     depositPaid: boolean;
+    rushShipping: boolean;
   }[];
   designs: {
     id: string;
@@ -48,6 +49,60 @@ type Context = {
   }[];
 };
 type Filter = "all" | "unread" | "starred" | "archived";
+
+const GOOGLE_REVIEW_URL =
+  "https://www.google.com/maps/search/?api=1&query=Slugger+Athletics+Ocala+FL";
+
+const QUICK_REPLIES = [
+  {
+    key: "pricing",
+    label: "Pricing",
+    message: (firstName: string) =>
+      `Hi ${firstName}, fully sublimated jerseys start at $28 for round neck and $30 for V-neck. Your custom design, team logos, sponsor logos, names, and numbers are included. Most orders have a 6-piece minimum per design. Current pricing: https://sluggerathletics.com/pricing`,
+  },
+  {
+    key: "sizing",
+    label: "Sizing",
+    message: (firstName: string) =>
+      `Hi ${firstName}, you can view our youth and adult size charts here: https://sluggerathletics.com/size-guide. Please compare the width and length to a jersey that already fits well. Basketball, volleyball, cheer, and other product-specific charts are listed separately.`,
+  },
+  {
+    key: "review",
+    label: "Review request",
+    message: (firstName: string) =>
+      `Hi ${firstName}, thank you for choosing Slugger Athletics! If you were happy with your order, would you mind leaving us a quick Google review? It really helps our small business: ${GOOGLE_REVIEW_URL}`,
+  },
+  {
+    key: "timeline",
+    label: "Timeline",
+    message: (firstName: string) =>
+      `Hi ${firstName}, standard production is 3 weeks after artwork approval and required payment. Two-week Rush is $100. Shipping time is additional. If you have a firm in-hand date, send it over before ordering so we can confirm availability.`,
+  },
+  {
+    key: "proof",
+    label: "Proof approval",
+    message: (firstName: string) =>
+      `Hi ${firstName}, your proof is ready for review. Please check spelling, numbers, colors, logos, and sponsor placement carefully. Reply with your approval or any changes. Production begins after final written approval and required payment.`,
+  },
+  {
+    key: "roster",
+    label: "Roster reminder",
+    message: (firstName: string) =>
+      `Hi ${firstName}, we are still waiting on your final roster and sizes. Please double-check every name, number, product, and size before submitting. Roster changes are locked once a deposit or full payment is recorded.`,
+  },
+  {
+    key: "payment",
+    label: "Payment reminder",
+    message: (firstName: string) =>
+      `Hi ${firstName}, your order is ready for the next payment step. Please use the invoice link we sent, or let us know if you need it resent. Production begins after the required payment is received.`,
+  },
+  {
+    key: "details",
+    label: "Need details",
+    message: (firstName: string) =>
+      `Hi ${firstName}, happy to help. Please send the sport, estimated quantity, preferred jersey style, and requested in-hand date. If you have logos or inspiration, send those too.`,
+  },
+] as const;
 
 const fmt = (d: string) =>
   new Date(d).toLocaleString("en-US", {
@@ -87,7 +142,8 @@ const isAutomatedMessage = (message: Message) =>
 export function AdminTextsInbox({
   initialPhone,
   initialName,
-}: { initialPhone?: string; initialName?: string } = {}) {
+  restricted = false,
+}: { initialPhone?: string; initialName?: string; restricted?: boolean } = {}) {
   const [convos, setConvos] = useState<Conversation[]>([]);
   const [active, setActive] = useState<string | null>(null);
   // Mobile is master-detail: the list OR the open thread, never both cramped
@@ -206,6 +262,7 @@ export function AdminTextsInbox({
   }, []);
 
   const loadContext = useCallback(async (phone: string) => {
+    if (restricted) return;
     setContext(null);
     try {
       const res = await fetch(
@@ -214,7 +271,7 @@ export function AdminTextsInbox({
       const data = await res.json();
       if (res.ok) setContext(data);
     } catch {}
-  }, []);
+  }, [restricted]);
 
   const setState = useCallback(
     async (
@@ -239,19 +296,22 @@ export function AdminTextsInbox({
   );
 
   useEffect(() => {
-    loadConvos();
+    const timeout = window.setTimeout(() => void loadConvos(), 0);
+    return () => window.clearTimeout(timeout);
   }, [loadConvos]);
 
   // New-conversation customer search: type a name, team, or email and pick
   // the person - no phone number hunting. Debounced type-ahead against the
   // same search the invoice form uses (now team-aware).
   useEffect(() => {
+    if (restricted) return;
     const q = pickerQ.trim();
-    if (q.length < 2 || /^[\d\s()+-]+$/.test(q)) {
-      setPickerHits([]);
-      return;
-    }
-    const t = setTimeout(async () => {
+    const shouldSearch = q.length >= 2 && !/^[\d\s()+-]+$/.test(q);
+    const t = window.setTimeout(async () => {
+      if (!shouldSearch) {
+        setPickerHits([]);
+        return;
+      }
       try {
         const res = await fetch(
           `/api/admin/customers/search?q=${encodeURIComponent(q)}`,
@@ -264,9 +324,9 @@ export function AdminTextsInbox({
             ),
           );
       } catch {}
-    }, 250);
-    return () => clearTimeout(t);
-  }, [pickerQ]);
+    }, shouldSearch ? 250 : 0);
+    return () => window.clearTimeout(t);
+  }, [pickerQ, restricted]);
 
   function pickCustomer(hit: { name: string; phone: string | null }) {
     if (!hit.phone) return;
@@ -315,11 +375,14 @@ export function AdminTextsInbox({
 
   useEffect(() => {
     if (!active) return;
-    loadThread(active);
-    loadContext(active);
-    setEditingName(false);
-    setMobileView("thread");
-    setState(active, { markRead: true });
+    const timeout = window.setTimeout(() => {
+      void loadThread(active);
+      void loadContext(active);
+      setEditingName(false);
+      setMobileView("thread");
+      void setState(active, { markRead: true });
+    }, 0);
+    return () => window.clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
@@ -393,6 +456,13 @@ export function AdminTextsInbox({
   const activeConvo = convos.find((c) => c.phone === active);
   const unreadCount = convos.filter((c) => c.unread && !c.archived).length;
 
+  function useQuickReply(message: (firstName: string) => string) {
+    const contactName = activeConvo?.name ?? newName;
+    const firstName = contactName?.trim().split(/\s+/)[0] || "there";
+    setDraft(message(firstName));
+    window.requestAnimationFrame(() => composerRef.current?.focus());
+  }
+
   const chip = (f: Filter, label: string) => (
     <button
       key={f}
@@ -424,7 +494,7 @@ export function AdminTextsInbox({
     0;
 
   return (
-    <div className="flex min-h-[32rem] flex-col overflow-hidden border border-line bg-steel shadow-[0_18px_60px_rgba(0,0,0,0.18)] lg:grid lg:h-[calc(100dvh-10.5rem)] lg:max-h-[52rem] lg:min-h-0 lg:grid-cols-[20rem_minmax(0,1fr)] xl:grid-cols-[19rem_minmax(28rem,1fr)_18rem]">
+    <div className={`flex min-h-[32rem] flex-col overflow-hidden border border-line bg-steel shadow-[0_18px_60px_rgba(0,0,0,0.18)] lg:grid lg:h-[calc(100dvh-10.5rem)] lg:max-h-[52rem] lg:min-h-0 lg:grid-cols-[20rem_minmax(0,1fr)] ${restricted ? "" : "xl:grid-cols-[19rem_minmax(28rem,1fr)_18rem]"}`}>
       {/* ── Conversations ─────────────────────────────────────────── */}
       <aside
         className={`min-w-0 flex-col overflow-hidden bg-steel lg:h-full lg:min-h-0 lg:border-r lg:border-line ${mobileView === "thread" ? "hidden lg:flex" : "flex h-[calc(100dvh-9rem)]"}`}
@@ -599,44 +669,47 @@ export function AdminTextsInbox({
             )
           ) : (
             <span className="flex-1 min-w-[16rem]">
-              <span className="relative block">
-                <input
-                  value={pickerQ}
-                  onChange={(e) => setPickerQ(e.target.value)}
-                  placeholder="Search a customer by name, team, or email…"
-                  autoFocus
-                  className="w-full bg-background border border-brand/40 px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
-                />
-                {pickerHits.length > 0 && (
-                  <span className="absolute left-0 right-0 top-full z-20 mt-1 block border border-line bg-steel shadow-xl max-h-64 overflow-y-auto">
-                    {pickerHits.map((h) => (
-                      <button
-                        key={h.email}
-                        type="button"
-                        onClick={() => pickCustomer(h)}
-                        className="block w-full text-left px-3 py-2 hover:bg-brand/10 border-b border-line/60 last:border-b-0"
-                      >
-                        <span className="text-sm text-foreground">
-                          {h.name || h.email}
-                        </span>
-                        {h.team && (
-                          <span className="ml-2 text-xs text-brand">
-                            {h.team}
+              {!restricted && (
+                <span className="relative block">
+                  <input
+                    value={pickerQ}
+                    onChange={(e) => setPickerQ(e.target.value)}
+                    placeholder="Search a customer by name, team, or email…"
+                    autoFocus
+                    className="w-full bg-background border border-brand/40 px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
+                  />
+                  {pickerHits.length > 0 && (
+                    <span className="absolute left-0 right-0 top-full z-20 mt-1 block border border-line bg-steel shadow-xl max-h-64 overflow-y-auto">
+                      {pickerHits.map((h) => (
+                        <button
+                          key={h.email}
+                          type="button"
+                          onClick={() => pickCustomer(h)}
+                          className="block w-full text-left px-3 py-2 hover:bg-brand/10 border-b border-line/60 last:border-b-0"
+                        >
+                          <span className="text-sm text-foreground">
+                            {h.name || h.email}
                           </span>
-                        )}
-                        <span className="block text-xs text-muted">
-                          {h.phone ? prettyPhone(h.phone) : ""} · {h.email}
-                        </span>
-                      </button>
-                    ))}
-                  </span>
-                )}
-              </span>
-              <span className="mt-2 flex gap-2">
+                          {h.team && (
+                            <span className="ml-2 text-xs text-brand">
+                              {h.team}
+                            </span>
+                          )}
+                          <span className="block text-xs text-muted">
+                            {h.phone ? prettyPhone(h.phone) : ""} · {h.email}
+                          </span>
+                        </button>
+                      ))}
+                    </span>
+                  )}
+                </span>
+              )}
+              <span className={`${restricted ? "" : "mt-2"} flex gap-2`}>
                 <input
                   value={newPhone}
                   onChange={(e) => setNewPhone(e.target.value)}
-                  placeholder="…or a raw phone number"
+                  placeholder={restricted ? "Phone number" : "…or a raw phone number"}
+                  autoFocus={restricted}
                   className="flex-1 bg-background border border-line px-3 py-1.5 text-xs text-foreground placeholder:text-muted/60 focus:border-brand focus:outline-none"
                   inputMode="tel"
                 />
@@ -651,20 +724,22 @@ export function AdminTextsInbox({
           )}
           {active && activeConvo && (
             <span className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() =>
-                  window.dispatchEvent(
-                    new CustomEvent("slugger-dial", {
-                      detail: { phone: active },
-                    }),
-                  )
-                }
-                className="display inline-flex min-h-[36px] items-center rounded-md border border-brand/40 px-3 text-[11px] text-brand hover:bg-brand/10"
-                aria-label="Call this contact"
-              >
-                Call
-              </button>
+              {!restricted && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.dispatchEvent(
+                      new CustomEvent("slugger-dial", {
+                        detail: { phone: active },
+                      }),
+                    )
+                  }
+                  className="display inline-flex min-h-[36px] items-center rounded-md border border-brand/40 px-3 text-[11px] text-brand hover:bg-brand/10"
+                  aria-label="Call this contact"
+                >
+                  Call
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setState(active, { star: !activeConvo.starred })}
@@ -821,12 +896,35 @@ export function AdminTextsInbox({
                 {label}
               </button>
             ))}
+            {mode !== "note" && (
+              <select
+                defaultValue=""
+                aria-label="Choose a quick reply"
+                onChange={(event) => {
+                  const reply = QUICK_REPLIES.find(
+                    (item) => item.key === event.currentTarget.value,
+                  );
+                  if (reply) useQuickReply(reply.message);
+                  event.currentTarget.value = "";
+                }}
+                className="ml-1 min-h-[34px] max-w-[11rem] rounded-md border border-line bg-background px-3 py-1 display text-[10px] text-foreground focus:border-brand focus:outline-none lg:min-h-0"
+              >
+                <option value="" disabled>
+                  Quick reply…
+                </option>
+                {QUICK_REPLIES.map((reply) => (
+                  <option key={reply.key} value={reply.key}>
+                    {reply.label}
+                  </option>
+                ))}
+              </select>
+            )}
             {mode === "note" && (
               <span className="text-amber-200/70">
                 Internal only — the customer will not see this
               </span>
             )}
-            {active && mode !== "note" && (
+            {active && mode !== "note" && !restricted && (
               <button
                 type="button"
                 onClick={draftReply}
@@ -937,7 +1035,7 @@ export function AdminTextsInbox({
       </section>
 
       {/* ── Customer panel ────────────────────────────────────────── */}
-      <aside className="hidden flex-col overflow-y-auto bg-background/20 xl:flex">
+      {!restricted && <aside className="hidden flex-col overflow-y-auto bg-background/20 xl:flex">
         {!active ? (
           <div className="grid h-full place-items-center p-6 text-center">
             <div>
@@ -1083,7 +1181,7 @@ export function AdminTextsInbox({
             )}
           </div>
         )}
-      </aside>
+      </aside>}
     </div>
   );
 }

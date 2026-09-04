@@ -154,7 +154,7 @@ export type InvoiceReminderCandidate = {
   reference: string;
   teamName: string;
   contactEmail: string;
-  stage: "deposit" | "balance";
+  stage: "deposit" | "full" | "balance";
   contactPhone: string | null;
   smsOptInAt: Date | null;
   payUrl: string;
@@ -175,20 +175,20 @@ export async function findInvoiceReminderCandidates(now = new Date()): Promise<I
     if (sent >= MAX_INVOICE_REMINDERS) continue;
 
     // Which invoice is outstanding?
-    let stage: "deposit" | "balance" | null = null;
+    let stage: "deposit" | "full" | "balance" | null = null;
     let payUrl: string | null = null;
     if (o.balanceInvoiceUrl && o.depositPaidAt) {
       stage = "balance";
       payUrl = o.balanceInvoiceUrl;
     } else if (o.invoiceUrl && !o.depositPaidAt) {
-      stage = "deposit";
+      stage = o.rushShipping ? "full" : "deposit";
       payUrl = o.invoiceUrl;
     }
     if (!stage || !payUrl || !o.contactEmail) continue;
 
     const total = o.quotedTotalCents ?? 0;
     const deposit = o.depositCents ?? Math.round(total / 2);
-    const dueGoods = stage === "deposit" ? deposit : total - deposit;
+    const dueGoods = stage === "full" ? total : stage === "deposit" ? deposit : total - deposit;
     if (dueGoods <= 0) continue;
     const dueCents = dueGoods + Math.round(dueGoods * 0.07); // + 7% FL tax
 

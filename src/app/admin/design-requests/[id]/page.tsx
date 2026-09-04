@@ -201,6 +201,7 @@ export default async function AdminDesignRequestPage({ params }: { params: Promi
         }
         printFileVerified={printFileVerified}
         showNextAction={false}
+        rush={Boolean(linkedOrder?.rushShipping ?? request.rush)}
       />
 
       {managePanel("overview")}

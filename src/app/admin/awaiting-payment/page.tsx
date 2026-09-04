@@ -39,6 +39,7 @@ export default async function AdminAwaitingPaymentPage() {
         depositPaidAt: teamOrders.depositPaidAt,
         taxExempt: teamOrders.taxExempt,
         localPickup: teamOrders.localPickup,
+        rushShipping: teamOrders.rushShipping,
         invoiceRemindersSent: teamOrders.invoiceRemindersSent,
         updatedAt: teamOrders.updatedAt,
       })
@@ -59,8 +60,8 @@ export default async function AdminAwaitingPaymentPage() {
     if (o.archivedAt || o.invoicePaidAt || !o.invoiceUrl) continue;
     const total = o.quotedTotalCents ?? 0;
     const deposit = o.depositCents ?? Math.round(total / 2);
-    const stage: "Deposit" | "Final balance" = o.depositPaidAt ? "Final balance" : "Deposit";
-    const goodsDue = stage === "Deposit" ? deposit : total - deposit;
+    const stage: "Deposit" | "Full payment" | "Final balance" = o.depositPaidAt ? "Final balance" : o.rushShipping ? "Full payment" : "Deposit";
+    const goodsDue = stage === "Full payment" ? total : stage === "Deposit" ? deposit : total - deposit;
     if (goodsDue <= 0) continue;
     const due = o.taxExempt ? goodsDue : goodsDue + Math.round(goodsDue * 0.07);
     const payUrl = (stage === "Final balance" ? o.balanceInvoiceUrl : o.invoiceUrl) ?? null;
@@ -76,10 +77,10 @@ export default async function AdminAwaitingPaymentPage() {
       href: `/admin/team-order/${o.id}`,
       // Final balance not sent yet -> offer to send/email it right here.
       sendInvoice: stage === "Final balance" && !payUrl
-        ? { orderId: o.id, stage: "balance", ship: o.localPickup ? "pickup" : "auto" }
+        ? { orderId: o.id, stage: "balance", ship: o.localPickup ? "pickup" : "auto", rushShipping: o.rushShipping }
         : undefined,
       teamOrderId: o.id,
-      canMarkUnresponsive: stage === "Deposit" && (o.invoiceRemindersSent ?? 0) >= 2,
+      canMarkUnresponsive: (stage === "Deposit" || stage === "Full payment") && (o.invoiceRemindersSent ?? 0) >= 2,
     });
   }
 

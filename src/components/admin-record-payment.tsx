@@ -12,15 +12,19 @@ export function AdminRecordPayment({
   teamName,
   depositPaid,
   suggestedDepositCents,
+  suggestedFullCents,
+  rushShipping = false,
 }: {
   teamOrderId: string;
   teamName: string;
   depositPaid: boolean;
   suggestedDepositCents: number | null;
+  suggestedFullCents?: number | null;
+  rushShipping?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [stage, setStage] = useState(depositPaid ? "balance" : "deposit");
+  const [stage, setStage] = useState(depositPaid ? "balance" : rushShipping ? "full" : "deposit");
   const [method, setMethod] = useState("Zelle");
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
@@ -68,7 +72,7 @@ export function AdminRecordPayment({
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5 bg-steel border border-brand/50 px-2 py-1.5">
       <select value={stage} onChange={(e) => setStage(e.target.value)} className="bg-background border border-line text-xs text-foreground px-1.5 py-1">
-        {!depositPaid && <option value="deposit">50% deposit</option>}
+        {!depositPaid && !rushShipping && <option value="deposit">50% deposit</option>}
         {!depositPaid && <option value="full">Paid in full</option>}
         {depositPaid && <option value="balance">Final balance</option>}
       </select>
@@ -81,7 +85,9 @@ export function AdminRecordPayment({
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         placeholder={
-          stage === "deposit" && suggestedDepositCents
+          stage === "full" && suggestedFullCents
+            ? `$${(suggestedFullCents / 100).toFixed(2)}`
+            : stage === "deposit" && suggestedDepositCents
             ? `$${(suggestedDepositCents / 100).toFixed(2)}`
             : "$ amount"
         }

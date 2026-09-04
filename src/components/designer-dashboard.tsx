@@ -94,6 +94,7 @@ export async function DesignerDashboard({ userName }: { userName: string }) {
   ].slice(0, 10);
 
   const modules = [
+    { href: "/admin/texts", icon: "chat", title: "Conversations", sub: "Customer texts and design-request emails" },
     { href: "/admin/design-requests", icon: "pen", title: "Design Requests", sub: `${activeDesigns.length} active · briefs, proofs, and approvals` },
     { href: "/admin/team-orders", icon: "box", title: "Production Orders", sub: `${productionOrders.length} being produced or ready` },
     { href: "/admin/designer-tracking", icon: "truck", title: "Production Tracking", sub: `${missingTracking.length} waiting for factory tracking` },
@@ -107,7 +108,7 @@ export async function DesignerDashboard({ userName }: { userName: string }) {
         <div>
           <span className="text-[11px] uppercase tracking-[0.2em] text-muted">Designer portal</span>
           <h1 className="display text-4xl text-foreground mt-1">Welcome, {userName}</h1>
-          <p className="mt-2 text-sm text-muted">Design, production, tracking, and your invoices—without customer contact or payment data.</p>
+          <p className="mt-2 text-sm text-muted">Conversations, design, production, tracking, and your invoices—without customer financial or payment data.</p>
         </div>
         <AdminLogout />
       </header>

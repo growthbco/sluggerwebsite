@@ -39,7 +39,7 @@ export type InfoPageProps = {
 const DEFAULT_STEPS: Step[] = [
   { n: 1, t: "Send your idea", d: "Share your logo, colors, or concept - our in-house team designs it for free." },
   { n: 2, t: "Approve a proof", d: "We send a free proof so you see exactly how it'll look before we produce anything." },
-  { n: 3, t: "We make & ship", d: "Standard production is three weeks after approval, final roster, and deposit. Confirmed rush targets two weeks; shipping time is additional." },
+  { n: 3, t: "We make & ship", d: "Standard production is three weeks after approval, final roster, and deposit. Confirmed Rush targets two weeks and requires full payment before production; carrier transit follows production." },
 ];
 
 export function InfoPage(props: InfoPageProps) {

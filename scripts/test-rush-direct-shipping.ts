@@ -23,11 +23,11 @@ for (const testCase of cases) {
 const rushInvoice = renderTeamOrderInvoice({
   teamName: "Test Team",
   reference: "TEST-1",
-  stage: "deposit",
+  stage: "full",
   lines: [],
   totalCents: 10_000,
-  dueCents: 5_000,
-  taxDueCents: 350,
+  dueCents: 10_000,
+  taxDueCents: 700,
   shipCents: 0,
   payUrl: "https://example.com/pay",
   shippingIncludedWithRush: true,
@@ -35,5 +35,9 @@ const rushInvoice = renderTeamOrderInvoice({
 assert.match(rushInvoice.html, /included with Rush/i);
 assert.match(rushInvoice.html, /No additional shipping charge/i);
 assert.doesNotMatch(rushInvoice.html, /added to your final invoice/i);
+assert.match(rushInvoice.subject, /Rush order/i);
+assert.match(rushInvoice.html, /paid in full/i);
+assert.match(rushInvoice.html, /no remaining balance/i);
+assert.doesNotMatch(rushInvoice.html, /50% deposit/i);
 
-console.log(`Passed ${cases.length + 3} Rush/direct-shipping billing checks.`);
+console.log(`Passed ${cases.length + 7} Rush/direct-shipping billing checks.`);

@@ -62,6 +62,11 @@ export default function TermsPage() {
             fees are separate from listed merchandise prices.
           </p>
           <p className="mt-2">
+            Rush orders must be paid in full before production begins. Because Rush orders
+            move directly through an accelerated production and delivery schedule, a partial
+            deposit is not offered and no balance remains to collect before shipment.
+          </p>
+          <p className="mt-2">
             Payment confirms the products, material, artwork, roster, sizes, service level,
             requested date, and subtotal shown on the order or invoice. Contact us immediately
             if anything is incorrect; a change is not accepted until Slugger Athletics confirms

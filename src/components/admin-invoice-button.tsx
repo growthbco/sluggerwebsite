@@ -17,6 +17,7 @@ export function AdminInvoiceButton({
   resend,
   warnPrintFile,
   localPickup,
+  rushShipping,
 }: {
   teamOrderId: string;
   teamName: string;
@@ -27,6 +28,8 @@ export function AdminInvoiceButton({
   warnPrintFile?: boolean;
   /** Order marked local pickup - the balance defaults to no shipping. */
   localPickup?: boolean;
+  /** Rush orders already include delivery and must never add shipping again. */
+  rushShipping?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -34,8 +37,10 @@ export function AdminInvoiceButton({
   const [error, setError] = useState("");
   const [ship, setShip] = useState<"auto" | "pickup">(localPickup ? "pickup" : "auto");
 
-  const label = stage === "deposit" ? "50% deposit" : "final invoice";
+  const rushRequiresFullPayment = stage === "deposit" && Boolean(rushShipping);
+  const label = rushRequiresFullPayment ? "pay-in-full invoice" : stage === "deposit" ? "50% deposit" : "final invoice";
   const withTax = Math.round(dueCents * 1.07);
+  const rushDeliveryIncluded = Boolean(rushShipping) && (stage === "balance" || rushRequiresFullPayment);
 
   function reset() {
     setOpen(false);
@@ -87,15 +92,23 @@ export function AdminInvoiceButton({
               )}
 
               <div className="border border-line p-3 text-sm text-foreground">
-                <div className="flex justify-between"><span className="text-muted">{label === "50% deposit" ? "Deposit" : "Balance"}</span><span>{money(dueCents)}</span></div>
+                <div className="flex justify-between"><span className="text-muted">{rushRequiresFullPayment ? "Rush order - paid in full" : stage === "deposit" ? "Deposit" : "Balance"}</span><span>{money(dueCents)}</span></div>
                 <div className="flex justify-between"><span className="text-muted">FL sales tax (7%)</span><span>{money(withTax - dueCents)}</span></div>
-                {stage === "balance" && ship === "auto" && (
-                  <div className="flex justify-between"><span className="text-muted">Shipping</span><span className="text-muted">auto (live carrier rate)</span></div>
-                )}
-                <div className="flex justify-between mt-1 pt-1 border-t border-line display"><span>Emailed to coach</span><span>{money(withTax)}{stage === "balance" && ship === "auto" ? " + ship" : ""}</span></div>
+                {(rushRequiresFullPayment || (stage === "balance" && (rushDeliveryIncluded || ship === "auto"))) ? (
+                  <div className="flex justify-between">
+                    <span className="text-muted">Shipping</span>
+                    <span className="text-muted">{rushDeliveryIncluded ? "included with Rush" : "auto (live carrier rate)"}</span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between mt-1 pt-1 border-t border-line display"><span>Emailed to coach</span><span>{money(withTax)}{stage === "balance" && ship === "auto" && !rushDeliveryIncluded ? " + ship" : ""}</span></div>
               </div>
 
-              {stage === "balance" && (
+              {rushDeliveryIncluded ? (
+                <div className="border border-sky-500/30 bg-sky-500/10 p-3">
+                  <p className="display text-sm text-sky-300">Rush delivery included</p>
+                  <p className="mt-1 text-xs text-muted">This order is marked Rush. {rushRequiresFullPayment ? "Full payment is required before production starts, and" : "The Rush fee is already paid, and"} no additional shipping charge will be added.</p>
+                </div>
+              ) : stage === "balance" && (
                 <div className="space-y-2">
                   <span className="text-sm text-foreground">Delivery</span>
                   <button
