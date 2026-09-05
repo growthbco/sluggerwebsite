@@ -26,7 +26,7 @@ test("Halloween concepts are whitelisted and carried into the existing designer 
 test("example assets exist and the form submits the campaign context", () => {
   for (const side of ["Front", "Back"]) assert.ok(existsSync(`public/media/NeonHalloweenTransparentJersey${side}.png`));
   const form = readFileSync("src/components/design-intake-form.tsx", "utf8");
-  assert.ok(form.includes("vision: withHalloweenContext(halloweenConcept, vision)"));
+  assert.ok(form.includes("withHalloweenContext(halloweenConcept, vision)"));
   assert.ok(form.includes('fetch("/api/design-request/create"'));
   assert.ok(readFileSync("src/app/sitemap.ts", "utf8").includes('"/halloween-jerseys"'));
 });

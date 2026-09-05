@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { DesignIntakeForm } from "@/components/design-intake-form";
 import { resolveHalloweenConcept } from "@/lib/halloween-designs";
+import { resolveChristmasConcept } from "@/lib/christmas-designs";
 
 export const metadata: Metadata = {
   title: "Start a Design - Custom Jersey & Uniform Design",
@@ -13,6 +14,7 @@ export const metadata: Metadata = {
 export default async function DesignPage({ searchParams }: { searchParams: Promise<{ campaign?: string; concept?: string; sport?: string }> }) {
   const params = await searchParams;
   const concept = resolveHalloweenConcept(params.campaign, params.concept);
+  const christmasConcept = resolveChristmasConcept(params.campaign, params.concept);
   const initialSport = typeof params.sport === "string" ? params.sport.trim().slice(0, 80) : "";
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14">
@@ -53,7 +55,7 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
       </ol>
 
       <div className="mt-10">
-        <DesignIntakeForm key={`${concept ?? "general"}:${initialSport}`} initialSport={initialSport} halloweenConcept={concept} />
+        <DesignIntakeForm key={`${concept ? `halloween:${concept}` : christmasConcept ? `christmas:${christmasConcept}` : "general"}:${initialSport}`} initialSport={initialSport} halloweenConcept={concept} christmasConcept={christmasConcept} />
       </div>
     </div>
   );

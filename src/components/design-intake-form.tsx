@@ -11,18 +11,19 @@ import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-ackno
 type Uploaded = { url: string; pathname: string };
 
 import { HALLOWEEN_DESIGNS, withHalloweenContext, type HalloweenConcept } from "@/lib/halloween-designs";
+import { CHRISTMAS_DESIGNS, withChristmasContext, type ChristmasConcept } from "@/lib/christmas-designs";
 
-export function DesignIntakeForm({ initialSport = "", halloweenConcept }: { initialSport?: string; halloweenConcept?: HalloweenConcept }) {
+export function DesignIntakeForm({ initialSport = "", halloweenConcept, christmasConcept }: { initialSport?: string; halloweenConcept?: HalloweenConcept; christmasConcept?: ChristmasConcept }) {
   const [teamName, setTeamName] = useState("");
   const [sport, setSport] = useState(initialSport);
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
-  const [productTypes, setProductTypes] = useState<string[]>(halloweenConcept ? ["Jersey / Shirt"] : []);
+  const [productTypes, setProductTypes] = useState<string[]>(halloweenConcept || christmasConcept ? ["Jersey / Shirt"] : []);
   const [estimatedPieces, setEstimatedPieces] = useState("");
   const [jerseyStyle, setJerseyStyle] = useState("");
   const [otherProduct, setOtherProduct] = useState("");
-  const [vision, setVision] = useState(halloweenConcept ? HALLOWEEN_DESIGNS[halloweenConcept].brief : "");
+  const [vision, setVision] = useState(halloweenConcept ? HALLOWEEN_DESIGNS[halloweenConcept].brief : christmasConcept ? CHRISTMAS_DESIGNS[christmasConcept].brief : "");
   const [colors, setColors] = useState("");
   const [colorHexes, setColorHexes] = useState<string[]>([]);
   const [pickerColor, setPickerColor] = useState("#B8A36C");
@@ -119,7 +120,7 @@ export function DesignIntakeForm({ initialSport = "", halloweenConcept }: { init
           contactPhone,
           productTypes: sendProducts,
           jerseyStyle: wantsJersey && jerseyStyle ? jerseyStyle : undefined,
-          vision: withHalloweenContext(halloweenConcept, vision),
+          vision: withChristmasContext(christmasConcept, withHalloweenContext(halloweenConcept, vision)),
           colors,
           colorHexes,
           inspirationImages: images.map((i) => i.url),
@@ -184,6 +185,7 @@ export function DesignIntakeForm({ initialSport = "", halloweenConcept }: { init
       onSubmit={(event) => { event.preventDefault(); void submit(); }}
     >
       {halloweenConcept && <aside className="border border-brand/50 bg-brand/10 p-5"><p className="display text-xl text-brand">Halloween design · {HALLOWEEN_DESIGNS[halloweenConcept].title}</p><p className="mt-2 text-sm text-muted">Your selected starting point is attached to your design brief. Choose your sport and jersey style below, and edit the description to make it yours.</p></aside>}
+      {christmasConcept && <aside className="border border-brand/50 bg-brand/10 p-5"><p className="display text-xl text-brand">Christmas design · {CHRISTMAS_DESIGNS[christmasConcept].title}</p><p className="mt-2 text-sm text-muted">Your selected starting point is attached to your design brief. Choose your sport and jersey style below, and edit the description to make it yours. Long sleeves are quoted separately.</p></aside>}
       {/* Team + contact */}
       <fieldset className="grid gap-4 border-0 p-0 sm:grid-cols-2">
         <legend className="display mb-1 text-xl text-foreground">1. Team and contact</legend>

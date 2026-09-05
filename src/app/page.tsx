@@ -106,10 +106,14 @@ export default function Home() {
 
       {/* Auto-updating showcase of recently approved mockups - up high as
           social proof, right after the hero + trust strip */}
-      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <section className="mx-auto grid max-w-7xl gap-4 px-4 py-8 sm:px-6 md:grid-cols-2">
         <Link href="/halloween-jerseys" className="flex flex-wrap items-center justify-between gap-4 border border-brand/40 bg-[linear-gradient(110deg,#292216,#171a10)] p-6 sm:p-8">
           <div><p className="display text-xs tracking-widest text-brand">HALLOWEEN TOURNAMENT SEASON</p><h2 className="display mt-2 text-3xl text-foreground">Your team. A frighteningly good look.</h2><p className="mt-2 text-sm text-muted">Custom Halloween jerseys. Your colors, your team, your game.</p></div>
           <span className="display text-brand">Explore Halloween Jerseys →</span>
+        </Link>
+        <Link href="/christmas-jerseys" className="flex flex-wrap items-center justify-between gap-4 border border-brand/40 bg-[linear-gradient(110deg,#213b2c,#211817)] p-6 sm:p-8">
+          <div><p className="display text-xs tracking-widest text-brand">CHRISTMAS & HOLIDAY TOURNAMENTS</p><h2 className="display mt-2 text-3xl text-foreground">Merry. Bright. Ready to play.</h2><p className="mt-2 text-sm text-muted">Custom Christmas jerseys with your team&apos;s holiday spirit.</p></div>
+          <span className="display text-brand">Explore Christmas Jerseys →</span>
         </Link>
       </section>
       <RecentDesigns />

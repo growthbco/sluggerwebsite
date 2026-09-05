@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { HALLOWEEN_DESIGNS, halloweenDesignUrl } from "@/lib/halloween-designs";
 import { RUSH_PRICE_COPY } from "@/lib/customer-policy";
+import { SeasonalJerseyPricing } from "@/components/seasonal-jersey-pricing";
 
 const title = "Custom Halloween Jerseys for Teams & Tournaments";
 const description = "Bring a Halloween look to your next tournament. Explore custom jersey inspiration, add your team identity, and start a free design with Slugger Athletics.";
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title, description, images: ["/media/NeonHalloweenTransparentJerseyFront.png"] },
 };
 
-const button = "inline-flex min-h-12 items-center justify-center bg-brand px-6 py-3 display text-on-brand transition-colors hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand";
+const button = "inline-flex min-h-12 w-full items-center justify-center bg-brand px-5 py-3 text-center display text-on-brand transition-colors hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand sm:w-auto";
 
 export default function HalloweenJerseysPage() {
   return (
@@ -22,12 +23,12 @@ export default function HalloweenJerseysPage() {
         <div className="mx-auto grid max-w-7xl items-center gap-8 px-4 py-12 sm:px-6 sm:py-20 lg:grid-cols-2">
           <div className="relative z-10">
             <p className="display text-sm tracking-[0.2em] text-brand">TOURNAMENT SEASON · AFTER DARK</p>
-            <h1 className="display mt-5 text-5xl leading-[0.98] text-foreground sm:text-7xl">YOUR TEAM.<br />A <span className="text-brand">FRIGHTENINGLY</span><br />GOOD LOOK.</h1>
+            <h1 className="display mt-5 text-[clamp(2.25rem,11vw,4.5rem)] leading-[0.98] text-foreground">YOUR TEAM.<br />A <span className="text-brand">FRIGHTENINGLY</span><br />GOOD LOOK.</h1>
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-muted">Custom Halloween jerseys for tournaments, leagues, and teams that want to show up with a little more spirit.</p>
             <p className="mt-3 max-w-lg text-muted">Your team name. Your colors. Your player details. Start with an example or let us create something original.</p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href={halloweenDesignUrl("original")} className={button}>Start My Halloween Design →</Link>
-              <a href="#jersey-examples" className="inline-flex min-h-12 items-center border border-brand/50 px-6 py-3 display text-foreground hover:bg-brand/10">View Jersey Examples ↓</a>
+              <a href="#jersey-examples" className="inline-flex min-h-12 w-full items-center justify-center border border-brand/50 px-5 py-3 text-center display text-foreground hover:bg-brand/10 sm:w-auto">View Jersey Examples ↓</a>
             </div>
             <p className="mt-4 text-sm text-brand">Free design to start · No commitment</p>
           </div>
@@ -43,6 +44,8 @@ export default function HalloweenJerseysPage() {
           </div>
         </div>
       </section>
+
+      <SeasonalJerseyPricing />
 
       <section id="jersey-examples" className="mx-auto max-w-7xl scroll-mt-24 px-4 py-16 sm:px-6">
         <p className="display text-sm tracking-widest text-brand">01 / FIND YOUR LOOK</p>
