@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DesignIntakeForm } from "@/components/design-intake-form";
+import { resolveHalloweenConcept } from "@/lib/halloween-designs";
 
 export const metadata: Metadata = {
   title: "Start a Design - Custom Jersey & Uniform Design",
@@ -9,7 +10,10 @@ export const metadata: Metadata = {
   alternates: { canonical: "/design" },
 };
 
-export default function DesignPage() {
+export default async function DesignPage({ searchParams }: { searchParams: Promise<{ campaign?: string; concept?: string; sport?: string }> }) {
+  const params = await searchParams;
+  const concept = resolveHalloweenConcept(params.campaign, params.concept);
+  const initialSport = typeof params.sport === "string" ? params.sport.trim().slice(0, 80) : "";
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-14">
       <header className="max-w-2xl">
@@ -49,7 +53,7 @@ export default function DesignPage() {
       </ol>
 
       <div className="mt-10">
-        <DesignIntakeForm />
+        <DesignIntakeForm key={`${concept ?? "general"}:${initialSport}`} initialSport={initialSport} halloweenConcept={concept} />
       </div>
     </div>
   );

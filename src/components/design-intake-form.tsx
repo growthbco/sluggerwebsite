@@ -10,17 +10,19 @@ import { DeliveryTimingAcknowledgment } from "@/components/delivery-timing-ackno
 
 type Uploaded = { url: string; pathname: string };
 
-export function DesignIntakeForm() {
+import { HALLOWEEN_DESIGNS, withHalloweenContext, type HalloweenConcept } from "@/lib/halloween-designs";
+
+export function DesignIntakeForm({ initialSport = "", halloweenConcept }: { initialSport?: string; halloweenConcept?: HalloweenConcept }) {
   const [teamName, setTeamName] = useState("");
-  const [sport, setSport] = useState("");
+  const [sport, setSport] = useState(initialSport);
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
-  const [productTypes, setProductTypes] = useState<string[]>([]);
+  const [productTypes, setProductTypes] = useState<string[]>(halloweenConcept ? ["Jersey / Shirt"] : []);
   const [estimatedPieces, setEstimatedPieces] = useState("");
   const [jerseyStyle, setJerseyStyle] = useState("");
   const [otherProduct, setOtherProduct] = useState("");
-  const [vision, setVision] = useState("");
+  const [vision, setVision] = useState(halloweenConcept ? HALLOWEEN_DESIGNS[halloweenConcept].brief : "");
   const [colors, setColors] = useState("");
   const [colorHexes, setColorHexes] = useState<string[]>([]);
   const [pickerColor, setPickerColor] = useState("#B8A36C");
@@ -54,7 +56,7 @@ export function DesignIntakeForm() {
   // "Other" reveals a free-text box.
   const PRODUCT_OPTIONS = ["Jersey / Shirt", "Polo - Dri-Fit", "Polo - Pin-Dot", "Shorts", "Pants", "Hoodie", "Jacket", "Hat", "Socks", "Bag", "Other"];
   const PIECE_RANGES = ["1-5", "6-9", "10-14", "15-24", "25+"];
-  const JERSEY_STYLES = ["Full-button", "Two-button", "Quarter-zip", "Crew neck", "V-neck", "Sleeveless / Tank"];
+  const JERSEY_STYLES = ["Full-button", "Two-button", "Quarter-zip", "Crew neck", "V-neck", "Bowling Shirt (Camp Collar)", "Sleeveless / Tank"];
   const wantsJersey = productTypes.includes("Jersey / Shirt");
   const wantsOther = productTypes.includes("Other");
 
@@ -117,7 +119,7 @@ export function DesignIntakeForm() {
           contactPhone,
           productTypes: sendProducts,
           jerseyStyle: wantsJersey && jerseyStyle ? jerseyStyle : undefined,
-          vision,
+          vision: withHalloweenContext(halloweenConcept, vision),
           colors,
           colorHexes,
           inspirationImages: images.map((i) => i.url),
@@ -181,6 +183,7 @@ export function DesignIntakeForm() {
       className="space-y-8"
       onSubmit={(event) => { event.preventDefault(); void submit(); }}
     >
+      {halloweenConcept && <aside className="border border-brand/50 bg-brand/10 p-5"><p className="display text-xl text-brand">Halloween design · {HALLOWEEN_DESIGNS[halloweenConcept].title}</p><p className="mt-2 text-sm text-muted">Your selected starting point is attached to your design brief. Choose your sport and jersey style below, and edit the description to make it yours.</p></aside>}
       {/* Team + contact */}
       <fieldset className="grid gap-4 border-0 p-0 sm:grid-cols-2">
         <legend className="display mb-1 text-xl text-foreground">1. Team and contact</legend>

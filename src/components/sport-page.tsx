@@ -131,6 +131,12 @@ export function SportPageTemplate({ page, photoOffset = 0 }: { page: SportPage; 
         )}
       </header>
 
+      {["custom-softball-uniforms", "custom-baseball-uniforms"].includes(page.slug) && (
+        <Link href="/halloween-jerseys" className="mt-8 flex flex-wrap items-center justify-between gap-3 border border-brand/40 bg-brand/5 p-5 text-foreground">
+          <span><span className="display text-lg">Playing a Halloween tournament?</span><span className="mt-1 block text-sm text-muted">Give your team a custom seasonal look.</span></span>
+          <span className="display text-brand">Explore Halloween jerseys →</span>
+        </Link>
+      )}
       {/* Mockup + real uniforms: proof beats promises. */}
       <section className="mt-14">
         <h2 className="display text-3xl text-foreground">{isCheer ? "Recent Cheer Designs" : "Real Uniforms, Real Teams"}</h2>
