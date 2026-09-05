@@ -4,7 +4,7 @@ import { HALLOWEEN_DESIGNS, resolveHalloweenConcept, halloweenDesignUrl, withHal
 import { readFileSync, existsSync } from "node:fs";
 
 test("Halloween concepts are whitelisted and carried into the existing designer brief", () => {
-  for (const concept of ["neon-halloween", "original"] as const) {
+  for (const concept of ["neon-halloween", "mamba-halloween-black", "mamba-halloween-white", "original"] as const) {
     const url = new URL(halloweenDesignUrl(concept), "https://test.invalid");
     assert.equal(resolveHalloweenConcept(url.searchParams.get("campaign"), url.searchParams.get("concept")), concept);
     const brief = withHalloweenContext(concept, "Purple and orange. Event October 24.");
@@ -17,6 +17,10 @@ test("Halloween concepts are whitelisted and carried into the existing designer 
   assert.equal(resolveHalloweenConcept("other", "original"), undefined);
   assert.equal(withHalloweenContext(undefined, "Normal request"), "Normal request");
   assert.match(withHalloweenContext("neon-halloween", "New description"), /NeonHalloweenTransparentJerseyFront.png/);
+  for (const concept of ["mamba-halloween-black", "mamba-halloween-white"] as const) {
+    assert.ok(withHalloweenContext(concept, "New description").includes(`Example: ${HALLOWEEN_DESIGNS[concept].reference}`));
+    assert.ok(!withHalloweenContext(concept, "").includes("sluggerathletics.comhttps:"));
+  }
 });
 
 test("example assets exist and the form submits the campaign context", () => {

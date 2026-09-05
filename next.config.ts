@@ -45,6 +45,18 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       // Placeholder images for the design preview. Replace with real product CDN later.
       { protocol: "https", hostname: "placehold.co" },
+      {
+        protocol: "https",
+        hostname: "wnbdipjkyfozqxrj.public.blob.vercel-storage.com",
+        pathname: "/design-proofs/mamba-store-full-button-blood-qJytaaZ0JQ9VwzKHJZ9Tmd9fvVLZ4M.png",
+        search: "",
+      },
+      {
+        protocol: "https",
+        hostname: "wnbdipjkyfozqxrj.public.blob.vercel-storage.com",
+        pathname: "/design-studio/DR-0YPBP5-2026-08-11T15-10-58-265Z-9uJsQ7aq2OSF7SLxLzcXgfxy2BPeAv.png",
+        search: "",
+      },
     ],
   },
 };

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { halloweenDesignUrl } from "@/lib/halloween-designs";
+import { HALLOWEEN_DESIGNS, halloweenDesignUrl } from "@/lib/halloween-designs";
 import { RUSH_PRICE_COPY } from "@/lib/customer-policy";
 
 const title = "Custom Halloween Jerseys for Teams & Tournaments";
@@ -48,7 +48,7 @@ export default function HalloweenJerseysPage() {
         <p className="display text-sm tracking-widest text-brand">01 / FIND YOUR LOOK</p>
         <h2 className="display mt-3 text-4xl text-foreground sm:text-5xl">A starting point. Not a limit.</h2>
         <p className="mt-4 max-w-2xl text-muted">Softball, baseball, kickball, bowling, and beyond. Choose your sport in the Design Center, then tell us what makes this team yours.</p>
-        <div className="mt-8 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+        <div className="mt-8 grid gap-6 lg:grid-cols-2">
           <article className="overflow-hidden border border-brand/30 bg-steel">
             <div className="grid grid-cols-2 gap-4 bg-black/30 p-5 sm:p-8">
               {["Front", "Back"].map((side) => (
@@ -63,6 +63,22 @@ export default function HalloweenJerseysPage() {
               <Link href={halloweenDesignUrl("neon-halloween")} className={`${button} mt-5`}>Start With This Look →</Link>
             </div>
           </article>
+          {(["mamba-halloween-black", "mamba-halloween-white"] as const).map((concept) => {
+            const design = HALLOWEEN_DESIGNS[concept];
+            return (
+              <article key={concept} className="flex flex-col overflow-hidden border border-brand/30 bg-steel">
+                <a href={design.reference} target="_blank" rel="noopener noreferrer" aria-label={`Enlarge ${design.title} jersey example`} className="relative block aspect-[4/3] bg-white">
+                  <Image src={design.reference} alt={`${design.title} full-button jersey example from Mamba Baseball`} fill sizes="(max-width: 1024px) 92vw, 600px" className="object-contain p-3 transition-transform hover:scale-105" />
+                </a>
+                <div className="flex flex-1 flex-col items-start border-t border-line p-6">
+                  <p className="display text-xs tracking-widest text-brand">TEAM DESIGN EXAMPLE · FULL-BUTTON JERSEY</p>
+                  <h3 className="display mt-2 text-3xl text-foreground">{design.title}</h3>
+                  <p className="mt-3 flex-1 text-muted">A Halloween look created for Mamba Baseball. Use it as inspiration—we&apos;ll customize your own team name, logos, colors, and player details in your proof.</p>
+                  <Link href={halloweenDesignUrl(concept)} className={`${button} mt-5`}>Start With This Look →</Link>
+                </div>
+              </article>
+            );
+          })}
           <article className="flex flex-col justify-between border border-brand/30 bg-[radial-gradient(ellipse_at_top_right,#493323,transparent_70%)] p-7 sm:p-10">
             <div>
               <p className="display text-sm tracking-widest text-brand">SOMETHING ONLY YOUR TEAM WOULD WEAR</p>
