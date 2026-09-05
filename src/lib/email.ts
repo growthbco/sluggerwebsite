@@ -152,7 +152,7 @@ export async function emailDesignRequestToDesigner(req: {
   }
   const subjectPrefix = req.rush ? "🚨 DATE REVIEW " : "";
   const bodyHtml = `
-    ${req.rush ? `<p style="background:#fff3cd;padding:10px 14px;border-left:4px solid #b8a36c;margin:0 0 16px;"><strong style="color:#13160b;">🚨 Expedited date review:</strong> this date is inside the standard three-week window. Two-week rush is $100; shorter deadlines require a manual priority quote. Approve the full timeline BEFORE promising the date.</p>` : ""}
+    ${req.rush ? `<p style="background:#fff3cd;padding:10px 14px;border-left:4px solid #b8a36c;margin:0 0 16px;"><strong style="color:#13160b;">🚨 Expedited date review:</strong> this date is inside the standard three-week window. Two-week rush is $100 for 1–49 pieces or $150 for 50+ pieces; shorter deadlines require a manual priority quote. Approve the full timeline BEFORE promising the date.</p>` : ""}
     <p style="margin:0 0 10px;"><strong>Team:</strong> ${esc(req.teamName)} ${req.sport ? `(${esc(req.sport)})` : ""}</p>
     ${neededByStr ? `<p style="margin:0 0 10px;"><strong>Needed by:</strong> ${neededByStr}</p>` : ""}
     <p style="margin:0 0 10px;"><strong>Contact:</strong> ${esc(req.contactName)} · ${esc(req.contactEmail)}${req.contactPhone ? ` · ${esc(req.contactPhone)}` : ""}</p>
@@ -198,7 +198,7 @@ export async function emailDesignRequestConfirmation(args: {
       `,
       ctaText: "Track your design",
       ctaUrl: args.statusUrl,
-      footerNote: "Free design proofs · Order early for fall · Flat $100 rush service",
+      footerNote: "Free design proofs · Order early for fall · Rush: $100 for 1–49 pieces; $150 for 50+ pieces",
     }),
   });
 }
@@ -715,9 +715,9 @@ export async function emailRushConfirmed(args: {
       heading: `Your rush service is confirmed`,
       intro: `Reference: <strong>${esc(args.reference)}</strong>`,
       bodyHtml: `
-        <p style="margin:0 0 12px;">${args.approvedBy ? `${esc(args.approvedBy)} at Slugger` : "Our team"} reviewed your deadline and we can have your order in hand by <strong>${esc(date)}</strong>.</p>
-        <p style="margin:0 0 12px;">Rush orders receive priority production. Rush is a flat <strong>$100 production fee</strong> and will appear on your invoice. Shipping is additional, and a carrier delivery date is an estimate rather than a guarantee.</p>
-        <p style="margin:0;">The two-week production clock starts after your final proof is approved, your final roster is submitted, and your deposit is paid.</p>
+        <p style="margin:0 0 12px;">${args.approvedBy ? `${esc(args.approvedBy)} at Slugger` : "Our team"} approved your Rush service. Your requested in-hand date is <strong>${esc(date)}</strong>; that date is not guaranteed unless separately confirmed in writing.</p>
+        <p style="margin:0 0 12px;">Rush costs <strong>$100 for 1–49 pieces or $150 for 50+ pieces, with shipping included</strong> and will appear on your invoice. There is no additional shipping charge. Carrier transit follows production and delivery dates are estimates.</p>
+        <p style="margin:0;">The two-week production clock starts after your final proof is approved, your final roster is submitted, and your order is paid in full.</p>
       `,
       ctaText: "View your design",
       ctaUrl: args.statusUrl,

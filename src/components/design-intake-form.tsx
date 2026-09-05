@@ -405,7 +405,7 @@ export function DesignIntakeForm() {
           if (days < 0) return <p className="mt-2 text-sm text-brand">That date is in the past - please pick a future date.</p>;
           if (days >= 14) return (
             <p className="mt-2 text-sm bg-brand/10 border border-brand/40 text-foreground p-3">
-              🚨 That date is inside our standard 3-week window. A <strong>2-week rush</strong> is a flat <strong>$100</strong> fee and must be confirmed before production.
+              🚨 That date is inside our standard 3-week window. A <strong>2-week rush</strong> costs <strong>$100 for 1–49 pieces or $150 for 50+ pieces</strong> and must be confirmed before production.
             </p>
           );
           return (

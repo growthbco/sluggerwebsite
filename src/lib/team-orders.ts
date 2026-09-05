@@ -703,9 +703,10 @@ export async function submitTeamOrder(
   teamOrderId: string,
   deliveryTermsAcceptedAt: Date,
   specSnapshot: CustomerOrderSpec,
+  expectedRush?: boolean,
 ) {
   const db = getDb();
-  await db
+  const [submitted] = await db
     .update(teamOrders)
     .set({
       status: "submitted",
@@ -716,7 +717,14 @@ export async function submitTeamOrder(
       submittedAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(eq(teamOrders.id, teamOrderId));
+    .where(and(
+      eq(teamOrders.id, teamOrderId),
+      inArray(teamOrders.status, ["draft", "collecting"]),
+      isNull(teamOrders.depositPaidAt), isNull(teamOrders.invoicePaidAt),
+      isNull(teamOrders.invoiceUrl), isNull(teamOrders.fullInvoiceUrl),
+      expectedRush === undefined ? undefined : eq(teamOrders.rushShipping, expectedRush),
+    )).returning({ id: teamOrders.id });
+  if (!submitted) throw new Error("The order changed. Refresh and review before submitting.");
 }
 
 import { itemLabel as _itemLabel } from "@/lib/order-items";

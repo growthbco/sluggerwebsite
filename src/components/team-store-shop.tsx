@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { RosterImport, type ImportedRow } from "@/components/roster-import";
-import { rushFeeCentsForPieces } from "@/lib/rush-pricing";
 
 type StoreItem = {
   key: string;
@@ -157,11 +156,8 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
     setDraft(item.key, { playerName: "", playerNumber: "" });
   }
 
-  const [rush, setRush] = useState(false);
   const [note, setNote] = useState("");
-  const pieces = selections.reduce((sum, s) => sum + s.quantity, 0);
-  const rushFeeCents = rush ? rushFeeCentsForPieces(pieces) : 0;
-  const subtotal = selections.reduce((sum, s) => sum + s.priceCents * s.quantity, 0) + rushFeeCents;
+  const subtotal = selections.reduce((sum, s) => sum + s.priceCents * s.quantity, 0);
 
   async function checkout() {
     if (selections.length === 0) return;
@@ -177,7 +173,7 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
         : await fetch(`/api/store/${token}/checkout`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ items: selections, rush, pickup, shipZip: /^\d{5}$/.test(zip) ? zip : undefined, note: note.trim() || undefined }),
+            body: JSON.stringify({ items: selections, pickup, shipZip: /^\d{5}$/.test(zip) ? zip : undefined, note: note.trim() || undefined }),
           });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not start checkout");
@@ -307,25 +303,6 @@ export function TeamStoreShop({ token, items, addToRef }: { token: string; items
               </li>
             ))}
           </ul>
-        )}
-        {selections.length > 0 && (
-          <label className="mt-3 flex items-start gap-2 text-sm cursor-pointer">
-            <input
-              type="checkbox"
-              checked={rush}
-              onChange={(e) => setRush(e.target.checked)}
-              className="mt-0.5 accent-[color:var(--brand-gold)]"
-            />
-            <span className="text-foreground">
-              🚨 Request 2-week rush production <span className="text-muted">(flat $100 fee · timeline confirmed by Slugger)</span>
-            </span>
-          </label>
-        )}
-        {rush && pieces > 0 && (
-          <div className="mt-2 flex justify-between text-sm">
-            <span className="text-muted">Rush fee (flat)</span>
-            <span className="text-foreground">{money(rushFeeCents)}</span>
-          </div>
         )}
         <div className="mt-4 pt-3 border-t border-line flex justify-between text-sm">
           <span className="text-muted">Subtotal</span>

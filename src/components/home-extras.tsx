@@ -186,7 +186,7 @@ export function AboutBand() {
             roster links to full uniform programs, the process stays in one place.
           </p>
           <ul className="mt-6 space-y-2 text-foreground/90">
-            {["Material and style confirmed before payment", "Free in-house design proofs", "Order early; approved rush service is $100 flat", "Real people, real customer support"].map((b) => (
+            {["Material and style confirmed before payment", "Free in-house design proofs", "Order early; approved rush service starts at $100 ($150 for 50+ pieces)", "Real people, real customer support"].map((b) => (
               <li key={b} className="flex gap-2"><span className="text-brand">✓</span> {b}</li>
             ))}
           </ul>

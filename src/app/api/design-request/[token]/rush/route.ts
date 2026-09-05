@@ -55,7 +55,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     postDesignThreadUpdate({
       threadId: request.discordThreadId ?? undefined,
       title: `✅ TWO-WEEK RUSH approved by ${name} - ${request.teamName} (${request.reference})`,
-      description: `Two-week production service approved. Requested in-hand date: **${neededStr}**. Rush is a flat $100 fee; shipping time is additional. Client has been emailed.`,
+      description: `Two-week production service approved. Requested in-hand date: **${neededStr}**. Rush is $100 for 1–49 pieces or $150 for 50+ pieces; shipping time is additional. Client has been emailed.`,
     }),
   ]);
 

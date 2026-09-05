@@ -108,7 +108,7 @@ export async function sendTeamOrderInvoice(opts: {
     totalCents = quote.totalCents;
     quoteLines = quote.lines;
     if (quote.rushFeeCents > 0) {
-      quoteLines = [...quote.lines, { label: "Two-Week Rush Production Fee", quantity: 1, unitPriceCents: quote.rushFeeCents, totalCents: quote.rushFeeCents }];
+      quoteLines = [...quote.lines, { label: "Two-Week Rush + Shipping Included", quantity: 1, unitPriceCents: quote.rushFeeCents, totalCents: quote.rushFeeCents }];
     }
     if (quote.priorityFeeCents > 0) {
       quoteLines = [...quoteLines, { label: "One-Week Priority Production Premium", quantity: 1, unitPriceCents: quote.priorityFeeCents, totalCents: quote.priorityFeeCents }];

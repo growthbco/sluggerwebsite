@@ -511,7 +511,7 @@ export async function postDesignRequestToDiscord(req: DesignRequestPayload): Pro
     // confirm the timeline and final rush fee before design starts.
     ...(req.rush
       ? {
-          content: `@here # 🚨🚨 EXPEDITED DATE REVIEW 🚨🚨\n**Needed by ${fmtNeededBy(req.neededBy ?? null) ?? "ASAP"}. Two-week rush is $100; deadlines inside two weeks require a manual priority quote. DO NOT promise the date until the full timeline is approved.**`,
+          content: `@here # 🚨🚨 EXPEDITED DATE REVIEW 🚨🚨\n**Needed by ${fmtNeededBy(req.neededBy ?? null) ?? "ASAP"}. Two-week rush is $100 for 1–49 pieces or $150 for 50+ pieces; deadlines inside two weeks require a manual priority quote. DO NOT promise the date until the full timeline is approved.**`,
           allowed_mentions: { parse: ["everyone"] },
         }
       : {}),

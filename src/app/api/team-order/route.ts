@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { customerServiceLocked } from "@/lib/customer-production-service";
 import { waitUntil } from "@vercel/functions";
 import { postTeamOrderToDiscord } from "@/lib/discord";
 import { setThreadStageTag } from "@/lib/discord-bot";
@@ -33,10 +34,11 @@ export async function POST(req: Request) {
     designToken?: string;
     deliveryTermsAccepted?: boolean;
     specConfirmed?: boolean;
-    localPickup?: boolean;
+    rushShipping?: boolean; localPickup?: boolean;
   };
   try {
     body = await req.json();
+    if (body.rushShipping != null && typeof body.rushShipping !== "boolean") return NextResponse.json({ error: "Choose Standard or Rush." }, { status: 400 });
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
@@ -140,6 +142,7 @@ export async function POST(req: Request) {
     // material. When the customer later chooses Dry-Fit on the actual order
     // form, carry that choice onto the reused record instead of silently
     // keeping the earlier Mesh default.
+    if (reuse && customerServiceLocked(reuse)) return NextResponse.json({ error: "This order already has a quote or timeline. Continue from its existing order page." }, { status: 409 });
     if (reuse && body.designToken && design) {
       await getDb()
         .update(teamOrders)
@@ -149,6 +152,7 @@ export async function POST(req: Request) {
           jerseyMaterial: selectedMaterial ?? reuse.jerseyMaterial,
           items,
           whiteLabel: Boolean(design?.whiteLabel || reuse.whiteLabel),
+            ...(typeof body.rushShipping === "boolean" ? { rushShipping: body.rushShipping, turnaroundTier: body.rushShipping ? "rush" : "standard" } : {}),
           localPickup: body.localPickup === true,
           updatedAt: new Date(),
         })
@@ -168,7 +172,7 @@ export async function POST(req: Request) {
           designRequestId: design?.id,
           whiteLabel: Boolean(design?.whiteLabel),
           discordThreadId: design?.discordThreadId ?? undefined,
-          rushShipping: design?.rush ?? false,
+          rushShipping: body.rushShipping ?? design?.rush ?? false,
           localPickup: body.localPickup === true,
           smsOptIn: (body.smsConsent === true && Boolean(contactPhone)) || Boolean(design?.smsOptInAt),
         });

@@ -76,7 +76,7 @@ const QUICK_REPLIES = [
     key: "timeline",
     label: "Timeline",
     message: (firstName: string) =>
-      `Hi ${firstName}, standard production is 3 weeks after artwork approval and required payment. Two-week Rush is $100. Shipping time is additional. If you have a firm in-hand date, send it over before ordering so we can confirm availability.`,
+      `Hi ${firstName}, standard production is 3 weeks after artwork approval and required payment. Two-week Rush is $100 for 1–49 pieces or $150 for 50+ pieces. Shipping time is additional. If you have a firm in-hand date, send it over before ordering so we can confirm availability.`,
   },
   {
     key: "proof",

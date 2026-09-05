@@ -346,6 +346,9 @@ export function DesignStatusPanel({
         </section>
       ) : hasProof ? (
         <section className="flex flex-wrap gap-3">
+          <p className="w-full text-sm text-muted">
+            Need it faster? After artwork approval, choose <strong className="text-foreground">2-week Rush + shipping included</strong> under Production speed on this same order page. The total adds $100 for 1–49 pieces or $150 for 50+ pieces, with no additional shipping charge. Carrier transit follows production; availability must be confirmed.
+          </p>
           <button
             onClick={() => { setAck(false); setConfirming(true); }}
             disabled={selected.length === 0 || busy !== ""}

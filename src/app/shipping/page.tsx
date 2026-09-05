@@ -19,7 +19,7 @@ const SECTIONS = [
   {
     h: "Production turnaround",
     body: [
-      "Custom orders are made to order, so the production clock starts after your proof is approved, your final roster is confirmed, and your deposit is paid.",
+      "Custom orders are made to order. The production clock starts after final proof approval, final roster submission, and the required payment: a 50% deposit for Standard or full payment for Rush.",
       `${STANDARD_PRODUCTION_COPY} This is the target for the order to be ready to ship or pick up, not a guaranteed in-hand date. Specialty items and larger orders may take longer.`,
       "Fall is our busiest season. Production queues and carrier networks can slow down, so order as early as possible and leave a buffer before your first game, event, or competition.",
       `${RUSH_PRODUCTION_COPY} ${PRIORITY_PRODUCTION_COPY} ${SHIPPING_TIMING_COPY}`,
@@ -29,7 +29,7 @@ const SECTIONS = [
     h: "Shipping rates & methods",
     body: [
       SHIPPING_CARRIER_COPY,
-      "Shipping is calculated at checkout based on your order size and address. Larger team orders typically ship as a single bulk shipment to your coach or team contact.",
+      "Standard shipping is calculated by shipment weight and destination. Rush includes delivery shipping in its $100 fee for 1–49 pieces or $150 fee for 50+ pieces, with no additional shipping charge. Larger team orders typically ship as a bulk shipment to your coach or team contact.",
       "Once a package is accepted by the carrier, weather, routing, customs, and carrier-network delays are outside Slugger Athletics' control. We will help locate and track a delayed package, but extra or upgraded shipping caused by a late order or carrier delay is the customer's responsibility unless Slugger agrees otherwise in writing.",
     ],
   },

@@ -71,8 +71,8 @@ export function serviceLevelForOrder(
   if (order.turnaroundTier === "rush" || order.rushShipping) {
     const fee = rushFeeCents && rushFeeCents > 0
       ? `$${(rushFeeCents / 100).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
-      : "$100";
-    return { serviceLevel: "Rush", productionWindow: `2 weeks after all production requirements are complete; ${fee} rush fee` };
+      : "$100 for 1–49 pieces; $150 for 50+ pieces";
+    return { serviceLevel: "Rush", productionWindow: `2 weeks after final artwork approval, final roster, and full payment; ${fee} includes shipping. Carrier transit follows production; availability must be confirmed.` };
   }
   return { serviceLevel: "Standard", productionWindow: "3 weeks after approved artwork, final roster, and deposit" };
 }

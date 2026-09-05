@@ -16,7 +16,7 @@ export function DeliveryTimingAcknowledgment({ checked, onChange, id = "delivery
       <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-foreground/90">
         <li>Standard production is three weeks after final proof approval, final roster submission, and deposit payment. Shipping time is additional.</li>
         <li>
-          Have a firm deadline? Ask us before ordering. A two-week rush is a flat <strong>$100</strong> fee and must be approved before production. Shorter deadlines require a separately priced priority review.
+          Have a firm deadline? Ask us before ordering. Two-week Rush costs <strong>$100 for 1–49 pieces or $150 for 50+ pieces, with shipping included</strong>. No additional shipping charge. Rush requires full payment and confirmed availability before production. Carrier transit follows production. Shorter deadlines require a separately priced priority review.
         </li>
         <li>
           Carrier, weather, customs, and routing delays are outside Slugger&apos;s control. We&apos;ll help track the package, but extra or upgraded shipping caused by a late order or carrier delay is the customer&apos;s responsibility unless we agree otherwise in writing.

@@ -5,7 +5,6 @@ import { getStoreByHandle, shippingCentsFor, applyFundraise, fundraisePortionCen
 import { taxCents, SALES_TAX_LABEL } from "@/lib/pricing";
 import { refCodeFromCookie } from "@/lib/referral-cookie";
 import { recordOperationalFailure } from "@/lib/operational-events";
-import { rushFeeCentsForPieces } from "@/lib/rush-pricing";
 import {
   createShippingProtectionPrice,
   estimatedPostageFromChargedShipping,
@@ -91,14 +90,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   let items: IncomingItem[];
   let shipZip: string | undefined;
-  let rush = false;
   let pickup = false;
   let note = "";
   try {
     const body = await req.json();
     items = body.items;
     shipZip = typeof body.shipZip === "string" ? body.shipZip.trim() : undefined;
-    rush = body.rush === true;
+    if (body.rush === true) {
+      return NextResponse.json({ error: "Rush is available only for full team orders, not team-store purchases. Refresh the store to continue with normal shipping." }, { status: 400 });
+    }
     pickup = body.pickup === true;
     note = typeof body.note === "string" ? body.note.trim().slice(0, 480) : "";
   } catch {
@@ -128,7 +128,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   for (const item of items) {
     const def = catalog.get(item.key);
     if (!def) continue;
-    const qty = Math.max(1, Math.min(99, Number(item.quantity) || 1));
+    const qty = Math.max(1, Math.min(99, Math.floor(Number(item.quantity) || 1)));
     const size = def.sizes.includes(item.size ?? "") ? item.size : def.sizes[0];
     const details = [size];
     // Multi-design teams: the chosen colorway leads the line item so it
@@ -173,26 +173,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (lineItems.length === 0) {
     return NextResponse.json({ error: "No valid items selected" }, { status: 400 });
   }
-  // Snapshot the physical merchandise value before rush and tax line items are
-  // added; those charges are not contents of the parcel.
+  // Snapshot the physical merchandise value before tax is added; tax is not
+  // part of the parcel contents.
   const merchandiseCents = lineItems.reduce((s, li) => s + li.price_data.unit_amount * li.quantity, 0);
 
-  // Rush production: one flat $100 fee. One explicit line keeps the
-  // Stripe total identical to the site and makes the policy easy to audit.
-  if (rush) {
-    const pieces = lineItems.reduce((s, l) => s + l.quantity, 0);
-    const rushFeeCents = rushFeeCentsForPieces(pieces);
-    lineItems.push({
-      quantity: 1,
-      price_data: {
-        currency: "usd",
-        unit_amount: rushFeeCents,
-        product_data: { name: "🚨 RUSH production (flat fee; timeline confirmed separately)" },
-      },
-    });
-  }
-
-  // Flat 7% FL sales tax on the full goods total (incl. rush), as its own line.
+  // Flat 7% FL sales tax on the full goods total, as its own line.
   // Skipped for tax-exempt org stores.
   if (!store.taxExempt) {
     const goodsCents = lineItems.reduce((s, li) => s + li.price_data.unit_amount * li.quantity, 0);
@@ -244,7 +229,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
           shippingProtectionValueCents: String(merchandiseCents),
           shippingProtectionQuotedCents: String(protectionChargeCents),
         } : {}),
-        ...(rush ? { rush: "true" } : {}),
         ...(referralCode ? { referralCode } : {}),
         ...(note ? { orderNote: note } : {}),
         ...(fundraiseTotal > 0 ? { fundraiseCents: String(fundraiseTotal) } : {}),

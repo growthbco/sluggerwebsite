@@ -248,7 +248,7 @@ export function DesignManagePanel({
           <p className="mt-2 text-sm text-foreground">
             {priorityReview
               ? "This deadline is inside the two-week rush window. Quote the internal one-week priority upgrade manually and get approval before promising any date."
-              : "Two-week rush production is a flat $100 fee. Shipping time is additional. "}
+              : "Two-week rush production is $100 for 1–49 pieces or $150 for 50+ pieces. Shipping time is additional. "}
             {!priorityReview && (rushOk ? "Rush service is confirmed." : <strong>Do NOT promise the requested in-hand date until the full timeline is reviewed.</strong>)}
           </p>
           {priorityReview ? (

@@ -228,9 +228,9 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
       },
       {
         name: "Rush Production (2 Weeks)",
-        price: "$100 flat",
+        price: "$100 / $150 at 50+ pieces",
         description:
-          "A confirmed Rush targets two weeks of production for one flat $100 fee. Shipping time is additional. Deadlines inside two weeks require a separately priced Priority review.",
+          "A confirmed Rush targets two weeks of production for an order-level fee: $100 for 1–49 pieces or $150 for 50+ pieces. Shipping time is additional. Deadlines inside two weeks require a separately priced Priority review.",
         href: "/faq",
       },
       {

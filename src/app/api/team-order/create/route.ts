@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { customerServiceLocked } from "@/lib/customer-production-service";
 import { dbEnabled, getDb } from "@/db";
 import { teamOrders } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -16,9 +17,10 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { teamName?: string; contactName?: string; contactEmail?: string; contactPhone?: string; smsConsent?: boolean; sport?: string; jerseyStyle?: string; jerseyMaterial?: string; items?: string[]; designToken?: string; localPickup?: boolean };
+  let body: { teamName?: string; contactName?: string; contactEmail?: string; contactPhone?: string; smsConsent?: boolean; sport?: string; jerseyStyle?: string; jerseyMaterial?: string; items?: string[]; designToken?: string; rushShipping?: boolean; localPickup?: boolean };
   try {
     body = await req.json();
+    if (body.rushShipping != null && typeof body.rushShipping !== "boolean") return NextResponse.json({ error: "Choose Standard or Rush." }, { status: 400 });
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
@@ -79,6 +81,7 @@ export async function POST(req: Request) {
     const OPEN_UNPAID = ["draft", "collecting", "submitted", "quoted"];
     if (existing && OPEN_UNPAID.includes(existing.status) && !existing.depositPaidAt && !existing.invoicePaidAt) {
       const selectedMaterial = resolveJerseyMaterial(body.jerseyMaterial, body.jerseyStyle, sport);
+      if (customerServiceLocked(existing)) return NextResponse.json({ error: "This order already has a quote or timeline. Continue from its existing order page." }, { status: 409 });
       if (trustedDesignToken) {
         await getDb()
           .update(teamOrders)
@@ -88,6 +91,7 @@ export async function POST(req: Request) {
             jerseyMaterial: selectedMaterial ?? existing.jerseyMaterial,
             items: body.items?.length ? body.items : existing.items,
             whiteLabel: whiteLabelFromDesign || existing.whiteLabel,
+            ...(typeof body.rushShipping === "boolean" ? { rushShipping: body.rushShipping, turnaroundTier: body.rushShipping ? "rush" : "standard" } : {}),
             localPickup: body.localPickup === true,
             updatedAt: new Date(),
           })
@@ -115,7 +119,7 @@ export async function POST(req: Request) {
       designRequestId,
       whiteLabel: whiteLabelFromDesign,
       discordThreadId,
-      rushShipping: rushFromDesign,
+      rushShipping: body.rushShipping ?? rushFromDesign,
       localPickup: body.localPickup === true,
       smsOptIn: body.smsConsent === true && Boolean(contactPhone),
     });

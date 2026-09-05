@@ -6,6 +6,8 @@ import { TeamFundraiseCard } from "@/components/team-fundraise-card";
 import { itemPriceCents, computeTeamOrderQuote } from "@/lib/team-order-pricing";
 import { countRosterPieces, EXTRA_ADDON_KEYS, itemLabel, minPiecesForItems } from "@/lib/order-items";
 import { TeamOrderManage } from "@/components/team-order-manage";
+import { SavedProductionChoice } from "@/components/customer-production-choice";
+import { customerServiceLocked } from "@/lib/customer-production-service";
 import { TeamOrderAddon } from "@/components/team-order-addon";
 import { TeamOrderShipping } from "@/components/team-order-shipping";
 import { ManageTabs, type ManageTab } from "@/components/manage-tabs";
@@ -333,6 +335,15 @@ export async function TeamOrderManageSection({ order }: { order: TeamOrderRow })
           </a>
         )}
       </section>
+
+      <SavedProductionChoice
+        key={order.updatedAt.toISOString()}
+        token={order.manageToken!}
+        rush={order.rushShipping}
+        pieces={quote.pieces}
+        updatedAt={order.updatedAt.toISOString()}
+        locked={customerServiceLocked(order)}
+      />
 
       {/* This order at a glance: status, total (with shipping once known), and
           Pay / Pay balance / Track by state. */}

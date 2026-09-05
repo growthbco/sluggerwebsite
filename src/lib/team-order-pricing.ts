@@ -1,5 +1,5 @@
 // Auto-pricing for quote-first team orders: roster rows x the public price
-// list. Jersey price follows the order's jersey style; rush is a flat $100.
+// list. Jersey price follows the order's jersey style; rush uses billable piece-count tiers.
 
 import { itemKeyForSizeField, itemLabel } from "@/lib/order-items";
 import { rushFeeCentsForPieces } from "@/lib/rush-pricing";

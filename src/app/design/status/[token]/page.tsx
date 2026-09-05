@@ -40,7 +40,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
   // The order this design turned into (auto-provisioned on approval). Drives the
   // roster / deposit / tracking stages of the hub.
   const order = isApproved ? await getByDesignRequestId(request.id) : null;
-  const rushOrder = Boolean(order?.rushShipping);
+  const rushOrder = Boolean(order?.rushShipping ?? request.rush);
 
   // Lifecycle flags off the team order.
   const submitted = order ? !["draft", "collecting"].includes(order.status) : false;
@@ -113,7 +113,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
 
       <div className="text-sm px-4 py-2 border border-brand/40 bg-brand/5 text-foreground">{feeLabel}</div>
 
-      {request.rush && (
+      {rushOrder && (
         <div className={`text-sm px-4 py-3 border ${request.rushApprovedAt ? "border-brand/40 bg-brand/5" : "border-amber-500/40 bg-amber-500/5"} text-foreground`}>
           {request.rushApprovedAt ? (
             <>
@@ -121,7 +121,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
               {request.neededBy
                 ? ` - your requested in-hand date is ${request.neededBy.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" })}.`
                 : "."}{" "}
-              The flat $100 fee covers a two-week production target after final approval, roster, and deposit. Shipping time is additional.
+              The Rush fee is $100 for 1–49 pieces or $150 for 50+ pieces, including shipping. Two-week production starts after final approval, roster, and full payment; carrier transit follows production.
             </>
           ) : (
             <>
@@ -129,7 +129,7 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
               {request.neededBy
                 ? ` - needed by ${request.neededBy.toLocaleDateString("en-US", { timeZone: "America/New_York", month: "long", day: "numeric", year: "numeric" })}.`
                 : "."}{" "}
-              We&apos;re reviewing the full timeline and will let you know shortly. Two-week rush is a flat $100 fee; shorter deadlines require a custom priority quote.
+              We&apos;re reviewing the full timeline and will let you know shortly. Two-week Rush is $100 for 1–49 pieces or $150 for 50+ pieces, including shipping; shorter deadlines require a custom priority quote.
             </>
           )}
         </div>
@@ -146,11 +146,11 @@ export default async function DesignStatusPage({ params }: { params: Promise<{ t
           proofLabels={request.proofLabels ?? {}}
           initialApprovedUrl={request.approvedDesignUrl}
           approvedUrls={approvedProofs}
-          teamOrderUrl={order ? "#roster" : `/team-order?design=${token}`}
+          teamOrderUrl="#roster"
           revisionsUsed={request.revisionsUsed ?? 0}
           maxRevisions={MAX_REVISIONS}
           whiteLabel={request.whiteLabel}
-          rush={request.rush}
+          rush={rushOrder}
         />
       </section>
 

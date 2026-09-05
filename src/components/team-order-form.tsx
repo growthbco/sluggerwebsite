@@ -19,6 +19,7 @@ import { computeTeamOrderQuote, itemPriceCents } from "@/lib/team-order-pricing"
 import { buildCustomerOrderSpec } from "@/lib/order-spec";
 import { OrderSpecificationCard } from "@/components/order-specification-card";
 import { CustomerDeliveryChoice } from "@/components/customer-delivery-choice";
+import { CustomerProductionChoice } from "@/components/customer-production-choice";
 
 const JERSEY_STYLES = ["Standard Crew Neck", "V-Neck", "Bowling Shirt (Camp Collar)", "Full Button", "Two Button", "Quarter-Zip"];
 const DEFAULT_JERSEY_STYLE = "Standard Crew Neck";
@@ -57,6 +58,7 @@ type DirectOrderDraft = {
   hatQty?: Record<string, Record<string, number>>;
   poloMaterial?: PoloMaterial;
   localPickup?: boolean;
+  rushShipping?: boolean;
   smsOptIn?: boolean;
   flowStep?: FlowStep;
 };
@@ -140,6 +142,7 @@ function readDraft(value: string | null): DirectOrderDraft | null {
       hatQty: restoreHatQty(draft.hatQty),
       smsOptIn: draft.smsOptIn === true,
       localPickup: draft.localPickup === true,
+      rushShipping: typeof draft.rushShipping === "boolean" ? draft.rushShipping : undefined,
       flowStep: isFlowStep(draft.flowStep) ? draft.flowStep : "team",
     };
   } catch {
@@ -225,6 +228,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
   const [rosterAck, setRosterAck] = useState(false);
   const [deliveryAck, setDeliveryAck] = useState(false);
   const [localPickup, setLocalPickup] = useState(false);
+  const [rushShipping, setRushShipping] = useState(prefill?.rush ?? false);
   const [flowStep, setFlowStep] = useState<FlowStep>("team");
   const [draftReady, setDraftReady] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
@@ -258,6 +262,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       else if (draft.items?.includes("polo_pin_dot")) setPoloMaterial("pin-dot");
       setSmsOptIn(Boolean(draft.smsOptIn));
       setLocalPickup(Boolean(draft.localPickup));
+      if (typeof draft.rushShipping === "boolean") setRushShipping(draft.rushShipping);
       setFlowStep(draft.flowStep ?? "team");
       setDraftRestored(true);
     }
@@ -281,6 +286,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       poloMaterial,
       smsOptIn,
       localPickup,
+      rushShipping,
       flowStep,
     };
     try {
@@ -288,7 +294,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
     } catch {
       // The final submission path remains unchanged when storage is blocked.
     }
-  }, [contactEmail, contactName, contactPhone, draftReady, draftStorageKey, flowStep, hatQty, items, jerseyStyle, localPickup, material, materialTouched, poloMaterial, rows, smsOptIn, status, teamName]);
+  }, [contactEmail, contactName, contactPhone, draftReady, draftStorageKey, flowStep, hatQty, items, jerseyStyle, localPickup, rushShipping, material, materialTouched, poloMaterial, rows, smsOptIn, status, teamName]);
 
   // Returning visitor prefill (browser-local). Skipped when the identity is
   // already locked from an approved design.
@@ -399,7 +405,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
     sport: prefill?.sport,
     jerseyStyle: hasJersey ? jerseyStyle : null,
     jerseyMaterial: hasJersey ? effectiveMaterial : null,
-    rushShipping: prefill?.rush ?? false,
+    rushShipping,
     localPickup,
     requestedInHandAt: prefill?.neededBy ? new Date(`${prefill.neededBy}T12:00:00`) : null,
   };
@@ -427,7 +433,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items: resolvedItems, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn, localPickup, deliveryTermsAccepted: true, specConfirmed: true }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items: resolvedItems, roster: [...rows, ...bulkRows()], designToken: prefill?.designToken, smsConsent: smsOptIn, rushShipping, localPickup, deliveryTermsAccepted: true, specConfirmed: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
@@ -445,7 +451,7 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
       const res = await fetch("/api/team-order/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items: resolvedItems, designToken: prefill?.designToken, smsConsent: smsOptIn, localPickup }),
+        body: JSON.stringify({ teamName, contactName, contactEmail, contactPhone, sport: prefill?.sport, jerseyStyle: hasJersey && jerseyStyle ? jerseyStyle : undefined, jerseyMaterial: hasJersey ? effectiveMaterial : undefined, items: resolvedItems, designToken: prefill?.designToken, smsConsent: smsOptIn, rushShipping, localPickup }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create link");
@@ -845,10 +851,17 @@ export function TeamOrderForm({ prefill }: { prefill?: Prefill }) {
         </section>
       )}
 
+      <CustomerProductionChoice
+        rush={rushShipping}
+        pieces={submissionQuote.pieces}
+        onChange={(rush) => { setRushShipping(rush); setRosterAck(false); }}
+        disabled={status === "sending"}
+      />
+
       <CustomerDeliveryChoice
         localPickup={localPickup}
         onChange={setLocalPickup}
-        rushShipping={prefill?.rush ?? false}
+        rushShipping={rushShipping}
         name="team-order-delivery-method"
       />
 

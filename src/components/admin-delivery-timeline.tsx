@@ -62,7 +62,7 @@ export function AdminDeliveryTimeline(props: Props) {
               : `Waiting: ${timeline.missing.join(", ")}`}
         />
         <DateBox label="Standard" value={timeline.standardTargetAt} note="3-week production target" active={timeline.tier === "standard"} />
-        <DateBox label="Rush" value={timeline.rushTargetAt} note="$100 · 2-week target · confirm first" active={timeline.tier === "rush"} />
+        <DateBox label="Rush" value={timeline.rushTargetAt} note="$100 / $150 at 50+ pieces · 2-week target · confirm first" active={timeline.tier === "rush"} />
         <DateBox label="Priority · internal" value={timeline.priorityTargetAt} note="1-week target · manual premium + approval" active={timeline.tier === "priority"} />
       </div>
 

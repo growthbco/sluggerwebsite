@@ -96,7 +96,7 @@ export default function Home() {
 
       <section aria-label="Ordering highlights" className="bg-brand py-3">
         <div className="mx-auto flex max-w-7xl flex-wrap justify-center gap-x-6 gap-y-2 px-4 text-center text-on-brand display text-xs sm:text-sm">
-          {["Free design", "3-week standard production", "$100 confirmed 2-week rush", "Live order portal"].map((item) => (
+          {["Free design", "3-week standard production", "2-week rush from $100", "Live order portal"].map((item) => (
             <span key={item} className="inline-flex items-center gap-2 whitespace-nowrap">
               <span className="opacity-50" aria-hidden="true">◆</span> {item}
             </span>

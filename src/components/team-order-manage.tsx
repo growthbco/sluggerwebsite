@@ -225,7 +225,7 @@ export function TeamOrderManage({ token, teamName, jerseyStyle, jerseyMaterial, 
       const res = await fetch(`/api/team-order/${token}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ localPickup: pickupChoice, deliveryTermsAccepted: true, specConfirmed: true }),
+        body: JSON.stringify({ localPickup: pickupChoice, deliveryTermsAccepted: true, specConfirmed: true, rushShipping, reviewedTotalCents: quote?.totalCents }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not submit");

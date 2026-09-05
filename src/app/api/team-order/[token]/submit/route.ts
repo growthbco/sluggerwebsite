@@ -24,11 +24,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   let deliveryTermsAccepted = false;
   let specConfirmed = false;
+  let reviewedRush: boolean | undefined;
+  let reviewedTotal: number | undefined;
   let requestedLocalPickup: boolean | undefined;
   try {
     const body = await req.json();
     deliveryTermsAccepted = body.deliveryTermsAccepted === true;
     specConfirmed = body.specConfirmed === true;
+    reviewedRush = typeof body.rushShipping === "boolean" ? body.rushShipping : undefined;
+    reviewedTotal = Number.isInteger(body.reviewedTotalCents) ? body.reviewedTotalCents : undefined;
     requestedLocalPickup = typeof body.localPickup === "boolean" ? body.localPickup : undefined;
   } catch {
     // A missing/invalid body cannot count as an affirmative acceptance.
@@ -42,7 +46,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
 
   const order = await getByManageToken(token);
   if (!order) return NextResponse.json({ error: "Link not found" }, { status: 404 });
-  if (order.status === "submitted") {
+  if (!["draft", "collecting"].includes(order.status) || order.depositPaidAt || order.invoicePaidAt || order.invoiceUrl || order.fullInvoiceUrl) {
     return NextResponse.json({ error: "Already submitted." }, { status: 409 });
   }
 
@@ -61,6 +65,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       { error: `This order has a ${minPieces}-piece minimum. You have ${roster.length} - add ${minPieces - roster.length} more to submit.` },
       { status: 400 },
     );
+  }
+
+  if (reviewedRush !== order.rushShipping || reviewedTotal !== computeTeamOrderQuote(order, roster).totalCents) {
+    return NextResponse.json({ error: "Your price or production speed changed. Refresh and review the current total before submitting." }, { status: 409 });
   }
 
   const design = order.designRequestId ? await getById(order.designRequestId) : null;
@@ -100,7 +108,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         }
       : null;
     const spec = buildCustomerOrderSpec(orderForSubmission, roster, preview, computeTeamOrderQuote(orderForSubmission, roster));
-    await submitTeamOrder(order.id, new Date(), spec);
+    await submitTeamOrder(order.id, new Date(), spec, order.rushShipping);
     // Linked orders post into the design's existing thread (one project, one
     // thread); standalone orders get their own thread in the same forum.
     const discordThreadId = await ensureTeamOrderDiscordThread(order.id);

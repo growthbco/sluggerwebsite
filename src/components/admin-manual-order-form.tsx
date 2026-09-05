@@ -82,7 +82,7 @@ export function AdminManualOrderForm() {
           <label className="text-sm text-muted">Service level <span className="text-brand">*</span>
             <select name="serviceLevel" required value={serviceLevel} onChange={(event) => setServiceLevel(event.target.value)} className={INPUT}>
               <option value="standard">Standard · 3 weeks</option>
-              <option value="rush">Rush · 2 weeks · $100</option>
+              <option value="rush">Rush · 2 weeks · $100 / $150 at 50+ pieces</option>
               <option value="priority">Priority · 1 week · manual premium</option>
             </select>
             <ErrorText errors={state.fieldErrors?.serviceLevel} />
